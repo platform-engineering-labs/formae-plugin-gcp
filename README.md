@@ -82,6 +82,12 @@ make install    # Build + install locally for testing
 ### Local Testing
 
 ```bash
+# Copy .env.example and configure your credentials
+cp .env.example .env
+
+# Load environment variables
+export $(cat .env | xargs)
+
 # Install plugin and schemas locally
 make install
 
@@ -91,6 +97,19 @@ formae agent start
 # Apply example resources
 formae apply examples/basic/main.pkl
 ```
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GCP_PROJECT_ID` | GCP project ID | Yes |
+| `GCP_PROJECT_NUMBER` | GCP project number | Yes |
+| `GCP_REGION` | GCP region (e.g., `europe-central2`) | Yes |
+| `GCP_ZONE` | GCP zone (e.g., `europe-central2-b`) | Yes |
+| `GCP_CREDENTIALS_FILE` | Path to service account JSON key | Local only |
+
+For local development, set `GCP_CREDENTIALS_FILE` to your service account key path.
+In CI with Workload Identity Federation, leave it unset to use Application Default Credentials (ADC).
 
 ### Conformance Testing
 
@@ -140,11 +159,22 @@ The script should be idempotent and delete all resources under the /testdata fol
 The `.github/workflows/ci.yml` workflow includes a `conformance-tests` job that is
 disabled by default. To enable it:
 
-1. Configure credentials for your cloud provider in the workflow
-2. Implement the hook scripts for local verification
-3. Set `run_conformance` to `true` when triggering the workflow, or modify the `if` condition
+1. Configure Workload Identity Federation in GCP (see [docs/gcp-github-actions-setup.md](docs/gcp-github-actions-setup.md))
+2. Add the required GitHub secrets (see below)
+3. Set `run_conformance` to `true` when triggering the workflow
 
-See the workflow file for credential configuration examples for AWS, Azure, GCP, and OpenStack.
+#### Required GitHub Secrets
+
+| Secret | Description |
+|--------|-------------|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full WIF provider path |
+| `GCP_SERVICE_ACCOUNT` | Service account email |
+| `GCP_PROJECT_ID` | GCP project ID |
+| `GCP_PROJECT_NUMBER` | GCP project number |
+| `GCP_REGION` | GCP region |
+| `GCP_ZONE` | GCP zone |
+
+For detailed WIF setup instructions, see [docs/gcp-workload-identity-federation-github-actions.md](docs/gcp-workload-identity-federation-github-actions.md).
 
 ## Defining Resources (Pkl)
 

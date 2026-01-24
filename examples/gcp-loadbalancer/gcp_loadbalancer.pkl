@@ -1,0 +1,295 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ *
+ * GCP Global HTTP(S) Load Balancer Example
+ *
+ * This example demonstrates how to deploy a complete Global External Application Load Balancer
+ * (formerly known as HTTP(S) Load Balancer) using Formae.
+ *
+ * Architecture:
+ *   Internet
+ *      │
+ *      ▼
+ *   Global Forwarding Rule (Entry point with static IP)
+ *      │
+ *      ▼
+ *   Target HTTP Proxy (or Target HTTPS Proxy for SSL)
+ *      │
+ *      ▼
+ *   URL Map (Routing rules)
+ *      │
+ *      ▼
+ *   Backend Service (Load balancing to backends)
+ *      │
+ *      ▼
+ *   Health Check (Monitors backend health)
+ *      │
+ *      ▼
+ *   Instance Groups / NEGs (Your compute instances)
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+import "@gcp/gcp.pkl"
+import "@gcp/compute/globalAddress.pkl"
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/urlMap.pkl"
+import "@gcp/compute/targetHttpProxy.pkl"
+import "@gcp/compute/globalForwardingRule.pkl"
+
+
+// ============================================================================
+// Configuration
+// ============================================================================
+
+/// The GCP project ID where resources will be created
+local Project = "development-477117"
+
+/// Credentials file path for GCP authentication
+local CredentialsFile = read("env:GCP_CREDENTIALS_FILE")
+
+/// Base name for all resources (used as prefix)
+local BaseName = "formae-demo-lb"
+
+
+// ============================================================================
+// Target & Stack Configuration
+// ============================================================================
+
+local target: formae.Target = new formae.Target {
+    label = "gcp-target"
+    config = new gcp.Config {
+        project = Project
+        region = "europe-west4"  // Region is not used for global resources, but required
+        credentialsFile = CredentialsFile
+    }
+}
+
+local stack: formae.Stack = new {
+    label = "gcp-loadbalancer-stack"
+    description = "Global HTTP Load Balancer infrastructure"
+}
+
+
+// ============================================================================
+// 1. Global Static IP Address
+// ============================================================================
+// Reserve a global external IP address for the load balancer.
+// This IP will be the entry point for all traffic.
+
+local globalIP = new globalAddress.GlobalAddress {
+    label = "lb-global-ip"
+    name = "\(BaseName)-ip"
+    description = "Global static IP for HTTP load balancer"
+    addressType = "EXTERNAL"
+    ipVersion = "IPV4"
+}
+
+
+// ============================================================================
+// 2. Health Check
+// ============================================================================
+// Health checks monitor your backend instances and determine if they can
+// receive traffic. Configure based on your application's health endpoint.
+
+local httpHealthCheck = new healthCheck.HealthCheck {
+    label = "lb-health-check"
+    name = "\(BaseName)-hc"
+    description = "HTTP health check for backend instances"
+
+    // Health check type
+    type = "HTTP"
+
+    // How often to check (seconds)
+    checkIntervalSec = 10
+
+    // How long to wait for a response (seconds)
+    timeoutSec = 5
+
+    // How many consecutive successes to mark healthy
+    healthyThreshold = 2
+
+    // How many consecutive failures to mark unhealthy
+    unhealthyThreshold = 3
+
+    // HTTP-specific configuration
+    httpHealthCheck = new healthCheck.HttpHealthCheck {
+        port = 80
+        requestPath = "/health"  // Change this to your app's health endpoint
+    }
+}
+
+
+// ============================================================================
+// 3. Backend Service
+// ============================================================================
+// Backend services define how traffic is distributed to your backends.
+// You can add instance groups, NEGs, or other backends here.
+
+local backendSvc = new backendService.BackendService {
+    label = "lb-backend-service"
+    name = "\(BaseName)-backend"
+    description = "Backend service for HTTP load balancer"
+
+    // Reference the health check
+    healthChecks {
+        httpHealthCheck.res.selfLink
+    }
+
+    // Protocol between load balancer and backends
+    protocol = "HTTP"
+
+    // Named port on instance groups (configure your instance groups to use this)
+    portName = "http"
+
+    // Request timeout to backends (seconds)
+    timeoutSec = 30
+
+    // Load balancing scheme for external load balancers
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+
+    // Load balancing algorithm
+    localityLbPolicy = "ROUND_ROBIN"
+
+    // Session affinity (NONE means each request can go to any backend)
+    sessionAffinity = "NONE"
+
+    // Connection draining timeout when removing backends
+    connectionDraining = new backendService.ConnectionDraining {
+        drainingTimeoutSec = 300
+    }
+
+    // Enable Cloud CDN for caching (optional)
+    enableCDN = false
+
+    // Logging configuration
+    logConfig = new backendService.LogConfig {
+        enable = true
+        sampleRate = 1.0  // Log all requests (reduce for high traffic)
+    }
+
+    // Add your backends here. Example with instance group:
+    // backends {
+    //     new backendService.Backend {
+    //         group = "projects/my-project/zones/us-central1-a/instanceGroups/my-ig"
+    //         balancingMode = "UTILIZATION"
+    //         maxUtilization = 0.8
+    //         capacityScaler = 1.0
+    //     }
+    // }
+}
+
+
+// ============================================================================
+// 4. URL Map
+// ============================================================================
+// URL maps define how requests are routed to backend services.
+// You can create complex routing rules based on host, path, headers, etc.
+
+local urlMapResource = new urlMap.UrlMap {
+    label = "lb-url-map"
+    name = "\(BaseName)-urlmap"
+    description = "URL routing rules for HTTP load balancer"
+
+    // Default backend service for requests that don't match any rules
+    defaultService = backendSvc.res.selfLink
+
+    // Host-based routing rules (optional)
+    // Uncomment and customize for multi-domain routing:
+    //
+    // hostRules {
+    //     new urlMap.HostRule {
+    //         hosts { "api.example.com" }
+    //         pathMatcher = "api-paths"
+    //     }
+    //     new urlMap.HostRule {
+    //         hosts { "www.example.com"; "example.com" }
+    //         pathMatcher = "web-paths"
+    //     }
+    // }
+    //
+    // pathMatchers {
+    //     new urlMap.PathMatcher {
+    //         name = "api-paths"
+    //         defaultService = backendSvc.res.selfLink
+    //         pathRules {
+    //             new urlMap.PathRule {
+    //                 paths { "/v1/*" }
+    //                 service = backendSvc.res.selfLink
+    //             }
+    //         }
+    //     }
+    //     new urlMap.PathMatcher {
+    //         name = "web-paths"
+    //         defaultService = backendSvc.res.selfLink
+    //     }
+    // }
+}
+
+
+// ============================================================================
+// 5. Target HTTP Proxy
+// ============================================================================
+// The target proxy terminates HTTP connections and forwards requests
+// to the URL map for routing decisions.
+//
+// For HTTPS, use TargetHttpsProxy with SSL certificates instead.
+
+local httpProxy = new targetHttpProxy.TargetHttpProxy {
+    label = "lb-http-proxy"
+    name = "\(BaseName)-http-proxy"
+    description = "HTTP proxy for load balancer"
+
+    // Reference the URL map for routing
+    urlMap = urlMapResource.res.selfLink
+}
+
+
+// ============================================================================
+// 6. Global Forwarding Rule
+// ============================================================================
+// The forwarding rule is the entry point for traffic. It binds the external
+// IP address to the target proxy and specifies which ports to listen on.
+
+local forwardingRule = new globalForwardingRule.GlobalForwardingRule {
+    label = "lb-forwarding-rule"
+    name = "\(BaseName)-fwd-rule"
+    description = "Global forwarding rule for HTTP load balancer"
+
+    // Bind to our reserved static IP
+    IPAddress = globalIP.res.address
+
+    // Protocol and port configuration
+    IPProtocol = "TCP"
+    portRange = "80"  // Use "443" for HTTPS
+
+    // Target the HTTP proxy
+    targetProxy = httpProxy.res.selfLink
+
+    // Load balancing scheme
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+
+    // Network tier (PREMIUM for global, STANDARD for regional)
+    networkTier = "PREMIUM"
+}
+
+
+// ============================================================================
+// Export all resources
+// ============================================================================
+
+forma {
+    stack
+    target
+
+    // Load balancer components (in dependency order)
+    globalIP
+    httpHealthCheck
+    backendSvc
+    urlMapResource
+    httpProxy
+    forwardingRule
+}

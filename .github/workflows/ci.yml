@@ -83,10 +83,15 @@ jobs:
     if: ${{ github.event.inputs.run_conformance == 'true' }}
     timeout-minutes: 60
 
-    # Uncomment and configure for your cloud provider:
-    # permissions:
-    #   id-token: write  # Required for OIDC
-    #   contents: read
+    permissions:
+      id-token: write  # Required for OIDC / Workload Identity Federation
+      contents: read
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
 
     steps:
       - name: Checkout
@@ -138,7 +143,10 @@ jobs:
       #     echo "OS_PROJECT_ID=${{ secrets.OS_PROJECT_ID }}" >> $GITHUB_ENV
 
       # =================================================================
-
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       - name: Install plugin
         run: make install
 

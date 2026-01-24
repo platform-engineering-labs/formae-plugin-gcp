@@ -17,6 +17,9 @@ vendor/
 .DS_Store
 Thumbs.db
 
+# Environment (contains credentials)
+.env
+
 # Test coverage
 coverage.out
 coverage.html
@@ -27,3 +30,4 @@ dist/
 # Pkl
 .pkl-cache/
 *.pkl-expected.pcf
+PklProject.deps.json
