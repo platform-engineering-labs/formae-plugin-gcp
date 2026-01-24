@@ -1,0 +1,86 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+/// GCP Bigtable Cluster
+///
+/// A cluster within a Bigtable instance.
+module gcp.bigtable.cluster
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Bigtable::Cluster"
+
+typealias StorageType = "SSD"|"HDD"
+
+@gcp.SubResourceHint
+open class EncryptionConfig extends formae.SubResource {
+  @gcp.FieldHint
+  kmsKeyName: String
+}
+
+open class ClusterResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ClusterResolvable = (this) {
+        property = "name"
+    }
+
+    hidden location: ClusterResolvable = (this) {
+        property = "location"
+    }
+}
+
+/// GCP Bigtable Cluster resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::Bigtable::Instance"
+    // instanceName is added by the plugin from name
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "instanceName" listParameter = "instance"
+        }
+    }.toList()
+}
+open class Cluster extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    defaultStorageType: StorageType
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    instance: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    location: String
+
+    @gcp.FieldHint
+    serveNodes: Int
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    encryptionConfig: EncryptionConfig?
+
+    hidden res: ClusterResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,182 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+/// GCP BigQuery Dataset
+///
+/// A container for organizing and controlling access to BigQuery tables and views.
+module gcp.bigquery.dataset
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BigQuery::Dataset"
+
+/// Dataset access entry
+@gcp.SubResourceHint
+open class DatasetAccessEntry extends formae.SubResource {
+  /// Role for the entity (READER, WRITER, OWNER)
+  @gcp.FieldHint
+  role: String?
+
+  @gcp.FieldHint
+  userByEmail: String?
+
+  @gcp.FieldHint
+  groupByEmail: String?
+
+  @gcp.FieldHint
+  domain: String?
+
+  @gcp.FieldHint
+  specialGroup: String?
+
+  @gcp.FieldHint
+  iamMember: String?
+
+  @gcp.FieldHint
+  view: TableReference?
+
+  @gcp.FieldHint
+  routine: RoutineReference?
+}
+
+/// Table reference
+@gcp.SubResourceHint
+open class TableReference extends formae.SubResource {
+  @gcp.FieldHint
+  projectId: String
+
+  @gcp.FieldHint
+  datasetId: String
+
+  @gcp.FieldHint
+  tableId: String
+}
+
+/// Routine reference
+@gcp.SubResourceHint
+open class RoutineReference extends formae.SubResource {
+  @gcp.FieldHint
+  projectId: String
+
+  @gcp.FieldHint
+  datasetId: String
+
+  @gcp.FieldHint
+  routineId: String
+}
+
+/// Encryption configuration
+@gcp.SubResourceHint
+open class EncryptionConfiguration extends formae.SubResource {
+  /// Customer-managed encryption key
+  ///
+  /// Format: projects/{project}/locations/{location}/keyRings/{keyring}/cryptoKeys/{key}
+  @gcp.FieldHint
+  kmsKeyName: String
+}
+
+open class DatasetResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: DatasetResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: DatasetResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden datasetId: DatasetResolvable = (this) {
+        property = "datasetId"
+    }
+
+    hidden fullyQualifiedName: DatasetResolvable = (this) {
+        property = "fullyQualifiedName"
+    }
+}
+
+/// GCP BigQuery Dataset resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "datasetId"
+}
+open class Dataset extends formae.Resource {
+    hidden parent = this
+
+    /// GCP project ID
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    /// Dataset ID (must be unique within the project)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    datasetId: String
+
+    /// Friendly name for the dataset
+    @gcp.FieldHint
+    name: String?
+
+    /// Description of the dataset
+    @gcp.FieldHint
+    description: String?
+
+    /// Geographic location where the dataset should reside
+    ///
+    /// Examples: "US", "EU", "us-central1", "europe-west1"
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    location: String?
+
+    /// Default table expiration in milliseconds
+    ///
+    /// Tables created in this dataset will be automatically deleted after this duration.
+    /// Set to 0 for no expiration.
+    @gcp.FieldHint
+    defaultTableExpirationMs: Int?
+
+    /// Default partition expiration in milliseconds
+    ///
+    /// Partitions older than this will be automatically deleted.
+    /// Set to 0 for no expiration.
+    @gcp.FieldHint
+    defaultPartitionExpirationMs: Int?
+
+    /// Labels for the dataset
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Access control entries
+    @gcp.FieldHint
+    access: Listing<DatasetAccessEntry>?
+
+    /// Default encryption configuration
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    defaultEncryptionConfiguration: EncryptionConfiguration?
+
+    /// Whether to use legacy SQL by default
+    ///
+    /// If false, uses Standard SQL (recommended)
+    @gcp.FieldHint
+    defaultTableExpirationDuration: String?
+
+    /// Maximum time travel window in hours (48-168)
+    @gcp.FieldHint
+    maxTimeTravelHours: Int?
+
+    /// Storage billing model (LOGICAL or PHYSICAL)
+    @gcp.FieldHint
+    storageBillingModel: String?
+
+    hidden res: DatasetResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,22 @@
+amends "pkl:Project"
+
+// For development, use local formae schema from monorepo
+// For production/published plugin, change to:
+// dependencies {
+//   ["formae"] {
+//     uri = "package://github.com/platform-engineering-labs/formae/pkl/schema@0.77.0"
+//   }
+// }
+dependencies {
+  ["formae"] {
+
+        uri = "package://hub.platform.engineering/plugins/pkl/schema/pkl/formae/formae@0.77.14-internal"
+  }
+}
+
+package {
+  name = "gcp"
+  baseUri = "package://github.com/platform-engineering-labs/formae-plugin-gcp/schema/pkl"
+  version = "0.1.0"
+  packageZipUrl = "https://github.com/platform-engineering-labs/formae-plugin-gcp/releases/download/v\(version)/gcp@\(version).zip"
+}

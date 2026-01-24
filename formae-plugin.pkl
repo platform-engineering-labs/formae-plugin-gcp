@@ -1,0 +1,24 @@
+/*
+ * Formae Plugin Manifest for GCP
+ *
+ * This file defines metadata for the GCP Formae plugin.
+ */
+
+name = "gcp"
+
+version = "0.1.0"
+
+// Resource type namespace prefix (uppercase)
+// This appears in resource types: GCP::Service::Resource
+namespace = "GCP"
+
+description = "Google Cloud Platform resource plugin for Formae"
+
+license = "FSL-1.1-ALv2"
+
+// Minimum formae version required
+minFormaeVersion = "0.77.0"
+
+output {
+  renderer = new JsonRenderer {}
+}

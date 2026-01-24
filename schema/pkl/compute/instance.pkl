@@ -1,0 +1,250 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.instance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Instance"
+
+typealias MachineType = String
+
+typealias DiskType = "pd-standard"|"pd-ssd"|"pd-balanced"|"local-ssd"
+
+typealias DiskMode = "READ_WRITE"|"READ_ONLY"
+
+typealias OnHostMaintenance = "MIGRATE"|"TERMINATE"
+
+typealias ProvisioningModel = "STANDARD"|"SPOT"
+
+@gcp.SubResourceHint
+open class AccessConfig extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    type: String?
+
+    @gcp.FieldHint
+    natIP: String?
+
+    @gcp.FieldHint
+    networkTier: String?
+}
+
+@gcp.SubResourceHint
+open class NetworkInterface extends formae.SubResource {
+    @gcp.FieldHint
+    network: String|formae.Resolvable
+
+    @gcp.FieldHint
+    subnetwork: String|formae.Resolvable
+
+    @gcp.FieldHint
+    accessConfigs: Listing<NetworkAccessConfig>?
+
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    networkIP: String?
+}
+
+/// Access configuration for network interface
+@gcp.SubResourceHint
+class NetworkAccessConfig {
+  /// The type of configuration (ONE_TO_ONE_NAT or DIRECT_IPV6)
+  type: String?
+
+  /// Name of this access configuration
+  name: String?
+
+  /// External IP address
+  natIP: String?
+
+  /// The networking tier
+  networkTier: String?
+}
+
+/// Attached disk configuration
+@gcp.SubResourceHint
+class AttachedDisk {
+  /// Whether the disk will be auto-deleted when the instance is deleted
+  autoDelete: Boolean?
+
+  /// Whether this is a boot disk
+  boot: Boolean?
+
+  /// Disk mode (READ_WRITE or READ_ONLY)
+  mode: String?
+
+  /// Source disk URL
+  source: (String|formae.Resolvable)?
+
+  /// Disk type (SCRATCH or PERSISTENT)
+  type: String?
+
+  // Parameters for creating a new disk
+  //TODO disabled for now until we find a solution to prevent update
+  //initializeParams: AttachedDiskInitializeParams?
+}
+
+/// Parameters for initializing a new disk
+@gcp.SubResourceHint
+class AttachedDiskInitializeParams {
+  /// Size of the disk in GB
+  diskSizeGb: Int?
+
+  /// Disk type (pd-standard, pd-ssd, pd-balanced)
+  diskType: DiskType?
+
+  /// Source image to create the disk from
+  sourceImage: String?
+
+  /// Labels for the disk
+  labels: Mapping<String, String>?
+}
+
+/// Service account configuration
+@gcp.SubResourceHint
+class ServiceAccount {
+  /// Email address of the service account
+  email: String?
+
+  /// List of scopes to authorize
+  scopes: Listing<String>?
+}
+
+/// Scheduling options for the instance
+@gcp.SubResourceHint
+class Scheduling {
+  /// Whether the instance should be automatically restarted
+  automaticRestart: Boolean?
+
+  /// Host maintenance action (MIGRATE or TERMINATE)
+  onHostMaintenance: String?
+
+  /// Whether the instance is preemptible
+  preemptible: Boolean?
+
+  /// Provisioning model (STANDARD or SPOT)
+  provisioningModel: String?
+}
+
+/// Metadata key-value pairs
+@gcp.SubResourceHint
+class Metadata {
+  /// Metadata items as key-value pairs
+  items: Mapping<String, String>?
+}
+
+/// Tags for the instance
+@gcp.SubResourceHint
+class Tags {
+  /// Array of tags
+  items: Listing<String>?
+
+  /// Fingerprint for optimistic locking
+  fingerprint: String?
+}
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: InstanceResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: InstanceResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+/// GCP Compute Engine Instance resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// GCP project ID
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    /// Zone where the instance will be created
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    zone: String
+
+    /// Name of the instance
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Machine type
+    ///
+    /// Can be a full URL or just the machine type name.
+    /// If just the name, it will be expanded to zones/{zone}/machineTypes/{machineType}
+    @gcp.FieldHint
+    machineType: MachineType
+
+    /// Array of disks to attach to the instance
+    @gcp.FieldHint
+    disks: Listing<AttachedDisk>
+
+    /// Array of network interfaces
+    @gcp.FieldHint
+    networkInterfaces: Listing<NetworkInterface>
+
+    /// Description of the instance
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// Labels for the instance
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Metadata for the instance
+    @gcp.FieldHint
+    metadata: Metadata?
+
+    /// Service accounts for the instance
+    @gcp.FieldHint
+    serviceAccounts: Listing<ServiceAccount>?
+
+    /// Scheduling options
+    @gcp.FieldHint
+    scheduling: Scheduling?
+
+    // Network tags
+    //@gcp.FieldHint
+    //tags: Any?
+
+    /// Whether to enable display device
+    @gcp.FieldHint
+    enableDisplay: Boolean?
+
+    /// Whether deletion protection is enabled
+    @gcp.FieldHint
+    deletionProtection: Boolean?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,417 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.urlMap
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::UrlMap"
+
+@gcp.SubResourceHint
+open class HostRule extends formae.SubResource {
+    @gcp.FieldHint
+    hosts: Listing<String>?
+
+    @gcp.FieldHint
+    pathMatcher: String?
+
+    @gcp.FieldHint
+    description: String?
+}
+
+@gcp.SubResourceHint
+open class PathRule extends formae.SubResource {
+    @gcp.FieldHint
+    paths: Listing<String>?
+
+    @gcp.FieldHint
+    service: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    routeAction: RouteAction?
+
+    @gcp.FieldHint
+    urlRedirect: UrlRedirect?
+}
+
+@gcp.SubResourceHint
+open class PathMatcher extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    defaultService: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    defaultRouteAction: RouteAction?
+
+    @gcp.FieldHint
+    defaultUrlRedirect: UrlRedirect?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    pathRules: Listing<PathRule>?
+
+    @gcp.FieldHint
+    routeRules: Listing<RouteRule>?
+}
+
+@gcp.SubResourceHint
+open class RouteRule extends formae.SubResource {
+    @gcp.FieldHint
+    priority: Int?
+
+    @gcp.FieldHint
+    matchRules: Listing<HttpRouteRuleMatch>?
+
+    @gcp.FieldHint
+    service: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    routeAction: RouteAction?
+
+    @gcp.FieldHint
+    urlRedirect: UrlRedirect?
+
+    @gcp.FieldHint
+    headerAction: HeaderAction?
+
+    @gcp.FieldHint
+    description: String?
+}
+
+@gcp.SubResourceHint
+open class HttpRouteRuleMatch extends formae.SubResource {
+    @gcp.FieldHint
+    prefixMatch: String?
+
+    @gcp.FieldHint
+    fullPathMatch: String?
+
+    @gcp.FieldHint
+    regexMatch: String?
+
+    @gcp.FieldHint
+    ignoreCase: Boolean?
+
+    @gcp.FieldHint
+    headerMatches: Listing<HeaderMatch>?
+
+    @gcp.FieldHint
+    queryParameterMatches: Listing<QueryParameterMatch>?
+
+    @gcp.FieldHint
+    metadataFilters: Listing<MetadataFilter>?
+}
+
+@gcp.SubResourceHint
+open class HeaderMatch extends formae.SubResource {
+    @gcp.FieldHint
+    headerName: String?
+
+    @gcp.FieldHint
+    exactMatch: String?
+
+    @gcp.FieldHint
+    prefixMatch: String?
+
+    @gcp.FieldHint
+    suffixMatch: String?
+
+    @gcp.FieldHint
+    regexMatch: String?
+
+    @gcp.FieldHint
+    presentMatch: Boolean?
+
+    @gcp.FieldHint
+    invertMatch: Boolean?
+
+    @gcp.FieldHint
+    rangeMatch: Int64RangeMatch?
+}
+
+@gcp.SubResourceHint
+open class Int64RangeMatch extends formae.SubResource {
+    @gcp.FieldHint
+    rangeStart: String?
+
+    @gcp.FieldHint
+    rangeEnd: String?
+}
+
+@gcp.SubResourceHint
+open class QueryParameterMatch extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    exactMatch: String?
+
+    @gcp.FieldHint
+    regexMatch: String?
+
+    @gcp.FieldHint
+    presentMatch: Boolean?
+}
+
+@gcp.SubResourceHint
+open class MetadataFilter extends formae.SubResource {
+    @gcp.FieldHint
+    filterMatchCriteria: String?
+
+    @gcp.FieldHint
+    filterLabels: Listing<MetadataFilterLabelMatch>?
+}
+
+@gcp.SubResourceHint
+open class MetadataFilterLabelMatch extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    value: String?
+}
+
+@gcp.SubResourceHint
+open class RouteAction extends formae.SubResource {
+    @gcp.FieldHint
+    weightedBackendServices: Listing<WeightedBackendService>?
+
+    @gcp.FieldHint
+    urlRewrite: UrlRewrite?
+
+    @gcp.FieldHint
+    timeout: Duration?
+
+    @gcp.FieldHint
+    retryPolicy: HttpRetryPolicy?
+
+    @gcp.FieldHint
+    requestMirrorPolicy: RequestMirrorPolicy?
+
+    @gcp.FieldHint
+    corsPolicy: CorsPolicy?
+
+    @gcp.FieldHint
+    faultInjectionPolicy: FaultInjectionPolicy?
+}
+
+@gcp.SubResourceHint
+open class WeightedBackendService extends formae.SubResource {
+    @gcp.FieldHint
+    backendService: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    weight: Int?
+
+    @gcp.FieldHint
+    headerAction: HeaderAction?
+}
+
+@gcp.SubResourceHint
+open class UrlRewrite extends formae.SubResource {
+    @gcp.FieldHint
+    pathPrefixRewrite: String?
+
+    @gcp.FieldHint
+    hostRewrite: String?
+
+    @gcp.FieldHint
+    pathTemplateRewrite: String?
+}
+
+@gcp.SubResourceHint
+open class Duration extends formae.SubResource {
+    @gcp.FieldHint
+    seconds: String?
+
+    @gcp.FieldHint
+    nanos: Int?
+}
+
+@gcp.SubResourceHint
+open class HttpRetryPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    retryConditions: Listing<String>?
+
+    @gcp.FieldHint
+    numRetries: Int?
+
+    @gcp.FieldHint
+    perTryTimeout: Duration?
+}
+
+@gcp.SubResourceHint
+open class RequestMirrorPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    backendService: (String|formae.Resolvable)?
+}
+
+@gcp.SubResourceHint
+open class CorsPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    allowOrigins: Listing<String>?
+
+    @gcp.FieldHint
+    allowOriginRegexes: Listing<String>?
+
+    @gcp.FieldHint
+    allowMethods: Listing<String>?
+
+    @gcp.FieldHint
+    allowHeaders: Listing<String>?
+
+    @gcp.FieldHint
+    exposeHeaders: Listing<String>?
+
+    @gcp.FieldHint
+    maxAge: Int?
+
+    @gcp.FieldHint
+    allowCredentials: Boolean?
+
+    @gcp.FieldHint
+    disabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class FaultInjectionPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    delay: FaultDelay?
+
+    @gcp.FieldHint
+    abort: FaultAbort?
+}
+
+@gcp.SubResourceHint
+open class FaultDelay extends formae.SubResource {
+    @gcp.FieldHint
+    fixedDelay: Duration?
+
+    @gcp.FieldHint
+    percentage: Number?
+}
+
+@gcp.SubResourceHint
+open class FaultAbort extends formae.SubResource {
+    @gcp.FieldHint
+    httpStatus: Int?
+
+    @gcp.FieldHint
+    percentage: Number?
+}
+
+@gcp.SubResourceHint
+open class HeaderAction extends formae.SubResource {
+    @gcp.FieldHint
+    requestHeadersToAdd: Listing<HttpHeaderOption>?
+
+    @gcp.FieldHint
+    requestHeadersToRemove: Listing<String>?
+
+    @gcp.FieldHint
+    responseHeadersToAdd: Listing<HttpHeaderOption>?
+
+    @gcp.FieldHint
+    responseHeadersToRemove: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class HttpHeaderOption extends formae.SubResource {
+    @gcp.FieldHint
+    headerName: String?
+
+    @gcp.FieldHint
+    headerValue: String?
+
+    @gcp.FieldHint
+    replace: Boolean?
+}
+
+@gcp.SubResourceHint
+open class UrlRedirect extends formae.SubResource {
+    @gcp.FieldHint
+    hostRedirect: String?
+
+    @gcp.FieldHint
+    pathRedirect: String?
+
+    @gcp.FieldHint
+    prefixRedirect: String?
+
+    @gcp.FieldHint
+    redirectResponseCode: String?
+
+    @gcp.FieldHint
+    httpsRedirect: Boolean?
+
+    @gcp.FieldHint
+    stripQuery: Boolean?
+}
+
+open class UrlMapResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: UrlMapResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: UrlMapResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: UrlMapResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class UrlMap extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    defaultService: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    defaultRouteAction: RouteAction?
+
+    @gcp.FieldHint
+    defaultUrlRedirect: UrlRedirect?
+
+    @gcp.FieldHint
+    hostRules: Listing<HostRule>?
+
+    @gcp.FieldHint
+    pathMatchers: Listing<PathMatcher>?
+
+    @gcp.FieldHint
+    headerAction: HeaderAction?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    fingerprint: String?
+
+    hidden res: UrlMapResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

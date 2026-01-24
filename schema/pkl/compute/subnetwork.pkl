@@ -1,0 +1,174 @@
+/*
+ * � 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.subnetwork
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Subnetwork"
+
+typealias Role = "ACTIVE"|"BACKUP"
+
+typealias StackType = "IPV4_ONLY"|"IPV4_IPV6"|"IPV6_ONLY"
+
+typealias Ipv6AccessType = "EXTERNAL"|"INTERNAL"
+
+typealias Ipv6GceEndpoint = "VM_AND_FR"|"VM_ONLY"
+
+typealias AggregationInterval = "INTERVAL_5_SEC"|"INTERVAL_30_SEC"|"INTERVAL_1_MIN"|"INTERVAL_5_MIN"|"INTERVAL_10_MIN"|"INTERVAL_15_MIN"
+
+typealias Metadata = "EXCLUDE_ALL_METADATA"|"INCLUDE_ALL_METADATA"|"CUSTOM_METADATA"
+
+
+
+@gcp.SubResourceHint
+open class LogConfig extends formae.SubResource {
+    @gcp.FieldHint
+    aggregationInterval: AggregationInterval?
+
+    flowSampling: Number?
+
+    @gcp.FieldHint
+    metadata: Metadata?
+
+    metadataFields: Listing<String>?
+
+    filterExpr: String?
+}
+
+@gcp.SubResourceHint
+open class Params extends formae.SubResource {
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    resourceManagerTags: Mapping<String, String>?
+}
+
+@gcp.SubResourceHint
+open class SecondaryIpRange extends formae.SubResource {
+    rangeName: String
+    ipCidrRange: String
+}
+
+open class SubnetworkResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: SubnetworkResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: SubnetworkResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: SubnetworkResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "subnetworkId"
+}
+open class Subnetwork extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    subnetworkId: Int?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    gatewayAddress: String?
+
+    @gcp.FieldHint
+    ipCidrRange: String?
+
+    @gcp.FieldHint
+    reservedInternalRange: String?
+
+    @gcp.FieldHint
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String|formae.Resolvable
+
+    @gcp.FieldHint
+    purpose: String?
+
+    @gcp.FieldHint
+    role: Role?
+
+    @gcp.FieldHint
+    secondaryIpRanges: Listing<SecondaryIpRange>?
+
+    @gcp.FieldHint
+    privateIpGoogleAccess: Boolean?
+
+    @gcp.FieldHint
+    privateIpv6GoogleAccess: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    logConfig: LogConfig?
+
+    @gcp.FieldHint
+    stackType: StackType?
+
+    @gcp.FieldHint
+    ipv6AccessType: Ipv6AccessType?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    ipv6CidrRange: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    internalIpv6Prefix: String?
+
+    @gcp.FieldHint
+    externalIpv6Prefix: String?
+
+    @gcp.FieldHint
+    ipCollection: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    ipv6GceEndpoint: Ipv6GceEndpoint?
+
+    @gcp.FieldHint
+    allowSubnetCidrRoutesOverlap: Boolean?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    state: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    params: Params?
+
+    hidden res: SubnetworkResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

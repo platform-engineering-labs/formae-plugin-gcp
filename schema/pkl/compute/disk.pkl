@@ -1,0 +1,249 @@
+/*
+ * (c) 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.disk
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Disk"
+
+/// Disk type - standard HDD, SSD, balanced, or local SSD
+typealias DiskType = "pd-standard"|"pd-ssd"|"pd-balanced"|"pd-extreme"|"hyperdisk-balanced"|"hyperdisk-extreme"|"hyperdisk-throughput"
+
+/// Access mode for Hyperdisk
+typealias AccessMode = "READ_WRITE_SINGLE"|"READ_WRITE_MANY"|"READ_ONLY_SINGLE"
+
+/// Architecture of the disk
+typealias Architecture = "X86_64"|"ARM64"
+
+/// Customer-supplied encryption key configuration
+@gcp.SubResourceHint
+class EncryptionKey {
+    /// Specifies a 256-bit customer-supplied encryption key, encoded in RFC 4648 base64
+    rawKey: String?
+
+    /// RFC 4648 base64 encoded, RSA-wrapped 2048-bit customer-supplied encryption key
+    rsaEncryptedKey: String?
+
+    /// The self link of the KMS key used to encrypt the disk
+    kmsKeyName: String?
+
+    /// The service account used for the encryption request for the given KMS key
+    kmsKeyServiceAccount: String?
+
+    /// The RFC 4648 base64 encoded SHA-256 hash of the customer-supplied encryption key (output only)
+    sha256: String?
+}
+
+/// Guest OS features for bootable disks
+@gcp.SubResourceHint
+class GuestOsFeature {
+    /// The type of supported feature (e.g., VIRTIO_SCSI_MULTIQUEUE, WINDOWS, MULTI_IP_SUBNET, etc.)
+    type: String
+}
+
+/// Async primary disk for asynchronous replication
+@gcp.SubResourceHint
+class AsyncPrimaryDisk {
+    /// Primary disk for asynchronous disk replication
+    disk: String
+}
+
+/// Additional params passed with the request
+@gcp.SubResourceHint
+class DiskParams {
+    /// Resource manager tags to be bound to the disk
+    resourceManagerTags: Mapping<String, String>?
+}
+
+/// Resolvable reference to a Disk
+open class DiskResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: DiskResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: DiskResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: DiskResolvable = (this) {
+        property = "name"
+    }
+
+    hidden source: DiskResolvable = (this) {
+        property = "source"
+    }
+}
+
+/// GCP Compute Engine Persistent Disk resource
+///
+/// Persistent disks are durable storage devices that function similarly to
+/// the physical disks in a desktop or a server. Compute Engine manages the
+/// hardware behind these devices to ensure data redundancy and optimize
+/// performance for you.
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Disk extends formae.Resource {
+    hidden parent = this
+
+    /// GCP project ID
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    /// Zone where the disk will be created
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    zone: String
+
+    /// Name of the disk (1-63 characters, must match [a-z]([-a-z0-9]*[a-z0-9])?)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Description of the disk
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// Size of the persistent disk in GB
+    @gcp.FieldHint{
+        outputTransformation = formae.transform.toString
+    }
+    sizeGb: Int?
+
+    /// URL of the disk type resource (e.g., pd-standard, pd-ssd, pd-balanced)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    diskType: DiskType?
+
+    /// The image from which to initialize this disk
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceImage: String|formae.Value?
+
+    /// The source snapshot used to create this disk
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceSnapshot: String?
+
+    /// The source disk used to create this disk
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceDisk: String?
+
+    /// The source instant snapshot used to create this disk
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceInstantSnapshot: String?
+
+    /// The full Google Cloud Storage URI where the disk image is stored
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceStorageObject: String?
+
+    /// Labels for the disk
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Encrypts the disk using a customer-supplied encryption key
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    diskEncryptionKey: EncryptionKey?
+
+    /// Customer-supplied encryption key of the source image
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceImageEncryptionKey: EncryptionKey?
+
+    /// Customer-supplied encryption key of the source snapshot
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceSnapshotEncryptionKey: EncryptionKey?
+
+    /// Physical block size of the persistent disk in bytes (4096 or 16384)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    physicalBlockSizeBytes: Int?
+
+    /// Indicates how many IOPS must be provisioned for the disk (for Hyperdisk)
+    @gcp.FieldHint
+    provisionedIops: Int?
+
+    /// Indicates how much throughput must be provisioned for the disk in MB/s (for Hyperdisk)
+    @gcp.FieldHint
+    provisionedThroughput: Int?
+
+    /// A list of features to enable on the guest operating system (for bootable disks)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    guestOsFeatures: Listing<GuestOsFeature>?
+
+    /// Any applicable license URIs
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    licenses: Listing<String>?
+
+    /// Whether this disk is using confidential compute mode (Hyperdisk only)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    enableConfidentialCompute: Boolean?
+
+    /// The architecture of the disk (X86_64 or ARM64)
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    architecture: Architecture?
+
+    /// The access mode of the disk (for Hyperdisk)
+    @gcp.FieldHint
+    accessMode: AccessMode?
+
+    /// Primary disk for asynchronous disk replication
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    asyncPrimaryDisk: AsyncPrimaryDisk?
+
+    /// The URL or name of the storage pool for Hyperdisk
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    storagePool: String?
+
+    /// Additional params passed with the request
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    params: DiskParams?
+
+    hidden res: DiskResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

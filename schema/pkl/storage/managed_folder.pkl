@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.storage.managed_folder
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::ManagedFolder"
+
+open class ManagedFolderResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ManagedFolderResolvable = (this) {
+        property = "Name"
+    }
+
+    hidden bucket: ManagedFolderResolvable = (this) {
+        property = "Bucket"
+    }
+
+    hidden createTime: ManagedFolderResolvable = (this) {
+        property = "CreateTime"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Name"
+}
+open class ManagedFolder extends formae.Resource {
+    hidden parent = this
+
+    /// The name of the bucket that contains the managed folder
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    bucket: String|formae.Resolvable
+
+    /// The name of the managed folder expressed as a path (must include trailing '/')
+    /// Example: `example_dir/example_dir2/`
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Allows deletion even if the managed folder contains objects
+    /// If true and folder is non-empty, objects remain in a simulated folder with the same name
+    forceDestroy: Boolean?
+
+    /// The timestamp at which this managed folder was created (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    createTime: String?
+
+    /// The timestamp at which this managed folder was most recently updated (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    updateTime: String?
+
+    /// The version of the metadata for this managed folder (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    metageneration: String?
+
+    hidden res: ManagedFolderResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

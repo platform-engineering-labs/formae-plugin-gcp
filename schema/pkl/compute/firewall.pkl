@@ -1,0 +1,121 @@
+/*
+ * � 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.firewall
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Firewall"
+
+typealias Direction = "INGRESS"|"EGRESS"
+
+typealias Metadata = "EXCLUDE_ALL_METADATA"|"INCLUDE_ALL_METADATA"
+
+
+
+@gcp.SubResourceHint
+open class LogConfig extends formae.SubResource {
+    @gcp.FieldHint
+    metadata: Metadata?
+}
+
+@gcp.SubResourceHint
+open class Params extends formae.SubResource {
+    resourceManagerTags: Mapping<String, String>?
+}
+
+open class FirewallResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: FirewallResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: FirewallResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: FirewallResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.SubResourceHint
+open class Rule extends formae.SubResource {
+    @gcp.FieldHint{
+        outputField="IPProtocol"
+    }
+    protocol: String
+    ports: Listing<String>
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Firewall extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint
+    allowed: Listing<Rule>?
+
+    @gcp.FieldHint
+    denied: Listing<Rule>?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    destinationRanges: Listing<String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    direction: Direction?
+
+    @gcp.FieldHint
+    disabled: Boolean?
+
+    @gcp.FieldHint
+    logConfig: LogConfig?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    network: String|formae.Resolvable
+
+    @gcp.FieldHint
+    priority: Int?
+
+    @gcp.FieldHint
+    sourceRanges: Listing<String>?
+
+    @gcp.FieldHint
+    sourceServiceAccounts: Listing<String>?
+
+    @gcp.FieldHint
+    sourceTags: Listing<String>?
+
+    @gcp.FieldHint
+    targetServiceAccounts: Listing<String>?
+
+    @gcp.FieldHint
+    targetTags: Listing<String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    params: Params?
+
+    hidden res: FirewallResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

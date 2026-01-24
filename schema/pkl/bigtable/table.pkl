@@ -1,0 +1,95 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+/// GCP Bigtable Table
+///
+/// A table in a Bigtable instance.
+module gcp.bigtable.table
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Bigtable::Table"
+
+@gcp.SubResourceHint
+open class ColumnFamily extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  gcRule: GCRule?
+}
+
+@gcp.SubResourceHint
+open class GCRule extends formae.SubResource {
+  @gcp.FieldHint
+  maxNumVersions: Int?
+
+  @gcp.FieldHint
+  maxAge: String?
+}
+
+@gcp.SubResourceHint
+open class AutomatedBackupConfig extends formae.SubResource {
+  @gcp.FieldHint
+  retentionPeriod: String
+
+  @gcp.FieldHint
+  frequency: String
+}
+
+open class TableResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: TableResolvable = (this) {
+        property = "name"
+    }
+}
+
+/// GCP Bigtable Table resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::Bigtable::Instance"
+    // instanceName is added by the plugin from name
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "instanceName" listParameter = "instance"
+        }
+    }.toList()
+}
+open class Table extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    instance: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    columnFamilies: Mapping<String, ColumnFamily>?
+
+    @gcp.FieldHint
+    granularity: String?
+
+    @gcp.FieldHint
+    automatedBackupConfig: AutomatedBackupConfig?
+
+    @gcp.FieldHint
+    deletionProtection: Boolean?
+
+    hidden res: TableResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

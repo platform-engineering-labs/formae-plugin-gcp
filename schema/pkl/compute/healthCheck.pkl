@@ -1,0 +1,228 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.healthCheck
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::HealthCheck"
+
+typealias HealthCheckType = "HTTP"|"HTTPS"|"HTTP2"|"TCP"|"SSL"|"GRPC"
+
+typealias PortSpecification = "USE_FIXED_PORT"|"USE_NAMED_PORT"|"USE_SERVING_PORT"
+
+typealias ProxyHeader = "NONE"|"PROXY_V1"
+
+@gcp.SubResourceHint
+open class HttpHealthCheck extends formae.SubResource {
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    portSpecification: PortSpecification?
+
+    @gcp.FieldHint
+    host: String?
+
+    @gcp.FieldHint
+    requestPath: String?
+
+    @gcp.FieldHint
+    proxyHeader: ProxyHeader?
+
+    @gcp.FieldHint
+    response: String?
+}
+
+@gcp.SubResourceHint
+open class HttpsHealthCheck extends formae.SubResource {
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    portSpecification: PortSpecification?
+
+    @gcp.FieldHint
+    host: String?
+
+    @gcp.FieldHint
+    requestPath: String?
+
+    @gcp.FieldHint
+    proxyHeader: ProxyHeader?
+
+    @gcp.FieldHint
+    response: String?
+}
+
+@gcp.SubResourceHint
+open class Http2HealthCheck extends formae.SubResource {
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    portSpecification: PortSpecification?
+
+    @gcp.FieldHint
+    host: String?
+
+    @gcp.FieldHint
+    requestPath: String?
+
+    @gcp.FieldHint
+    proxyHeader: ProxyHeader?
+
+    @gcp.FieldHint
+    response: String?
+}
+
+@gcp.SubResourceHint
+open class TcpHealthCheck extends formae.SubResource {
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    portSpecification: PortSpecification?
+
+    @gcp.FieldHint
+    proxyHeader: ProxyHeader?
+
+    @gcp.FieldHint
+    request: String?
+
+    @gcp.FieldHint
+    response: String?
+}
+
+@gcp.SubResourceHint
+open class SslHealthCheck extends formae.SubResource {
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    portSpecification: PortSpecification?
+
+    @gcp.FieldHint
+    proxyHeader: ProxyHeader?
+
+    @gcp.FieldHint
+    request: String?
+
+    @gcp.FieldHint
+    response: String?
+}
+
+@gcp.SubResourceHint
+open class GrpcHealthCheck extends formae.SubResource {
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    portSpecification: PortSpecification?
+
+    @gcp.FieldHint
+    grpcServiceName: String?
+}
+
+@gcp.SubResourceHint
+open class LogConfig extends formae.SubResource {
+    @gcp.FieldHint
+    enable: Boolean?
+}
+
+open class HealthCheckResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: HealthCheckResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: HealthCheckResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: HealthCheckResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class HealthCheck extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    checkIntervalSec: Int?
+
+    @gcp.FieldHint
+    timeoutSec: Int?
+
+    @gcp.FieldHint
+    unhealthyThreshold: Int?
+
+    @gcp.FieldHint
+    healthyThreshold: Int?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: HealthCheckType?
+
+    @gcp.FieldHint
+    httpHealthCheck: HttpHealthCheck?
+
+    @gcp.FieldHint
+    httpsHealthCheck: HttpsHealthCheck?
+
+    @gcp.FieldHint
+    http2HealthCheck: Http2HealthCheck?
+
+    @gcp.FieldHint
+    tcpHealthCheck: TcpHealthCheck?
+
+    @gcp.FieldHint
+    sslHealthCheck: SslHealthCheck?
+
+    @gcp.FieldHint
+    grpcHealthCheck: GrpcHealthCheck?
+
+    @gcp.FieldHint
+    logConfig: LogConfig?
+
+    hidden res: HealthCheckResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

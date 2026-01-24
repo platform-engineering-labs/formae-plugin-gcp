@@ -1,0 +1,109 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.storage.default_object_access_control
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::DefaultObjectAccessControl"
+
+typealias Role = "OWNER"|"READER"
+typealias Team = "editors"|"owners"|"viewers"
+
+@gcp.SubResourceHint
+open class ProjectTeam extends formae.SubResource {
+    /// The project number
+    projectNumber: (String|formae.Resolvable)?
+
+    /// The team
+    team: Team?
+}
+
+open class DefaultObjectAccessControlResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden entity: DefaultObjectAccessControlResolvable = (this) {
+        property = "Entity"
+    }
+
+    hidden role: DefaultObjectAccessControlResolvable = (this) {
+        property = "Role"
+    }
+
+    hidden entityId: DefaultObjectAccessControlResolvable = (this) {
+        property = "EntityId"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Entity"
+}
+open class DefaultObjectAccessControl extends formae.Resource {
+    hidden parent = this
+
+    /// The name of the bucket
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    bucket: String|formae.Resolvable
+
+    /// The entity holding the permission, in one of the following forms:
+    /// - user-{{userId}}
+    /// - user-{{email}} (such as "user-liz@example.com")
+    /// - group-{{groupId}}
+    /// - group-{{email}} (such as "group-example@googlegroups.com")
+    /// - domain-{{domain}} (such as "domain-example.com")
+    /// - project-team-{{projectId}}
+    /// - allUsers
+    /// - allAuthenticatedUsers
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    entity: String
+
+    /// The access permission for the entity
+    role: Role
+
+    /// The name of the object, if applied to an object
+    object: String?
+
+    /// The domain associated with the entity (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    domain: String?
+
+    /// The email address associated with the entity (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    email: String?
+
+    /// The ID for the entity (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    entityId: String?
+
+    /// The content generation of the object, if applied to an object (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    generation: Int?
+
+    /// The project team associated with the entity (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    projectTeam: ProjectTeam?
+
+    hidden res: DefaultObjectAccessControlResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

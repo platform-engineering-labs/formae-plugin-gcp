@@ -1,0 +1,95 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.storage.anywhere_cache
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::AnywhereCache"
+
+typealias AdmissionPolicy = "admit-on-first-miss"|"admit-on-second-miss"
+
+open class AnywhereCacheResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden anywhereCacheId: AnywhereCacheResolvable = (this) {
+        property = "AnywhereCacheId"
+    }
+
+    hidden bucket: AnywhereCacheResolvable = (this) {
+        property = "Bucket"
+    }
+
+    hidden state: AnywhereCacheResolvable = (this) {
+        property = "State"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "AnywhereCacheId"
+}
+open class AnywhereCache extends formae.Resource {
+    hidden parent = this
+
+    /// The name of the bucket that contains the anywhere cache
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    bucket: String
+
+    /// The zone in which the cache instance needs to be created
+    /// Example: `us-central1-a`
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    zone: String
+
+    /// The cache admission policy (whether to cache on first or second miss)
+    /// Default: admit-on-first-miss
+    admissionPolicy: AdmissionPolicy?
+
+    /// The TTL of all cache entries in whole seconds
+    /// Example: "7200s"
+    /// Default: "86400s" (24 hours)
+    ttl: String?
+
+    /// The ID of the Anywhere cache instance (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    anywhereCacheId: String?
+
+    /// The creation time of the cache instance in RFC 3339 format (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    createTime: String?
+
+    /// The modification time of the cache instance metadata in RFC 3339 format (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    updateTime: String?
+
+    /// True if the cache instance has an active Update long-running operation (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    pendingUpdate: Boolean?
+
+    /// The current state of the cache instance (output only)
+    @gcp.FieldHint {
+        persist = false
+    }
+    state: String?
+
+    hidden res: AnywhereCacheResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

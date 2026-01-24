@@ -1,0 +1,987 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.container.cluster
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Container::Cluster"
+
+// Release Channel types
+typealias ReleaseChannelChannel = "UNSPECIFIED"|"RAPID"|"REGULAR"|"STABLE"
+
+// Network types
+typealias DatapathProvider = "DATAPATH_PROVIDER_UNSPECIFIED"|"LEGACY_DATAPATH"|"ADVANCED_DATAPATH"
+
+typealias PrivateIpv6GoogleAccess = "PRIVATE_IPV6_GOOGLE_ACCESS_UNSPECIFIED"|"INHERIT_FROM_SUBNETWORK"|"OUTBOUND"|"BIDIRECTIONAL"
+
+typealias ClusterDns = "PROVIDER_UNSPECIFIED"|"PLATFORM_DEFAULT"|"CLOUD_DNS"|"KUBE_DNS"
+
+typealias ClusterDnsScope = "DNS_SCOPE_UNSPECIFIED"|"CLUSTER_SCOPE"|"VPC_SCOPE"
+
+typealias GatewayApiChannel = "CHANNEL_DISABLED"|"CHANNEL_EXPERIMENTAL"|"CHANNEL_STANDARD"
+
+typealias InTransitEncryptionConfig = "IN_TRANSIT_ENCRYPTION_CONFIG_UNSPECIFIED"|"IN_TRANSIT_ENCRYPTION_DISABLED"|"IN_TRANSIT_ENCRYPTION_INTER_NODE_TRANSPARENT"
+
+typealias NetworkTier = "PREMIUM"|"STANDARD" | "NETWORK_TIER_DEFAULT"
+
+// IP Allocation Policy
+typealias StackType = "STACK_TYPE_UNSPECIFIED"|"IPV4"|"IPV4_IPV6"
+
+// Autoscaling
+typealias AutoscalingProfile = "PROFILE_UNSPECIFIED"|"OPTIMIZE_UTILIZATION"|"BALANCED"
+
+// Database Encryption
+typealias DatabaseEncryptionState = "UNKNOWN"|"ENCRYPTED"|"DECRYPTED"
+
+// Workload Identity
+typealias WorkloadMetadataMode = "MODE_UNSPECIFIED"|"GCE_METADATA"|"GKE_METADATA"
+
+// Enterprise Config
+typealias ClusterTier = "CLUSTER_TIER_UNSPECIFIED"|"STANDARD"|"ENTERPRISE"
+
+// Security Posture
+typealias SecurityPostureMode = "MODE_UNSPECIFIED"|"DISABLED"|"BASIC"|"ENTERPRISE"
+
+typealias VulnerabilityMode = "VULNERABILITY_MODE_UNSPECIFIED"|"VULNERABILITY_DISABLED"|"VULNERABILITY_BASIC"|"VULNERABILITY_ENTERPRISE"
+
+// Node Config
+typealias DiskType = "DISK_TYPE_UNSPECIFIED"|"PD_STANDARD"|"PD_SSD"|"PD_BALANCED"|"pd-standard"|"pd-ssd"|"pd-balanced"
+
+typealias ImageType = "IMAGE_TYPE_UNSPECIFIED"|"COS"|"COS_CONTAINERD"|"UBUNTU_CONTAINERD"|"WINDOWS_SAC"|"WINDOWS_LTSC"
+
+// Maintenance Policy
+typealias MaintenanceInterval = "MAINTENANCE_INTERVAL_UNSPECIFIED"|"AS_NEEDED"|"PERIODIC"
+
+// Binary Authorization
+typealias BinaryAuthorizationEvaluationMode = "EVALUATION_MODE_UNSPECIFIED"|"DISABLED"|"PROJECT_SINGLETON_POLICY_ENFORCE"
+
+@gcp.SubResourceHint
+open class ReleaseChannel extends formae.SubResource {
+    @gcp.FieldHint
+    channel: ReleaseChannelChannel
+}
+
+@gcp.SubResourceHint
+open class WorkloadPolicyConfig extends formae.SubResource {
+    allowNetAdmin: Boolean?
+}
+
+@gcp.SubResourceHint
+open class Autopilot extends formae.SubResource {
+    enabled: Boolean?
+    workloadPolicyConfig: WorkloadPolicyConfig?
+}
+
+@gcp.SubResourceHint
+open class GpuSharingConfig extends formae.SubResource {
+    maxSharedClientsPerGpu: Int?
+    gpuSharingStrategy: String?
+}
+
+@gcp.SubResourceHint
+open class GpuDriverInstallationConfig extends formae.SubResource {
+    gpuDriverVersion: String?
+}
+
+@gcp.SubResourceHint
+open class Accelerator extends formae.SubResource {
+    acceleratorCount: Int
+    acceleratorType: String
+    gpuPartitionSize: String?
+    gpuSharingConfig: GpuSharingConfig?
+    gpuDriverInstallationConfig: GpuDriverInstallationConfig?
+}
+
+@gcp.SubResourceHint
+open class Taint extends formae.SubResource {
+    key: String
+    value: String
+    effect: String
+}
+
+@gcp.SubResourceHint
+open class ShieldedInstanceConfig extends formae.SubResource {
+    enableSecureBoot: Boolean?
+    enableIntegrityMonitoring: Boolean?
+}
+
+@gcp.SubResourceHint
+open class Hugepages extends formae.SubResource {
+    hugepageSize1g: Int?
+    hugepageSize2m: Int?
+}
+
+@gcp.SubResourceHint
+open class LinuxNodeConfig extends formae.SubResource {
+    sysctls: Mapping<String, String>?
+    cgroupMode: String?
+    transparentHugepageEnabled: String?
+    transparentHugepageDefrag: String?
+    hugepages: Hugepages?
+}
+
+
+@gcp.SubResourceHint
+open class KubeletConfig extends formae.SubResource {
+    cpuManagerPolicy: String?
+    cpuCfsQuota: Boolean?
+    cpuCfsQuotaPeriod: String?
+    podPidsLimit: Int?
+    insecureKubeletReadonlyPortEnabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class ConfidentialNodes extends formae.SubResource {
+    enabled: Boolean
+    confidentialInstanceType: String?
+}
+
+@gcp.SubResourceHint
+open class WorkloadMetadataConfig extends formae.SubResource {
+    @gcp.FieldHint
+    mode: WorkloadMetadataMode
+}
+
+@gcp.SubResourceHint
+open class NodeConfig extends formae.SubResource {
+    machineType: String?
+
+    diskSizeGb: Int?
+
+    @gcp.FieldHint
+    diskType: DiskType?
+
+    oauthScopes: Listing<String>?
+
+    serviceAccount: String?
+
+    metadata: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    imageType: ImageType?
+
+    labels: Mapping<String, String>?
+
+    localSsdCount: Int?
+
+    tags: Listing<String>?
+
+    preemptible: Boolean?
+
+
+    accelerators: Listing<Accelerator>?
+
+    minCpuPlatform: String?
+
+    taints: Listing<Taint>?
+
+    bootDiskKmsKey: String?
+
+    shieldedInstanceConfig: ShieldedInstanceConfig?
+
+    linuxNodeConfig: LinuxNodeConfig?
+
+    kubeletConfig: KubeletConfig?
+
+    spot: Boolean?
+
+    confidentialNodes: ConfidentialNodes?
+
+    workloadMetadataConfig: WorkloadMetadataConfig?
+
+    resourceLabels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    resourceManagerTags: Mapping<String, String>?
+}
+
+@gcp.SubResourceHint
+open class ClientCertificateConfig extends formae.SubResource {
+    issueClientCertificate: Boolean?
+}
+
+@gcp.SubResourceHint
+open class MasterAuth extends formae.SubResource {
+    username: String?
+    password: String?
+    clientCertificateConfig: ClientCertificateConfig?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    clusterCaCertificate: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    clientCertificate: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    clientKey: String?
+}
+
+@gcp.SubResourceHint
+open class HttpLoadBalancing extends formae.SubResource {
+    disabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class HorizontalPodAutoscaling extends formae.SubResource {
+    disabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class NetworkPolicyConfig extends formae.SubResource {
+        disabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class CloudRunConfig extends formae.SubResource {
+        disabled: Boolean?
+        loadBalancerType: String?
+    }
+
+@gcp.SubResourceHint
+open class DnsCacheConfig extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class GcePersistentDiskCsiDriverConfig extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class GcpFilestoreCsiDriverConfig extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class GcsFuseCsiDriverConfig extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class GkeBackupAgentConfig extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class AddonsConfig extends formae.SubResource {
+
+    httpLoadBalancing: HttpLoadBalancing?
+    horizontalPodAutoscaling: HorizontalPodAutoscaling?
+
+    networkPolicyConfig: NetworkPolicyConfig?
+
+    cloudRunConfig: CloudRunConfig?
+
+    dnsCacheConfig: DnsCacheConfig?
+
+    gcePersistentDiskCsiDriverConfig: GcePersistentDiskCsiDriverConfig?
+
+    gcpFilestoreCsiDriverConfig: GcpFilestoreCsiDriverConfig?
+
+    gcsFuseCsiDriverConfig: GcsFuseCsiDriverConfig?
+
+    gkeBackupAgentConfig: GkeBackupAgentConfig?
+}
+
+@gcp.SubResourceHint
+open class DefaultSnatStatus extends formae.SubResource {
+    disabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class DnsConfig extends formae.SubResource {
+    @gcp.FieldHint
+    clusterDns: ClusterDns?
+
+    @gcp.FieldHint
+    clusterDnsScope: ClusterDnsScope?
+
+    clusterDnsDomain: String?
+
+    additiveVpcScopeDnsDomain: String?
+}
+
+@gcp.SubResourceHint
+open class ServiceExternalIpsConfig extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class GatewayApiConfig extends formae.SubResource {
+    @gcp.FieldHint
+    channel: GatewayApiChannel
+}
+
+@gcp.SubResourceHint
+open class NetworkPerformanceConfig extends formae.SubResource {
+    totalEgressBandwidthTier: String?
+}
+
+@gcp.SubResourceHint
+open class NetworkConfig extends formae.SubResource {
+    network: String?
+
+    subnetwork: String?
+
+    enableIntraNodeVisibility: Boolean?
+
+    @gcp.FieldHint
+    datapathProvider: DatapathProvider?
+
+    defaultSnatStatus: DefaultSnatStatus?
+
+    @gcp.FieldHint
+    privateIpv6GoogleAccess: PrivateIpv6GoogleAccess?
+
+    dnsConfig: DnsConfig?
+
+    serviceExternalIpsConfig: ServiceExternalIpsConfig?
+
+    gatewayApiConfig: GatewayApiConfig?
+
+    enableCiliumClusterwideNetworkPolicy: Boolean?
+
+    enableFqdnNetworkPolicy: Boolean?
+
+    enableL4ilbSubsetting: Boolean?
+
+    disableL4LbFirewallReconciliation: Boolean?
+
+    enableMultiNetworking: Boolean?
+
+    @gcp.FieldHint
+    inTransitEncryptionConfig: InTransitEncryptionConfig?
+
+    networkPerformanceConfig: NetworkPerformanceConfig?
+}
+
+
+@gcp.SubResourceHint
+class NetworkTierConfig extends formae.SubResource {
+    @gcp.FieldHint
+    networkTier: NetworkTier?
+}
+
+@gcp.SubResourceHint
+class PodCidrOverprovisionConfig extends formae.SubResource {
+    disable: Boolean?
+}
+
+    @gcp.SubResourceHint
+class AdditionalPodRangesConfig extends formae.SubResource {
+    podRangeNames: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class IPAllocationPolicy extends formae.SubResource {
+    useIpAliases: Boolean?
+
+    clusterSecondaryRangeName: String?
+
+    servicesSecondaryRangeName: String?
+
+    clusterIpv4CidrBlock: String?
+
+    servicesIpv4CidrBlock: String?
+
+    @gcp.FieldHint
+    stackType: StackType?
+
+    networkTierConfig: NetworkTierConfig?
+
+    podCidrOverprovisionConfig: PodCidrOverprovisionConfig?
+
+    additionalPodRangesConfig: AdditionalPodRangesConfig?
+}
+
+@gcp.SubResourceHint
+open class CidrBlock extends formae.SubResource {
+    cidrBlock: String
+    displayName: String?
+}
+
+
+@gcp.SubResourceHint
+open class MasterAuthorizedNetworksConfig extends formae.SubResource {
+    enabled: Boolean?
+
+
+    cidrBlocks: Listing<CidrBlock>?
+
+    gcpPublicCidrsAccessEnabled: Boolean?
+
+    privateEndpointEnforcementEnabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class TimeWindow extends formae.SubResource {
+    startTime: String
+    endTime: String
+}
+
+@gcp.SubResourceHint
+open class RecurringWindow extends formae.SubResource {
+
+
+    window: TimeWindow
+
+    recurrence: String
+}
+
+@gcp.SubResourceHint
+open class ExclusionOptions extends formae.SubResource {
+    scope: String?
+}
+
+@gcp.SubResourceHint
+open class MaintenanceExclusion extends formae.SubResource {
+    exclusionName: String
+    startTime: String
+    endTime: String
+
+    exclusionOptions: ExclusionOptions?
+}
+
+@gcp.SubResourceHint
+open class DailyMaintenanceWindow extends formae.SubResource {
+    startTime: String
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    duration: String?
+}
+
+@gcp.SubResourceHint
+open class MaintenanceWindow extends formae.SubResource {
+
+    dailyMaintenanceWindow: DailyMaintenanceWindow?
+
+    recurringWindow: RecurringWindow?
+
+    maintenanceExclusions: Mapping<String, MaintenanceExclusion>?
+}
+
+@gcp.SubResourceHint
+open class MaintenancePolicy extends formae.SubResource {
+
+
+    window: MaintenanceWindow?
+}
+
+@gcp.SubResourceHint
+open class BinaryAuthorization extends formae.SubResource {
+    enabled: Boolean?
+
+    @gcp.FieldHint
+    evaluationMode: BinaryAuthorizationEvaluationMode?
+}
+
+
+@gcp.SubResourceHint
+open class ResourceLimit extends formae.SubResource {
+    resourceType: String
+    minimum: Int?
+    maximum: Int?
+}
+
+@gcp.SubResourceHint
+open class AutoprovisioningNodePoolDefaults extends formae.SubResource {
+    oauthScopes: Listing<String>?
+    serviceAccount: String?
+    diskSizeGb: Int?
+    diskType: String?
+    minCpuPlatform: String?
+    bootDiskKmsKey: String?
+    imageType: String?
+    shieldedInstanceConfig: ShieldedInstanceConfig?
+    management: Management?
+}
+
+@gcp.SubResourceHint
+open class ClusterAutoscaling extends formae.SubResource {
+    enableNodeAutoprovisioning: Boolean?
+
+    resourceLimits: Listing<ResourceLimit>?
+
+    @gcp.FieldHint
+    autoscalingProfile: AutoscalingProfile?
+
+    autoprovisioningLocations: Listing<String>?
+
+    autoprovisioningNodePoolDefaults: AutoprovisioningNodePoolDefaults?
+}
+
+@gcp.SubResourceHint
+open class NetworkPolicy extends formae.SubResource {
+    enabled: Boolean?
+    provider: String?
+}
+
+
+@gcp.SubResourceHint
+open class MasterGlobalAccessConfig extends formae.SubResource {
+    enabled: Boolean
+}
+
+@gcp.SubResourceHint
+open class PrivateClusterConfig extends formae.SubResource {
+    enablePrivateNodes: Boolean?
+
+    enablePrivateEndpoint: Boolean?
+
+    masterIpv4CidrBlock: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    privateEndpoint: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    publicEndpoint: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    peeringName: String?
+
+    masterGlobalAccessConfig: MasterGlobalAccessConfig?
+
+    privateEndpointSubnetwork: String?
+}
+
+@gcp.SubResourceHint
+open class DatabaseEncryption extends formae.SubResource {
+    keyName: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    state: DatabaseEncryptionState?
+}
+
+@gcp.SubResourceHint
+open class VerticalPodAutoscaling extends formae.SubResource {
+    enabled: Boolean
+}
+
+@gcp.SubResourceHint
+open class WorkloadIdentityConfig extends formae.SubResource {
+    workloadPool: String?
+}
+
+@gcp.SubResourceHint
+open class Filter extends formae.SubResource {
+    eventType: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class PubSub extends formae.SubResource {
+    enabled: Boolean?
+    topic: String?
+    filter: Filter?
+}
+
+@gcp.SubResourceHint
+open class NotificationConfig extends formae.SubResource {
+    pubsub: PubSub?
+}
+
+@gcp.SubResourceHint
+open class ComponentConfig extends formae.SubResource {
+    enableComponents: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class LoggingConfig extends formae.SubResource {
+    componentConfig: ComponentConfig?
+}
+
+@gcp.SubResourceHint
+open class AutoMonitoringConfig extends formae.SubResource {
+    scope: String?
+}
+
+@gcp.SubResourceHint
+open class ManagedPrometheusConfig extends formae.SubResource {
+    enabled: Boolean
+
+    autoMonitoringConfig: AutoMonitoringConfig?
+}
+
+@gcp.SubResourceHint
+class AdvancedDatapathObservabilityConfig extends formae.SubResource {
+    enableMetrics: Boolean?
+    enableRelay: Boolean?
+}
+
+@gcp.SubResourceHint
+open class MonitoringConfig extends formae.SubResource {
+
+    componentConfig: ComponentConfig?
+
+    managedPrometheusConfig: ManagedPrometheusConfig?
+
+    advancedDatapathObservabilityConfig: AdvancedDatapathObservabilityConfig?
+}
+
+@gcp.SubResourceHint
+open class StandardRolloutPolicy extends formae.SubResource {
+    batchPercentage: Float?
+    batchNodeCount: Int?
+    batchSoakDuration: String?
+}
+
+@gcp.SubResourceHint
+open class BlueGreenSettings extends formae.SubResource {
+    nodePoolSoakDuration: String?
+    standardRolloutPolicy: StandardRolloutPolicy?
+}
+
+@gcp.SubResourceHint
+open class UpgradeSettings extends formae.SubResource {
+    maxSurge: Int?
+    maxUnavailable: Int?
+    strategy: String?
+    blueGreenSettings: BlueGreenSettings?
+}
+
+@gcp.SubResourceHint
+open class Autoscaling extends formae.SubResource {
+    enabled: Boolean?
+    minNodeCount: Int?
+    maxNodeCount: Int?
+    totalMinNodeCount: Int?
+    totalMaxNodeCount: Int?
+    locationPolicy: String?
+}
+
+@gcp.SubResourceHint
+open class Management extends formae.SubResource {
+    autoUpgrade: Boolean?
+    autoRepair: Boolean?
+}
+
+@gcp.SubResourceHint
+open class MaxPodsConstraint extends formae.SubResource {
+    maxPodsPerNode: Int
+}
+
+@gcp.SubResourceHint
+open class NodePoolNetworkConfig extends formae.SubResource {
+    createPodRange: Boolean?
+    podRange: String?
+    podIpv4CidrBlock: String?
+    enablePrivateNodes: Boolean?
+    subnetwork: String?
+    podCidrOverprovisionConfig: PodCidrOverprovisionConfig?
+    networkPerformanceConfig: NetworkPerformanceConfig?
+}
+
+@gcp.SubResourceHint
+open class NodePool extends formae.SubResource {
+    name: String
+
+    config: NodeConfig?
+
+    initialNodeCount: Int?
+
+    locations: Listing<String>?
+
+    autoscaling: Autoscaling?
+
+    management: Management?
+
+    maxPodsConstraint: MaxPodsConstraint?
+
+    networkConfig: NodePoolNetworkConfig?
+
+    upgradeSettings: UpgradeSettings?
+
+    version: String?
+}
+
+@gcp.SubResourceHint
+open class EnterpriseConfig extends formae.SubResource {
+    @gcp.FieldHint
+    clusterTier: ClusterTier?
+}
+
+@gcp.SubResourceHint
+open class SecurityPostureConfig extends formae.SubResource {
+    @gcp.FieldHint
+    mode: SecurityPostureMode?
+
+    @gcp.FieldHint
+    vulnerabilityMode: VulnerabilityMode?
+}
+
+@gcp.SubResourceHint
+open class Fleet extends formae.SubResource {
+    project: String?
+    membership: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    preRegistered: Boolean?
+}
+
+@gcp.SubResourceHint
+open class CostManagementConfig extends formae.SubResource {
+    enabled: Boolean
+}
+
+@gcp.SubResourceHint
+open class Params extends formae.SubResource {
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    resourceManagerTags: Mapping<String, String>?
+}
+
+open class ClusterResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ClusterResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: ClusterResolvable = (this) {
+        property = "SelfLink"
+    }
+
+    hidden name: ClusterResolvable = (this) {
+        property = "Name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Name"
+}
+open class Cluster extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    initialNodeCount: Int?
+
+    @gcp.FieldHint
+    nodeConfig: NodeConfig?
+
+    @gcp.FieldHint
+    masterAuth: MasterAuth?
+
+    loggingService: String?
+
+    monitoringService: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String|formae.Resolvable
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    subnetwork: String|formae.Resolvable
+
+    clusterIpv4Cidr: String?
+
+    @gcp.FieldHint
+    addonsConfig: AddonsConfig?
+
+    nodePools: Listing<NodePool>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    locations: Listing<String>?
+
+    enableKubernetesAlpha: Boolean?
+
+    resourceLabels: Mapping<String, String>?
+
+    labelFingerprint: String?
+
+    legacyAbac: Mapping<String, Boolean>?
+
+    @gcp.FieldHint
+    networkPolicy: NetworkPolicy?
+
+    @gcp.FieldHint
+    ipAllocationPolicy: IPAllocationPolicy?
+
+    @gcp.FieldHint
+    masterAuthorizedNetworksConfig: MasterAuthorizedNetworksConfig?
+
+    @gcp.FieldHint
+    maintenancePolicy: MaintenancePolicy?
+
+    @gcp.FieldHint
+    binaryAuthorization: BinaryAuthorization?
+
+    @gcp.FieldHint
+    autoscaling: ClusterAutoscaling?
+
+    @gcp.FieldHint
+    networkConfig: NetworkConfig?
+
+    defaultMaxPodsConstraint: MaxPodsConstraint?
+
+    @gcp.FieldHint
+    privateClusterConfig: PrivateClusterConfig?
+
+    @gcp.FieldHint
+    databaseEncryption: DatabaseEncryption?
+
+    @gcp.FieldHint
+    verticalPodAutoscaling: VerticalPodAutoscaling?
+
+    shieldedNodes: Mapping<String, Boolean>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    releaseChannel: ReleaseChannel?
+
+    @gcp.FieldHint
+    workloadIdentityConfig: WorkloadIdentityConfig?
+
+    @gcp.FieldHint
+    notificationConfig: NotificationConfig?
+
+    @gcp.FieldHint
+    confidentialNodes: ConfidentialNodes?
+
+    @gcp.FieldHint
+    loggingConfig: LoggingConfig?
+
+    @gcp.FieldHint
+    monitoringConfig: MonitoringConfig?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    location: formae.Resolvable|String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    autopilot: Autopilot?
+
+    @gcp.FieldHint
+    enterpriseConfig: EnterpriseConfig?
+
+    @gcp.FieldHint
+    securityPostureConfig: SecurityPostureConfig?
+
+    @gcp.FieldHint
+    fleet: Fleet?
+
+    @gcp.FieldHint
+    costManagementConfig: CostManagementConfig?
+
+    initialClusterVersion: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    currentMasterVersion: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    currentNodeVersion: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    createTime: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    status: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    statusMessage: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    nodeIpv4CidrSize: Int?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    servicesIpv4Cidr: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    instanceGroupUrls: Listing<String>?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    currentNodeCount: Int?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    expireTime: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    zone: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    endpoint: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    selfLink: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    params: Params?
+
+    hidden res: ClusterResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

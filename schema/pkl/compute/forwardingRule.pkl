@@ -1,0 +1,207 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.forwardingRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::ForwardingRule"
+
+typealias IpProtocol = "TCP"|"UDP"|"ESP"|"AH"|"SCTP"|"ICMP"|"L3_DEFAULT"
+
+typealias LoadBalancingScheme = "EXTERNAL"|"EXTERNAL_MANAGED"|"INTERNAL"|"INTERNAL_MANAGED"|"INTERNAL_SELF_MANAGED"
+
+typealias NetworkTier = "PREMIUM"|"STANDARD"|"STANDARD_OVERRIDES_FIXED_STANDARD"
+
+typealias IpVersion = "IPV4"|"IPV6"|"UNSPEC_VERSION"
+
+@gcp.SubResourceHint
+open class MetadataFilter extends formae.SubResource {
+    @gcp.FieldHint
+    filterMatchCriteria: String?
+
+    @gcp.FieldHint
+    filterLabels: Listing<FilterLabel>?
+}
+
+@gcp.SubResourceHint
+open class FilterLabel extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    value: String?
+}
+
+@gcp.SubResourceHint
+open class ServiceDirectoryRegistration extends formae.SubResource {
+    @gcp.FieldHint
+    namespace: String?
+
+    @gcp.FieldHint
+    service: String?
+
+    @gcp.FieldHint
+    serviceDirectoryRegion: String?
+}
+
+open class ForwardingRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ForwardingRuleResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: ForwardingRuleResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ForwardingRuleResolvable = (this) {
+        property = "name"
+    }
+
+    hidden ipAddress: ForwardingRuleResolvable = (this) {
+        property = "IPAddress"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ForwardingRule extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    IPAddress: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    IPProtocol: IpProtocol?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    portRange: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ports: Listing<String>?
+
+    @gcp.FieldHint {
+        outputField = "target"
+    }
+    targetProxy: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    backendService: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    loadBalancingScheme: LoadBalancingScheme?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    subnetwork: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkTier: NetworkTier?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ipVersion: IpVersion?
+
+    @gcp.FieldHint
+    allowGlobalAccess: Boolean?
+
+    @gcp.FieldHint
+    allPorts: Boolean?
+
+    @gcp.FieldHint
+    metadataFilters: Listing<MetadataFilter>?
+
+    @gcp.FieldHint
+    sourceIpRanges: Listing<String>?
+
+    @gcp.FieldHint
+    serviceDirectoryRegistrations: Listing<ServiceDirectoryRegistration>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    isMirroringCollector: Boolean?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    serviceLabel: String?
+
+    @gcp.FieldHint
+    noAutomateDnsZone: Boolean?
+
+    @gcp.FieldHint
+    allowPscGlobalAccess: Boolean?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    labelFingerprint: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    serviceName: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    baseForwardingRule: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    pscConnectionId: String?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    pscConnectionStatus: String?
+
+    hidden res: ForwardingRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

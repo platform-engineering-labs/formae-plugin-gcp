@@ -1,0 +1,240 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.backendService
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::BackendService"
+
+typealias Protocol = "HTTP"|"HTTPS"|"HTTP2"|"TCP"|"SSL"|"UDP"|"GRPC"|"UNSPECIFIED"
+
+typealias LoadBalancingScheme = "EXTERNAL"|"EXTERNAL_MANAGED"|"INTERNAL"|"INTERNAL_MANAGED"|"INTERNAL_SELF_MANAGED"
+
+typealias LocalityLbPolicy = "ROUND_ROBIN"|"LEAST_REQUEST"|"RING_HASH"|"RANDOM"|"ORIGINAL_DESTINATION"|"MAGLEV"|"WEIGHTED_MAGLEV"
+
+typealias SessionAffinity = "NONE"|"CLIENT_IP"|"CLIENT_IP_PORT_PROTO"|"CLIENT_IP_PROTO"|"GENERATED_COOKIE"|"HEADER_FIELD"|"HTTP_COOKIE"|"CLIENT_IP_NO_DESTINATION"
+
+typealias BalancingMode = "UTILIZATION"|"RATE"|"CONNECTION"
+
+@gcp.SubResourceHint
+open class Backend extends formae.SubResource {
+    @gcp.FieldHint
+    group: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    balancingMode: BalancingMode?
+
+    @gcp.FieldHint
+    maxUtilization: Number?
+
+    @gcp.FieldHint
+    maxRate: Int?
+
+    @gcp.FieldHint
+    maxRatePerInstance: Number?
+
+    @gcp.FieldHint
+    maxRatePerEndpoint: Number?
+
+    @gcp.FieldHint
+    maxConnections: Int?
+
+    @gcp.FieldHint
+    maxConnectionsPerInstance: Int?
+
+    @gcp.FieldHint
+    maxConnectionsPerEndpoint: Int?
+
+    @gcp.FieldHint
+    capacityScaler: Number?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    failover: Boolean?
+}
+
+@gcp.SubResourceHint
+open class ConnectionDraining extends formae.SubResource {
+    @gcp.FieldHint
+    drainingTimeoutSec: Int?
+}
+
+@gcp.SubResourceHint
+open class CdnPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    cacheMode: String?
+
+    @gcp.FieldHint
+    signedUrlCacheMaxAgeSec: String?
+
+    @gcp.FieldHint
+    defaultTtl: Int?
+
+    @gcp.FieldHint
+    maxTtl: Int?
+
+    @gcp.FieldHint
+    clientTtl: Int?
+
+    @gcp.FieldHint
+    negativeCaching: Boolean?
+
+    @gcp.FieldHint
+    serveWhileStale: Int?
+}
+
+@gcp.SubResourceHint
+open class CircuitBreakers extends formae.SubResource {
+    @gcp.FieldHint
+    maxRequestsPerConnection: Int?
+
+    @gcp.FieldHint
+    maxConnections: Int?
+
+    @gcp.FieldHint
+    maxPendingRequests: Int?
+
+    @gcp.FieldHint
+    maxRequests: Int?
+
+    @gcp.FieldHint
+    maxRetries: Int?
+}
+
+@gcp.SubResourceHint
+open class ConsistentHash extends formae.SubResource {
+    @gcp.FieldHint
+    httpHeaderName: String?
+
+    @gcp.FieldHint
+    minimumRingSize: String?
+}
+
+@gcp.SubResourceHint
+open class LogConfig extends formae.SubResource {
+    @gcp.FieldHint
+    enable: Boolean?
+
+    @gcp.FieldHint
+    sampleRate: Number?
+}
+
+@gcp.SubResourceHint
+open class Iap extends formae.SubResource {
+    @gcp.FieldHint
+    enabled: Boolean?
+
+    @gcp.FieldHint
+    oauth2ClientId: String?
+
+    @gcp.FieldHint
+    oauth2ClientSecret: String?
+}
+
+open class BackendServiceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: BackendServiceResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: BackendServiceResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: BackendServiceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class BackendService extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    backends: Listing<Backend>?
+
+    @gcp.FieldHint
+    healthChecks: Listing<String|formae.Resolvable>?
+
+    @gcp.FieldHint
+    protocol: Protocol?
+
+    @gcp.FieldHint
+    portName: String?
+
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    timeoutSec: Int?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    loadBalancingScheme: LoadBalancingScheme?
+
+    @gcp.FieldHint
+    localityLbPolicy: LocalityLbPolicy?
+
+    @gcp.FieldHint
+    sessionAffinity: SessionAffinity?
+
+    @gcp.FieldHint
+    affinityCookieTtlSec: Int?
+
+    @gcp.FieldHint
+    connectionDraining: ConnectionDraining?
+
+    @gcp.FieldHint
+    cdnPolicy: CdnPolicy?
+
+    @gcp.FieldHint
+    enableCDN: Boolean?
+
+    @gcp.FieldHint
+    circuitBreakers: CircuitBreakers?
+
+    @gcp.FieldHint
+    consistentHash: ConsistentHash?
+
+    @gcp.FieldHint
+    logConfig: LogConfig?
+
+    @gcp.FieldHint
+    iap: Iap?
+
+    @gcp.FieldHint
+    securityPolicy: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    edgeSecurityPolicy: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        persist = false
+    }
+    fingerprint: String?
+
+    hidden res: BackendServiceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
