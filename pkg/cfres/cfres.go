@@ -12,4 +12,5 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/compute"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/container"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/sql"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/storage"
 )

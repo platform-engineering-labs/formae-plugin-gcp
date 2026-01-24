@@ -32,6 +32,11 @@ open class AnywhereCacheResolvable extends formae.Resolvable {
 @gcp.ResourceHint {
     type = module.type
     identifier = "AnywhereCacheId"
+    parent = "GCP::Storage::Bucket"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "name" listParameter = "bucket"
+        }
+    }.toList()
 }
 open class AnywhereCache extends formae.Resource {
     hidden parent = this

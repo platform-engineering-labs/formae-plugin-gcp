@@ -28,6 +28,11 @@ open class BucketAccessControlResolvable extends formae.Resolvable {
 @gcp.ResourceHint {
     type = module.type
     identifier = "Entity"
+    parent = "GCP::Storage::Bucket"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "name" listParameter = "bucket"
+        }
+    }.toList()
 }
 open class BucketAccessControl extends formae.Resource {
     hidden parent = this

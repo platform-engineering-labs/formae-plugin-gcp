@@ -30,6 +30,11 @@ open class FolderResolvable extends formae.Resolvable {
 @gcp.ResourceHint {
     type = module.type
     identifier = "Name"
+    parent = "GCP::Storage::Bucket"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "name" listParameter = "bucket"
+        }
+    }.toList()
 }
 open class Folder extends formae.Resource {
     hidden parent = this
