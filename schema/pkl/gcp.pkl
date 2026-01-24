@@ -52,17 +52,24 @@ typealias Region = "us-central1" |
 // GCP Zones follow pattern: <region>-<a,b,c,d,e,f>
 typealias Zone = String
 
+// GCP Location - used by Container (GKE) and CloudRun APIs
+// Can be a region (e.g., "us-central1") or zone (e.g., "us-central1-a")
+// For GKE, use "-" to target all locations
+typealias Location = String
+
 open class Config {
   hidden fixed type: String = "GCP"
   hidden project: String
   hidden region: Region?
   hidden zone: Zone?
+  hidden location: Location?
   hidden credentialsFile: String?
 
   fixed Type: String = type
   fixed Project: String = project
   fixed Region: Region? = region
   fixed Zone: Zone? = zone
+  fixed Location: Location? = location
   fixed CredentialsFile: String? = credentialsFile
 }
 

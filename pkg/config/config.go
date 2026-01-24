@@ -23,6 +23,10 @@ type Config struct {
 	// Zone is the GCP zone (e.g., "us-central1-a")
 	Zone string `json:"Zone,omitempty"`
 
+	// Location is used by Container (GKE) and CloudRun APIs
+	// Can be a region or zone. For GKE, use "-" to target all locations.
+	Location string `json:"Location,omitempty"`
+
 	// CredentialsFile is the path to the service account JSON key file
 	CredentialsFile string `json:"CredentialsFile,omitempty"`
 

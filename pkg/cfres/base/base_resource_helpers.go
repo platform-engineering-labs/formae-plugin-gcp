@@ -17,11 +17,12 @@ import (
 // buildPathContext builds a PathContext from target config and properties
 func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[string]interface{}) PathContext {
 	cfg := config.FromTargetConfig(targetConfig)
+	// Use explicit Location only - no fallback to Region
 	ctx := PathContext{
 		Project:      cfg.Project,
 		Region:       cfg.Region,
 		Zone:         cfg.Zone,
-		Location:     cfg.Region, // Container API uses location
+		Location:     cfg.Location, // Container/CloudRun use location (no Region fallback)
 		ResourceType: b.ResourceConfig.ResourceType,
 	}
 
@@ -80,6 +81,8 @@ func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, c
 		ctx.Project = cfg.Project
 	}
 
+	// Use explicit Location only - no fallback to Region for location-based APIs
+
 	// Respect resource scope when filling in region/zone
 	if b.ResourceConfig.Scope != nil {
 		switch b.ResourceConfig.Scope.Type {
@@ -93,9 +96,6 @@ func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, c
 			if ctx.Region == "" {
 				ctx.Region = cfg.Region
 			}
-			if ctx.Location == "" {
-				ctx.Location = cfg.Region
-			}
 			ctx.Zone = ""
 		case ScopeZonal:
 			// Zonal resources use both region and zone
@@ -105,8 +105,11 @@ func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, c
 			if ctx.Zone == "" {
 				ctx.Zone = cfg.Zone
 			}
+		case ScopeLocationBased:
+			// Location-based resources (Container/CloudRun) use location only
+			// No fallback to Region - location must be explicitly set
 			if ctx.Location == "" {
-				ctx.Location = cfg.Region
+				ctx.Location = cfg.Location
 			}
 		default:
 			// If scope type is not set, use legacy behavior
@@ -117,7 +120,7 @@ func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, c
 				ctx.Zone = cfg.Zone
 			}
 			if ctx.Location == "" {
-				ctx.Location = cfg.Region
+				ctx.Location = cfg.Location
 			}
 		}
 	} else {
@@ -129,7 +132,7 @@ func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, c
 			ctx.Zone = cfg.Zone
 		}
 		if ctx.Location == "" {
-			ctx.Location = cfg.Region
+			ctx.Location = cfg.Location
 		}
 	}
 }

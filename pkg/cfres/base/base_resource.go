@@ -321,11 +321,12 @@ func (b *BaseResource) List(
 
 	// Build path context from target
 	cfg := config.FromTargetConfig(request.TargetConfig)
+	// Use explicit Location only - no fallback to Region
 	pathCtx := PathContext{
 		Project:      cfg.Project,
 		Region:       cfg.Region,
 		Zone:         cfg.Zone,
-		Location:     cfg.Region, // Container uses location
+		Location:     cfg.Location, // Container/CloudRun use location (no Region fallback)
 		ResourceType: b.ResourceConfig.ResourceType,
 	}
 
@@ -343,6 +344,15 @@ func (b *BaseResource) List(
 		case ScopeZonal:
 			// Zonal resources use both region and zone
 			// Keep both as-is
+		case ScopeLocationBased:
+			// Location-based resources (Container/GKE, CloudRun) require explicit location
+			// If location is not provided, return empty result instead of making API call
+			if pathCtx.Location == "" {
+				return &resource.ListResult{
+					NativeIDs:     []string{},
+					NextPageToken: nil,
+				}, nil
+			}
 		}
 	}
 
@@ -365,10 +375,15 @@ func (b *BaseResource) List(
 		}
 	}
 
-	// Build URL - for zonal resources without a specific zone, use aggregated list
+	// Build URL - for zonal/regional resources without a specific zone/region, use aggregated list
 	var url string
 	if b.ResourceConfig.Scope != nil && b.ResourceConfig.Scope.Type == ScopeZonal && pathCtx.Zone == "" {
 		// Use aggregated list for zonal resources when no specific zone is provided
+		// Format: /projects/{project}/aggregated/{resourceType}
+		url = fmt.Sprintf("%s/projects/%s/aggregated/%s",
+			b.APIConfig.BaseURL, pathCtx.Project, b.ResourceConfig.ResourceType)
+	} else if b.ResourceConfig.Scope != nil && b.ResourceConfig.Scope.Type == ScopeRegional && pathCtx.Region == "" {
+		// Use aggregated list for regional resources when no specific region is provided
 		// Format: /projects/{project}/aggregated/{resourceType}
 		url = fmt.Sprintf("%s/projects/%s/aggregated/%s",
 			b.APIConfig.BaseURL, pathCtx.Project, b.ResourceConfig.ResourceType)

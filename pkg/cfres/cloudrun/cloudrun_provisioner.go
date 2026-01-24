@@ -48,19 +48,20 @@ func (p *CloudRunProvisioner) Create(
 
 	// Build path context from config and properties
 	cfg := config.FromTargetConfig(request.TargetConfig)
+	// Use explicit Location only - no fallback to Region
 	pathCtx := base.PathContext{
 		Project:      cfg.Project,
 		Region:       cfg.Region,
 		Zone:         cfg.Zone,
-		Location:     cfg.Region, // Cloud Run uses location
+		Location:     cfg.Location, // Cloud Run uses location (no Region fallback)
 		ResourceType: p.ResourceConfig.ResourceType,
 		ResourceName: resourceName,
 	}
 
 	// Override location from properties if specified
-	if location := utils.GetString(props, "location"); location != "" {
-		pathCtx.Location = location
-		pathCtx.Region = location
+	if propLocation := utils.GetString(props, "location"); propLocation != "" {
+		pathCtx.Location = propLocation
+		pathCtx.Region = propLocation
 	}
 
 	// Transform request properties

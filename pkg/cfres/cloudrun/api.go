@@ -40,12 +40,11 @@ var CloudRunNativeID = base.NativeIDConfig{
 // cloudRunPathBuilder builds Cloud Run API paths with location-based scoping
 // Cloud Run v2 API format: /projects/{project}/locations/{location}/{resourceType}[/{name}]
 // Special case for Create: adds query parameter ?serviceId={name} or ?jobId={name}
+// Location must be explicitly provided in target config (no wildcards or defaults).
 func cloudRunPathBuilder(ctx base.PathContext) string {
 	// Use location (Cloud Run v2 uses locations, not zones/regions)
+	// Location must be explicitly set in target config
 	location := ctx.Location
-	if location == "" {
-		location = "us-central1" // default location
-	}
 
 	// Build base path
 	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, location, ctx.ResourceType)

@@ -8,9 +8,9 @@ require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.0.0-20260122175017-38e3018820c0
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.0.0-20260122175017-38e3018820c0
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.0.0-20260122235241-e8b1e56a5f23
+	github.com/platform-engineering-labs/formae/pkg/model v0.0.0-20260120041653-c26026025caf
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.0
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
 	google.golang.org/grpc v1.77.0

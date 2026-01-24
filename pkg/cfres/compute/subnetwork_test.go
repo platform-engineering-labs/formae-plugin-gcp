@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/testutil"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -491,4 +491,66 @@ func TestSubnetworkUpdate(t *testing.T) {
 	}
 	netDelResult, _ := network.Delete(ctx, netDeleteReq)
 	testutil.WaitForDelete(t, ctx, network, netDelResult, testutil.TargetConfig, "GCP::Compute::Network")
+}
+
+// TestSubnetworkList tests listing GCP Subnetworks
+func TestSubnetworkList(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	subnetwork, err := NewComputeProvisioner(testutil.Config, SubnetworkResourceType)
+	require.NoError(t, err, "Failed to create subnetwork provisioner")
+
+	ctx := context.Background()
+
+	t.Run("ListSubnetworks", func(t *testing.T) {
+		listReq := &resource.ListRequest{
+			ResourceType: "GCP::Compute::Subnetwork",
+			TargetConfig: testutil.TargetConfig,
+		}
+
+		listResult, err := subnetwork.List(ctx, listReq)
+		require.NoError(t, err, "List operation should not return error")
+		require.NotNil(t, listResult, "List result should not be nil")
+		require.NotNil(t, listResult.NativeIDs, "NativeIDs list should not be nil")
+
+		t.Logf("Found %d subnetworks in region %s", len(listResult.NativeIDs), testutil.Region)
+
+		// Log first few subnetworks for debugging
+		for i, nativeID := range listResult.NativeIDs {
+			if i >= 5 {
+				t.Logf("  ... and %d more", len(listResult.NativeIDs)-5)
+				break
+			}
+			t.Logf("  - %s", nativeID)
+		}
+	})
+
+	t.Run("ListWithPagination", func(t *testing.T) {
+		// Test pagination if there are enough subnetworks
+		listReq := &resource.ListRequest{
+			ResourceType: "GCP::Compute::Subnetwork",
+			TargetConfig: testutil.TargetConfig,
+			PageSize:     2,
+		}
+
+		listResult, err := subnetwork.List(ctx, listReq)
+		require.NoError(t, err, "List with pagination should not return error")
+		require.NotNil(t, listResult, "List result should not be nil")
+
+		t.Logf("First page: %d subnetworks", len(listResult.NativeIDs))
+
+		if listResult.NextPageToken != nil && *listResult.NextPageToken != "" {
+			t.Logf("Next page token present: %s", *listResult.NextPageToken)
+
+			// Fetch next page
+			listReq.PageToken = listResult.NextPageToken
+			nextPageResult, err := subnetwork.List(ctx, listReq)
+			require.NoError(t, err, "List next page should not return error")
+			t.Logf("Second page: %d subnetworks", len(nextPageResult.NativeIDs))
+		} else {
+			t.Log("No next page token (less than 2 subnetworks or single page)")
+		}
+	})
 }
