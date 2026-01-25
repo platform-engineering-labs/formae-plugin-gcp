@@ -5,11 +5,26 @@
 package compute
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 )
+
+// diskRequestTransformer transforms disk creation requests
+// - type: converts short form (pd-standard) to full URL (projects/{project}/zones/{zone}/diskTypes/pd-standard)
+func diskRequestTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	// Transform type field to full URL if it's a short form
+	if diskType := utils.GetString(props, "type"); diskType != "" {
+		// If not already in full path format, convert it
+		if !strings.HasPrefix(diskType, "projects/") && !strings.HasPrefix(diskType, "zones/") {
+			props["type"] = fmt.Sprintf("projects/%s/zones/%s/diskTypes/%s", ctx.Project, ctx.Zone, diskType)
+		}
+	}
+
+	return props, nil
+}
 
 // diskResponseTransformer transforms Disk API responses
 // - zone: extracts just the zone name from full URL
@@ -19,6 +34,11 @@ func diskResponseTransformer(apiResponse map[string]interface{}, ctx base.Transf
 	// Transform zone - extract last segment
 	if zone, ok := apiResponse["zone"].(string); ok && zone != "" {
 		apiResponse["zone"] = base.ExtractLastSegment(zone)
+	}
+
+	// Transform zone - extract last segment
+	if diskType, ok := apiResponse["type"].(string); ok && diskType != "" {
+		apiResponse["type"] = base.ExtractLastSegment(diskType)
 	}
 
 	// Transform sourceImage - extract relative path starting from "projects/"

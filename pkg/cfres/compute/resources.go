@@ -105,7 +105,7 @@ func init() {
 				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
-			RequestTransformer:  nil,
+			RequestTransformer:  base.RequestTransformerFunc(diskRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(diskResponseTransformer),
 		},
 		{

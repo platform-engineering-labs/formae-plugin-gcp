@@ -128,7 +128,7 @@ open class Disk extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    diskType: DiskType?
+    type: DiskType?
 
     /// The image from which to initialize this disk
     @gcp.FieldHint {
