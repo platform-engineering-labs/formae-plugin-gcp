@@ -36,26 +36,42 @@ set -euo pipefail
 TEST_PREFIX="${TEST_PREFIX:-formae-plugin-sdk-test-}"
 
 echo "clean-environment.sh: Cleaning resources with prefix '${TEST_PREFIX}'"
-echo ""
-echo "To implement cleanup for your provider, edit this script."
-echo "See comments in this file for examples."
-echo ""
 
-# Uncomment and modify for your provider:
-#
-# # AWS - clean up S3 buckets with test prefix
-# echo "Cleaning S3 buckets..."
-# aws s3api list-buckets --query "Buckets[?starts_with(Name, '${TEST_PREFIX}')].Name" --output text | \
-#     xargs -r -n1 aws s3 rb --force s3://
-#
-# # OpenStack - clean up instances
-# echo "Cleaning instances..."
-# openstack server list --name "^${TEST_PREFIX}" -f value -c ID | \
-#     xargs -r -n1 openstack server delete --wait
-#
-# # OpenStack - clean up volumes
-# echo "Cleaning volumes..."
-# openstack volume list --name "^${TEST_PREFIX}" -f value -c ID | \
-#     xargs -r -n1 openstack volume delete
+# GCP - clean up disks with test prefix
+echo "Cleaning GCP disks..."
+DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$DISKS" ]; then
+    echo "$DISKS" | while read -r disk zone; do
+        echo "  Deleting disk: $disk (zone: $zone)"
+        gcloud compute disks delete "$disk" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No disks found matching prefix 'formae-plugin-sdk*'"
+fi
 
-echo "clean-environment.sh: Cleanup complete (no-op - not configured)"
+# GCP - clean up networks with test prefix
+echo "Cleaning GCP networks..."
+NETWORKS=$(gcloud compute networks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$NETWORKS" ]; then
+    echo "$NETWORKS" | while read -r network; do
+        echo "  Deleting network: $network"
+        gcloud compute networks delete "$network" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No networks found matching prefix 'formae-plugin-sdk*'"
+fi
+
+# GCP - clean up storage buckets with test prefix
+echo "Cleaning GCP storage buckets..."
+BUCKETS=$(gcloud storage buckets list --filter="name~^formae-plugin-sdk-test" --format="value(name)" 2>/dev/null || true)
+if [ -n "$BUCKETS" ]; then
+    echo "$BUCKETS" | while read -r bucket; do
+        echo "  Deleting bucket: $bucket"
+        gcloud storage rm -r "gs://$bucket" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No buckets found matching prefix 'formae-plugin-sdk-test*'"
+fi
+
+echo ""
+echo "clean-environment.sh: Cleanup complete"

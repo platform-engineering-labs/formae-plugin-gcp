@@ -1,0 +1,29 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/gcp.pkl"
+
+import "@gcp/compute/network.pkl"
+
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new network.Network {
+    label = "plugin-sdk-test-network"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    description = "Test network for plugin SDK tests"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "GLOBAL"  // This is the mutable field being tested (changed from REGIONAL to GLOBAL)
+    }
+  }
+}

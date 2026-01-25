@@ -18,19 +18,6 @@ func bucketScopedBodyBuilder(props map[string]interface{}) (map[string]interface
 	return body, nil
 }
 
-// objectScopedBodyBuilder filters out bucket, object, and entity properties
-func objectScopedBodyBuilder(props map[string]interface{}) (map[string]interface{}, error) {
-	body := make(map[string]interface{})
-	for k, v := range props {
-		// Skip properties that are part of the URL path
-		if k == "bucket" || k == "object" {
-			continue
-		}
-		body[k] = v
-	}
-	return body, nil
-}
-
 // aclBodyBuilder filters out bucket property and keeps entity and role
 func aclBodyBuilder(props map[string]interface{}) (map[string]interface{}, error) {
 	body := make(map[string]interface{})

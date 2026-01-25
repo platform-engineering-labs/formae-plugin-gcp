@@ -14,14 +14,11 @@ import (
 
 // Resource type constants
 const (
-	BucketResourceType                      = "GCP::Storage::Bucket"
-	ManagedFolderResourceType               = "GCP::Storage::ManagedFolder"
-	HmacKeyResourceType                     = "GCP::Storage::HmacKey"
-	FolderResourceType                      = "GCP::Storage::Folder"
-	AnywhereCacheResourceType               = "GCP::Storage::AnywhereCache"
-	BucketAccessControlResourceType         = "GCP::Storage::BucketAccessControl"
-	DefaultObjectAccessControlResourceType  = "GCP::Storage::DefaultObjectAccessControl"
-	ObjectAccessControlResourceType         = "GCP::Storage::ObjectAccessControl"
+	BucketResourceType                     = "GCP::Storage::Bucket"
+	AnywhereCacheResourceType              = "GCP::Storage::AnywhereCache"
+	BucketAccessControlResourceType        = "GCP::Storage::BucketAccessControl"
+	DefaultObjectAccessControlResourceType = "GCP::Storage::DefaultObjectAccessControl"
+	ObjectAccessControlResourceType        = "GCP::Storage::ObjectAccessControl"
 )
 
 // storageRegistry is the unified registry for all Storage resources
@@ -112,62 +109,6 @@ func init() {
 			},
 			RequestTransformer:  wrapBodyBuilder(bucketBodyBuilder),
 			ResponseTransformer: wrapResponseTransformer(bucketResponseTransformer),
-		},
-		{
-			ResourceType: ManagedFolderResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType: "managedFolders",
-				Scope:        nil,
-				ParentResource: &base.ParentResourceConfig{
-					ParentType:         "bucket", // Property name in props
-					RequiresParent:     true,
-					ParentPathSegments: []string{"b"}, // Parent is bucket
-				},
-				SupportsUpdate: false,
-				OptimisticLocking: &base.OptimisticLockingConfig{
-					Enabled:       true,
-					FieldName:     "metageneration",
-					LocationInURL: false,
-				},
-			},
-			RequestTransformer:  wrapBodyBuilder(bucketScopedBodyBuilder),
-			ResponseTransformer: nil,
-		},
-		{
-			ResourceType: HmacKeyResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "hmacKeys",
-				Scope:          nil,
-				ParentResource: nil, // Project-scoped, not parent-based
-				SupportsUpdate: true,
-				OptimisticLocking: &base.OptimisticLockingConfig{
-					Enabled:       false,
-					FieldName:     "",
-					LocationInURL: false,
-				},
-			},
-			RequestTransformer:  nil, // Pass through
-			ResponseTransformer: nil,
-		},
-		{
-			ResourceType: FolderResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType: "folders",
-				Scope:        nil,
-				ParentResource: &base.ParentResourceConfig{
-					ParentType:         "bucket", // Property name in props
-					RequiresParent:     true,
-					ParentPathSegments: []string{"b"}, // Parent is bucket
-				},
-				SupportsUpdate: false,
-				OptimisticLocking: &base.OptimisticLockingConfig{
-					Enabled:       true,
-					FieldName:     "metageneration",
-					LocationInURL: false,
-				},
-			},
-			RequestTransformer:  wrapBodyBuilder(bucketScopedBodyBuilder),
-			ResponseTransformer: nil,
 		},
 		{
 			ResourceType: AnywhereCacheResourceType,

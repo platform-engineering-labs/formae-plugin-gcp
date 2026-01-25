@@ -16,6 +16,52 @@
 
 set -euo pipefail
 
+# =============================================================================
+# Load Environment Variables
+# =============================================================================
+# Load .env file if present (for local development).
+# In CI, these are set via workflow environment variables.
+# =============================================================================
+
+SCRIPT_DIR_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT_ENV="$(cd "${SCRIPT_DIR_ENV}/.." && pwd)"
+
+if [[ -f "${PROJECT_ROOT_ENV}/.env" ]]; then
+    echo "Loading environment variables from .env..."
+    set -a
+    source "${PROJECT_ROOT_ENV}/.env"
+    set +a
+fi
+
+# Validate required environment variables for GCP
+: "${GCP_PROJECT_ID:?Environment variable GCP_PROJECT_ID is required}"
+: "${GCP_REGION:?Environment variable GCP_REGION is required}"
+: "${GCP_ZONE:?Environment variable GCP_ZONE is required}"
+: "${GCP_LOCATION:?Environment variable GCP_LOCATION is required}"
+
+# Obfuscate project ID for logging (show first 3 and last 3 chars)
+obfuscate_project() {
+    local project="$1"
+    local len=${#project}
+    if [[ $len -le 6 ]]; then
+        echo "***"
+    else
+        echo "${project:0:3}***${project: -3}"
+    fi
+}
+
+echo "GCP Configuration:"
+echo "  Project:     $(obfuscate_project "${GCP_PROJECT_ID}")"
+echo "  Region:      ${GCP_REGION}"
+echo "  Zone:        ${GCP_ZONE}"
+echo "  Location:    ${GCP_LOCATION}"
+if [[ -n "${GCP_CREDENTIALS_FILE:-}" ]]; then
+    echo "  Credentials: ${GCP_CREDENTIALS_FILE}"
+else
+    echo "  Credentials: Using Application Default Credentials (ADC)"
+fi
+echo ""
+
 # Cross-platform sed in-place edit (macOS vs Linux)
 sed_inplace() {
     if [[ "$(uname)" == "Darwin" ]]; then

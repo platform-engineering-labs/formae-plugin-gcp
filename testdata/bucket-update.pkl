@@ -1,0 +1,33 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/gcp.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "./vars.pkl" as v
+
+forma {
+   v.stack
+  v.target
+
+  new bucket.Bucket {
+    label = "plugin-sdk-test-bucket"
+    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    location = v.gcpRegion
+    storageClass = "STANDARD"
+    versioning = new bucket.Versioning {
+      enabled = false  // This is the mutable field being tested (changed from false to true)
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+      ["updated"] = "true"  // New label added in update
+    }
+  }
+}

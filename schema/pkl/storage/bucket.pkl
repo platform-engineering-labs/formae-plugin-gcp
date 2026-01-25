@@ -130,14 +130,16 @@ open class Bucket extends formae.Resource {
     @gcp.FieldHint
     lifecycle: Lifecycle?
 
-    location: String?
+    @gcp.FieldHint
+    location: gcp.Region
 
     @gcp.FieldHint
     logging: Logging?
 
     metageneration: Int?
 
-    name: String?
+    @gcp.FieldHint
+    name: String
 
     @gcp.FieldHint
     owner: Owner?
@@ -166,6 +168,7 @@ open class Bucket extends formae.Resource {
     @gcp.FieldHint
     website: Website?
 
+    @gcp.FieldHint
     labels: Mapping<String, String>?
 
     @gcp.FieldHint

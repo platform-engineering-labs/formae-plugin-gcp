@@ -4,6 +4,8 @@
 
 package storage
 
+import "strings"
+
 // bucketBodyBuilder transforms Formae properties to GCP Storage API format
 func bucketBodyBuilder(props map[string]interface{}) (map[string]interface{}, error) {
 	body := make(map[string]interface{})
@@ -54,38 +56,10 @@ func bucketBodyBuilder(props map[string]interface{}) (map[string]interface{}, er
 
 // bucketResponseTransformer transforms GCP Storage API response to Formae format
 func bucketResponseTransformer(apiResponse map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	// Copy all fields
-	for k, v := range apiResponse {
-		result[k] = v
+	// Location comes back as uppercase from GCP, convert to lowercase
+	if location, ok := apiResponse["location"].(string); ok {
+		apiResponse["location"] = strings.ToLower(location)
 	}
 
-	// Transform lifecycle.rule -> lifecycleRule
-	if lifecycle, ok := apiResponse["lifecycle"].(map[string]interface{}); ok {
-		if rules, ok := lifecycle["rule"].([]interface{}); ok {
-			result["lifecycleRule"] = rules
-		}
-	}
-
-	// Transform iamConfiguration fields to top-level
-	if iamConfig, ok := apiResponse["iamConfiguration"].(map[string]interface{}); ok {
-		if ubla, ok := iamConfig["uniformBucketLevelAccess"].(map[string]interface{}); ok {
-			if enabled, ok := ubla["enabled"].(bool); ok {
-				result["uniformBucketLevelAccess"] = enabled
-			}
-		}
-		if pap, ok := iamConfig["publicAccessPrevention"].(string); ok {
-			result["publicAccessPrevention"] = pap
-		}
-	}
-
-	// Transform billing.requesterPays to top-level
-	if billing, ok := apiResponse["billing"].(map[string]interface{}); ok {
-		if requesterPays, ok := billing["requesterPays"].(bool); ok {
-			result["requesterPays"] = requesterPays
-		}
-	}
-
-	return result
+	return apiResponse
 }
