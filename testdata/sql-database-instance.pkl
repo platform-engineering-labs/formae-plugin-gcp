@@ -1,0 +1,58 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/sql/database.pkl"
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new database.DatabaseInstance {
+    label = "plugin-sdk-test-sql-instance"
+    project = v.gcpProject
+    name = "formae-test-sql-\(v.testRunID)"
+    databaseVersion = "POSTGRES_15"
+    region = v.gcpRegion
+    settings = new database.Settings {
+      tier = "db-f1-micro"
+      availabilityType = "ZONAL"
+      dataDiskSizeGb = 10
+      dataDiskType = "PD_SSD"
+      storageAutoResize = true
+      userLabels = new Mapping {
+        ["environment"] = "test"
+        ["managed-by"] = "formae"
+      }
+      ipConfiguration = new database.IpConfiguration {
+        ipv4Enabled = true
+        requireSsl = false
+        authorizedNetworks = new Listing {
+          new database.AclEntry {
+            name = "test-network"
+            value = "0.0.0.0/0"
+          }
+        }
+      }
+      backupConfiguration = new database.BackupConfiguration {
+        enabled = true
+        startTime = "03:00"
+        pointInTimeRecoveryEnabled = false
+        backupRetentionSettings = new database.BackupRetentionSettings {
+          retainedBackups = 7
+          retentionUnit = "COUNT"
+        }
+      }
+      maintenanceWindow = new database.MaintenanceWindow {
+        day = 7
+        hour = 3
+        updateTrack = "stable"
+      }
+    }
+  }
+}

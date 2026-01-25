@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance.pkl"
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new instance.Instance {
+    label = "plugin-sdk-test-bigtable-instance"
+    project = v.gcpProject
+    name = "formae-test-instance-\(v.testRunID)"
+    displayName = "Plugin SDK Test Instance"
+    type = "DEVELOPMENT"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

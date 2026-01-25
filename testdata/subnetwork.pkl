@@ -1,0 +1,50 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "./vars.pkl" as v
+
+local testNetworkName = "formae-plugin-sdk-test-net-\(v.testRunID)"
+
+forma {
+  v.stack
+  v.target
+
+  // Parent network for the subnetwork
+  new network.Network {
+    label = "plugin-sdk-test-network-for-subnet"
+    name = testNetworkName
+    description = "Test network for subnetwork conformance test"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "REGIONAL"
+    }
+  }
+
+  // Test subnetwork
+  new subnetwork.Subnetwork {
+    label = "plugin-sdk-test-subnetwork"
+    name = "formae-plugin-sdk-test-subnet-\(v.testRunID)"
+    description = "Test subnetwork for plugin SDK conformance tests"
+    network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
+    ipCidrRange = "10.0.0.0/24"
+    region = v.gcpRegion
+    privateIpGoogleAccess = true
+    secondaryIpRanges = new Listing {
+      new subnetwork.SecondaryIpRange {
+        rangeName = "pods"
+        ipCidrRange = "10.1.0.0/16"
+      }
+      new subnetwork.SecondaryIpRange {
+        rangeName = "services"
+        ipCidrRange = "10.2.0.0/16"
+      }
+    }
+  }
+}

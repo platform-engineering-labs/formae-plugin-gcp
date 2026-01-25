@@ -1,0 +1,91 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/container/cluster.pkl"
+import "./vars.pkl" as v
+
+local testNetworkName = "formae-plugin-sdk-test-gke-net-\(v.testRunID)"
+local testSubnetworkName = "formae-plugin-sdk-test-gke-subnet-\(v.testRunID)"
+
+forma {
+  v.stack
+  v.target
+
+  // Network for GKE cluster
+  new network.Network {
+    label = "plugin-sdk-test-gke-network"
+    name = testNetworkName
+    description = "Test network for GKE cluster conformance test"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "REGIONAL"
+    }
+  }
+
+  // Subnetwork for GKE cluster with secondary ranges for pods/services
+  new subnetwork.Subnetwork {
+    label = "plugin-sdk-test-gke-subnetwork"
+    name = testSubnetworkName
+    description = "Test subnetwork for GKE cluster"
+    network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
+    ipCidrRange = "10.0.0.0/24"
+    region = v.gcpRegion
+    privateIpGoogleAccess = true
+    secondaryIpRanges = new Listing {
+      new subnetwork.SecondaryIpRange {
+        rangeName = "pods"
+        ipCidrRange = "10.10.0.0/16"
+      }
+      new subnetwork.SecondaryIpRange {
+        rangeName = "services"
+        ipCidrRange = "10.20.0.0/16"
+      }
+    }
+  }
+
+  // GKE Cluster
+  new cluster.Cluster {
+    label = "plugin-sdk-test-gke-cluster"
+    name = "formae-test-gke-\(v.testRunID)"
+    description = "Test GKE cluster for plugin SDK conformance tests"
+    location = v.gcpRegion
+    network = testNetworkName
+    subnetwork = testSubnetworkName
+    initialNodeCount = 1
+    releaseChannel = new cluster.ReleaseChannel {
+      channel = "REGULAR"
+    }
+    nodeConfig = new cluster.NodeConfig {
+      machineType = "e2-medium"
+      diskSizeGb = 50
+      diskType = "pd-standard"
+      oauthScopes = new Listing {
+        "https://www.googleapis.com/auth/cloud-platform"
+      }
+    }
+    ipAllocationPolicy = new cluster.IPAllocationPolicy {
+      useIpAliases = true
+      clusterSecondaryRangeName = "pods"
+      servicesSecondaryRangeName = "services"
+    }
+    addonsConfig = new cluster.AddonsConfig {
+      httpLoadBalancing = new cluster.HttpLoadBalancing {
+        disabled = false
+      }
+      horizontalPodAutoscaling = new cluster.HorizontalPodAutoscaling {
+        disabled = false
+      }
+    }
+    resourceLabels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}
