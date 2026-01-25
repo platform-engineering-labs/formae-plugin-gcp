@@ -33,6 +33,29 @@ func TestNetworkCreate(t *testing.T) {
 
 	ctx := context.Background()
 
+	var nativeID string
+
+	// Cleanup network if test fails
+	defer func() {
+		if nativeID != "" {
+			t.Logf("Cleaning up network: %s", nativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     nativeID,
+				ResourceType: NetworkResourceType,
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := network.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete network: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, network, deleteRes, testutil.TargetConfig, NetworkResourceType)
+				}
+				t.Logf("Network deleted: %s", nativeID)
+			}
+		}
+	}()
+
 	// Prepare network properties
 	properties := map[string]interface{}{
 		"name":                  networkName,
@@ -53,8 +76,6 @@ func TestNetworkCreate(t *testing.T) {
 		Properties:   propertiesJSON,
 		TargetConfig: testutil.TargetConfig,
 	}
-
-	var nativeID string
 
 	// Test Create operation
 	t.Run("Create", func(t *testing.T) {
@@ -185,5 +206,8 @@ func TestNetworkCreate(t *testing.T) {
 		}
 
 		t.Logf("Verified network was deleted")
+
+		// Clear nativeID so defer doesn't try to delete again
+		nativeID = ""
 	})
 }

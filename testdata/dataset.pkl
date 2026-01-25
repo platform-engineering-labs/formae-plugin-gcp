@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigquery/dataset.pkl"
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new dataset.Dataset {
+    label = "plugin-sdk-test-dataset"
+    project = v.gcpProject
+    datasetId = "formae_plugin_sdk_test_\(v.testRunID)"
+    name = "Plugin SDK Test Dataset"
+    description = "Test dataset for plugin SDK conformance tests"
+    location = v.gcpRegion
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

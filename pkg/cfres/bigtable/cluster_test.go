@@ -15,306 +15,588 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/testutil"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestClusterCreate tests the full CRUD lifecycle of a Bigtable cluster
-func TestClusterCreate(t *testing.T) {
-	ctx := context.Background()
+// createTestProductionInstance creates a PRODUCTION Bigtable instance for cluster tests.
+// PRODUCTION instances are required to add additional clusters.
+func createTestProductionInstance(t *testing.T, ctx context.Context) (string, string, func()) {
+	t.Helper()
 
-	// Create provisioners
 	instanceProv, err := NewBigtableProvisioner(testutil.Config, InstanceResourceType)
-	require.NoError(t, err, "Failed to create Bigtable instance provisioner")
+	require.NoError(t, err)
+
+	instanceName := fmt.Sprintf("formae-test-bt-%s", strings.ToLower(uuid.New().String()[:8]))
+
+	instanceProperties := map[string]interface{}{
+		"name":        instanceName,
+		"displayName": "Formae Cluster Test",
+		"type":        "PRODUCTION",
+		"labels": map[string]interface{}{
+			"test": "formae-bigtable-cluster",
+		},
+		"clusters": map[string]interface{}{
+			"initial-cluster": map[string]interface{}{
+				"location":           testutil.Region + "-a",
+				"serveNodes":         1,
+				"defaultStorageType": "SSD",
+			},
+		},
+	}
+
+	propsJSON, err := json.Marshal(instanceProperties)
+	require.NoError(t, err)
+
+	createReq := &resource.CreateRequest{
+		ResourceType: InstanceResourceType,
+		Properties:   propsJSON,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	createResult, err := instanceProv.Create(ctx, createReq)
+	require.NoError(t, err)
+	require.NotNil(t, createResult)
+
+	var nativeID string
+	if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+		statusResult, err := testutil.PollUntilComplete(t, ctx, instanceProv,
+			createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  InstanceResourceType,
+				OperationName: "Create",
+			})
+		require.NoError(t, err)
+		require.Equal(t, resource.OperationStatusSuccess, statusResult.ProgressResult.OperationStatus)
+		nativeID = statusResult.ProgressResult.NativeID
+	} else {
+		require.Equal(t, resource.OperationStatusSuccess, createResult.ProgressResult.OperationStatus,
+			"Create failed: %s", createResult.ProgressResult.StatusMessage)
+		nativeID = createResult.ProgressResult.NativeID
+	}
+
+	cleanup := func() {
+		deleteReq := &resource.DeleteRequest{
+			NativeID:     nativeID,
+			TargetConfig: testutil.TargetConfig,
+		}
+		deleteResult, err := instanceProv.Delete(ctx, deleteReq)
+		if err == nil && deleteResult != nil && deleteResult.ProgressResult != nil {
+			if deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress &&
+				deleteResult.ProgressResult.RequestID != "" {
+				_, _ = testutil.PollUntilComplete(t, ctx, instanceProv,
+					deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+						MaxAttempts:   60,
+						CheckInterval: 10 * time.Second,
+						ResourceType:  InstanceResourceType,
+						OperationName: "Delete",
+					})
+			}
+		}
+	}
+
+	return instanceName, nativeID, cleanup
+}
+
+// TestCluster_Create_Integration tests creating a Bigtable cluster.
+func TestCluster_Create_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	ctx := context.Background()
+	instanceName, _, cleanupInstance := createTestProductionInstance(t, ctx)
+	defer cleanupInstance()
 
 	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
-	require.NoError(t, err, "Failed to create Bigtable cluster provisioner")
+	require.NoError(t, err)
 
-	// Generate unique names
-	instanceName := fmt.Sprintf("formae-test-bt-%s", strings.ToLower(uuid.New().String()[:8]))
 	clusterName := fmt.Sprintf("cluster-%s", strings.ToLower(uuid.New().String()[:6]))
 
-	var instanceNativeID string
+	clusterProperties := map[string]interface{}{
+		"instance":           instanceName,
+		"name":               clusterName,
+		"location":           testutil.Region + "-b",
+		"serveNodes":         1,
+		"defaultStorageType": "SSD",
+	}
+
+	propsJSON, err := json.Marshal(clusterProperties)
+	require.NoError(t, err)
+
+	createReq := &resource.CreateRequest{
+		ResourceType: ClusterResourceType,
+		Properties:   propsJSON,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	createResult, err := clusterProv.Create(ctx, createReq)
+	require.NoError(t, err)
+	require.NotNil(t, createResult)
+	require.NotNil(t, createResult.ProgressResult)
+
 	var clusterNativeID string
+	if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+		require.NotEmpty(t, createResult.ProgressResult.RequestID)
+		require.NotEmpty(t, createResult.ProgressResult.NativeID)
 
-	// Test 1: Create Instance (prerequisite for cluster)
-	t.Run("CreateInstance", func(t *testing.T) {
-		instanceProperties := map[string]interface{}{
-			"name":        instanceName,
-			"displayName": "Formae Cluster Test",
-			"type":        "PRODUCTION", // PRODUCTION instances require clusters
-			"labels": map[string]interface{}{
-				"test": "formae-bigtable-cluster",
-			},
-			// PRODUCTION instances require at least one cluster
-			"clusters": map[string]interface{}{
-				"initial-cluster": map[string]interface{}{
-					"location":           testutil.Region + "-a", // Use zone in same region
-					"serveNodes":         1,
-					"defaultStorageType": "SSD",
-				},
-			},
-		}
-
-		propsJSON, err := json.Marshal(instanceProperties)
+		statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+			createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  ClusterResourceType,
+				OperationName: "Create",
+			})
 		require.NoError(t, err)
+		require.Equal(t, resource.OperationStatusSuccess, statusResult.ProgressResult.OperationStatus)
+		clusterNativeID = statusResult.ProgressResult.NativeID
+	} else {
+		require.Equal(t, resource.OperationStatusSuccess, createResult.ProgressResult.OperationStatus)
+		clusterNativeID = createResult.ProgressResult.NativeID
+	}
 
-		createReq := &resource.CreateRequest{
-			ResourceType: InstanceResourceType,
-			Properties:   propsJSON,
-			TargetConfig: testutil.TargetConfig,
-		}
-
-		createResult, err := instanceProv.Create(ctx, createReq)
-		require.NoError(t, err)
-		require.NotNil(t, createResult)
-
-		if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
-			statusResult, err := testutil.PollUntilComplete(t, ctx, instanceProv,
-				createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
-					MaxAttempts:   60,
-					CheckInterval: 10 * time.Second,
-					ResourceType:  InstanceResourceType,
-					OperationName: "Create",
-				})
-			require.NoError(t, err)
-			require.Equal(t, resource.OperationStatusSuccess, statusResult.ProgressResult.OperationStatus)
-			instanceNativeID = statusResult.ProgressResult.NativeID
-		} else {
-			t.Logf("Create result status: %s, message: %s", createResult.ProgressResult.OperationStatus, createResult.ProgressResult.StatusMessage)
-			require.Equal(t, resource.OperationStatusSuccess, createResult.ProgressResult.OperationStatus)
-			instanceNativeID = createResult.ProgressResult.NativeID
-		}
-
-		require.NotEmpty(t, instanceNativeID)
-		t.Logf("Instance created: %s", instanceNativeID)
-	})
-
-	// Cleanup function for instance
+	// Cleanup cluster
 	defer func() {
-		if instanceNativeID != "" {
-			deleteReq := &resource.DeleteRequest{
-				NativeID: instanceNativeID,
-				TargetConfig: testutil.TargetConfig,
-			}
-			deleteResult, err := instanceProv.Delete(ctx, deleteReq)
-			if err == nil && deleteResult != nil && deleteResult.ProgressResult != nil {
-				if deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
-					_, _ = testutil.PollUntilComplete(t, ctx, instanceProv,
-						deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
-							MaxAttempts:   60,
-							CheckInterval: 10 * time.Second,
-							ResourceType:  InstanceResourceType,
-							OperationName: "Delete",
-						})
-				}
-			}
-			t.Logf("Instance cleanup completed")
-		}
-	}()
-
-	// Test 2: Create Cluster
-	t.Run("CreateCluster", func(t *testing.T) {
-		require.NotEmpty(t, instanceNativeID, "Instance ID should be set")
-
-		clusterProperties := map[string]interface{}{
-			"instance":           instanceName,
-			"name":               clusterName,
-			"location":           testutil.Region + "-b", // Use zone in same region
-			"serveNodes":         1,
-			"defaultStorageType": "SSD",
-		}
-
-		propsJSON, err := json.Marshal(clusterProperties)
-		require.NoError(t, err)
-
-		createReq := &resource.CreateRequest{
-			ResourceType: ClusterResourceType,
-			Properties:   propsJSON,
-			TargetConfig: testutil.TargetConfig,
-		}
-
-		createResult, err := clusterProv.Create(ctx, createReq)
-		require.NoError(t, err)
-		require.NotNil(t, createResult)
-		require.NotNil(t, createResult.ProgressResult)
-
-		// Cluster creation is async (LRO)
-		if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
-			require.NotEmpty(t, createResult.ProgressResult.RequestID)
-			require.NotEmpty(t, createResult.ProgressResult.NativeID)
-
-			t.Logf("Cluster creation initiated: %s", createResult.ProgressResult.RequestID)
-
-			statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
-				createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
-					MaxAttempts:   60,
-					CheckInterval: 10 * time.Second,
-					ResourceType:  ClusterResourceType,
-					OperationName: "Create",
-				})
-			require.NoError(t, err)
-			require.Equal(t, resource.OperationStatusSuccess, statusResult.ProgressResult.OperationStatus)
-			clusterNativeID = statusResult.ProgressResult.NativeID
-		} else {
-			require.Equal(t, resource.OperationStatusSuccess, createResult.ProgressResult.OperationStatus)
-			clusterNativeID = createResult.ProgressResult.NativeID
-		}
-
-		require.NotEmpty(t, clusterNativeID)
-		expectedID := fmt.Sprintf("projects/%s/instances/%s/clusters/%s", testutil.Project, instanceName, clusterName)
-		assert.Equal(t, expectedID, clusterNativeID)
-		t.Logf("Cluster created: %s", clusterNativeID)
-	})
-
-	// Test 3: Read Cluster
-	t.Run("ReadCluster", func(t *testing.T) {
-		require.NotEmpty(t, clusterNativeID, "Cluster ID should be set")
-
-		readReq := &resource.ReadRequest{
-			NativeID: clusterNativeID,
-			TargetConfig: testutil.TargetConfig,
-		}
-
-		readResult, err := clusterProv.Read(ctx, readReq)
-		require.NoError(t, err)
-		require.NotNil(t, readResult)
-		require.NotEmpty(t, readResult.Properties)
-
-		var props map[string]interface{}
-		err = json.Unmarshal([]byte(readResult.Properties), &props)
-		require.NoError(t, err)
-
-		// Verify key properties
-		assert.Contains(t, props["name"].(string), clusterName)
-		assert.Equal(t, fmt.Sprintf("projects/%s/locations/%s", testutil.Project, testutil.Region+"-b"), props["location"])
-		assert.Equal(t, "READY", props["state"])
-		assert.Equal(t, "SSD", props["defaultStorageType"])
-
-		t.Logf("Cluster properties: %+v", props)
-	})
-
-	// Test 4: List Clusters
-	t.Run("ListClusters", func(t *testing.T) {
-		require.NotEmpty(t, instanceName, "Instance name should be set")
-
-		listReq := &resource.ListRequest{
-			ResourceType: ClusterResourceType,
-			TargetConfig: testutil.TargetConfig,
-			AdditionalProperties: map[string]string{
-				"instance": instanceName,
-			},
-		}
-
-		listResult, err := clusterProv.List(ctx, listReq)
-		require.NoError(t, err)
-		require.NotNil(t, listResult)
-		require.NotEmpty(t, listResult.NativeIDs)
-
-		// Verify our cluster is in the list
-		found := false
-		for _, id := range listResult.NativeIDs {
-			if id == clusterNativeID {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "Our cluster should be in the list")
-		t.Logf("Listed %d clusters in instance", len(listResult.NativeIDs))
-	})
-
-	// Test 5: Update Cluster (should return NotUpdatable)
-	t.Run("UpdateCluster", func(t *testing.T) {
-		require.NotEmpty(t, clusterNativeID)
-
-		updatedProperties := map[string]interface{}{
-			"instance":   instanceName,
-			"name":       clusterName,
-			"serveNodes": 2,
-		}
-
-		propsJSON, err := json.Marshal(updatedProperties)
-		require.NoError(t, err)
-
-		updateReq := &resource.UpdateRequest{
-			NativeID:          clusterNativeID,
-			ResourceType:      ClusterResourceType,
-			DesiredProperties: propsJSON,
-			TargetConfig:      testutil.TargetConfig,
-		}
-
-		updateResult, err := clusterProv.Update(ctx, updateReq)
-		require.NoError(t, err)
-		require.NotNil(t, updateResult)
-		require.Equal(t, resource.OperationStatusFailure, updateResult.ProgressResult.OperationStatus)
-		require.Equal(t, resource.OperationErrorCodeNotUpdatable, updateResult.ProgressResult.ErrorCode)
-
-		t.Logf("Update correctly returned NotUpdatable")
-	})
-
-	// Test 6: Delete Cluster
-	t.Run("DeleteCluster", func(t *testing.T) {
-		require.NotEmpty(t, clusterNativeID)
-
 		deleteReq := &resource.DeleteRequest{
-			NativeID: clusterNativeID,
+			NativeID:     clusterNativeID,
 			TargetConfig: testutil.TargetConfig,
 		}
-
-		deleteResult, err := clusterProv.Delete(ctx, deleteReq)
-		require.NoError(t, err)
-		require.NotNil(t, deleteResult)
-
-		if deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
-			statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+		deleteResult, _ := clusterProv.Delete(ctx, deleteReq)
+		if deleteResult != nil && deleteResult.ProgressResult != nil &&
+			deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress &&
+			deleteResult.ProgressResult.RequestID != "" {
+			_, _ = testutil.PollUntilComplete(t, ctx, clusterProv,
 				deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
 					MaxAttempts:   60,
 					CheckInterval: 10 * time.Second,
 					ResourceType:  ClusterResourceType,
 					OperationName: "Delete",
 				})
-			require.NoError(t, err)
-			require.Equal(t, resource.OperationStatusSuccess, statusResult.ProgressResult.OperationStatus)
-		} else {
-			require.Equal(t, resource.OperationStatusSuccess, deleteResult.ProgressResult.OperationStatus)
 		}
+	}()
 
-		t.Logf("Cluster deleted: %s", clusterNativeID)
-	})
-
-	// Test 7: Verify Cluster is Deleted
-	t.Run("VerifyClusterDeleted", func(t *testing.T) {
-		require.NotEmpty(t, clusterNativeID)
-
-		readReq := &resource.ReadRequest{
-			NativeID: clusterNativeID,
-			TargetConfig: testutil.TargetConfig,
-		}
-
-		readResult, err := clusterProv.Read(ctx, readReq)
-		require.NoError(t, err)
-		require.NotNil(t, readResult)
-		require.Equal(t, resource.OperationErrorCodeNotFound, readResult.ErrorCode)
-
-		t.Logf("Verified cluster is deleted (not found)")
-	})
+	require.NotEmpty(t, clusterNativeID)
+	expectedID := fmt.Sprintf("projects/%s/instances/%s/clusters/%s", testutil.Project, instanceName, clusterName)
+	assert.Equal(t, expectedID, clusterNativeID)
+	t.Logf("Cluster created: %s", clusterNativeID)
 }
 
-// TestClusterReadNonExistent tests reading a non-existent cluster
-func TestClusterReadNonExistent(t *testing.T) {
+// TestCluster_Read_Integration tests reading a Bigtable cluster.
+func TestCluster_Read_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
 	ctx := context.Background()
+	instanceName, _, cleanupInstance := createTestProductionInstance(t, ctx)
+	defer cleanupInstance()
 
 	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
 	require.NoError(t, err)
 
+	clusterName := fmt.Sprintf("cluster-%s", strings.ToLower(uuid.New().String()[:6]))
+
+	// Create cluster
+	clusterProperties := map[string]interface{}{
+		"instance":           instanceName,
+		"name":               clusterName,
+		"location":           testutil.Region + "-b",
+		"serveNodes":         1,
+		"defaultStorageType": "SSD",
+	}
+
+	propsJSON, err := json.Marshal(clusterProperties)
+	require.NoError(t, err)
+
+	createReq := &resource.CreateRequest{
+		ResourceType: ClusterResourceType,
+		Properties:   propsJSON,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	createResult, err := clusterProv.Create(ctx, createReq)
+	require.NoError(t, err)
+
+	var clusterNativeID string
+	if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+		statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+			createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  ClusterResourceType,
+				OperationName: "Create",
+			})
+		require.NoError(t, err)
+		clusterNativeID = statusResult.ProgressResult.NativeID
+	} else {
+		clusterNativeID = createResult.ProgressResult.NativeID
+	}
+
+	defer func() {
+		deleteReq := &resource.DeleteRequest{
+			NativeID:     clusterNativeID,
+			TargetConfig: testutil.TargetConfig,
+		}
+		deleteResult, _ := clusterProv.Delete(ctx, deleteReq)
+		if deleteResult != nil && deleteResult.ProgressResult != nil &&
+			deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress &&
+			deleteResult.ProgressResult.RequestID != "" {
+			_, _ = testutil.PollUntilComplete(t, ctx, clusterProv,
+				deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+					MaxAttempts:   60,
+					CheckInterval: 10 * time.Second,
+					ResourceType:  ClusterResourceType,
+					OperationName: "Delete",
+				})
+		}
+	}()
+
+	// Read cluster
+	readReq := &resource.ReadRequest{
+		NativeID:     clusterNativeID,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	readResult, err := clusterProv.Read(ctx, readReq)
+	require.NoError(t, err)
+	require.NotNil(t, readResult)
+	require.NotEmpty(t, readResult.Properties)
+
+	var props map[string]interface{}
+	err = json.Unmarshal([]byte(readResult.Properties), &props)
+	require.NoError(t, err)
+
+	assert.Contains(t, props["name"].(string), clusterName)
+	assert.Equal(t, fmt.Sprintf("projects/%s/locations/%s", testutil.Project, testutil.Region+"-b"), props["location"])
+	assert.Equal(t, "READY", props["state"])
+	assert.Equal(t, "SSD", props["defaultStorageType"])
+	t.Logf("Cluster read successfully")
+}
+
+// TestCluster_Update_NotUpdatable_Integration tests that cluster updates return NotUpdatable.
+func TestCluster_Update_NotUpdatable_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	ctx := context.Background()
+	instanceName, _, cleanupInstance := createTestProductionInstance(t, ctx)
+	defer cleanupInstance()
+
+	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
+	require.NoError(t, err)
+
+	clusterName := fmt.Sprintf("cluster-%s", strings.ToLower(uuid.New().String()[:6]))
+
+	// Create cluster
+	clusterProperties := map[string]interface{}{
+		"instance":           instanceName,
+		"name":               clusterName,
+		"location":           testutil.Region + "-b",
+		"serveNodes":         1,
+		"defaultStorageType": "SSD",
+	}
+
+	propsJSON, err := json.Marshal(clusterProperties)
+	require.NoError(t, err)
+
+	createReq := &resource.CreateRequest{
+		ResourceType: ClusterResourceType,
+		Properties:   propsJSON,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	createResult, err := clusterProv.Create(ctx, createReq)
+	require.NoError(t, err)
+
+	var clusterNativeID string
+	if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+		statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+			createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  ClusterResourceType,
+				OperationName: "Create",
+			})
+		require.NoError(t, err)
+		clusterNativeID = statusResult.ProgressResult.NativeID
+	} else {
+		clusterNativeID = createResult.ProgressResult.NativeID
+	}
+
+	defer func() {
+		deleteReq := &resource.DeleteRequest{
+			NativeID:     clusterNativeID,
+			TargetConfig: testutil.TargetConfig,
+		}
+		deleteResult, _ := clusterProv.Delete(ctx, deleteReq)
+		if deleteResult != nil && deleteResult.ProgressResult != nil &&
+			deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress &&
+			deleteResult.ProgressResult.RequestID != "" {
+			_, _ = testutil.PollUntilComplete(t, ctx, clusterProv,
+				deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+					MaxAttempts:   60,
+					CheckInterval: 10 * time.Second,
+					ResourceType:  ClusterResourceType,
+					OperationName: "Delete",
+				})
+		}
+	}()
+
+	// Attempt to update
+	updatedProperties := map[string]interface{}{
+		"instance":   instanceName,
+		"name":       clusterName,
+		"serveNodes": 2,
+	}
+
+	updatedPropsJSON, err := json.Marshal(updatedProperties)
+	require.NoError(t, err)
+
+	updateReq := &resource.UpdateRequest{
+		NativeID:          clusterNativeID,
+		ResourceType:      ClusterResourceType,
+		DesiredProperties: updatedPropsJSON,
+		TargetConfig:      testutil.TargetConfig,
+	}
+
+	updateResult, err := clusterProv.Update(ctx, updateReq)
+	require.NoError(t, err)
+	require.NotNil(t, updateResult)
+	require.Equal(t, resource.OperationStatusFailure, updateResult.ProgressResult.OperationStatus)
+	require.Equal(t, resource.OperationErrorCodeNotUpdatable, updateResult.ProgressResult.ErrorCode)
+	t.Logf("Update correctly returned NotUpdatable")
+}
+
+// TestCluster_Delete_Integration tests deleting a Bigtable cluster.
+func TestCluster_Delete_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	ctx := context.Background()
+	instanceName, _, cleanupInstance := createTestProductionInstance(t, ctx)
+	defer cleanupInstance()
+
+	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
+	require.NoError(t, err)
+
+	clusterName := fmt.Sprintf("cluster-%s", strings.ToLower(uuid.New().String()[:6]))
+
+	// Create cluster
+	clusterProperties := map[string]interface{}{
+		"instance":           instanceName,
+		"name":               clusterName,
+		"location":           testutil.Region + "-b",
+		"serveNodes":         1,
+		"defaultStorageType": "SSD",
+	}
+
+	propsJSON, err := json.Marshal(clusterProperties)
+	require.NoError(t, err)
+
+	createReq := &resource.CreateRequest{
+		ResourceType: ClusterResourceType,
+		Properties:   propsJSON,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	createResult, err := clusterProv.Create(ctx, createReq)
+	require.NoError(t, err)
+
+	var clusterNativeID string
+	if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+		statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+			createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  ClusterResourceType,
+				OperationName: "Create",
+			})
+		require.NoError(t, err)
+		clusterNativeID = statusResult.ProgressResult.NativeID
+	} else {
+		clusterNativeID = createResult.ProgressResult.NativeID
+	}
+
+	// Delete cluster
+	deleteReq := &resource.DeleteRequest{
+		NativeID:     clusterNativeID,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	deleteResult, err := clusterProv.Delete(ctx, deleteReq)
+	require.NoError(t, err)
+	require.NotNil(t, deleteResult)
+
+	if deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress &&
+		deleteResult.ProgressResult.RequestID != "" {
+		statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+			deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  ClusterResourceType,
+				OperationName: "Delete",
+			})
+		require.NoError(t, err)
+		require.Equal(t, resource.OperationStatusSuccess, statusResult.ProgressResult.OperationStatus)
+	} else {
+		require.Equal(t, resource.OperationStatusSuccess, deleteResult.ProgressResult.OperationStatus)
+	}
+	t.Logf("Cluster deleted: %s", clusterNativeID)
+
+	// Verify it's deleted
+	readReq := &resource.ReadRequest{
+		NativeID:     clusterNativeID,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	readResult, err := clusterProv.Read(ctx, readReq)
+	require.NoError(t, err)
+	require.Equal(t, resource.OperationErrorCodeNotFound, readResult.ErrorCode)
+	t.Logf("Verified cluster is deleted (not found)")
+}
+
+// TestCluster_Delete_NotFound_Integration tests deleting a non-existent cluster.
+func TestCluster_Delete_NotFound_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	ctx := context.Background()
+	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
+	require.NoError(t, err)
+
 	nonExistentID := fmt.Sprintf("projects/%s/instances/nonexistent/clusters/nonexistent-%s",
-		testutil.Project,
-		strings.ToLower(uuid.New().String()[:8]))
+		testutil.Project, strings.ToLower(uuid.New().String()[:8]))
+
+	deleteReq := &resource.DeleteRequest{
+		NativeID:     nonExistentID,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	deleteResult, err := clusterProv.Delete(ctx, deleteReq)
+	require.NoError(t, err)
+	require.NotNil(t, deleteResult)
+	// Bigtable returns Failure for non-existent resources
+	require.Equal(t, resource.OperationStatusFailure, deleteResult.ProgressResult.OperationStatus)
+	t.Logf("Delete non-existent cluster returned status: %s", deleteResult.ProgressResult.OperationStatus)
+}
+
+// TestCluster_List_Integration tests listing Bigtable clusters.
+func TestCluster_List_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	ctx := context.Background()
+	instanceName, _, cleanupInstance := createTestProductionInstance(t, ctx)
+	defer cleanupInstance()
+
+	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
+	require.NoError(t, err)
+
+	clusterName := fmt.Sprintf("cluster-%s", strings.ToLower(uuid.New().String()[:6]))
+
+	// Create cluster
+	clusterProperties := map[string]interface{}{
+		"instance":           instanceName,
+		"name":               clusterName,
+		"location":           testutil.Region + "-b",
+		"serveNodes":         1,
+		"defaultStorageType": "SSD",
+	}
+
+	propsJSON, err := json.Marshal(clusterProperties)
+	require.NoError(t, err)
+
+	createReq := &resource.CreateRequest{
+		ResourceType: ClusterResourceType,
+		Properties:   propsJSON,
+		TargetConfig: testutil.TargetConfig,
+	}
+
+	createResult, err := clusterProv.Create(ctx, createReq)
+	require.NoError(t, err)
+
+	var clusterNativeID string
+	if createResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+		statusResult, err := testutil.PollUntilComplete(t, ctx, clusterProv,
+			createResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+				MaxAttempts:   60,
+				CheckInterval: 10 * time.Second,
+				ResourceType:  ClusterResourceType,
+				OperationName: "Create",
+			})
+		require.NoError(t, err)
+		clusterNativeID = statusResult.ProgressResult.NativeID
+	} else {
+		clusterNativeID = createResult.ProgressResult.NativeID
+	}
+
+	defer func() {
+		deleteReq := &resource.DeleteRequest{
+			NativeID:     clusterNativeID,
+			TargetConfig: testutil.TargetConfig,
+		}
+		deleteResult, _ := clusterProv.Delete(ctx, deleteReq)
+		if deleteResult != nil && deleteResult.ProgressResult != nil &&
+			deleteResult.ProgressResult.OperationStatus == resource.OperationStatusInProgress &&
+			deleteResult.ProgressResult.RequestID != "" {
+			_, _ = testutil.PollUntilComplete(t, ctx, clusterProv,
+				deleteResult.ProgressResult.RequestID, testutil.TargetConfig, testutil.PollConfig{
+					MaxAttempts:   60,
+					CheckInterval: 10 * time.Second,
+					ResourceType:  ClusterResourceType,
+					OperationName: "Delete",
+				})
+		}
+	}()
+
+	// List clusters
+	listReq := &resource.ListRequest{
+		ResourceType: ClusterResourceType,
+		TargetConfig: testutil.TargetConfig,
+		AdditionalProperties: map[string]string{
+			"instance": instanceName,
+		},
+	}
+
+	listResult, err := clusterProv.List(ctx, listReq)
+	require.NoError(t, err)
+	require.NotNil(t, listResult)
+	require.NotEmpty(t, listResult.NativeIDs)
+	t.Logf("Listed %d clusters in instance", len(listResult.NativeIDs))
+
+	// Verify our cluster is in the list
+	found := false
+	for _, id := range listResult.NativeIDs {
+		if id == clusterNativeID {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Created cluster should be in the list")
+}
+
+// TestCluster_Read_NotFound_Integration tests reading a non-existent cluster.
+func TestCluster_Read_NotFound_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+
+	ctx := context.Background()
+	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
+	require.NoError(t, err)
+
+	nonExistentID := fmt.Sprintf("projects/%s/instances/nonexistent/clusters/nonexistent-%s",
+		testutil.Project, strings.ToLower(uuid.New().String()[:8]))
 
 	readReq := &resource.ReadRequest{
-		NativeID: nonExistentID,
+		NativeID:     nonExistentID,
 		TargetConfig: testutil.TargetConfig,
 	}
 
@@ -322,20 +604,23 @@ func TestClusterReadNonExistent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, readResult)
 	require.Equal(t, resource.OperationErrorCodeNotFound, readResult.ErrorCode)
-
-	t.Logf("Correctly handled read of non-existent cluster: %s", nonExistentID)
+	t.Logf("Correctly handled read of non-existent cluster")
 }
 
-// TestClusterCreateMissingInstance tests creating a cluster without specifying instance
-func TestClusterCreateMissingInstance(t *testing.T) {
-	ctx := context.Background()
+// TestCluster_CreateInvalid_Integration tests error handling for invalid create requests.
+func TestCluster_CreateInvalid_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 
+	ctx := context.Background()
 	clusterProv, err := NewBigtableProvisioner(testutil.Config, ClusterResourceType)
 	require.NoError(t, err)
 
+	// Test with missing instance
 	clusterProperties := map[string]interface{}{
 		"name":               "test-cluster",
-		"location":           testutil.Region + "-a", // Use zone in same region
+		"location":           testutil.Region + "-a",
 		"serveNodes":         1,
 		"defaultStorageType": "SSD",
 	}
@@ -355,6 +640,5 @@ func TestClusterCreateMissingInstance(t *testing.T) {
 	require.Equal(t, resource.OperationStatusFailure, createResult.ProgressResult.OperationStatus)
 	require.Equal(t, resource.OperationErrorCodeInvalidRequest, createResult.ProgressResult.ErrorCode)
 	assert.Contains(t, createResult.ProgressResult.StatusMessage, "instance")
-
 	t.Logf("Correctly rejected create with missing instance")
 }

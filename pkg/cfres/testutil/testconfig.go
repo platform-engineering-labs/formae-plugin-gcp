@@ -19,6 +19,9 @@ var (
 	ProjectNumber = getEnvOrDefault("GCP_PROJECT_NUMBER", "989754770009")
 	Region        = getEnvOrDefault("GCP_REGION", "europe-central2")
 	Zone          = getEnvOrDefault("GCP_ZONE", "europe-central2-b")
+	// Location is used for Container/GKE and CloudRun resources (ScopeLocationBased)
+	// Defaults to Region if not explicitly set
+	Location = getEnvOrDefault("GCP_LOCATION", Region)
 
 	// CredentialsFile from GCP_CREDENTIALS_FILE env var.
 	// If empty, Application Default Credentials (ADC) will be used.
@@ -27,14 +30,16 @@ var (
 	Config = &config.Config{
 		Project:         Project,
 		Region:          Region,
+		Location:        Location,
 		CredentialsFile: CredentialsFile,
 	}
 
 	// TargetConfig is a json.RawMessage containing the target configuration
 	TargetConfig = func() json.RawMessage {
 		cfg := map[string]interface{}{
-			"Project": Project,
-			"Region":  Region,
+			"Project":  Project,
+			"Region":   Region,
+			"Location": Location,
 		}
 		if CredentialsFile != "" {
 			cfg["CredentialsFile"] = CredentialsFile

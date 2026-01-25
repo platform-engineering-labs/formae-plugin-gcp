@@ -504,7 +504,68 @@ func TestClusterWithPrivateNodes(t *testing.T) {
 	ctx := context.Background()
 	networkNativeID := ""
 	subnetworkNativeID := ""
+	clusterNativeID := ""
 	networkSelfLink := ""
+
+	// Cleanup resources if test fails
+	defer func() {
+		// Delete cluster first (if exists)
+		if clusterNativeID != "" {
+			t.Logf("Cleaning up cluster: %s", clusterNativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     clusterNativeID,
+				ResourceType: "GCP::Container::Cluster",
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := cluster.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete cluster: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, cluster, deleteRes, testutil.TargetConfig, "GCP::Container::Cluster")
+				}
+				t.Logf("Cluster deleted: %s", clusterNativeID)
+			}
+		}
+
+		// Delete subnetwork
+		if subnetworkNativeID != "" {
+			t.Logf("Cleaning up subnetwork: %s", subnetworkNativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     subnetworkNativeID,
+				ResourceType: "GCP::Compute::Subnetwork",
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := subnetwork.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete subnetwork: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, subnetwork, deleteRes, testutil.TargetConfig, "GCP::Compute::Subnetwork")
+				}
+				t.Logf("Subnetwork deleted: %s", subnetworkNativeID)
+			}
+		}
+
+		// Delete network
+		if networkNativeID != "" {
+			t.Logf("Cleaning up network: %s", networkNativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     networkNativeID,
+				ResourceType: "GCP::Compute::Network",
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := network.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete network: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, network, deleteRes, testutil.TargetConfig, "GCP::Compute::Network")
+				}
+				t.Logf("Network deleted: %s", networkNativeID)
+			}
+		}
+	}()
 
 	// Create network
 	t.Run("SetupNetwork", func(t *testing.T) {
@@ -622,14 +683,19 @@ func TestClusterWithPrivateNodes(t *testing.T) {
 		createResult, err := cluster.Create(ctx, createReq)
 		require.NoError(t, err)
 
-		statusResult, err := testutil.WaitForCreate(t, ctx, cluster, createResult, testutil.TargetConfig, "GCP::Container::Cluster")
+		// GKE private cluster creation can take 15+ minutes
+		pollConfig := testutil.NewPollConfig().ForCreate().WithResourceType("GCP::Container::Cluster").Build()
+		pollConfig.MaxAttempts = 150
+		pollConfig.CheckInterval = 10 * time.Second
+
+		statusResult, err := testutil.WaitForCreateWithConfig(t, ctx, cluster, createResult, testutil.TargetConfig, "GCP::Container::Cluster", pollConfig)
 		require.NoError(t, err)
 
-		nativeID := statusResult.ProgressResult.NativeID
+		clusterNativeID = statusResult.ProgressResult.NativeID
 
 		// Verify private cluster properties
 		readReq := &resource.ReadRequest{
-			NativeID:     nativeID,
+			NativeID:     clusterNativeID,
 			TargetConfig: testutil.TargetConfig,
 			ResourceType: "GCP::Container::Cluster",
 		}
@@ -648,9 +714,9 @@ func TestClusterWithPrivateNodes(t *testing.T) {
 
 		t.Logf("Private cluster created successfully")
 
-		// Cleanup
+		// Cleanup cluster
 		deleteReq := &resource.DeleteRequest{
-			NativeID:     nativeID,
+			NativeID:     clusterNativeID,
 			TargetConfig: testutil.TargetConfig,
 			ResourceType: "GCP::Container::Cluster",
 		}
@@ -658,6 +724,9 @@ func TestClusterWithPrivateNodes(t *testing.T) {
 		require.NoError(t, err)
 		_, err = testutil.WaitForDelete(t, ctx, cluster, deleteResult, testutil.TargetConfig, "GCP::Container::Cluster")
 		require.NoError(t, err)
+
+		// Clear so defer doesn't double-delete
+		clusterNativeID = ""
 	})
 
 	// Cleanup subnetwork
@@ -671,6 +740,9 @@ func TestClusterWithPrivateNodes(t *testing.T) {
 		require.NoError(t, err)
 		_, err = testutil.WaitForDelete(t, ctx, subnetwork, deleteResult, testutil.TargetConfig, "GCP::Compute::Subnetwork")
 		require.NoError(t, err)
+
+		// Clear so defer doesn't double-delete
+		subnetworkNativeID = ""
 	})
 
 	// Cleanup network
@@ -684,6 +756,9 @@ func TestClusterWithPrivateNodes(t *testing.T) {
 		require.NoError(t, err)
 		_, err = testutil.WaitForDelete(t, ctx, network, deleteResult, testutil.TargetConfig, "GCP::Compute::Network")
 		require.NoError(t, err)
+
+		// Clear so defer doesn't double-delete
+		networkNativeID = ""
 	})
 }
 
@@ -738,7 +813,68 @@ func TestClusterWithAutopilot(t *testing.T) {
 	ctx := context.Background()
 	networkNativeID := ""
 	subnetworkNativeID := ""
+	clusterNativeID := ""
 	networkSelfLink := ""
+
+	// Cleanup resources if test fails
+	defer func() {
+		// Delete cluster first (if exists)
+		if clusterNativeID != "" {
+			t.Logf("Cleaning up cluster: %s", clusterNativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     clusterNativeID,
+				ResourceType: "GCP::Container::Cluster",
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := cluster.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete cluster: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, cluster, deleteRes, testutil.TargetConfig, "GCP::Container::Cluster")
+				}
+				t.Logf("Cluster deleted: %s", clusterNativeID)
+			}
+		}
+
+		// Delete subnetwork
+		if subnetworkNativeID != "" {
+			t.Logf("Cleaning up subnetwork: %s", subnetworkNativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     subnetworkNativeID,
+				ResourceType: "GCP::Compute::Subnetwork",
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := subnetwork.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete subnetwork: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, subnetwork, deleteRes, testutil.TargetConfig, "GCP::Compute::Subnetwork")
+				}
+				t.Logf("Subnetwork deleted: %s", subnetworkNativeID)
+			}
+		}
+
+		// Delete network
+		if networkNativeID != "" {
+			t.Logf("Cleaning up network: %s", networkNativeID)
+			deleteReq := &resource.DeleteRequest{
+				NativeID:     networkNativeID,
+				ResourceType: "GCP::Compute::Network",
+				TargetConfig: testutil.TargetConfig,
+			}
+			deleteRes, err := network.Delete(ctx, deleteReq)
+			if err != nil {
+				t.Logf("Failed to delete network: %v", err)
+			} else if deleteRes != nil && deleteRes.ProgressResult != nil {
+				if deleteRes.ProgressResult.OperationStatus == resource.OperationStatusInProgress {
+					_, _ = testutil.WaitForDelete(t, ctx, network, deleteRes, testutil.TargetConfig, "GCP::Compute::Network")
+				}
+				t.Logf("Network deleted: %s", networkNativeID)
+			}
+		}
+	}()
 
 	// Create network
 	t.Run("SetupNetwork", func(t *testing.T) {
@@ -840,11 +976,11 @@ func TestClusterWithAutopilot(t *testing.T) {
 		statusResult, err := testutil.WaitForCreate(t, ctx, cluster, createResult, testutil.TargetConfig, "GCP::Container::Cluster")
 		require.NoError(t, err)
 
-		nativeID := statusResult.ProgressResult.NativeID
+		clusterNativeID = statusResult.ProgressResult.NativeID
 
 		// Verify autopilot configuration
 		readReq := &resource.ReadRequest{
-			NativeID:     nativeID,
+			NativeID:     clusterNativeID,
 			TargetConfig: testutil.TargetConfig,
 			ResourceType: "GCP::Container::Cluster",
 		}
@@ -862,9 +998,9 @@ func TestClusterWithAutopilot(t *testing.T) {
 
 		t.Logf("Autopilot cluster created successfully")
 
-		// Cleanup
+		// Cleanup cluster
 		deleteReq := &resource.DeleteRequest{
-			NativeID:     nativeID,
+			NativeID:     clusterNativeID,
 			TargetConfig: testutil.TargetConfig,
 			ResourceType: "GCP::Container::Cluster",
 		}
@@ -872,6 +1008,9 @@ func TestClusterWithAutopilot(t *testing.T) {
 		require.NoError(t, err)
 		_, err = testutil.WaitForDelete(t, ctx, cluster, deleteResult, testutil.TargetConfig, "GCP::Container::Cluster")
 		require.NoError(t, err)
+
+		// Clear so defer doesn't double-delete
+		clusterNativeID = ""
 	})
 
 	// Cleanup subnetwork
@@ -885,6 +1024,9 @@ func TestClusterWithAutopilot(t *testing.T) {
 		require.NoError(t, err)
 		_, err = testutil.WaitForDelete(t, ctx, subnetwork, deleteResult, testutil.TargetConfig, "GCP::Compute::Subnetwork")
 		require.NoError(t, err)
+
+		// Clear so defer doesn't double-delete
+		subnetworkNativeID = ""
 	})
 
 	// Cleanup network
@@ -898,5 +1040,8 @@ func TestClusterWithAutopilot(t *testing.T) {
 		require.NoError(t, err)
 		_, err = testutil.WaitForDelete(t, ctx, network, deleteResult, testutil.TargetConfig, "GCP::Compute::Network")
 		require.NoError(t, err)
+
+		// Clear so defer doesn't double-delete
+		networkNativeID = ""
 	})
 }

@@ -13,7 +13,7 @@ import "@gcp/storage/bucket.pkl"
 import "./vars.pkl" as v
 
 forma {
-   v.stack
+  v.stack
   v.target
 
   new bucket.Bucket {
