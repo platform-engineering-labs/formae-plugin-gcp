@@ -137,6 +137,12 @@ func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, c
 	}
 }
 
+// FillPathContextFromTarget is the public version of fillPathContextFromTarget
+// It fills missing fields in PathContext from target config
+func (b *BaseResource) FillPathContextFromTarget(targetConfig json.RawMessage, ctx *PathContext) {
+	b.fillPathContextFromTarget(targetConfig, ctx)
+}
+
 // buildTransformContext builds a TransformContext for transformers
 func (b *BaseResource) buildTransformContext(pathCtx PathContext, operation resource.Operation) TransformContext {
 	return TransformContext{

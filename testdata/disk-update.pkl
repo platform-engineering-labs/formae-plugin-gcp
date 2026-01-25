@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/gcp.pkl"
+
+import "@gcp/compute/disk.pkl"
+
+local stackName = "plugin-sdk-test-stack"
+// Read the test run ID from environment variable set by the test harness
+// This ensures consistent naming within a test run but unique names between runs
+local testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+// Read GCP config from environment variables
+local gcpProject = read("env:GCP_PROJECT_ID")
+local gcpZone = read("env:GCP_ZONE")
+
+forma {
+  new formae.Stack {
+    label = stackName
+    description = "Plugin SDK test for GCP Compute Disk"
+  }
+
+  new formae.Target {
+    label = "gcp-target"
+    config = new gcp.Config {
+      project = gcpProject
+      zone = gcpZone
+      credentialsFile = read("env:GCP_CREDENTIALS_FILE")
+    }
+  }
+
+  new disk.Disk {
+    label = "plugin-sdk-test-disk"
+    project = gcpProject
+    zone = gcpZone
+    name = "formae-plugin-sdk-test-\(testRunID)"
+    description = "Test disk for plugin SDK tests"
+    sizeGb = 10
+    type = "pd-standard"
+    sourceImage = formae.value("projects/debian-cloud/global/images/family/debian-12")
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+      ["updated"] = "true"  // New label added in update
+    }
+  }
+}

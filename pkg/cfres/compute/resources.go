@@ -93,21 +93,7 @@ func init() {
 			RequestTransformer:  nil, // Pass through properties
 			ResponseTransformer: base.RegionResponseTransformer,
 		},
-		{
-			ResourceType: DiskResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType: "disks",
-				Scope: &base.ScopeConfig{
-					Type: base.ScopeZonal,
-				},
-				// Disk updates for labels require the setLabels API, not standard PATCH
-				// For now, disable updates - can be implemented with custom handler later
-				SupportsUpdate:    false,
-				OptimisticLocking: nil,
-			},
-			RequestTransformer:  base.RequestTransformerFunc(diskRequestTransformer),
-			ResponseTransformer: base.ResponseTransformerFunc(diskResponseTransformer),
-		},
+		// Note: DiskResourceType is registered separately in disk.go with custom setLabels update handler
 		{
 			ResourceType: InstanceResourceType,
 			ResourceConfig: base.ResourceConfig{
