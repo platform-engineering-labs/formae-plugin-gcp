@@ -9,8 +9,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.0.0-20260120041653-c26026025caf
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.1
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.3
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.2
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.4
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
 	google.golang.org/grpc v1.77.0
@@ -42,7 +42,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/masterminds/semver v1.5.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
-	github.com/platform-engineering-labs/formae/pkg/api/model v0.0.0-20260120144850-43ba653cd83d // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/theory/jsonpath v0.10.2 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
