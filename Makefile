@@ -16,7 +16,6 @@ PLUGIN_NAMESPACE := $(shell pkl eval -x 'namespace' formae-plugin.pkl 2>/dev/nul
 GO := go
 GOFLAGS := -trimpath
 BINARY := $(PLUGIN_NAME)
-FORMAE_REF ?= 41f0eaad79bab7c8d9eadca1b2e33b7d1efffc07
 
 # Installation paths
 # Plugin discovery expects lowercase directory names matching the plugin name
