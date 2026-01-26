@@ -18,11 +18,11 @@ GOFLAGS := -trimpath
 BINARY := $(PLUGIN_NAME)
 
 # Installation paths
-# NOTE: Directory structure will change from <namespace> to <name> in a future version
+# Plugin discovery expects lowercase directory names matching the plugin name
 PLUGIN_BASE_DIR := $(HOME)/.pel/formae/plugins
-INSTALL_DIR := $(PLUGIN_BASE_DIR)/$(PLUGIN_NAMESPACE)/v$(PLUGIN_VERSION)
+INSTALL_DIR := $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)/v$(PLUGIN_VERSION)
 
-.PHONY: all build test test-unit test-integration lint clean install help setup-credentials clean-environment conformance-test
+.PHONY: all build test test-unit test-integration lint clean install help clean-environment conformance-test conformance-test-crud conformance-test-discovery
 
 all: build
 
@@ -52,11 +52,11 @@ clean:
 	rm -rf bin/ dist/
 
 ## install: Build and install plugin locally (binary + schema + manifest)
-## Installs to ~/.pel/formae/plugins/<namespace>/v<version>/
+## Installs to ~/.pel/formae/plugins/<name>/v<version>/
 ## Removes any existing versions of the plugin first to ensure clean state.
 install: build
 	@echo "Installing $(PLUGIN_NAME) v$(PLUGIN_VERSION) (namespace: $(PLUGIN_NAMESPACE))..."
-	@rm -rf $(PLUGIN_BASE_DIR)/$(PLUGIN_NAMESPACE)
+	@rm -rf $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)
 	@mkdir -p $(INSTALL_DIR)/schema/pkl
 	@cp bin/$(BINARY) $(INSTALL_DIR)/$(BINARY)
 	@cp -r schema/pkl/* $(INSTALL_DIR)/schema/pkl/
@@ -71,27 +71,44 @@ help:
 	@echo "Available targets:"
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /'
 
-## setup-credentials: Provision cloud provider credentials
-## Edit scripts/ci/setup-credentials.sh to configure for your provider.
-setup-credentials:
-	@./scripts/ci/setup-credentials.sh
-
 ## clean-environment: Clean up test resources in cloud environment
 ## Called before and after conformance tests. Edit scripts/ci/clean-environment.sh
 ## to configure for your provider.
 clean-environment:
 	@./scripts/ci/clean-environment.sh
 
-## conformance-test: Run conformance tests against formae
-## Usage: make conformance-test [VERSION=0.76.0]
+## conformance-test: Run all conformance tests (CRUD + discovery)
+## Usage: make conformance-test [VERSION=0.80.0] [TEST=s3-bucket]
 ## Downloads the specified formae version (or latest) and runs conformance tests.
-## Calls setup-credentials and clean-environment automatically.
-conformance-test: install setup-credentials
+## Calls clean-environment before and after tests.
+##
+## Parameters:
+##   VERSION - Formae version to test against (default: latest)
+##   TEST    - Filter tests by name pattern (e.g., TEST=s3-bucket)
+conformance-test: conformance-test-crud conformance-test-discovery
+
+## conformance-test-crud: Run only CRUD lifecycle tests
+## Usage: make conformance-test-crud [VERSION=0.80.0] [TEST=s3-bucket]
+conformance-test-crud: install
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
-	@echo "Running conformance tests..."
-	@./scripts/run-conformance-tests.sh $(VERSION); \
+	@echo "Running CRUD conformance tests..."
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud ./scripts/run-conformance-tests.sh $(VERSION); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	echo "Post-test cleanup..."; \
+	./scripts/ci/clean-environment.sh || true; \
+	exit $$TEST_EXIT
+
+## conformance-test-discovery: Run only discovery tests
+## Usage: make conformance-test-discovery [VERSION=0.80.0] [TEST=s3-bucket]
+conformance-test-discovery: install
+	@echo "Pre-test cleanup..."
+	@./scripts/ci/clean-environment.sh || true
+	@echo ""
+	@echo "Running discovery conformance tests..."
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery ./scripts/run-conformance-tests.sh $(VERSION); \
 	TEST_EXIT=$$?; \
 	echo ""; \
 	echo "Post-test cleanup..."; \
