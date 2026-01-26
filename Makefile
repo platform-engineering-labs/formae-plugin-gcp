@@ -16,6 +16,7 @@ PLUGIN_NAMESPACE := $(shell pkl eval -x 'namespace' formae-plugin.pkl 2>/dev/nul
 GO := go
 GOFLAGS := -trimpath
 BINARY := $(PLUGIN_NAME)
+FORMAE_REF ?= 41f0eaad79bab7c8d9eadca1b2e33b7d1efffc07
 
 # Installation paths
 # Plugin discovery expects lowercase directory names matching the plugin name
@@ -50,6 +51,14 @@ lint:
 ## clean: Remove build artifacts
 clean:
 	rm -rf bin/ dist/
+
+## verify-schema: Verify plugin schema files against PKL spec
+verify-schema:
+	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema ./schema/pkl
+
+## schema-docs: Generate documentation for plugin schema in markdown format
+schema-docs:
+	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/schema-docs --format markdown ./schema/pkl
 
 ## install: Build and install plugin locally (binary + schema + manifest)
 ## Installs to ~/.pel/formae/plugins/<name>/v<version>/
