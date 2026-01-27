@@ -10,8 +10,8 @@ import (
 	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 
-	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres"
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/cfres/registry"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/gcp"
 )
