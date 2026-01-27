@@ -57,7 +57,6 @@ open class GlobalAddress extends formae.Resource {
     description: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     address: String?
 
@@ -92,7 +91,6 @@ open class GlobalAddress extends formae.Resource {
     networkTier: NetworkTier?
 
     @gcp.FieldHint {
-        persist = false
     }
     status: String?
 

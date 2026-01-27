@@ -69,7 +69,6 @@ open class Network extends formae.Resource {
     description: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     gatewayIpv4: String?
 
@@ -81,7 +80,6 @@ open class Network extends formae.Resource {
     networkId: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     numericId: String?
 

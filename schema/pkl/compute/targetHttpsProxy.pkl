@@ -77,7 +77,6 @@ open class TargetHttpsProxy extends formae.Resource {
     tlsEarlyData: TlsEarlyData?
 
     @gcp.FieldHint {
-        persist = false
     }
     fingerprint: String?
 

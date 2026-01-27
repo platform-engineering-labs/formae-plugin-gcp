@@ -216,17 +216,14 @@ open class MasterAuth extends formae.SubResource {
     clientCertificateConfig: ClientCertificateConfig?
 
     @gcp.FieldHint {
-        persist = false
     }
     clusterCaCertificate: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     clientCertificate: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     clientKey: String?
 }
@@ -462,7 +459,6 @@ open class DailyMaintenanceWindow extends formae.SubResource {
     startTime: String
 
     @gcp.FieldHint {
-        persist = false
     }
     duration: String?
 }
@@ -548,17 +544,14 @@ open class PrivateClusterConfig extends formae.SubResource {
     masterIpv4CidrBlock: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     privateEndpoint: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     publicEndpoint: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     peeringName: String?
 
@@ -572,7 +565,6 @@ open class DatabaseEncryption extends formae.SubResource {
     keyName: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     state: DatabaseEncryptionState?
 }
@@ -739,7 +731,6 @@ open class Fleet extends formae.SubResource {
     membership: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     preRegistered: Boolean?
 }
@@ -911,67 +902,54 @@ open class Cluster extends formae.Resource {
     initialClusterVersion: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     currentMasterVersion: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     currentNodeVersion: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     createTime: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     status: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     statusMessage: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     nodeIpv4CidrSize: Int?
 
     @gcp.FieldHint {
-        persist = false
     }
     servicesIpv4Cidr: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     instanceGroupUrls: Listing<String>?
 
     @gcp.FieldHint {
-        persist = false
     }
     currentNodeCount: Int?
 
     @gcp.FieldHint {
-        persist = false
     }
     expireTime: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     zone: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     endpoint: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     selfLink: String?
 

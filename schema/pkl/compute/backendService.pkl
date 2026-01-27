@@ -229,7 +229,6 @@ open class BackendService extends formae.Resource {
     edgeSecurityPolicy: (String|formae.Resolvable)?
 
     @gcp.FieldHint {
-        persist = false
     }
     fingerprint: String?
 

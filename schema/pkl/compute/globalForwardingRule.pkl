@@ -145,17 +145,14 @@ open class GlobalForwardingRule extends formae.Resource {
     noAutomateDnsZone: Boolean?
 
     @gcp.FieldHint {
-        persist = false
     }
     labelFingerprint: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     pscConnectionId: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     pscConnectionStatus: String?
 

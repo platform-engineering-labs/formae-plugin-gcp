@@ -82,31 +82,26 @@ open class ObjectAccessControl extends formae.Resource {
 
     /// The domain associated with the entity (output only)
     @gcp.FieldHint {
-        persist = false
     }
     domain: String?
 
     /// The email address associated with the entity (output only)
     @gcp.FieldHint {
-        persist = false
     }
     email: String?
 
     /// The ID for the entity (output only)
     @gcp.FieldHint {
-        persist = false
     }
     entityId: String?
 
     /// The content generation of the object, if applied to an object (output only)
     @gcp.FieldHint {
-        persist = false
     }
     generation: Int?
 
     /// The project team associated with the entity (output only)
     @gcp.FieldHint {
-        persist = false
     }
     projectTeam: ProjectTeam?
 

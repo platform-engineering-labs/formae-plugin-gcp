@@ -247,7 +247,6 @@ open class RegionBackendService extends formae.Resource {
     connectionTrackingPolicy: ConnectionTrackingPolicy?
 
     @gcp.FieldHint {
-        persist = false
     }
     fingerprint: String?
 

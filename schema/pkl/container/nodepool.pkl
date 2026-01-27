@@ -683,22 +683,18 @@ open class NodePool extends formae.Resource {
 
     // Output-only fields
     @gcp.FieldHint {
-        persist = false
     }
     status: NodePoolStatus?
 
     @gcp.FieldHint {
-        persist = false
     }
     statusMessage: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     instanceGroupUrls: Listing<String>?
 
     @gcp.FieldHint {
-        persist = false
     }
     selfLink: String?
 

@@ -57,7 +57,6 @@ open class RegionTargetHttpProxy extends formae.Resource {
     httpKeepAliveTimeoutSec: Int?
 
     @gcp.FieldHint {
-        persist = false
     }
     fingerprint: String?
 

@@ -65,31 +65,26 @@ open class AnywhereCache extends formae.Resource {
 
     /// The ID of the Anywhere cache instance (output only)
     @gcp.FieldHint {
-        persist = false
     }
     anywhereCacheId: String?
 
     /// The creation time of the cache instance in RFC 3339 format (output only)
     @gcp.FieldHint {
-        persist = false
     }
     createTime: String?
 
     /// The modification time of the cache instance metadata in RFC 3339 format (output only)
     @gcp.FieldHint {
-        persist = false
     }
     updateTime: String?
 
     /// True if the cache instance has an active Update long-running operation (output only)
     @gcp.FieldHint {
-        persist = false
     }
     pendingUpdate: Boolean?
 
     /// The current state of the cache instance (output only)
     @gcp.FieldHint {
-        persist = false
     }
     state: String?
 

@@ -176,27 +176,22 @@ open class ForwardingRule extends formae.Resource {
     allowPscGlobalAccess: Boolean?
 
     @gcp.FieldHint {
-        persist = false
     }
     labelFingerprint: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     serviceName: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     baseForwardingRule: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     pscConnectionId: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     pscConnectionStatus: String?
 

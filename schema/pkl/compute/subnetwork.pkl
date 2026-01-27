@@ -81,12 +81,10 @@ open class Subnetwork extends formae.Resource {
     description: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     subnetworkId: Int?
 
     @gcp.FieldHint {
-        persist = false
     }
     gatewayAddress: String?
 
@@ -134,12 +132,10 @@ open class Subnetwork extends formae.Resource {
     ipv6AccessType: Ipv6AccessType?
 
     @gcp.FieldHint {
-        persist = false
     }
     ipv6CidrRange: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     internalIpv6Prefix: String?
 
@@ -150,7 +146,6 @@ open class Subnetwork extends formae.Resource {
     ipCollection: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     ipv6GceEndpoint: Ipv6GceEndpoint?
 
@@ -158,7 +153,6 @@ open class Subnetwork extends formae.Resource {
     allowSubnetCidrRoutesOverlap: Boolean?
 
     @gcp.FieldHint {
-        persist = false
     }
     state: String?
 

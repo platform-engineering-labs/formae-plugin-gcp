@@ -109,27 +109,22 @@ open class Address extends formae.Resource {
     subnetwork: (String|formae.Resolvable)?
 
     @gcp.FieldHint {
-        persist = false
     }
     effectiveLabels: Mapping<String, String>?
 
     @gcp.FieldHint {
-        persist = false
     }
     labelFingerprint: String?
 
     @gcp.FieldHint {
-        persist = false
     }
     terraformLabels: Mapping<String, String>?
 
     @gcp.FieldHint {
-        persist = false
     }
     users: Listing<String>?
 
     @gcp.FieldHint {
-        persist = false
     }
     selfLink: String?
 
