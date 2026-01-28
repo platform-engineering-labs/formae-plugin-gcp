@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_conformance:
+        description: 'Run conformance tests'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test-unit
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8.0.0
+        with:
+          version: latest
+
+  pkl-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Validate Pkl schemas
+        run: |
+          pkl eval formae-plugin.pkl --format json > /dev/null
+          echo "Manifest validated successfully"
+
+  # Conformance tests run against real cloud resources.
+  # This job is disabled by default - enable it after configuring credentials.
+  #
+  # To enable:
+  # 1. Configure credentials for your cloud provider (see below)
+  # 2. Implement scripts/ci/setup-credentials.sh for local credential verification
+  # 3. Implement scripts/ci/clean-environment.sh for test resource cleanup
+  # 4. Remove 'if: false' condition or set run_conformance to true
+  conformance-tests:
+    needs: [build, lint, pkl-validate]
+    runs-on: ubuntu-latest
+    # Disabled by default - uncomment 'if' line below after configuring credentials
+    if: ${{ github.event.inputs.run_conformance == 'true' }}
+    timeout-minutes: 60
+
+    permissions:
+      id-token: write  # Required for OIDC / Workload Identity Federation
+      contents: read
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Install plugin
+        run: make install
+
+      - name: Run conformance tests
+        env:
+          FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: make conformance-test

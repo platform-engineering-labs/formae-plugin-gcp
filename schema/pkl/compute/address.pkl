@@ -1,0 +1,135 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.address
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Address"
+
+typealias AddressType = "INTERNAL"|"EXTERNAL"
+
+typealias IpVersion = "IPV4"|"IPV6"
+
+typealias Ipv6EndpointType = "VM"|"NETLB"
+
+typealias NetworkTier = "PREMIUM"|"STANDARD"
+
+typealias Purpose = "GCE_ENDPOINT"|"SHARED_LOADBALANCER_VIP"|"VPC_PEERING"|"IPSEC_INTERCONNECT"|"PRIVATE_SERVICE_CONNECT"
+
+
+
+open class AddressResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden address: AddressResolvable = (this) {
+        property = "address"
+    }
+
+    hidden selfLink: AddressResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: AddressResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Address extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    address: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    addressType: AddressType?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ipVersion: IpVersion?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ipv6EndpointType: Ipv6EndpointType?
+
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkTier: NetworkTier?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    prefixLength: Int?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    purpose: Purpose?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    subnetwork: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+    }
+    effectiveLabels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+    }
+    labelFingerprint: String?
+
+    @gcp.FieldHint {
+    }
+    terraformLabels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+    }
+    users: Listing<String>?
+
+    @gcp.FieldHint {
+    }
+    selfLink: String?
+
+    hidden res: AddressResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

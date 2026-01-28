@@ -1,0 +1,43 @@
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+// Resource imports
+import "@gcp/compute/network.pkl"
+import "@gcp/gcp.pkl"
+
+forma {
+
+  local gcpStack = new formae.Stack {
+    label = "gcp-stack"
+    description = "This was generated"
+  }
+  gcpStack
+
+
+  local gcpTarget = new formae.Target {
+    label = "gcp-target"
+    namespace = "GCP"
+    discoverable = true
+    // Credentials are read from GCP_CREDENTIALS_FILE or GCP_CREDENTIALS_JSON env vars
+    config {
+      Type = "GCP"
+      Project = "development-477117"
+      Region = "europe-west4"
+    }
+  }
+  gcpTarget
+
+  new network.Network {
+    label = "formae-demo-vpc"
+    description = "Formae demo VPC network"
+    name = "formae-demo-network"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "REGIONAL"
+      bgpBestPathSelectionMode = "LEGACY"
+    }
+    networkFirewallPolicyEnforcementOrder = "AFTER_CLASSIC_FIREWALL"
+    target = gcpTarget.res
+    stack = gcpStack.res
+  }
+}

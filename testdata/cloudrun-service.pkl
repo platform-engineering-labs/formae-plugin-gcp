@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudrun/service.pkl"
+import "./vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new service.Service {
+    label = "plugin-sdk-test-cloudrun-service"
+    project = v.gcpProject
+    region = v.gcpRegion
+    name = "formae-test-svc-\(v.testRunID)"
+    description = "Test Cloud Run service for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+    ingress = "INGRESS_TRAFFIC_ALL"
+    template = new service.RevisionTemplate {
+      scaling = new service.RevisionScaling {
+        minInstanceCount = 0
+        maxInstanceCount = 2
+      }
+      maxInstanceRequestConcurrency = 80
+      containers = new Listing {
+        new service.Container {
+          name = "test-container"
+          image = "gcr.io/cloudrun/hello"
+          ports = new Listing {
+            new service.ContainerPort {
+              name = "http1"
+              containerPort = 8080
+            }
+          }
+          resources = new service.ResourceRequirements {
+            limits = new Mapping {
+              ["cpu"] = "1000m"
+              ["memory"] = "512Mi"
+            }
+            cpuIdle = true
+          }
+          env = new Listing {
+            new service.EnvVar {
+              name = "ENVIRONMENT"
+              value = "test"
+            }
+          }
+        }
+      }
+    }
+    traffic = new Listing {
+      new service.TrafficTarget {
+        percent = 100
+        type = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+      }
+    }
+  }
+}

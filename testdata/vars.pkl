@@ -1,0 +1,26 @@
+import "@formae/formae.pkl"
+import "@gcp/gcp.pkl"
+
+local stackName = "plugin-sdk-test-stack"
+
+// Read GCP config from environment variables
+gcpProject = read("env:GCP_PROJECT_ID")
+gcpRegion = read("env:GCP_REGION")
+gcpZone = read("env:GCP_ZONE")
+testRunID = read("env:FORMAE_TEST_RUN_ID")
+
+stack = new formae.Stack {
+label = stackName
+description = "Plugin SDK test for GCP Compute Disk"
+}
+
+target = new formae.Target {
+    label = "gcp-target"
+    config = new gcp.Config {
+      project = gcpProject
+      region = gcpRegion
+      zone = gcpZone
+      credentialsFile = read("env:GCP_CREDENTIALS_FILE")
+    }
+  }
+

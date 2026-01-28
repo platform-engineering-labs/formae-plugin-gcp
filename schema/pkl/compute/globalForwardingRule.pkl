@@ -1,0 +1,163 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.globalForwardingRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::GlobalForwardingRule"
+
+typealias IpProtocol = "TCP"|"UDP"|"ESP"|"AH"|"SCTP"|"ICMP"|"L3_DEFAULT"
+
+typealias LoadBalancingScheme = "EXTERNAL"|"EXTERNAL_MANAGED"|"INTERNAL_MANAGED"|"INTERNAL_SELF_MANAGED"
+
+typealias NetworkTier = "PREMIUM"|"STANDARD"
+
+typealias IpVersion = "IPV4"|"IPV6"|"UNSPEC_VERSION"
+
+@gcp.SubResourceHint
+open class MetadataFilter extends formae.SubResource {
+    @gcp.FieldHint
+    filterMatchCriteria: String?
+
+    @gcp.FieldHint
+    filterLabels: Listing<FilterLabel>?
+}
+
+@gcp.SubResourceHint
+open class FilterLabel extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    value: String?
+}
+
+@gcp.SubResourceHint
+open class ServiceDirectoryRegistration extends formae.SubResource {
+    @gcp.FieldHint
+    namespace: String?
+
+    @gcp.FieldHint
+    service: String?
+
+    @gcp.FieldHint
+    serviceDirectoryRegion: String?
+}
+
+open class GlobalForwardingRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: GlobalForwardingRuleResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: GlobalForwardingRuleResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: GlobalForwardingRuleResolvable = (this) {
+        property = "name"
+    }
+
+    hidden ipAddress: GlobalForwardingRuleResolvable = (this) {
+        property = "IPAddress"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class GlobalForwardingRule extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    IPAddress: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    IPProtocol: IpProtocol?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    portRange: String?
+
+    @gcp.FieldHint {
+        outputField = "target"
+    }
+    targetProxy: (String|formae.Resolvable)
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    loadBalancingScheme: LoadBalancingScheme?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    subnetwork: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkTier: NetworkTier?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ipVersion: IpVersion?
+
+    @gcp.FieldHint
+    allowGlobalAccess: Boolean?
+
+    @gcp.FieldHint
+    metadataFilters: Listing<MetadataFilter>?
+
+    @gcp.FieldHint
+    sourceIpRanges: Listing<String>?
+
+    @gcp.FieldHint
+    serviceDirectoryRegistrations: Listing<ServiceDirectoryRegistration>?
+
+    @gcp.FieldHint
+    noAutomateDnsZone: Boolean?
+
+    @gcp.FieldHint {
+    }
+    labelFingerprint: String?
+
+    @gcp.FieldHint {
+    }
+    pscConnectionId: String?
+
+    @gcp.FieldHint {
+    }
+    pscConnectionStatus: String?
+
+    hidden res: GlobalForwardingRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

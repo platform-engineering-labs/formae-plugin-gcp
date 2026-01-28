@@ -1,0 +1,179 @@
+/*
+ * � 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.bucket
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::Bucket"
+
+typealias StorageClass = "MULTI_REGIONAL"|"REGIONAL"|"STANDARD"|"NEARLINE"|"COLDLINE"|"ARCHIVE"|"DURABLE_REDUCED_AVAILABILITY"
+
+@gcp.SubResourceHint
+open class LifecycleAction extends formae.SubResource {
+    storageClass: String?
+    type: String
+}
+
+@gcp.SubResourceHint
+open class LifecycleCondition extends formae.SubResource {
+    age: Int?
+    createdBefore: String?
+    customTimeBefore: String?
+    daysSinceCustomTime: Int?
+    daysSinceNoncurrentTime: Int?
+    isLive: Boolean?
+    matchesPrefix: Listing<String>?
+    matchesStorageClass: Listing<String>?
+    matchesSuffix: Listing<String>?
+    noncurrentTimeBefore: String?
+    numNewerVersions: Int?
+}
+
+@gcp.SubResourceHint
+open class LifecycleRule extends formae.SubResource {
+    action: LifecycleAction?
+    condition: LifecycleCondition?
+}
+
+@gcp.SubResourceHint
+open class Lifecycle extends formae.SubResource {
+    rule: Listing<LifecycleRule>?
+}
+
+@gcp.SubResourceHint
+open class Logging extends formae.SubResource {
+    logBucket: String?
+
+    logObjectPrefix: String?
+}
+
+@gcp.SubResourceHint
+open class Owner extends formae.SubResource {
+    entity: String?
+
+    @gcp.FieldHint {
+    }
+    entityId: String?
+}
+
+@gcp.SubResourceHint
+open class Versioning extends formae.SubResource {
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class Website extends formae.SubResource {
+    mainPageSuffix: String?
+
+    notFoundPage: String?
+}
+
+@gcp.SubResourceHint
+open class Encryption extends formae.SubResource {
+    defaultKmsKeyName: String?
+}
+
+@gcp.SubResourceHint
+open class RetentionPolicy extends formae.SubResource {
+    effectiveTime: String?
+
+    isLocked: Boolean?
+
+    retentionPeriod: Int?
+}
+
+open class BucketResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: BucketResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: BucketResolvable = (this) {
+        property = "SelfLink"
+    }
+
+    hidden name: BucketResolvable = (this) {
+        property = "Name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Bucket extends formae.Resource {
+    hidden parent = this
+
+    acl: Listing<Mapping<String, Any>>?
+
+    cors: Listing<Mapping<String, Any>>?
+
+    defaultEventBasedHold: Boolean?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    defaultObjectAcl: Listing<Mapping<String, Any>>?
+
+    @gcp.FieldHint {
+    }
+    id: String?
+
+    @gcp.FieldHint
+    lifecycle: Lifecycle?
+
+    @gcp.FieldHint
+    location: gcp.Region
+
+    @gcp.FieldHint
+    logging: Logging?
+
+    metageneration: Int?
+
+    @gcp.FieldHint
+    name: String
+
+    @gcp.FieldHint
+    owner: Owner?
+
+    @gcp.FieldHint {
+    }
+    projectNumber: String?
+
+    @gcp.FieldHint
+    storageClass: StorageClass?
+
+    @gcp.FieldHint {
+    }
+    timeCreated: String?
+
+    @gcp.FieldHint {
+    }
+    updated: String?
+
+    @gcp.FieldHint
+    versioning: Versioning?
+
+    @gcp.FieldHint
+    website: Website?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    encryption: Encryption?
+
+    @gcp.FieldHint
+    retentionPolicy: RetentionPolicy?
+
+    hidden res: BucketResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

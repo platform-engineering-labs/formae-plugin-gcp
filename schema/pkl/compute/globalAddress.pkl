@@ -1,0 +1,101 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.globalAddress
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::GlobalAddress"
+
+typealias IpVersion = "IPV4"|"IPV6"
+
+typealias AddressType = "EXTERNAL"|"INTERNAL"
+
+typealias Purpose = "VPC_PEERING"|"PRIVATE_SERVICE_CONNECT"|"SHARED_LOADBALANCER_VIP"
+
+typealias NetworkTier = "PREMIUM"|"STANDARD"
+
+open class GlobalAddressResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: GlobalAddressResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: GlobalAddressResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: GlobalAddressResolvable = (this) {
+        property = "name"
+    }
+
+    hidden address: GlobalAddressResolvable = (this) {
+        property = "address"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class GlobalAddress extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    @gcp.FieldHint {
+    }
+    address: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ipVersion: IpVersion?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    addressType: AddressType?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    purpose: Purpose?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    prefixLength: Int?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkTier: NetworkTier?
+
+    @gcp.FieldHint {
+    }
+    status: String?
+
+    hidden res: GlobalAddressResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

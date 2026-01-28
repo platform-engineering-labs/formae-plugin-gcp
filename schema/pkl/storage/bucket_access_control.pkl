@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.storage.bucket_access_control
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::BucketAccessControl"
+
+typealias Role = "OWNER"|"READER"|"WRITER"
+
+open class BucketAccessControlResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden entity: BucketAccessControlResolvable = (this) {
+        property = "Entity"
+    }
+
+    hidden role: BucketAccessControlResolvable = (this) {
+        property = "Role"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Entity"
+    parent = "GCP::Storage::Bucket"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "name" listParameter = "bucket"
+        }
+    }.toList()
+}
+open class BucketAccessControl extends formae.Resource {
+    hidden parent = this
+
+    /// The name of the bucket
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    bucket: String|formae.Resolvable
+
+    /// The entity holding the permission, in one of the following forms:
+    /// - user-userId
+    /// - user-email
+    /// - group-groupId
+    /// - group-email
+    /// - domain-domain
+    /// - project-team-projectId
+    /// - allUsers
+    /// - allAuthenticatedUsers
+    /// Example: user-liz@example.com or group-example@googlegroups.com
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    entity: String
+
+    /// The access permission for the entity
+    role: Role?
+
+    /// The domain associated with the entity (output only)
+    @gcp.FieldHint {
+    }
+    domain: String?
+
+    /// The email address associated with the entity (output only)
+    @gcp.FieldHint {
+    }
+    email: String?
+
+    hidden res: BucketAccessControlResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

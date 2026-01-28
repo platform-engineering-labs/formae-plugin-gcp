@@ -1,0 +1,62 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+/// GCP Bigtable Instance
+///
+/// A Bigtable instance containing clusters and tables.
+module gcp.bigtable.instance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Bigtable::Instance"
+
+typealias InstanceType = "PRODUCTION"|"DEVELOPMENT"
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+
+    hidden displayName: InstanceResolvable = (this) {
+        property = "displayName"
+    }
+}
+
+/// GCP Bigtable Instance resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: InstanceType
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

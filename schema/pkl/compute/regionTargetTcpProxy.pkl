@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.regionTargetTcpProxy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionTargetTcpProxy"
+
+typealias ProxyHeader = "NONE"|"PROXY_V1"
+
+open class RegionTargetTcpProxyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionTargetTcpProxyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionTargetTcpProxyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionTargetTcpProxyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionTargetTcpProxy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    service: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    proxyHeader: ProxyHeader?
+
+    @gcp.FieldHint
+    proxyBind: Boolean?
+
+    hidden res: RegionTargetTcpProxyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

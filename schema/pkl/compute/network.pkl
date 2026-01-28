@@ -1,0 +1,123 @@
+/*
+ * � 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.network
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Network"
+
+typealias NetworkFirewallPolicyEnforcementOrder = "BEFORE_CLASSIC_FIREWALL"|"AFTER_CLASSIC_FIREWALL"
+
+typealias RoutingMode = "REGIONAL"|"GLOBAL"
+
+typealias BgpBestPathSelectionMode = "LEGACY"|"STANDARD"
+
+typealias BgpInterRegionCost = "DEFAULT"|"ADD_COST_TO_MED"
+
+
+
+@gcp.SubResourceHint
+open class RoutingConfig extends formae.SubResource {
+    @gcp.FieldHint
+    routingMode: RoutingMode?
+
+    @gcp.FieldHint
+    bgpBestPathSelectionMode: BgpBestPathSelectionMode?
+
+    bgpAlwaysCompareMed: Boolean?
+
+    @gcp.FieldHint
+    bgpInterRegionCost: BgpInterRegionCost?
+}
+
+@gcp.SubResourceHint
+open class Params extends formae.SubResource {
+    resourceManagerTags: Mapping<String, String>?
+}
+
+open class NetworkResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NetworkResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: NetworkResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: NetworkResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Network extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    @gcp.FieldHint {
+    }
+    gatewayIpv4: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    networkId: String?
+
+    @gcp.FieldHint {
+    }
+    numericId: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    autoCreateSubnetworks: Boolean?
+
+    @gcp.FieldHint
+    routingConfig: RoutingConfig?
+
+    mtu: Int?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    enableUlaInternalIpv6: Boolean?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    internalIpv6Range: String?
+
+    @gcp.FieldHint
+    networkFirewallPolicyEnforcementOrder: NetworkFirewallPolicyEnforcementOrder?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkProfile: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    params: Params?
+
+    hidden res: NetworkResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

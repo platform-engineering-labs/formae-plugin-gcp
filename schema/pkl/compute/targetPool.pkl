@@ -1,0 +1,73 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.targetPool
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::TargetPool"
+
+typealias SessionAffinity = "NONE"|"CLIENT_IP"|"CLIENT_IP_PROTO"|"CLIENT_IP_PORT_PROTO"
+
+open class TargetPoolResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: TargetPoolResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: TargetPoolResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: TargetPoolResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class TargetPool extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    healthChecks: Listing<String|formae.Resolvable>?
+
+    @gcp.FieldHint
+    instances: Listing<String|formae.Resolvable>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sessionAffinity: SessionAffinity?
+
+    @gcp.FieldHint
+    failoverRatio: Number?
+
+    @gcp.FieldHint
+    backupPool: (String|formae.Resolvable)?
+
+    hidden res: TargetPoolResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

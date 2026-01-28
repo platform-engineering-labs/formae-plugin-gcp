@@ -1,0 +1,73 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+/// GCP Bigtable MaterializedView
+///
+/// A materialized view of a Bigtable table.
+module gcp.bigtable.materialized_view
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Bigtable::MaterializedView"
+
+@gcp.SubResourceHint
+open class DeletionProtection extends formae.SubResource {
+  @gcp.FieldHint
+  enabled: Boolean
+}
+
+open class MaterializedViewResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MaterializedViewResolvable = (this) {
+        property = "name"
+    }
+
+    hidden sourceTable: MaterializedViewResolvable = (this) {
+        property = "sourceTable"
+    }
+}
+
+/// GCP Bigtable MaterializedView resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class MaterializedView extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    instance: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    cluster: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    sourceTable: String
+
+    @gcp.FieldHint
+    deletionProtection: Boolean?
+
+    hidden res: MaterializedViewResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

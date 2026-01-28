@@ -1,0 +1,705 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.container.nodepool
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Container::NodePool"
+
+// Autoscaling Location Policy
+typealias LocationPolicy = "LOCATION_POLICY_UNSPECIFIED"|"BALANCED"|"ANY"
+
+// Node Pool Status
+typealias NodePoolStatus = "STATUS_UNSPECIFIED"|"PROVISIONING"|"RUNNING"|"RUNNING_WITH_ERROR"|"RECONCILING"|"STOPPING"|"ERROR"
+
+// Upgrade Strategy
+typealias UpgradeStrategy = "NODE_POOL_UPDATE_STRATEGY_UNSPECIFIED"|"BLUE_GREEN"|"SURGE"
+
+// Network Tier
+typealias NetworkTier = "PREMIUM"|"STANDARD"
+
+// Disk Type
+typealias DiskType = "DISK_TYPE_UNSPECIFIED"|"PD_STANDARD"|"PD_SSD"|"PD_BALANCED"|"pd-balanced"
+
+// Image Type
+typealias ImageType = "IMAGE_TYPE_UNSPECIFIED"|"COS"|"COS_CONTAINERD"|"UBUNTU_CONTAINERD"|"WINDOWS_SAC"|"WINDOWS_LTSC"
+
+// Workload Metadata Mode
+typealias WorkloadMetadataMode = "MODE_UNSPECIFIED"|"GCE_METADATA"|"GKE_METADATA"
+
+// CGroup Mode
+typealias CgroupMode = "CGROUP_MODE_UNSPECIFIED"|"CGROUP_MODE_V1"|"CGROUP_MODE_V2"
+
+// Maintenance Interval
+typealias MaintenanceInterval = "MAINTENANCE_INTERVAL_UNSPECIFIED"|"AS_NEEDED"|"PERIODIC"
+
+// GPU Sharing Strategy
+typealias GpuSharingStrategy = "GPU_SHARING_STRATEGY_UNSPECIFIED"|"TIME_SHARING"|"MPS"
+
+// Placement Policy Type
+typealias PlacementPolicyType = "TYPE_UNSPECIFIED"|"COMPACT"
+
+// Advanced Machine Features
+@gcp.SubResourceHint
+open class AdvancedMachineFeatures extends formae.SubResource {
+    threadsPerCore: Int?
+    enableNestedVirtualization: Boolean?
+    performanceMonitoringUnit: String?
+}
+
+// Boot Disk
+@gcp.SubResourceHint
+open class BootDisk extends formae.SubResource {
+    @gcp.FieldHint
+    diskType: DiskType?
+
+    sizeGb: Int?
+
+    provisionedIops: Int?
+
+    provisionedThroughput: Int?
+}
+
+// Confidential Nodes
+@gcp.SubResourceHint
+open class ConfidentialNodes extends formae.SubResource {
+    enabled: Boolean
+
+    confidentialInstanceType: String?
+}
+
+// GPU Sharing Config
+@gcp.SubResourceHint
+open class GpuSharingConfig extends formae.SubResource {
+    maxSharedClientsPerGpu: Int
+
+    @gcp.FieldHint
+    gpuSharingStrategy: GpuSharingStrategy?
+}
+
+// GPU Driver Installation Config
+@gcp.SubResourceHint
+open class GpuDriverInstallationConfig extends formae.SubResource {
+    gpuDriverVersion: String?
+}
+
+// Accelerator (Guest Accelerator)
+@gcp.SubResourceHint
+open class Accelerator extends formae.SubResource {
+    acceleratorCount: Int
+
+    acceleratorType: String
+
+    gpuPartitionSize: String?
+
+    gpuSharingConfig: GpuSharingConfig?
+
+    gpuDriverInstallationConfig: GpuDriverInstallationConfig?
+}
+
+// Ephemeral Storage Local SSD Config
+@gcp.SubResourceHint
+open class EphemeralStorageLocalSsdConfig extends formae.SubResource {
+    localSsdCount: Int
+
+    dataCacheCount: Int?
+}
+
+// Local NVME SSD Block Config
+@gcp.SubResourceHint
+open class LocalNvmeSsdBlockConfig extends formae.SubResource {
+    localSsdCount: Int
+}
+
+// GCFS Config
+@gcp.SubResourceHint
+open class GcfsConfig extends formae.SubResource {
+    enabled: Boolean
+}
+
+// GVNIC
+@gcp.SubResourceHint
+open class Gvnic extends formae.SubResource {
+    enabled: Boolean
+}
+
+// Fast Socket
+@gcp.SubResourceHint
+open class FastSocket extends formae.SubResource {
+    enabled: Boolean
+}
+
+// Shielded Instance Config
+@gcp.SubResourceHint
+open class ShieldedInstanceConfig extends formae.SubResource {
+    enableSecureBoot: Boolean?
+
+    enableIntegrityMonitoring: Boolean?
+}
+
+// Taint
+@gcp.SubResourceHint
+open class Taint extends formae.SubResource {
+    key: String
+
+    value: String
+
+    effect: String
+}
+
+// Node Affinity
+@gcp.SubResourceHint
+open class NodeAffinity extends formae.SubResource {
+    key: String
+
+    operator: String
+
+    values: Listing<String>
+}
+
+// Sole Tenant Config
+@gcp.SubResourceHint
+open class SoleTenantConfig extends formae.SubResource {
+    nodeAffinities: Listing<NodeAffinity>
+
+    minNodeCpus: Int?
+}
+
+// Reservation Affinity
+@gcp.SubResourceHint
+open class ReservationAffinity extends formae.SubResource {
+    consumeReservationType: String
+
+    key: String?
+
+    values: Listing<String>?
+}
+
+// Hugepages
+@gcp.SubResourceHint
+open class Hugepages extends formae.SubResource {
+    hugepageSize1g: Int?
+
+    hugepageSize2m: Int?
+}
+
+// Linux Node Config
+@gcp.SubResourceHint
+open class LinuxNodeConfig extends formae.SubResource {
+    sysctls: Mapping<String, String>?
+
+    @gcp.FieldHint
+    cgroupMode: CgroupMode?
+
+    transparentHugepageEnabled: String?
+
+    transparentHugepageDefrag: String?
+
+    hugepages: Hugepages?
+}
+
+// Topology Manager
+@gcp.SubResourceHint
+open class TopologyManager extends formae.SubResource {
+    policy: String?
+
+    scope: String?
+}
+
+// Memory Manager
+@gcp.SubResourceHint
+open class MemoryManager extends formae.SubResource {
+    policy: String?
+}
+
+// Eviction Minimum Reclaim
+@gcp.SubResourceHint
+open class EvictionMinimumReclaim extends formae.SubResource {
+    imagefsAvailable: String?
+
+    imagefsInodesFree: String?
+
+    memoryAvailable: String?
+
+    nodefsAvailable: String?
+
+    nodefsInodesFree: String?
+
+    pidAvailable: String?
+}
+
+// Eviction Soft
+@gcp.SubResourceHint
+open class EvictionSoft extends formae.SubResource {
+    imagefsAvailable: String?
+
+    imagefsInodesFree: String?
+
+    memoryAvailable: String?
+
+    nodefsAvailable: String?
+
+    nodefsInodesFree: String?
+
+    pidAvailable: String?
+}
+
+// Eviction Soft Grace Period
+@gcp.SubResourceHint
+open class EvictionSoftGracePeriod extends formae.SubResource {
+    imagefsAvailable: String?
+
+    imagefsInodesFree: String?
+
+    memoryAvailable: String?
+
+    nodefsAvailable: String?
+
+    nodefsInodesFree: String?
+
+    pidAvailable: String?
+}
+
+// Kubelet Config
+@gcp.SubResourceHint
+open class KubeletConfig extends formae.SubResource {
+    cpuManagerPolicy: String?
+
+    cpuCfsQuota: Boolean?
+
+    cpuCfsQuotaPeriod: String?
+
+    podPidsLimit: Int?
+
+    insecureKubeletReadonlyPortEnabled: Boolean?
+
+    allowedUnsafeSysctls: Listing<String>?
+
+    containerLogMaxFiles: Int?
+
+    containerLogMaxSize: String?
+
+    evictionMaxPodGracePeriodSeconds: Int?
+
+    evictionMinimumReclaim: EvictionMinimumReclaim?
+
+    evictionSoft: EvictionSoft?
+
+    evictionSoftGracePeriod: EvictionSoftGracePeriod?
+
+    imageGcHighThresholdPercent: Int?
+
+    imageGcLowThresholdPercent: Int?
+
+    imageMaximumGcAge: String?
+
+    imageMinimumGcAge: String?
+
+    maxParallelImagePulls: Int?
+
+    memoryManager: MemoryManager?
+
+    singleProcessOomKill: Boolean?
+
+    topologyManager: TopologyManager?
+}
+
+// Workload Metadata Config
+@gcp.SubResourceHint
+open class WorkloadMetadataConfig extends formae.SubResource {
+    @gcp.FieldHint
+    mode: WorkloadMetadataMode
+}
+
+// Host Maintenance Policy
+@gcp.SubResourceHint
+open class HostMaintenancePolicy extends formae.SubResource {
+    @gcp.FieldHint
+    maintenanceInterval: MaintenanceInterval
+}
+
+// Secondary Boot Disk
+@gcp.SubResourceHint
+open class SecondaryBootDisk extends formae.SubResource {
+    diskImage: String
+
+    mode: String?
+}
+
+// Private Registry Access Config
+@gcp.SubResourceHint
+open class GcpSecretManagerCertificateConfig extends formae.SubResource {
+    secretUri: String
+}
+
+@gcp.SubResourceHint
+open class CertificateAuthorityDomainConfig extends formae.SubResource {
+    fqdns: Listing<String>
+
+    gcpSecretManagerCertificateConfig: GcpSecretManagerCertificateConfig
+}
+
+@gcp.SubResourceHint
+open class PrivateRegistryAccessConfig extends formae.SubResource {
+    enabled: Boolean
+
+    certificateAuthorityDomainConfig: Listing<CertificateAuthorityDomainConfig>?
+}
+
+@gcp.SubResourceHint
+open class ContainerdConfig extends formae.SubResource {
+    privateRegistryAccessConfig: PrivateRegistryAccessConfig?
+}
+
+// Logging Config
+@gcp.SubResourceHint
+open class VariantConfig extends formae.SubResource {
+    variant: String
+}
+
+@gcp.SubResourceHint
+open class LoggingConfig extends formae.SubResource {
+    variantConfig: VariantConfig?
+}
+
+// Windows Node Config
+@gcp.SubResourceHint
+open class WindowsNodeConfig extends formae.SubResource {
+    osVersion: String?
+}
+
+// Node Config
+@gcp.SubResourceHint
+open class NodeConfig extends formae.SubResource {
+    machineType: String?
+
+    diskSizeGb: Int?
+
+    @gcp.FieldHint
+    diskType: DiskType?
+
+    oauthScopes: Listing<String>?
+
+    serviceAccount: String?
+
+    metadata: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    imageType: ImageType?
+
+    labels: Mapping<String, String>?
+
+    localSsdCount: Int?
+
+    tags: Listing<String>?
+
+    preemptible: Boolean?
+
+    accelerators: Listing<Accelerator>?
+
+    minCpuPlatform: String?
+
+    taints: Listing<Taint>?
+
+    bootDiskKmsKey: String?
+
+    shieldedInstanceConfig: ShieldedInstanceConfig?
+
+    linuxNodeConfig: LinuxNodeConfig?
+
+    kubeletConfig: KubeletConfig?
+
+    spot: Boolean?
+
+    confidentialNodes: ConfidentialNodes?
+
+    workloadMetadataConfig: WorkloadMetadataConfig?
+
+    resourceLabels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    resourceManagerTags: Mapping<String, String>?
+
+    enableConfidentialStorage: Boolean?
+
+    advancedMachineFeatures: AdvancedMachineFeatures?
+
+    bootDisk: BootDisk?
+
+    ephemeralStorageLocalSsdConfig: EphemeralStorageLocalSsdConfig?
+
+    localNvmeSsdBlockConfig: LocalNvmeSsdBlockConfig?
+
+    gcfsConfig: GcfsConfig?
+
+    gvnic: Gvnic?
+
+    fastSocket: FastSocket?
+
+    soleTenantConfig: SoleTenantConfig?
+
+    reservationAffinity: ReservationAffinity?
+
+    hostMaintenancePolicy: HostMaintenancePolicy?
+
+    secondaryBootDisks: Listing<SecondaryBootDisk>?
+
+    containerdConfig: ContainerdConfig?
+
+    loggingConfig: LoggingConfig?
+
+    windowsNodeConfig: WindowsNodeConfig?
+
+    nodeGroup: String?
+
+    maxRunDuration: String?
+
+    flexStart: Boolean?
+
+    localSsdEncryptionMode: String?
+
+    storagePools: Listing<String>?
+}
+
+// Autoscaling
+@gcp.SubResourceHint
+open class Autoscaling extends formae.SubResource {
+    enabled: Boolean?
+
+    minNodeCount: Int?
+
+    maxNodeCount: Int?
+
+    totalMinNodeCount: Int?
+
+    totalMaxNodeCount: Int?
+
+    @gcp.FieldHint
+    locationPolicy: LocationPolicy?
+}
+
+// Management
+@gcp.SubResourceHint
+open class Management extends formae.SubResource {
+    autoUpgrade: Boolean?
+
+    autoRepair: Boolean?
+}
+
+// Max Pods Constraint
+@gcp.SubResourceHint
+open class MaxPodsConstraint extends formae.SubResource {
+    maxPodsPerNode: Int
+}
+
+// Standard Rollout Policy
+@gcp.SubResourceHint
+open class StandardRolloutPolicy extends formae.SubResource {
+    batchPercentage: Float?
+
+    batchNodeCount: Int?
+
+    batchSoakDuration: String?
+}
+
+// Blue Green Settings
+@gcp.SubResourceHint
+open class BlueGreenSettings extends formae.SubResource {
+    nodePoolSoakDuration: String?
+
+    standardRolloutPolicy: StandardRolloutPolicy?
+}
+
+// Upgrade Settings
+@gcp.SubResourceHint
+open class UpgradeSettings extends formae.SubResource {
+    maxSurge: Int?
+
+    maxUnavailable: Int?
+
+    @gcp.FieldHint
+    strategy: UpgradeStrategy?
+
+    blueGreenSettings: BlueGreenSettings?
+}
+
+// Network Performance Config
+@gcp.SubResourceHint
+open class NetworkPerformanceConfig extends formae.SubResource {
+    totalEgressBandwidthTier: String?
+}
+
+// Pod CIDR Overprovision Config
+@gcp.SubResourceHint
+open class PodCidrOverprovisionConfig extends formae.SubResource {
+    disable: Boolean
+}
+
+// Additional Node Network Config
+@gcp.SubResourceHint
+open class AdditionalNodeNetworkConfig extends formae.SubResource {
+    network: String
+
+    subnetwork: String
+}
+
+// Max Pods Per Node (for additional pod networks)
+@gcp.SubResourceHint
+open class MaxPodsPerNode extends formae.SubResource {
+    maxPodsPerNode: Int
+}
+
+// Additional Pod Network Config
+@gcp.SubResourceHint
+open class AdditionalPodNetworkConfig extends formae.SubResource {
+    subnetwork: String
+
+    secondaryPodRange: String
+
+    maxPodsPerNode: MaxPodsPerNode?
+}
+
+// Network Config
+@gcp.SubResourceHint
+open class NetworkConfig extends formae.SubResource {
+    createPodRange: Boolean?
+
+    podRange: String?
+
+    podIpv4CidrBlock: String?
+
+    enablePrivateNodes: Boolean?
+
+    subnetwork: String?
+
+    networkPerformanceConfig: NetworkPerformanceConfig?
+
+    podCidrOverprovisionConfig: PodCidrOverprovisionConfig?
+
+    additionalNodeNetworkConfigs: Listing<AdditionalNodeNetworkConfig>?
+
+    additionalPodNetworkConfigs: Listing<AdditionalPodNetworkConfig>?
+}
+
+// Placement Policy
+@gcp.SubResourceHint
+open class PlacementPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    type: PlacementPolicyType
+
+    policyName: String?
+
+    tpuTopology: String?
+}
+
+// Queued Provisioning
+@gcp.SubResourceHint
+open class QueuedProvisioning extends formae.SubResource {
+    enabled: Boolean?
+}
+
+// NodePool Resolvable
+open class NodePoolResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NodePoolResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: NodePoolResolvable = (this) {
+        property = "SelfLink"
+    }
+
+    hidden name: NodePoolResolvable = (this) {
+        property = "Name"
+    }
+}
+
+// Main NodePool Resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Name"
+    parent = "GCP::Container::Cluster"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "clusterName" listParameter = "cluster" };
+        new formae.ListProperty { parentProperty = "location" listParameter = "location" }
+    }.toList()
+}
+open class NodePool extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    cluster: String|formae.Resolvable
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    location: String?
+
+    @gcp.FieldHint
+    config: NodeConfig?
+
+    initialNodeCount: Int?
+
+    locations: Listing<String>?
+
+    @gcp.FieldHint
+    autoscaling: Autoscaling?
+
+    @gcp.FieldHint
+    management: Management?
+
+    maxPodsConstraint: MaxPodsConstraint?
+
+    @gcp.FieldHint
+    networkConfig: NetworkConfig?
+
+    @gcp.FieldHint
+    upgradeSettings: UpgradeSettings?
+
+    version: String?
+
+    @gcp.FieldHint
+    placementPolicy: PlacementPolicy?
+
+    @gcp.FieldHint
+    queuedProvisioning: QueuedProvisioning?
+
+    // Output-only fields
+    @gcp.FieldHint {
+    }
+    status: NodePoolStatus?
+
+    @gcp.FieldHint {
+    }
+    statusMessage: String?
+
+    @gcp.FieldHint {
+    }
+    instanceGroupUrls: Listing<String>?
+
+    @gcp.FieldHint {
+    }
+    selfLink: String?
+
+    hidden res: NodePoolResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

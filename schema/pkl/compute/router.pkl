@@ -1,0 +1,115 @@
+/*
+ * � 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.router
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Router"
+
+typealias AdvertiseMode = "DEFAULT"|"CUSTOM"
+
+typealias AdvertisedGroup = "ALL_SUBNETS"
+
+@gcp.SubResourceHint
+open class AdvertisedIpRange extends formae.SubResource {
+    range: String
+    description: String?
+}
+
+@gcp.SubResourceHint
+open class Bgp extends formae.SubResource {
+    asn: Int
+
+    @gcp.FieldHint
+    advertiseMode: AdvertiseMode?
+
+    advertisedGroups: Listing<AdvertisedGroup>?
+
+    advertisedIpRanges: Listing<AdvertisedIpRange>?
+
+    keepaliveInterval: Int?
+
+    identifierRange: String?
+}
+
+@gcp.SubResourceHint
+open class Md5AuthenticationKeys extends formae.SubResource {
+    name: String
+
+    key: String
+}
+
+@gcp.SubResourceHint
+open class Params extends formae.SubResource {
+    resourceManagerTags: Mapping<String, String>?
+}
+
+open class RouterResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RouterResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: RouterResolvable = (this) {
+        property = "SelfLink"
+    }
+
+    hidden name: RouterResolvable = (this) {
+        property = "Name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Name"
+}
+open class Router extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String|formae.Resolvable
+
+    @gcp.FieldHint
+    bgp: Bgp?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    encryptedInterconnectRouter: Boolean?
+
+    @gcp.FieldHint
+    md5AuthenticationKeys: Md5AuthenticationKeys?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    nccGateway: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    params: Params?
+
+    @gcp.FieldHint
+    region: gcp.Region
+
+    hidden res: RouterResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

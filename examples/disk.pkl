@@ -1,0 +1,63 @@
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+// Resource imports
+import "@gcp/compute/disk.pkl"
+import "@gcp/gcp.pkl"
+
+forma {
+
+  local gcpStack = new formae.Stack {
+    label = "gcp-stack"
+    description = "This was generated"
+  }
+  gcpStack
+
+
+  local gcpTarget = new formae.Target {
+    label = "gcp-target"
+    namespace = "GCP"
+    discoverable = true
+    // Credentials are read from GCP_CREDENTIALS_FILE or GCP_CREDENTIALS_JSON env vars
+    config {
+      Type = "GCP"
+      Project = "development-477117"
+      Region = "europe-west4"
+    }
+  }
+  gcpTarget
+
+  new disk.Disk {
+    label = "demo-boot-disk"
+    project = "development-477117"
+    zone = "europe-west4-b"
+    name = "formae-demo-boot-disk"
+    description = "Boot disk for demo instance"
+    sizeGb = 20
+    type = "pd-balanced"
+    sourceImage = new formae.Value {
+      // Value: projects/debian-cloud/global/images/family/debian-12
+      value = "projects/debian-cloud/global/images/family/debian-12"
+    }
+    labels = new Mapping {
+      ["environment"] = "demo"
+      ["project"] = "formae-lifeline"
+    }
+    physicalBlockSizeBytes = 4096
+    guestOsFeatures = new Listing { new disk.GuestOsFeature {
+        type = "UEFI_COMPATIBLE"
+      }; new disk.GuestOsFeature {
+        type = "VIRTIO_SCSI_MULTIQUEUE"
+      }; new disk.GuestOsFeature {
+        type = "GVNIC"
+      }; new disk.GuestOsFeature {
+        type = "SEV_CAPABLE"
+      }; new disk.GuestOsFeature {
+        type = "SEV_LIVE_MIGRATABLE_V2"
+      } }
+    enableConfidentialCompute = false
+    architecture = "X86_64"
+    target = gcpTarget.res
+    stack = gcpStack.res
+  }
+}

@@ -1,0 +1,84 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.regionTargetHttpsProxy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionTargetHttpsProxy"
+
+typealias TlsEarlyData = "STRICT"|"PERMISSIVE"|"DISABLED"
+
+open class RegionTargetHttpsProxyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionTargetHttpsProxyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionTargetHttpsProxyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionTargetHttpsProxyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionTargetHttpsProxy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    urlMap: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    sslCertificates: Listing<String|formae.Resolvable>?
+
+    @gcp.FieldHint
+    certificateMap: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    sslPolicy: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    proxyBind: Boolean?
+
+    @gcp.FieldHint
+    serverTlsPolicy: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    httpKeepAliveTimeoutSec: Int?
+
+    @gcp.FieldHint
+    tlsEarlyData: TlsEarlyData?
+
+    @gcp.FieldHint {
+    }
+    fingerprint: String?
+
+    hidden res: RegionTargetHttpsProxyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

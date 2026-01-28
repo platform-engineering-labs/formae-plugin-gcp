@@ -1,0 +1,251 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+module gcp.cloudrun.service
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudRun::Service"
+
+/// Revision template for the service
+@gcp.SubResourceHint
+open class RevisionTemplate extends formae.SubResource {
+  @gcp.FieldHint
+  scaling: RevisionScaling?
+
+  @gcp.FieldHint
+  containers: Listing<Container>
+
+  @gcp.FieldHint
+  volumes: Listing<Volume>?
+
+  @gcp.FieldHint
+  serviceAccount: String?
+
+  /// Execution environment (EXECUTION_ENVIRONMENT_GEN1 or EXECUTION_ENVIRONMENT_GEN2)
+  @gcp.FieldHint
+  executionEnvironment: String?
+
+  @gcp.FieldHint
+  maxInstanceRequestConcurrency: Int?
+}
+
+@gcp.SubResourceHint
+open class RevisionScaling extends formae.SubResource {
+  @gcp.FieldHint
+  minInstanceCount: Int?
+
+  @gcp.FieldHint
+  maxInstanceCount: Int?
+}
+
+@gcp.SubResourceHint
+open class Container extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  image: String
+
+  @gcp.FieldHint
+  ports: Listing<ContainerPort>?
+
+  @gcp.FieldHint
+  env: Listing<EnvVar>?
+
+  @gcp.FieldHint
+  resources: ResourceRequirements?
+
+  @gcp.FieldHint
+  volumeMounts: Listing<VolumeMount>?
+
+  @gcp.FieldHint
+  command: Listing<String>?
+
+  @gcp.FieldHint
+  args: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class ContainerPort extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  containerPort: Int
+
+  @gcp.FieldHint
+  protocol: String?
+}
+
+@gcp.SubResourceHint
+open class EnvVar extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  value: String?
+
+  @gcp.FieldHint
+  valueSource: EnvVarSource?
+}
+
+@gcp.SubResourceHint
+open class EnvVarSource extends formae.SubResource {
+  @gcp.FieldHint
+  secretKeyRef: SecretKeySelector?
+}
+
+@gcp.SubResourceHint
+open class SecretKeySelector extends formae.SubResource {
+  @gcp.FieldHint
+  secret: String
+
+  @gcp.FieldHint
+  version: String?
+}
+
+@gcp.SubResourceHint
+open class ResourceRequirements extends formae.SubResource {
+  /// Resource limits
+  ///
+  /// Example: {"cpu": "1000m", "memory": "512Mi"}
+  @gcp.FieldHint
+  limits: Mapping<String, String>?
+
+  @gcp.FieldHint
+  cpuIdle: Boolean?
+}
+
+@gcp.SubResourceHint
+open class Volume extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  secret: SecretVolumeSource?
+
+  @gcp.FieldHint
+  cloudSqlInstance: CloudSqlInstance?
+}
+
+@gcp.SubResourceHint
+open class SecretVolumeSource extends formae.SubResource {
+  @gcp.FieldHint
+  secret: String
+
+  @gcp.FieldHint
+  items: Listing<SecretVolumeItem>?
+}
+
+@gcp.SubResourceHint
+open class SecretVolumeItem extends formae.SubResource {
+  @gcp.FieldHint
+  key: String
+
+  @gcp.FieldHint
+  version: String?
+
+  @gcp.FieldHint
+  path: String
+}
+
+@gcp.SubResourceHint
+open class CloudSqlInstance extends formae.SubResource {
+  /// Connection names for Cloud SQL instances
+  ///
+  /// Format: {project}:{region}:{instance}
+  @gcp.FieldHint
+  instances: Listing<String>
+}
+
+@gcp.SubResourceHint
+open class VolumeMount extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  mountPath: String
+}
+
+typealias TrafficType = "TRAFFIC_TARGET_ALLOCATION_TYPE_UNSPECIFIED" | "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST" | "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION"
+
+@gcp.SubResourceHint
+open class TrafficTarget extends formae.SubResource {
+  @gcp.FieldHint
+  percent: Int
+
+  @gcp.FieldHint
+  revision: String?
+
+  @gcp.FieldHint
+  tag: String?
+
+  @gcp.FieldHint
+  type: TrafficType?
+}
+
+open class ServiceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ServiceResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: ServiceResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ServiceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Service extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    @gcp.FieldHint
+    template: RevisionTemplate
+
+    @gcp.FieldHint
+    traffic: Listing<TrafficTarget>?
+
+    /// Ingress settings (INGRESS_TRAFFIC_ALL, INGRESS_TRAFFIC_INTERNAL_ONLY, INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER)
+    @gcp.FieldHint
+    ingress: String?
+
+    hidden res: ServiceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,221 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+/// GCP BigQuery Table
+///
+/// A table in BigQuery containing structured data.
+module gcp.bigquery.table
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BigQuery::Table"
+
+/// Table schema field
+@gcp.SubResourceHint
+open class SchemaField extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  type: String
+
+  @gcp.FieldHint
+  mode: String?
+
+  @gcp.FieldHint
+  description: String?
+
+  @gcp.FieldHint
+  fields: Listing<SchemaField>?
+}
+
+/// Time partitioning configuration
+@gcp.SubResourceHint
+open class TimePartitioning extends formae.SubResource {
+  /// HOUR, DAY, MONTH, or YEAR
+  @gcp.FieldHint
+  type: String
+
+  @gcp.FieldHint
+  field: String?
+
+  @gcp.FieldHint
+  expirationMs: Int?
+
+  @gcp.FieldHint
+  requirePartitionFilter: Boolean?
+}
+
+/// Range partitioning configuration
+@gcp.SubResourceHint
+open class RangePartitioning extends formae.SubResource {
+  @gcp.FieldHint
+  field: String
+
+  @gcp.FieldHint
+  range: PartitionRange
+}
+
+@gcp.SubResourceHint
+open class PartitionRange extends formae.SubResource {
+  @gcp.FieldHint
+  start: Int
+
+  @gcp.FieldHint
+  end: Int
+
+  @gcp.FieldHint
+  interval: Int
+}
+
+/// Clustering configuration
+@gcp.SubResourceHint
+open class Clustering extends formae.SubResource {
+  @gcp.FieldHint
+  fields: Listing<String>
+}
+
+/// Encryption configuration
+@gcp.SubResourceHint
+open class EncryptionConfiguration extends formae.SubResource {
+  @gcp.FieldHint
+  kmsKeyName: String
+}
+
+/// External data configuration
+@gcp.SubResourceHint
+open class ExternalDataConfiguration extends formae.SubResource {
+  @gcp.FieldHint
+  sourceFormat: String
+
+  @gcp.FieldHint
+  sourceUris: Listing<String>
+
+  @gcp.FieldHint
+  autodetect: Boolean?
+
+  @gcp.FieldHint
+  compression: String?
+
+  @gcp.FieldHint
+  ignoreUnknownValues: Boolean?
+
+  @gcp.FieldHint
+  maxBadRecords: Int?
+}
+
+/// View definition
+@gcp.SubResourceHint
+open class ViewDefinition extends formae.SubResource {
+  @gcp.FieldHint
+  query: String
+
+  @gcp.FieldHint
+  useLegacySql: Boolean?
+}
+
+/// Materialized view definition
+@gcp.SubResourceHint
+open class MaterializedViewDefinition extends formae.SubResource {
+  @gcp.FieldHint
+  query: String
+
+  @gcp.FieldHint
+  enableRefresh: Boolean?
+
+  @gcp.FieldHint
+  refreshIntervalMs: Int?
+}
+
+open class TableResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: TableResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden selfLink: TableResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden tableId: TableResolvable = (this) {
+        property = "tableId"
+    }
+}
+
+/// GCP BigQuery Table resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "tableId"
+    parent = "GCP::BigQuery::Dataset"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "datasetId" listParameter = "datasetId"
+        }
+    }.toList()
+}
+open class Table extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    datasetId: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    tableId: String
+
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    schema: Listing<SchemaField>?
+
+    @gcp.FieldHint
+    timePartitioning: TimePartitioning?
+
+    @gcp.FieldHint
+    rangePartitioning: RangePartitioning?
+
+    @gcp.FieldHint
+    clustering: Clustering?
+
+    @gcp.FieldHint
+    expirationTime: Int?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    encryptionConfiguration: EncryptionConfiguration?
+
+    @gcp.FieldHint
+    externalDataConfiguration: ExternalDataConfiguration?
+
+    @gcp.FieldHint
+    view: ViewDefinition?
+
+    @gcp.FieldHint
+    materializedView: MaterializedViewDefinition?
+
+    @gcp.FieldHint
+    requirePartitionFilter: Boolean?
+
+    hidden res: TableResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

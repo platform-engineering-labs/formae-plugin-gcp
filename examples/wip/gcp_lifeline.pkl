@@ -1,0 +1,184 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+import "@formae/ext/random.pkl"
+import "@gcp/gcp.pkl"
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/firewall.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/router.pkl"
+import "@gcp/compute/instance.pkl"
+import "@gcp/compute/disk.pkl"
+
+
+local Region = "europe-west4"
+
+local target: formae.Target = new formae.Target {
+    label = "gcp-target"
+    config = new gcp.Config{
+        project = "development-477117"
+        region = Region
+        credentialsFile = read("env:GCP_CREDENTIALS_FILE")
+    }
+}
+
+local stack: formae.Stack = new {
+    label = "gcp-stack"
+    description = "Stack for the lifeline showcase"
+}
+
+local vpcNetwork = new network.Network {
+    label = "formae-demo-vpc"
+    description = "Formae demo VPC network"
+    name = "formae-demo-network"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "REGIONAL"
+      bgpBestPathSelectionMode = "LEGACY"
+    }
+    networkFirewallPolicyEnforcementOrder = "AFTER_CLASSIC_FIREWALL"
+  }
+
+
+// 2. Subnets (equivalent to AWS Subnets)
+local publicSubnet = new subnetwork.Subnetwork {
+    label = "public-subnet-a"
+    name = "public-subnet-eu-central1-a"
+    network = vpcNetwork.res.selfLink
+    region = Region
+    ipCidrRange = "10.0.1.0/24"
+    privateIpGoogleAccess = false
+}
+
+local privateSubnet = new subnetwork.Subnetwork {
+    label = "private-subnet-a"
+    name = "private-subnet-eu-central1-a"
+    network = vpcNetwork.res.selfLink
+    region = Region
+    ipCidrRange = "10.0.10.0/24"
+    privateIpGoogleAccess = true
+}
+
+local allowSshFirewall = new firewall.Firewall {
+    label = "allow-ssh"
+    name = "allow-ssh-from-internet"
+    network = vpcNetwork.res.selfLink
+    direction = "INGRESS"
+    sourceRanges {
+         "0.0.0.0/0"
+    }
+    allowed {
+        new {
+            protocol = "tcp"
+            ports { "22" }
+        }
+    }
+}
+
+local allowHttpFirewall = new firewall.Firewall {
+    label = "allow-http"
+    name = "allow-http-from-internet"
+    network = vpcNetwork.res.selfLink
+    direction = "INGRESS"
+    sourceRanges { "0.0.0.0/0" }
+    allowed {
+        new {
+            protocol = "tcp"
+            ports { "80"; "443"}
+        }
+    }
+}
+
+// 4. Router (equivalent to AWS Internet Gateway)
+local r = new router.Router {
+    label = "vpc-router"
+    name = "formae-demo-router"
+    network = vpcNetwork.res.selfLink
+    region = Region
+    //params {
+    //    resourceManagerTags {
+    //        ["Environment"] = "Demo"
+    //        ["Project"]     = "FormaeLifeline"
+    //    }
+    //}
+}
+
+// 5. Standalone Boot Disk
+local bootDisk = new disk.Disk {
+    label = "demo-boot-disk"
+    project = "development-477117"
+    zone = Region + "-b"
+    name = "formae-demo-boot-disk"
+    description = "Boot disk for demo instance"
+    sizeGb = 20
+    type = "pd-balanced"
+    sourceImage = new formae.Value {
+      value = "projects/debian-cloud/global/images/family/debian-12"
+    }
+    labels {
+        ["environment"] = "demo"
+        ["project"] = "formae-lifeline"
+    }
+    physicalBlockSizeBytes = 4096
+    guestOsFeatures = new Listing { new disk.GuestOsFeature {
+        type = "UEFI_COMPATIBLE"
+      }; new disk.GuestOsFeature {
+        type = "VIRTIO_SCSI_MULTIQUEUE"
+      }; new disk.GuestOsFeature {
+        type = "GVNIC"
+      }; new disk.GuestOsFeature {
+        type = "SEV_CAPABLE"
+      }; new disk.GuestOsFeature {
+        type = "SEV_LIVE_MIGRATABLE_V2"
+      } }
+    enableConfidentialCompute = false
+    architecture = "X86_64"
+}
+
+// 6. Compute Instance
+local demoInstance = new instance.Instance {
+    label = "demo-instance"
+    project = "development-477117"
+    zone = Region + "-b" //eu-central-1-b
+    name = "formae-demo-instance"
+    machineType = "e2-small"
+
+    disks {
+        new {
+            boot = true
+            autoDelete = false
+            source = bootDisk.res.selfLink  // Reference the standalone disk
+        }
+    }
+
+    networkInterfaces {
+        new {
+            network = vpcNetwork.res.selfLink
+            subnetwork = publicSubnet.res.selfLink
+            //networkIP = "10.0.1.2"
+        }
+    }
+    labels {
+        ["environment"] = "demo"
+        ["project"]     = "formae-lifeline"
+    }
+}
+
+
+forma {
+    stack
+    target
+    vpcNetwork
+    publicSubnet
+    privateSubnet
+    allowSshFirewall
+    allowHttpFirewall
+    r
+    bootDisk
+    demoInstance
+}

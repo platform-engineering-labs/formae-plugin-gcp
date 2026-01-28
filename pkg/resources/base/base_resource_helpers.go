@@ -1,0 +1,487 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+package base
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+)
+
+// buildPathContext builds a PathContext from target config and properties
+func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[string]interface{}) PathContext {
+	cfg := config.FromTargetConfig(targetConfig)
+	// Use explicit Location only - no fallback to Region
+	ctx := PathContext{
+		Project:      cfg.Project,
+		Region:       cfg.Region,
+		Zone:         cfg.Zone,
+		Location:     cfg.Location, // Container/CloudRun use location (no Region fallback)
+		ResourceType: b.ResourceConfig.ResourceType,
+	}
+
+	// Respect resource scope - clear region/zone if not applicable
+	if b.ResourceConfig.Scope != nil {
+		switch b.ResourceConfig.Scope.Type {
+		case ScopeGlobal:
+			// Global resources don't use region or zone
+			ctx.Region = ""
+			ctx.Zone = ""
+		case ScopeRegional:
+			// Regional resources don't use zone
+			ctx.Zone = ""
+		case ScopeZonal:
+			// Zonal resources use both region and zone
+			// Keep both as-is
+		}
+	}
+
+	// Extract name from properties
+	if name, ok := props["name"].(string); ok {
+		ctx.ResourceName = name
+	}
+
+	// Extract parent resource for nested resources
+	if b.ResourceConfig.ParentResource != nil && b.ResourceConfig.ParentResource.RequiresParent {
+		// Use PropertyName if specified, otherwise fall back to ParentType
+		propName := b.ResourceConfig.ParentResource.PropertyName
+		if propName == "" {
+			propName = b.ResourceConfig.ParentResource.ParentType
+		}
+		if parent, ok := props[propName].(string); ok {
+			ctx.ParentResource = parent
+			ctx.ParentType = b.ResourceConfig.ParentResource.ParentType
+		}
+	}
+
+	// Extract location if specified in properties (overrides target)
+	if location, ok := props["location"].(string); ok {
+		ctx.Location = location
+		ctx.Region = location
+	}
+
+	// Extract zone if specified in properties (overrides target) - for Compute Engine
+	if zone, ok := props["zone"].(string); ok {
+		ctx.Zone = zone
+	}
+
+	return ctx
+}
+
+// fillPathContextFromTarget fills missing fields in PathContext from target config
+func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, ctx *PathContext) {
+	cfg := config.FromTargetConfig(targetConfig)
+	if ctx.Project == "" {
+		ctx.Project = cfg.Project
+	}
+
+	// Use explicit Location only - no fallback to Region for location-based APIs
+
+	// Respect resource scope when filling in region/zone
+	if b.ResourceConfig.Scope != nil {
+		switch b.ResourceConfig.Scope.Type {
+		case ScopeGlobal:
+			// Global resources don't use region or zone - don't fill them in
+			ctx.Region = ""
+			ctx.Zone = ""
+			ctx.Location = ""
+		case ScopeRegional:
+			// Regional resources use region but not zone
+			if ctx.Region == "" {
+				ctx.Region = cfg.Region
+			}
+			ctx.Zone = ""
+		case ScopeZonal:
+			// Zonal resources use both region and zone
+			if ctx.Region == "" {
+				ctx.Region = cfg.Region
+			}
+			if ctx.Zone == "" {
+				ctx.Zone = cfg.Zone
+			}
+		case ScopeLocationBased:
+			// Location-based resources (Container/CloudRun) use location only
+			// No fallback to Region - location must be explicitly set
+			if ctx.Location == "" {
+				ctx.Location = cfg.Location
+			}
+		default:
+			// If scope type is not set, use legacy behavior
+			if ctx.Region == "" {
+				ctx.Region = cfg.Region
+			}
+			if ctx.Zone == "" {
+				ctx.Zone = cfg.Zone
+			}
+			if ctx.Location == "" {
+				ctx.Location = cfg.Location
+			}
+		}
+	} else {
+		// If no scope config, use legacy behavior
+		if ctx.Region == "" {
+			ctx.Region = cfg.Region
+		}
+		if ctx.Zone == "" {
+			ctx.Zone = cfg.Zone
+		}
+		if ctx.Location == "" {
+			ctx.Location = cfg.Location
+		}
+	}
+}
+
+// FillPathContextFromTarget is the public version of fillPathContextFromTarget
+// It fills missing fields in PathContext from target config
+func (b *BaseResource) FillPathContextFromTarget(targetConfig json.RawMessage, ctx *PathContext) {
+	b.fillPathContextFromTarget(targetConfig, ctx)
+}
+
+// buildTransformContext builds a TransformContext for transformers
+func (b *BaseResource) buildTransformContext(pathCtx PathContext, operation resource.Operation) TransformContext {
+	return TransformContext{
+		Project:      pathCtx.Project,
+		Region:       pathCtx.Region,
+		Zone:         pathCtx.Zone,
+		Location:     pathCtx.Location,
+		ResourceType: pathCtx.ResourceType,
+		Operation:    operation,
+	}
+}
+
+// handleSynchronousCreate handles synchronous create operations
+func (b *BaseResource) handleSynchronousCreate(
+	ctx context.Context,
+	request *resource.CreateRequest,
+	responseBody map[string]interface{},
+	pathCtx PathContext,
+) (*resource.CreateResult, error) {
+	nativeID := b.OperationConfig.NativeIDExtractor(responseBody, pathCtx)
+
+	// Transform response if configured
+	apiResponse := responseBody
+	if b.ResponseTransformer != nil {
+		transformCtx := b.buildTransformContext(pathCtx, resource.OperationCreate)
+		apiResponse = b.ResponseTransformer.Transform(apiResponse, transformCtx)
+	}
+
+	// Marshal properties
+	propsJSON, err := json.Marshal(apiResponse)
+	if err != nil {
+		return b.createFailureResult(resource.OperationErrorCodeServiceInternalError,
+			fmt.Sprintf("failed to marshal properties: %v", err)), nil
+	}
+
+	return &resource.CreateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:          resource.OperationCreate,
+			OperationStatus:    resource.OperationStatusSuccess,
+			NativeID:           nativeID,
+			StatusMessage:      "Resource created successfully",
+			ResourceProperties: json.RawMessage(propsJSON),
+		},
+	}, nil
+}
+
+// performUpdate performs a standard update operation
+func (b *BaseResource) performUpdate(
+	ctx context.Context,
+	client *transport.Client,
+	request *resource.UpdateRequest,
+	props map[string]interface{},
+	pathCtx PathContext,
+) (*resource.UpdateResult, error) {
+	// Transform request properties
+	body := props
+	var err error
+	if b.RequestTransformer != nil {
+		transformCtx := b.buildTransformContext(pathCtx, resource.OperationUpdate)
+		body, err = b.RequestTransformer.Transform(props, transformCtx)
+		if err != nil {
+			return b.updateFailureResult(request.NativeID,
+				resource.OperationErrorCodeInvalidRequest,
+				fmt.Sprintf("failed to transform request: %v", err)), nil
+		}
+	}
+
+	// Apply request wrapper if configured
+	if b.ResourceConfig.RequestWrapper != "" {
+		body = map[string]interface{}{
+			b.ResourceConfig.RequestWrapper: body,
+		}
+	}
+
+	// Build URL using just the resource name (not the full native ID)
+	urlBuilder := NewURLBuilder(b.APIConfig, pathCtx)
+	url := urlBuilder.ResourceURL(pathCtx.ResourceName)
+
+	// Use configured HTTP method (PATCH or PUT)
+	httpMethod := b.ResourceConfig.GetUpdateMethod()
+
+	// Add any configured update query parameters
+	if len(b.ResourceConfig.UpdateQueryParams) > 0 {
+		url, _ = transport.AddQueryParams(url, b.ResourceConfig.UpdateQueryParams)
+	}
+
+	response, err := client.SendRequest(ctx, transport.RequestOptions{
+		Method: httpMethod,
+		URL:    url,
+		Body:   body,
+	})
+	if err != nil {
+		transportErr := transport.WrapError(err, "failed to update resource")
+		return b.updateFailureResult(request.NativeID,
+			transport.ToResourceErrorCode(transportErr.Code),
+			transportErr.Message), nil
+	}
+
+	// Handle synchronous operations
+	if b.OperationConfig.Synchronous {
+		return &resource.UpdateResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationUpdate,
+				OperationStatus: resource.OperationStatusSuccess,
+				NativeID:        request.NativeID,
+				StatusMessage:   "Resource updated successfully",
+			},
+		}, nil
+	}
+
+	// Extract operation ID for async operations
+	operationID := b.OperationConfig.OperationIDExtractor(response.Body)
+	requestID := b.OperationConfig.OperationURLBuilder(pathCtx, operationID)
+
+	return &resource.UpdateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationUpdate,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        request.NativeID,
+			RequestID:       requestID,
+			StatusMessage:   fmt.Sprintf("%s update in progress", b.ResourceConfig.ResourceType),
+		},
+	}, nil
+}
+
+// updateWithOptimisticLocking handles updates that require optimistic locking
+func (b *BaseResource) updateWithOptimisticLocking(
+	ctx context.Context,
+	client *transport.Client,
+	request *resource.UpdateRequest,
+	props map[string]interface{},
+	pathCtx PathContext,
+) (*resource.UpdateResult, error) {
+	// First, read the current resource to get the locking field
+	urlBuilder := NewURLBuilder(b.APIConfig, pathCtx)
+	url := urlBuilder.ResourceURL(pathCtx.ResourceName)
+
+	getResponse, err := client.SendRequest(ctx, transport.RequestOptions{
+		Method: "GET",
+		URL:    url,
+	})
+	if err != nil {
+		wrappedErr := transport.WrapError(err, "failed to read resource for locking")
+		return b.updateFailureResult(request.NativeID,
+			transport.ToResourceErrorCode(wrappedErr.Code),
+			wrappedErr.Message), nil
+	}
+
+	// Extract locking field
+	lockingField := b.ResourceConfig.OptimisticLocking.FieldName
+	lockingValue, _ := getResponse.Body[lockingField].(string)
+
+	// Transform request properties
+	body := props
+	if b.RequestTransformer != nil {
+		transformCtx := b.buildTransformContext(pathCtx, resource.OperationUpdate)
+		body, err = b.RequestTransformer.Transform(props, transformCtx)
+		if err != nil {
+			return b.updateFailureResult(request.NativeID,
+				resource.OperationErrorCodeInvalidRequest,
+				fmt.Sprintf("failed to transform request: %v", err)), nil
+		}
+	}
+
+	// Add locking field to body or URL
+	if b.ResourceConfig.OptimisticLocking.LocationInURL {
+		// Add as query parameter
+		url, _ = transport.AddQueryParam(url, lockingField, lockingValue)
+	} else {
+		// Add to request body
+		body[lockingField] = lockingValue
+	}
+
+	// Apply request wrapper if configured
+	if b.ResourceConfig.RequestWrapper != "" {
+		body = map[string]interface{}{
+			b.ResourceConfig.RequestWrapper: body,
+		}
+	}
+
+	// Use configured HTTP method (PATCH or PUT)
+	httpMethod := b.ResourceConfig.GetUpdateMethod()
+
+	// Add any configured update query parameters
+	if len(b.ResourceConfig.UpdateQueryParams) > 0 {
+		url, _ = transport.AddQueryParams(url, b.ResourceConfig.UpdateQueryParams)
+	}
+
+	response, err := client.SendRequest(ctx, transport.RequestOptions{
+		Method: httpMethod,
+		URL:    url,
+		Body:   body,
+	})
+	if err != nil {
+		transportErr := transport.WrapError(err, "failed to update resource")
+		return b.updateFailureResult(request.NativeID,
+			transport.ToResourceErrorCode(transportErr.Code),
+			transportErr.Message), nil
+	}
+
+	// Handle synchronous operations
+	if b.OperationConfig.Synchronous {
+		return &resource.UpdateResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationUpdate,
+				OperationStatus: resource.OperationStatusSuccess,
+				NativeID:        request.NativeID,
+				StatusMessage:   "Resource updated successfully",
+			},
+		}, nil
+	}
+
+	// Extract operation ID for async operations
+	operationID := b.OperationConfig.OperationIDExtractor(response.Body)
+	requestID := b.OperationConfig.OperationURLBuilder(pathCtx, operationID)
+
+	return &resource.UpdateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationUpdate,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        request.NativeID,
+			RequestID:       requestID,
+			StatusMessage:   fmt.Sprintf("%s update in progress", b.ResourceConfig.ResourceType),
+		},
+	}, nil
+}
+
+// parseListResponse parses list response - can be overridden by API-specific implementations
+func (b *BaseResource) parseListResponse(
+	responseBody map[string]interface{},
+	pathCtx PathContext,
+) (*resource.ListResult, error) {
+	var nativeIDs []string
+
+	// Try "items" first (common pattern)
+	if items, ok := responseBody["items"].([]interface{}); ok {
+		// Simple array of items
+		for _, item := range items {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
+					nativeIDs = append(nativeIDs, nativeID)
+				}
+			}
+		}
+	} else if items, ok := responseBody["items"].(map[string]interface{}); ok {
+		// Aggregated list format: items is a map of zones/regions to resource lists
+		// Example: {"zones/us-central1-a": {"instances": [...]}, "zones/us-central1-b": {"instances": [...]}}
+		for _, zoneData := range items {
+			if zoneMap, ok := zoneData.(map[string]interface{}); ok {
+				// Look for the resource type key within each zone/region
+				if resourceList, ok := zoneMap[b.ResourceConfig.ResourceType].([]interface{}); ok {
+					for _, item := range resourceList {
+						if itemMap, ok := item.(map[string]interface{}); ok {
+							if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
+								nativeIDs = append(nativeIDs, nativeID)
+							}
+						}
+					}
+				}
+			}
+		}
+	} else if items, ok := responseBody[b.ResourceConfig.ResourceType].([]interface{}); ok {
+		// Try resource type key (Container API pattern)
+		for _, item := range items {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
+					nativeIDs = append(nativeIDs, nativeID)
+				}
+			}
+		}
+	}
+
+	// Extract next page token
+	var nextToken *string
+	if token, ok := responseBody["nextPageToken"].(string); ok && token != "" {
+		nextToken = &token
+	}
+
+	return &resource.ListResult{
+		NativeIDs:     nativeIDs,
+		NextPageToken: nextToken,
+	}, nil
+}
+
+// extractNativeIDFromItem extracts the native ID from a list item
+func (b *BaseResource) extractNativeIDFromItem(itemMap map[string]interface{}, pathCtx PathContext) string {
+	name, _ := itemMap["name"].(string)
+	if name == "" {
+		return ""
+	}
+
+	// Build native ID - try NativeIDExtractor first if available
+	var nativeID string
+	if b.OperationConfig.NativeIDExtractor != nil {
+		// Use the extractor function which can handle selfLink/targetLink extraction
+		nativeID = b.OperationConfig.NativeIDExtractor(itemMap, pathCtx)
+	}
+
+	// Fallback to BuildNativeID if extractor didn't return a value
+	if nativeID == "" {
+		nativeID = BuildNativeID(b.NativeIDConfig, name, pathCtx)
+	}
+
+	return nativeID
+}
+
+// Failure result helpers
+
+func (b *BaseResource) createFailureResult(errorCode resource.OperationErrorCode, message string) *resource.CreateResult {
+	return &resource.CreateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCreate,
+			OperationStatus: resource.OperationStatusFailure,
+			ErrorCode:       errorCode,
+			StatusMessage:   message,
+		},
+	}
+}
+
+func (b *BaseResource) updateFailureResult(nativeID string, errorCode resource.OperationErrorCode, message string) *resource.UpdateResult {
+	return &resource.UpdateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationUpdate,
+			OperationStatus: resource.OperationStatusFailure,
+			ErrorCode:       errorCode,
+			StatusMessage:   message,
+			NativeID:        nativeID,
+		},
+	}
+}
+
+func (b *BaseResource) deleteFailureResult(nativeID string, errorCode resource.OperationErrorCode, message string) *resource.DeleteResult {
+	return &resource.DeleteResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationDelete,
+			OperationStatus: resource.OperationStatusFailure,
+			ErrorCode:       errorCode,
+			StatusMessage:   message,
+			NativeID:        nativeID,
+		},
+	}
+}

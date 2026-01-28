@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.compute.regionTargetHttpProxy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionTargetHttpProxy"
+
+open class RegionTargetHttpProxyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionTargetHttpProxyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionTargetHttpProxyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionTargetHttpProxyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionTargetHttpProxy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    urlMap: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    proxyBind: Boolean?
+
+    @gcp.FieldHint
+    httpKeepAliveTimeoutSec: Int?
+
+    @gcp.FieldHint {
+    }
+    fingerprint: String?
+
+    hidden res: RegionTargetHttpProxyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
