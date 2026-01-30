@@ -1,6 +1,9 @@
-# Formae Plugin Template
+# GCP Plugin for Formae
 
-Template repository for creating formae resource plugins.
+[![CI](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/ci.yml)
+[![Nightly](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/nightly.yml)
+
+Formae plugin for managing Google Cloud Platform resources.
 
 > **Note:** Don't use GitHub's "Use this template" button. Instead, use the Formae CLI
 > which will prompt for your plugin details and set everything up correctly:
