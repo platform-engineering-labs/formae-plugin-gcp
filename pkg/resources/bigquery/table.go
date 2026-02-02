@@ -95,7 +95,7 @@ func (t *Table) Create(ctx context.Context, req *resource.CreateRequest) (*resou
 			},
 		}, nil
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	table := client.Dataset(datasetID).Table(tableID)
 	metadata := buildTableMetadata(props)
@@ -141,7 +141,7 @@ func (t *Table) Read(ctx context.Context, req *resource.ReadRequest) (*resource.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	table := client.Dataset(datasetID).Table(tableID)
 	metadata, err := table.Metadata(ctx)
@@ -188,7 +188,7 @@ func (t *Table) Delete(ctx context.Context, req *resource.DeleteRequest) (*resou
 			},
 		}, nil
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	table := client.Dataset(datasetID).Table(tableID)
 	err = table.Delete(ctx)
@@ -231,7 +231,7 @@ func (t *Table) List(ctx context.Context, req *resource.ListRequest) (*resource.
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	it := client.Dataset(datasetID).Tables(ctx)
 	nativeIDs := make([]string, 0)

@@ -164,9 +164,7 @@ func parseContainerNativeID(nativeID string) (base.PathContext, error) {
 			}
 		}
 		// Remove API version if present
-		if strings.HasPrefix(path, "v1/") {
-			path = path[3:]
-		}
+		path = strings.TrimPrefix(path, "v1/")
 	}
 
 	// Parse path: projects/{project}/locations/{location}/clusters/{cluster}[/nodePools/{nodePool}]

@@ -20,7 +20,6 @@ target = new formae.Target {
       project = gcpProject
       region = gcpRegion
       zone = gcpZone
-      credentialsFile = read("env:GCP_CREDENTIALS_FILE")
     }
   }
 

@@ -252,8 +252,3 @@ func NewNodePoolPathComponents(nativeID string) (*NodePoolPathComponents, error)
 		NodePoolName: nodePoolName,
 	}, nil
 }
-
-// containsIgnoreCase checks if a string contains a substring (case-insensitive)
-func containsIgnoreCase(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
-}

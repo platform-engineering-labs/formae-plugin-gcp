@@ -94,7 +94,7 @@ func (r *Routine) Create(ctx context.Context, req *resource.CreateRequest) (*res
 			},
 		}, nil
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	routine := client.Dataset(datasetID).Routine(routineID)
 	metadata := buildRoutineMetadata(props)
@@ -140,7 +140,7 @@ func (r *Routine) Read(ctx context.Context, req *resource.ReadRequest) (*resourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	routine := client.Dataset(datasetID).Routine(routineID)
 	metadata, err := routine.Metadata(ctx)
@@ -187,7 +187,7 @@ func (r *Routine) Delete(ctx context.Context, req *resource.DeleteRequest) (*res
 			},
 		}, nil
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	routine := client.Dataset(datasetID).Routine(routineID)
 	err = routine.Delete(ctx)
@@ -230,7 +230,7 @@ func (r *Routine) List(ctx context.Context, req *resource.ListRequest) (*resourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	it := client.Dataset(datasetID).Routines(ctx)
 	nativeIDs := make([]string, 0)
@@ -393,7 +393,7 @@ func flattenRoutine(metadata *bigquery.RoutineMetadata, project, datasetID, rout
 		props["determinismLevel"] = string(metadata.DeterminismLevel)
 	}
 
-	if metadata.Arguments != nil && len(metadata.Arguments) > 0 {
+	if len(metadata.Arguments) > 0 {
 		args := make([]map[string]interface{}, 0, len(metadata.Arguments))
 		for _, arg := range metadata.Arguments {
 			argMap := map[string]interface{}{
@@ -434,7 +434,7 @@ func flattenRoutine(metadata *bigquery.RoutineMetadata, project, datasetID, rout
 		}
 	}
 
-	if metadata.ImportedLibraries != nil && len(metadata.ImportedLibraries) > 0 {
+	if len(metadata.ImportedLibraries) > 0 {
 		props["importedLibraries"] = metadata.ImportedLibraries
 	}
 
