@@ -92,7 +92,7 @@ func (d *Dataset) Create(ctx context.Context, req *resource.CreateRequest) (*res
 			},
 		}, nil
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	ds := client.Dataset(datasetID)
 	metadata := &bigquery.DatasetMetadata{
@@ -153,7 +153,7 @@ func (d *Dataset) Read(ctx context.Context, req *resource.ReadRequest) (*resourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	ds := client.Dataset(datasetID)
 	metadata, err := ds.Metadata(ctx)
@@ -200,7 +200,7 @@ func (d *Dataset) Delete(ctx context.Context, req *resource.DeleteRequest) (*res
 			},
 		}, nil
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	ds := client.Dataset(datasetID)
 
@@ -236,7 +236,7 @@ func (d *Dataset) List(ctx context.Context, req *resource.ListRequest) (*resourc
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	it := client.Datasets(ctx)
 	nativeIDs := make([]string, 0)

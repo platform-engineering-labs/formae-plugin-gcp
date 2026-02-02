@@ -58,32 +58,6 @@ func wrapResponseTransformer(responseTransformer func(map[string]interface{}) ma
 	})
 }
 
-// objectScopedRequestTransformer handles the special case of object-scoped resources
-// which need both bucket and object in the parent resource path
-// It creates a synthetic "bucketObject" property that combines bucket and object
-func objectScopedRequestTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
-	// Extract bucket and object
-	bucket, bucketOk := props["bucket"].(string)
-	object, objectOk := props["object"].(string)
-
-	// Create a copy of props for transformation
-	body := make(map[string]interface{})
-	for k, v := range props {
-		// Skip bucket and object (they'll be in the URL)
-		if k == "bucket" || k == "object" {
-			continue
-		}
-		body[k] = v
-	}
-
-	// Add synthetic combined property if both exist
-	if bucketOk && objectOk {
-		body["bucketObject"] = fmt.Sprintf("%s/%s", bucket, object)
-	}
-
-	return body, nil
-}
-
 func init() {
 	// Create the registry with common Storage API configurations
 	storageRegistry = base.NewResourceRegistry(

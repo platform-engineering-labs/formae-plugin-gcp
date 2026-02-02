@@ -53,7 +53,7 @@ func (p *DiskProvisioner) Update(
 			fmt.Sprintf("invalid native ID: %v", err)), nil
 	}
 
-	p.BaseResource.FillPathContextFromTarget(request.TargetConfig, &pathCtx)
+	p.FillPathContextFromTarget(request.TargetConfig, &pathCtx)
 	pathCtx.ResourceType = p.ResourceConfig.ResourceType
 
 	// First, read the current disk to get the labelFingerprint

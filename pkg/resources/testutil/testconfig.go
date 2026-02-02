@@ -28,10 +28,9 @@ var (
 	CredentialsFile = os.Getenv("GCP_CREDENTIALS_FILE")
 
 	Config = &config.Config{
-		Project:         Project,
-		Region:          Region,
-		Location:        Location,
-		CredentialsFile: CredentialsFile,
+		Project:  Project,
+		Region:   Region,
+		Location: Location,
 	}
 
 	// TargetConfig is a json.RawMessage containing the target configuration
