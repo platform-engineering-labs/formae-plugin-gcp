@@ -7,8 +7,8 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/bigquery/dataset.pkl"
-import "@gcp/bigquery/table.pkl"
-import "./vars.pkl" as v
+import "@gcp/bigquery/table_bigquery.pkl" as table
+import "./config/vars.pkl" as v
 
 local testDatasetId = "formae_plugin_sdk_test_\(v.testRunID)"
 

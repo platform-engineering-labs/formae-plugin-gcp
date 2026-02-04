@@ -109,7 +109,11 @@ func getClustersMap(props map[string]interface{}, project string, instanceType s
 // instanceResponseTransformer transforms the API response into a normalized format
 func instanceResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	apiResponse["project"] = ctx.Project
-	apiResponse["instanceName"] = base.ExtractLastSegment(utils.GetString(apiResponse, "name"))
+	// The API returns name as full path (projects/.../instances/...), normalize to short name
+	if name := utils.GetString(apiResponse, "name"); name != "" {
+		apiResponse["name"] = base.ExtractLastSegment(name)
+	}
+	apiResponse["instanceName"] = apiResponse["name"]
 	return apiResponse
 }
 

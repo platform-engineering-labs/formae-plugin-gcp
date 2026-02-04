@@ -107,9 +107,10 @@ func (p *BigtableProvisioner) Create(
 	url := urlBuilder.CollectionURL()
 
 	// Add Bigtable-specific query parameter for resource ID
-	// Format: ?instanceId={name} or ?clusterId={name} or ?tableId={name}
+	// Format: ?instance_id={name} or ?cluster_id={name} or ?table_id={name}
+	// Note: Bigtable Admin API uses snake_case for query parameters
 	resourceIDSuffix := strings.TrimSuffix(p.resourceTypeAPI, "s")
-	resourceIDParam := resourceIDSuffix + "Id"
+	resourceIDParam := resourceIDSuffix + "_id"
 	url, err = transport.AddQueryParams(url, map[string]string{
 		resourceIDParam: resourceName,
 	})

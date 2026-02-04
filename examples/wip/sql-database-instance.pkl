@@ -7,7 +7,7 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/sql/database.pkl"
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 forma {
   v.stack
@@ -30,14 +30,11 @@ forma {
         ["managed-by"] = "formae"
       }
       ipConfiguration = new database.IpConfiguration {
-        ipv4Enabled = true
+        // Disable public IP to comply with org policy constraints/sql.restrictPublicIp
+        ipv4Enabled = false
         requireSsl = false
-        authorizedNetworks = new Listing {
-          new database.AclEntry {
-            name = "test-network"
-            value = "0.0.0.0/0"
-          }
-        }
+        // Enable private IP using the default VPC network
+        privateNetwork = "projects/\(v.gcpProject)/global/networks/default"
       }
       backupConfiguration = new database.BackupConfiguration {
         enabled = true

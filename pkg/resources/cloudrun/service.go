@@ -357,13 +357,78 @@ func getServiceNetworkInterfacesArray(props map[string]interface{}) []map[string
 	return nil
 }
 
+// filterTemplate removes API-added defaults not in the PKL schema
+func filterTemplate(template map[string]interface{}) map[string]interface{} {
+	filtered := make(map[string]interface{})
+
+	// Copy only known fields from schema that were explicitly set
+	// Exclude API-generated defaults like serviceAccount, timeout
+	// Fields in RevisionTemplate: scaling, containers, volumes, executionEnvironment, maxInstanceRequestConcurrency
+	schemaFields := map[string]bool{
+		"scaling":                       true,
+		"containers":                    true,
+		"volumes":                       true,
+		"executionEnvironment":          true,
+		"maxInstanceRequestConcurrency": true,
+		// Note: serviceAccount is in schema but we exclude API-generated defaults
+	}
+
+	for key, value := range template {
+		if schemaFields[key] {
+			// For containers, also filter each container
+			if key == "containers" {
+				if containers, ok := value.([]interface{}); ok {
+					filtered[key] = filterContainers(containers)
+				} else {
+					filtered[key] = value
+				}
+			} else {
+				filtered[key] = value
+			}
+		}
+	}
+
+	return filtered
+}
+
+// filterContainers removes API-added defaults from container specs
+func filterContainers(containers []interface{}) []interface{} {
+	result := make([]interface{}, 0, len(containers))
+
+	// Fields in Container schema
+	containerFields := map[string]bool{
+		"name":         true,
+		"image":        true,
+		"ports":        true,
+		"env":          true,
+		"resources":    true,
+		"volumeMounts": true,
+		"command":      true,
+		"args":         true,
+	}
+
+	for _, c := range containers {
+		if container, ok := c.(map[string]interface{}); ok {
+			filtered := make(map[string]interface{})
+			for key, value := range container {
+				if containerFields[key] {
+					filtered[key] = value
+				}
+			}
+			result = append(result, filtered)
+		}
+	}
+
+	return result
+}
+
 // serviceResponseTransformer transforms the API response into a normalized format
 func serviceResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	props := make(map[string]interface{})
 
-	// Basic fields
+	// Basic fields - normalize name to short form
 	if name, ok := apiResponse["name"].(string); ok {
-		props["name"] = name
+		props["name"] = base.ExtractLastSegment(name)
 	}
 	if uid, ok := apiResponse["uid"].(string); ok {
 		props["uid"] = uid
@@ -382,9 +447,9 @@ func serviceResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 		props["annotations"] = annotations
 	}
 
-	// Template
+	// Template - filter out API-added defaults not in schema
 	if template, ok := apiResponse["template"].(map[string]interface{}); ok {
-		props["template"] = template
+		props["template"] = filterTemplate(template)
 	}
 
 	// Traffic
@@ -398,7 +463,12 @@ func serviceResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 	}
 
 	props["project"] = ctx.Project
-	props["region"] = ctx.Region
+	// Cloud Run uses location, but PKL schema expects "region" - use Location as Region
+	if ctx.Region != "" {
+		props["region"] = ctx.Region
+	} else if ctx.Location != "" {
+		props["region"] = ctx.Location
+	}
 
 	return props
 }

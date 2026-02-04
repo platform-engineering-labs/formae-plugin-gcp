@@ -8,7 +8,7 @@ amends "@formae/forma.pkl"
 
 import "@gcp/compute/network.pkl"
 import "@gcp/compute/subnetwork.pkl"
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 local testNetworkName = "formae-plugin-sdk-test-net-\(v.testRunID)"
 

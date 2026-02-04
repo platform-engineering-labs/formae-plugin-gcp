@@ -10,7 +10,7 @@ import "@formae/formae.pkl"
 import "@gcp/gcp.pkl"
 
 import "@gcp/storage/bucket.pkl"
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 forma {
   v.stack

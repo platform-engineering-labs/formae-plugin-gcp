@@ -130,7 +130,7 @@ func init() {
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
-			ResponseTransformer: nil,
+			ResponseTransformer: NetworkResponseTransformer,
 		},
 		{
 			ResourceType: FirewallResourceType,
@@ -147,7 +147,7 @@ func init() {
 				},
 			},
 			RequestTransformer:  nil,
-			ResponseTransformer: nil,
+			ResponseTransformer: FirewallResponseTransformer,
 		},
 		{
 			ResourceType: SubnetworkResourceType,
@@ -164,7 +164,7 @@ func init() {
 				},
 			},
 			RequestTransformer:  nil,
-			ResponseTransformer: base.RegionResponseTransformer,
+			ResponseTransformer: SubnetworkResponseTransformer,
 		},
 		{
 			ResourceType: RouterResourceType,

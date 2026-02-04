@@ -10,6 +10,8 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // Resource type constants
@@ -133,5 +135,27 @@ func init() {
 
 	if err != nil {
 		panic(err)
+	}
+
+	// Override registrations with BigtableProvisioner for proper Create handling
+	// BigtableProvisioner adds the required instance_id/cluster_id/table_id query parameters
+	bigtableResourceTypes := []string{InstanceResourceType, ClusterResourceType, TableResourceType}
+	for _, rt := range bigtableResourceTypes {
+		resourceType := rt // capture by value for closure
+		registry.Register(
+			resourceType,
+			[]resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			func(cfg *config.Config) prov.Provisioner {
+				provisioner, _ := NewBigtableProvisioner(cfg, resourceType)
+				return provisioner
+			},
+		)
 	}
 }
