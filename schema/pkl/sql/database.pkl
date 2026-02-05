@@ -137,7 +137,7 @@ open class IpConfiguration extends formae.SubResource {
   requireSsl: Boolean?
 
   @gcp.FieldHint
-  authorizedNetworks: Listing<AclEntry>?
+ authorizedNetworks: Listing<AclEntry>? = new List().toListing()
 }
 
 /// Authorized network entry
@@ -155,9 +155,6 @@ open class AclEntry extends formae.SubResource {
 open class BackupConfiguration extends formae.SubResource {
   @gcp.FieldHint
   enabled: Boolean?
-
-  @gcp.FieldHint
-  startTime: String?
 
   @gcp.FieldHint
   pointInTimeRecoveryEnabled: Boolean?
