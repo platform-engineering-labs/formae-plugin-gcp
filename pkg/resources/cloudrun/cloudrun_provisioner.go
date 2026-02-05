@@ -172,7 +172,7 @@ func (p *CloudRunProvisioner) Status(
 		return result, nil
 	}
 
-	readResult, err := p.BaseResource.Read(ctx, &resource.ReadRequest{
+	readResult, err := p.Read(ctx, &resource.ReadRequest{
 		ResourceType: request.ResourceType,
 		NativeID:     nativeID,
 		TargetConfig: request.TargetConfig,
