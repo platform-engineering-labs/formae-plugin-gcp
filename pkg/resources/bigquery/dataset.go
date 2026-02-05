@@ -204,9 +204,11 @@ func (d *Dataset) Delete(ctx context.Context, req *resource.DeleteRequest) (*res
 
 	ds := client.Dataset(datasetID)
 
-	// Delete all tables first (if deleteContents is true)
-	// For now, we'll just try to delete the dataset
-	err = ds.Delete(ctx)
+	// Use DeleteWithContents to delete the dataset along with any tables/views it contains.
+	// This is the expected behavior for IaC tools and handles cases where:
+	// 1. Child resources were created outside of Formae management
+	// 2. Dependency ordering doesn't delete children first
+	err = ds.DeleteWithContents(ctx)
 	if err != nil {
 		errorCode := status.MapGCPError(err)
 		return &resource.DeleteResult{

@@ -59,9 +59,13 @@ func (p *CloudRunProvisioner) Create(
 	}
 
 	// Override location from properties if specified
+	// Cloud Run uses "location" but PKL schemas often use "region" - check both
 	if propLocation := utils.GetString(props, "location"); propLocation != "" {
 		pathCtx.Location = propLocation
 		pathCtx.Region = propLocation
+	} else if propRegion := utils.GetString(props, "region"); propRegion != "" {
+		pathCtx.Location = propRegion
+		pathCtx.Region = propRegion
 	}
 
 	// Transform request properties
@@ -144,6 +148,46 @@ func createFailureResult(errorCode resource.OperationErrorCode, message string) 
 			StatusMessage:   message,
 		},
 	}
+}
+
+// Status overrides the base Status to fetch resource properties when operation completes
+func (p *CloudRunProvisioner) Status(
+	ctx context.Context,
+	request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	// Call base Status to check operation
+	result, err := p.BaseResource.Status(ctx, request)
+	if err != nil {
+		return result, err
+	}
+
+	// If operation is still in progress or failed, return as-is
+	if result.ProgressResult == nil || result.ProgressResult.OperationStatus != resource.OperationStatusSuccess {
+		return result, nil
+	}
+
+	// Operation completed - fetch the resource properties via Read
+	nativeID := result.ProgressResult.NativeID
+	if nativeID == "" {
+		return result, nil
+	}
+
+	readResult, err := p.BaseResource.Read(ctx, &resource.ReadRequest{
+		ResourceType: request.ResourceType,
+		NativeID:     nativeID,
+		TargetConfig: request.TargetConfig,
+	})
+	if err != nil {
+		// Log but don't fail - return success without properties
+		return result, nil
+	}
+
+	// ReadResult has Properties (string) and ErrorCode fields
+	if readResult.Properties != "" && readResult.ErrorCode == "" {
+		result.ProgressResult.ResourceProperties = json.RawMessage(readResult.Properties)
+	}
+
+	return result, nil
 }
 
 // newCloudRunProvisionerWithBase creates a CloudRunProvisioner from a BaseResource

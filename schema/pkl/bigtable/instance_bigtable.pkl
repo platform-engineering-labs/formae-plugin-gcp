@@ -13,6 +13,27 @@ import "@formae/formae.pkl"
 const type = "GCP::Bigtable::Instance"
 
 typealias InstanceType = "PRODUCTION"|"DEVELOPMENT"
+typealias StorageType = "SSD"|"HDD"
+
+/// Cluster configuration for Bigtable instance
+@gcp.SubResourceHint
+open class ClusterConfig extends formae.SubResource {
+    /// The location (zone) for the cluster (e.g., "us-central1-a")
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    location: String
+
+    /// Storage type for the cluster
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    defaultStorageType: StorageType?
+
+    /// Number of nodes (only for PRODUCTION instances)
+    @gcp.FieldHint
+    serveNodes: Int?
+}
 
 open class InstanceResolvable extends formae.Resolvable {
     hidden type = module.type
@@ -54,6 +75,13 @@ open class Instance extends formae.Resource {
 
     @gcp.FieldHint
     labels: Mapping<String, String>?
+
+    /// Cluster configurations for the instance (at least one required for Create)
+    /// This is createOnly - not returned by Read operations as clusters are managed separately
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    clusters: Mapping<String, ClusterConfig>?
 
     hidden res: InstanceResolvable = new {
         label = parent.label

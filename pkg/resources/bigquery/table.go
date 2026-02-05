@@ -194,6 +194,19 @@ func (t *Table) Delete(ctx context.Context, req *resource.DeleteRequest) (*resou
 	err = table.Delete(ctx)
 	if err != nil {
 		errorCode := status.MapGCPError(err)
+		// Treat NotFound as success for idempotent delete behavior.
+		// This handles cases where:
+		// 1. The table was already deleted
+		// 2. The parent dataset was deleted (which also deletes its tables)
+		if errorCode == resource.OperationErrorCodeNotFound {
+			return &resource.DeleteResult{
+				ProgressResult: &resource.ProgressResult{
+					Operation:       resource.OperationDelete,
+					OperationStatus: resource.OperationStatusSuccess,
+					StatusMessage:   "BigQuery table deleted successfully (resource was already gone)",
+				},
+			}, nil
+		}
 		return &resource.DeleteResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationDelete,

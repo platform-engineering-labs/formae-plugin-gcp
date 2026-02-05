@@ -10,6 +10,8 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // Resource type constants
@@ -111,5 +113,27 @@ func init() {
 
 	if err != nil {
 		panic(err)
+	}
+
+	// Register CloudRunProvisioner with global registry for proper Create handling
+	// CloudRunProvisioner adds the required serviceId/jobId query parameters
+	cloudRunResourceTypes := []string{ServiceResourceType, JobResourceType}
+	for _, rt := range cloudRunResourceTypes {
+		resourceType := rt // capture by value for closure
+		registry.Register(
+			resourceType,
+			[]resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			func(cfg *config.Config) prov.Provisioner {
+				provisioner, _ := NewCloudRunProvisioner(cfg, resourceType)
+				return provisioner
+			},
+		)
 	}
 }

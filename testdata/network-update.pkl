@@ -11,7 +11,7 @@ import "@gcp/gcp.pkl"
 
 import "@gcp/compute/network.pkl"
 
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 forma {
   v.stack

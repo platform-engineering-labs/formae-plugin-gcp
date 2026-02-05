@@ -6,8 +6,8 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/bigtable/instance.pkl"
-import "./vars.pkl" as v
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "./config/vars.pkl" as v
 
 forma {
   v.stack
@@ -22,6 +22,12 @@ forma {
     labels = new Mapping {
       ["environment"] = "test"
       ["managed-by"] = "formae"
+    }
+    clusters = new Mapping {
+      ["cluster1"] = new instance.ClusterConfig {
+        location = "\(v.gcpRegion)-a"
+        defaultStorageType = "SSD"
+      }
     }
   }
 }

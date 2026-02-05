@@ -7,7 +7,7 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/bigquery/dataset.pkl"
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 forma {
   v.stack

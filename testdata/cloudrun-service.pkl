@@ -7,7 +7,7 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/cloudrun/service.pkl"
-import "./vars.pkl" as v
+import "./config/vars.pkl" as v
 
 forma {
   v.stack
