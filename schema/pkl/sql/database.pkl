@@ -137,7 +137,7 @@ open class IpConfiguration extends formae.SubResource {
   requireSsl: Boolean?
 
   @gcp.FieldHint
- authorizedNetworks: Listing<AclEntry>? = new List().toListing()
+ authorizedNetworks: Listing<AclEntry>?
 }
 
 /// Authorized network entry
