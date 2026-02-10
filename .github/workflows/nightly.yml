@@ -22,6 +22,7 @@ jobs:
       GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
       GCP_REGION: ${{ secrets.GCP_REGION }}
       GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
 
     steps:
       - name: Checkout plugin
