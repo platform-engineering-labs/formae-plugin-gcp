@@ -1,0 +1,134 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+module gcp.cloudrun.execution
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudRun::Execution"
+
+/// Task template for the execution
+@gcp.SubResourceHint
+open class TaskTemplate extends formae.SubResource {
+  @gcp.FieldHint
+  containers: Listing<Container>?
+
+  @gcp.FieldHint
+  volumes: Listing<Volume>?
+
+  @gcp.FieldHint
+  serviceAccount: String?
+
+  @gcp.FieldHint
+  maxRetries: Int?
+
+  @gcp.FieldHint
+  timeout: String?
+}
+
+@gcp.SubResourceHint
+open class Container extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  image: String
+
+  @gcp.FieldHint
+  env: Listing<EnvVar>?
+
+  @gcp.FieldHint
+  resources: ResourceRequirements?
+
+  @gcp.FieldHint
+  command: Listing<String>?
+
+  @gcp.FieldHint
+  args: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class EnvVar extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  value: String?
+}
+
+@gcp.SubResourceHint
+open class ResourceRequirements extends formae.SubResource {
+  @gcp.FieldHint
+  limits: Mapping<String, String>?
+}
+
+@gcp.SubResourceHint
+open class Volume extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+}
+
+open class ExecutionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ExecutionResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden name: ExecutionResolvable = (this) {
+        property = "name"
+    }
+
+    hidden uid: ExecutionResolvable = (this) {
+        property = "uid"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Execution extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    /// The parent job name
+    @gcp.FieldHint
+    job: String?
+
+    @gcp.FieldHint
+    taskCount: Int?
+
+    @gcp.FieldHint
+    parallelism: Int?
+
+    @gcp.FieldHint
+    template: TaskTemplate?
+
+    hidden res: ExecutionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -99,8 +99,11 @@ func (p *CloudRunProvisioner) Create(
 
 	// Add Cloud Run-specific query parameter for resource ID
 	idParam := "serviceId"
-	if p.resourceTypeAPI == "jobs" {
+	switch p.resourceTypeAPI {
+	case "jobs":
 		idParam = "jobId"
+	case "workerPools":
+		idParam = "workerPoolId"
 	}
 	url, err = transport.AddQueryParams(url, map[string]string{
 		idParam: resourceName,

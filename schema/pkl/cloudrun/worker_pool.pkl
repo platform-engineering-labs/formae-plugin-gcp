@@ -1,0 +1,330 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+module gcp.cloudrun.worker_pool
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudRun::WorkerPool"
+
+/// Revision template for the worker pool
+@gcp.SubResourceHint
+open class WorkerPoolRevisionTemplate extends formae.SubResource {
+  @gcp.FieldHint
+  revision: String?
+
+  @gcp.FieldHint
+  scaling: InstanceScaling?
+
+  @gcp.FieldHint
+  containers: Listing<Container>
+
+  @gcp.FieldHint
+  volumes: Listing<Volume>?
+
+  @gcp.FieldHint
+  serviceAccount: String?
+
+  /// Execution environment (EXECUTION_ENVIRONMENT_GEN1 or EXECUTION_ENVIRONMENT_GEN2)
+  @gcp.FieldHint
+  executionEnvironment: String?
+
+  @gcp.FieldHint
+  maxInstanceRequestConcurrency: Int?
+
+  @gcp.FieldHint
+  timeout: String?
+
+  /// VPC connector for private networking
+  @gcp.FieldHint
+  vpcAccess: VpcAccess?
+
+  @gcp.FieldHint
+  sessionAffinity: Boolean?
+}
+
+/// Instance scaling for worker pools
+@gcp.SubResourceHint
+open class InstanceScaling extends formae.SubResource {
+  @gcp.FieldHint
+  minInstanceCount: Int?
+
+  @gcp.FieldHint
+  maxInstanceCount: Int?
+
+  @gcp.FieldHint
+  maxSurge: Int?
+}
+
+/// Top-level worker pool scaling
+@gcp.SubResourceHint
+open class WorkerPoolScaling extends formae.SubResource {
+  @gcp.FieldHint
+  minInstanceCount: Int?
+
+  @gcp.FieldHint
+  maxInstanceCount: Int?
+}
+
+@gcp.SubResourceHint
+open class Container extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  image: String
+
+  @gcp.FieldHint
+  ports: Listing<ContainerPort>?
+
+  @gcp.FieldHint
+  env: Listing<EnvVar>?
+
+  @gcp.FieldHint
+  resources: ResourceRequirements?
+
+  @gcp.FieldHint
+  volumeMounts: Listing<VolumeMount>?
+
+  @gcp.FieldHint
+  command: Listing<String>?
+
+  @gcp.FieldHint
+  args: Listing<String>?
+
+  @gcp.FieldHint
+  workingDir: String?
+}
+
+@gcp.SubResourceHint
+open class ContainerPort extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  containerPort: Int
+
+  @gcp.FieldHint
+  protocol: String?
+}
+
+@gcp.SubResourceHint
+open class EnvVar extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  value: String?
+
+  @gcp.FieldHint
+  valueSource: EnvVarSource?
+}
+
+@gcp.SubResourceHint
+open class EnvVarSource extends formae.SubResource {
+  @gcp.FieldHint
+  secretKeyRef: SecretKeySelector?
+}
+
+@gcp.SubResourceHint
+open class SecretKeySelector extends formae.SubResource {
+  @gcp.FieldHint
+  secret: String
+
+  @gcp.FieldHint
+  version: String?
+}
+
+@gcp.SubResourceHint
+open class ResourceRequirements extends formae.SubResource {
+  /// Resource limits
+  ///
+  /// Example: {"cpu": "1000m", "memory": "512Mi"}
+  @gcp.FieldHint
+  limits: Mapping<String, String>?
+
+  @gcp.FieldHint
+  cpuIdle: Boolean?
+
+  @gcp.FieldHint
+  startupCpuBoost: Boolean?
+}
+
+@gcp.SubResourceHint
+open class Volume extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  secret: SecretVolumeSource?
+
+  @gcp.FieldHint
+  cloudSqlInstance: CloudSqlInstance?
+
+  @gcp.FieldHint
+  emptyDir: EmptyDirVolumeSource?
+}
+
+@gcp.SubResourceHint
+open class SecretVolumeSource extends formae.SubResource {
+  @gcp.FieldHint
+  secret: String
+
+  @gcp.FieldHint
+  items: Listing<SecretVolumeItem>?
+
+  @gcp.FieldHint
+  defaultMode: Int?
+}
+
+@gcp.SubResourceHint
+open class SecretVolumeItem extends formae.SubResource {
+  @gcp.FieldHint
+  key: String
+
+  @gcp.FieldHint
+  version: String?
+
+  @gcp.FieldHint
+  path: String
+
+  @gcp.FieldHint
+  mode: Int?
+}
+
+@gcp.SubResourceHint
+open class CloudSqlInstance extends formae.SubResource {
+  /// Connection names for Cloud SQL instances
+  ///
+  /// Format: {project}:{region}:{instance}
+  @gcp.FieldHint
+  instances: Listing<String>
+}
+
+@gcp.SubResourceHint
+open class EmptyDirVolumeSource extends formae.SubResource {
+  /// Medium (MEMORY or empty for disk)
+  @gcp.FieldHint
+  medium: String?
+
+  @gcp.FieldHint
+  sizeLimit: String?
+}
+
+@gcp.SubResourceHint
+open class VolumeMount extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  mountPath: String
+}
+
+@gcp.SubResourceHint
+open class VpcAccess extends formae.SubResource {
+  @gcp.FieldHint
+  connector: String?
+
+  /// Egress setting (ALL_TRAFFIC or PRIVATE_RANGES_ONLY)
+  @gcp.FieldHint
+  egress: String?
+
+  @gcp.FieldHint
+  networkInterfaces: Listing<NetworkInterface>?
+}
+
+@gcp.SubResourceHint
+open class NetworkInterface extends formae.SubResource {
+  @gcp.FieldHint
+  network: String?
+
+  @gcp.FieldHint
+  subnetwork: String?
+
+  @gcp.FieldHint
+  tags: Listing<String>?
+}
+
+typealias InstanceSplitAllocationType = "INSTANCE_SPLIT_ALLOCATION_TYPE_UNSPECIFIED" | "INSTANCE_SPLIT_ALLOCATION_TYPE_LATEST" | "INSTANCE_SPLIT_ALLOCATION_TYPE_REVISION"
+
+@gcp.SubResourceHint
+open class InstanceSplitTarget extends formae.SubResource {
+  @gcp.FieldHint
+  percent: Int
+
+  @gcp.FieldHint
+  revision: String?
+
+  @gcp.FieldHint
+  type: InstanceSplitAllocationType?
+}
+
+open class WorkerPoolResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: WorkerPoolResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden name: WorkerPoolResolvable = (this) {
+        property = "name"
+    }
+
+    hidden uid: WorkerPoolResolvable = (this) {
+        property = "uid"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class WorkerPool extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    @gcp.FieldHint
+    template: WorkerPoolRevisionTemplate
+
+    /// Top-level scaling for the worker pool
+    @gcp.FieldHint
+    scaling: WorkerPoolScaling?
+
+    /// Instance split across revisions
+    @gcp.FieldHint
+    instanceSplit: Listing<InstanceSplitTarget>?
+
+    /// Launch stage (GA, BETA, ALPHA)
+    @gcp.FieldHint
+    launchStage: String?
+
+    hidden res: WorkerPoolResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

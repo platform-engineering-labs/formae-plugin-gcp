@@ -1,0 +1,155 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+module gcp.cloudrun.revision
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudRun::Revision"
+
+/// Container specification
+@gcp.SubResourceHint
+open class Container extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  image: String
+
+  @gcp.FieldHint
+  ports: Listing<ContainerPort>?
+
+  @gcp.FieldHint
+  env: Listing<EnvVar>?
+
+  @gcp.FieldHint
+  resources: ResourceRequirements?
+
+  @gcp.FieldHint
+  volumeMounts: Listing<VolumeMount>?
+
+  @gcp.FieldHint
+  command: Listing<String>?
+
+  @gcp.FieldHint
+  args: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class ContainerPort extends formae.SubResource {
+  @gcp.FieldHint
+  name: String?
+
+  @gcp.FieldHint
+  containerPort: Int
+}
+
+@gcp.SubResourceHint
+open class EnvVar extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  value: String?
+}
+
+@gcp.SubResourceHint
+open class ResourceRequirements extends formae.SubResource {
+  @gcp.FieldHint
+  limits: Mapping<String, String>?
+
+  @gcp.FieldHint
+  cpuIdle: Boolean?
+}
+
+@gcp.SubResourceHint
+open class VolumeMount extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+
+  @gcp.FieldHint
+  mountPath: String
+}
+
+@gcp.SubResourceHint
+open class Volume extends formae.SubResource {
+  @gcp.FieldHint
+  name: String
+}
+
+@gcp.SubResourceHint
+open class RevisionScaling extends formae.SubResource {
+  @gcp.FieldHint
+  minInstanceCount: Int?
+
+  @gcp.FieldHint
+  maxInstanceCount: Int?
+}
+
+open class RevisionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RevisionResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden name: RevisionResolvable = (this) {
+        property = "name"
+    }
+
+    hidden uid: RevisionResolvable = (this) {
+        property = "uid"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Revision extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    @gcp.FieldHint
+    scaling: RevisionScaling?
+
+    @gcp.FieldHint
+    containers: Listing<Container>?
+
+    @gcp.FieldHint
+    volumes: Listing<Volume>?
+
+    @gcp.FieldHint
+    serviceAccount: String?
+
+    /// The parent service or worker pool name
+    @gcp.FieldHint
+    service: String?
+
+    hidden res: RevisionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
