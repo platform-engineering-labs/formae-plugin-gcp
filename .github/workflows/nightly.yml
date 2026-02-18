@@ -54,7 +54,7 @@ jobs:
       - name: Checkout plugin
         uses: actions/checkout@v4
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -110,7 +110,7 @@ jobs:
           make build VERSION="${LATEST_TAG}"
           echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -141,7 +141,7 @@ jobs:
       - name: Checkout plugin
         uses: actions/checkout@v4
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
