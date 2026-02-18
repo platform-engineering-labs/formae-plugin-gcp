@@ -13,6 +13,11 @@ on:
         default: 'false'
         type: boolean
 
+# Prevent concurrent conformance tests (CI and nightly share test resources)
+concurrency:
+  group: gcp-conformance-tests
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,7 +38,18 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Test
+  test-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Run unit tests
         run: make test-unit
 
   lint:
@@ -48,7 +64,7 @@ jobs:
           go-version: "1.25"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8.0.0
+        uses: golangci/golangci-lint-action@v9.2.0
         with:
           version: latest
 
@@ -63,28 +79,94 @@ jobs:
         with:
           pkl-version: 0.30.0
 
-      - name: Validate Pkl schemas
+      - name: Validate Pkl manifest
         run: |
           pkl eval formae-plugin.pkl --format json > /dev/null
           echo "Manifest validated successfully"
 
-  # Conformance tests run against real cloud resources.
-  # This job is disabled by default - enable it after configuring credentials.
-  #
-  # To enable:
-  # 1. Configure credentials for your cloud provider (see below)
-  # 2. Implement scripts/ci/setup-credentials.sh for local credential verification
-  # 3. Implement scripts/ci/clean-environment.sh for test resource cleanup
-  # 4. Remove 'if: false' condition or set run_conformance to true
-  conformance-tests:
-    needs: [build, lint, pkl-validate]
+  verify-schema:
     runs-on: ubuntu-latest
-    # Disabled by default - uncomment 'if' line below after configuring credentials
-    if: ${{ github.event.inputs.run_conformance == 'true' }}
-    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - name: Verify schema
+        run: make verify-schema
+
+  # Discover test cases from testdata/ directory for matrix strategy
+  discover-tests:
+    needs: [build, lint, pkl-validate, verify-schema, test-unit]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      test-cases: ${{ steps.discover.outputs.test-cases }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Discover test cases
+        id: discover
+        run: |
+          # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
+          # and extract the base test case name
+          TEST_CASES=$(ls testdata/*.pkl 2>/dev/null \
+            | xargs -n1 basename \
+            | grep -v '\-update\.pkl$' \
+            | grep -v '\-replace\.pkl$' \
+            | sed 's/\.pkl$//' \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Discovered test cases: ${TEST_CASES}"
+          echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
+
+  # Clean up test resources before running any conformance tests
+  pre-cleanup:
+    needs: [discover-tests]
+    runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Required for OIDC / Workload Identity Federation
+      id-token: write
+      contents: read
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
+
+  # Conformance tests run the full CRUD lifecycle against real GCP resources.
+  # Each test case runs in its own isolated job via matrix strategy.
+  # Cleanup is handled by separate pre/post-cleanup jobs, NOT per test.
+  conformance-tests:
+    needs: [discover-tests, pre-cleanup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
+      max-parallel: 5
+      fail-fast: false
+    permissions:
+      id-token: write
       contents: read
 
     env:
@@ -92,6 +174,7 @@ jobs:
       GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
       GCP_REGION: ${{ secrets.GCP_REGION }}
       GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
 
     steps:
       - name: Checkout
@@ -111,17 +194,44 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
       - name: Install plugin
         run: make install
 
-      - name: Run conformance tests
+      - name: Run conformance test (${{ matrix.test-case }})
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: make conformance-test
+        run: make conformance-test-crud-run conformance-test-discovery-run TEST=${{ matrix.test-case }} PARALLEL=1
+
+  # Clean up test resources after all conformance tests (always runs)
+  post-cleanup:
+    needs: [conformance-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
 
   # Notify when build is fixed (was red, now green)
   notify-fixed:
-    needs: [build, lint, pkl-validate, conformance-tests]
+    needs: [build, test-unit, lint, pkl-validate, verify-schema, conformance-tests, post-cleanup]
     runs-on: ubuntu-latest
     if: success() && github.event_name == 'push'
     steps:
@@ -150,7 +260,7 @@ jobs:
 
       - name: Notify Slack (Fixed)
         if: steps.check_previous.outputs.result == 'true'
-        uses: slackapi/slack-github-action@v2.1.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
@@ -183,12 +293,12 @@ jobs:
 
   # Notify on failure
   notify-failure:
-    needs: [build, lint, pkl-validate, conformance-tests]
+    needs: [build, test-unit, lint, pkl-validate, verify-schema, conformance-tests, post-cleanup]
     runs-on: ubuntu-latest
     if: failure() && github.event_name == 'push'
     steps:
       - name: Notify Slack
-        uses: slackapi/slack-github-action@v2.1.0
+        uses: slackapi/slack-github-action@v2.1.1
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook

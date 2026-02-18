@@ -134,7 +134,7 @@ open class Disk extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    sourceImage: String|formae.Value?
+    sourceImage: (String|formae.Value)?
 
     /// The source snapshot used to create this disk
     @gcp.FieldHint {

@@ -18,11 +18,11 @@ GOFLAGS := -trimpath
 BINARY := $(PLUGIN_NAME)
 
 # Installation paths
-# Plugin discovery expects lowercase directory names matching the plugin name
+# NOTE: Directory structure will change from <namespace> to <name> in a future version
 PLUGIN_BASE_DIR := $(HOME)/.pel/formae/plugins
 INSTALL_DIR := $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)/v$(PLUGIN_VERSION)
 
-.PHONY: all build test test-unit test-integration lint clean install help clean-environment conformance-test conformance-test-crud conformance-test-discovery
+.PHONY: all build test test-unit test-integration lint verify-schema clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery
 
 all: build
 
@@ -47,17 +47,18 @@ test-integration:
 lint:
 	golangci-lint run
 
-## clean: Remove build artifacts
-clean:
-	rm -rf bin/ dist/
-
-## verify-schema: Verify plugin schema files against PKL spec
+## verify-schema: Validate PKL schema files
+## Checks that schema files are well-formed and follow formae conventions.
 verify-schema:
-	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema ./schema/pkl
+	$(GO) run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema --namespace $(PLUGIN_NAMESPACE) ./schema/pkl
 
 ## schema-docs: Generate documentation for plugin schema in markdown format
 schema-docs:
 	go run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/schema-docs --format markdown ./schema/pkl
+
+## clean: Remove build artifacts
+clean:
+	rm -rf bin/ dist/
 
 ## install: Build and install plugin locally (binary + schema + manifest)
 ## Installs to ~/.pel/formae/plugins/<name>/v<version>/
@@ -79,6 +80,11 @@ help:
 	@echo "Available targets:"
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/## /  /'
 
+## setup-credentials: Provision cloud provider credentials
+## Edit scripts/ci/setup-credentials.sh to configure for your provider.
+setup-credentials:
+	@./scripts/ci/setup-credentials.sh
+
 ## clean-environment: Clean up test resources in cloud environment
 ## Called before and after conformance tests. Edit scripts/ci/clean-environment.sh
 ## to configure for your provider.
@@ -86,40 +92,58 @@ clean-environment:
 	@./scripts/ci/clean-environment.sh
 
 ## conformance-test: Run all conformance tests (CRUD + discovery)
-## Usage: make conformance-test [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
+## Usage: make conformance-test [VERSION=0.80.0] [TEST=s3-bucket] [PARALLEL=10] [TIMEOUT=15]
 ## Downloads the specified formae version (or latest) and runs conformance tests.
-## Calls clean-environment before and after tests.
+## Calls setup-credentials and clean-environment automatically.
 ##
 ## Parameters:
-##   VERSION - Formae version to test against (default: latest)
-##   TEST    - Filter tests by name pattern (e.g., TEST=s3-bucket)
-##   TIMEOUT - Timeout in minutes for long-running operations (default: 5)
-conformance-test: conformance-test-crud conformance-test-discovery
-
-## conformance-test-crud: Run only CRUD lifecycle tests
-## Usage: make conformance-test-crud [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
-conformance-test-crud: install
+##   VERSION  - Formae version to test against (default: latest)
+##   TEST     - Filter tests by name pattern (e.g., TEST=s3-bucket)
+##   PARALLEL - Max parallel tests (default: 1 = sequential)
+##   TIMEOUT  - Timeout in minutes for long-running operations (default: 5)
+conformance-test: install setup-credentials
 	@echo "Pre-test cleanup..."
 	@./scripts/ci/clean-environment.sh || true
 	@echo ""
+	@$(MAKE) conformance-test-crud-run conformance-test-discovery-run VERSION=$(VERSION) TEST=$(TEST) PARALLEL=$(PARALLEL) TIMEOUT=$(TIMEOUT); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	echo "Post-test cleanup..."; \
+	./scripts/ci/clean-environment.sh || true; \
+	exit $$TEST_EXIT
+
+## conformance-test-crud: Run CRUD tests with cleanup (convenience for local dev)
+conformance-test-crud: install setup-credentials
+	@echo "Pre-test cleanup..."
+	@./scripts/ci/clean-environment.sh || true
+	@echo ""
+	@$(MAKE) conformance-test-crud-run VERSION=$(VERSION) TEST=$(TEST) PARALLEL=$(PARALLEL) TIMEOUT=$(TIMEOUT); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	echo "Post-test cleanup..."; \
+	./scripts/ci/clean-environment.sh || true; \
+	exit $$TEST_EXIT
+
+## conformance-test-discovery: Run discovery tests with cleanup (convenience for local dev)
+conformance-test-discovery: install setup-credentials
+	@echo "Pre-test cleanup..."
+	@./scripts/ci/clean-environment.sh || true
+	@echo ""
+	@$(MAKE) conformance-test-discovery-run VERSION=$(VERSION) TEST=$(TEST) PARALLEL=$(PARALLEL) TIMEOUT=$(TIMEOUT); \
+	TEST_EXIT=$$?; \
+	echo ""; \
+	echo "Post-test cleanup..."; \
+	./scripts/ci/clean-environment.sh || true; \
+	exit $$TEST_EXIT
+
+## conformance-test-crud-run: Run only CRUD lifecycle tests (no cleanup)
+## Used by CI matrix jobs where cleanup is managed separately.
+conformance-test-crud-run:
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION); \
-	TEST_EXIT=$$?; \
-	echo ""; \
-	echo "Post-test cleanup..."; \
-	./scripts/ci/clean-environment.sh || true; \
-	exit $$TEST_EXIT
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_PARALLEL="$(PARALLEL)" FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION)
 
-## conformance-test-discovery: Run only discovery tests
-## Usage: make conformance-test-discovery [VERSION=0.80.0] [TEST=s3-bucket] [TIMEOUT=15]
-conformance-test-discovery: install
-	@echo "Pre-test cleanup..."
-	@./scripts/ci/clean-environment.sh || true
-	@echo ""
+## conformance-test-discovery-run: Run only discovery tests (no cleanup)
+## Used by CI matrix jobs where cleanup is managed separately.
+conformance-test-discovery-run:
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION); \
-	TEST_EXIT=$$?; \
-	echo ""; \
-	echo "Post-test cleanup..."; \
-	./scripts/ci/clean-environment.sh || true; \
-	exit $$TEST_EXIT
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_PARALLEL="$(PARALLEL)" FORMAE_TEST_TIMEOUT="$(TIMEOUT)" ./scripts/run-conformance-tests.sh $(VERSION)

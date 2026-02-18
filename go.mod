@@ -2,15 +2,13 @@ module github.com/platform-engineering-labs/formae-plugin-gcp
 
 go 1.25
 
-toolchain go1.25.1
-
 require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.5
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.13
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.19
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.20
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
 	google.golang.org/grpc v1.78.0
