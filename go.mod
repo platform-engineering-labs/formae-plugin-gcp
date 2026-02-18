@@ -2,8 +2,6 @@ module github.com/platform-engineering-labs/formae-plugin-gcp
 
 go 1.25
 
-toolchain go1.25.1
-
 require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/google/uuid v1.6.0

@@ -7,6 +7,7 @@ local stackName = "plugin-sdk-test-stack"
 gcpProject = read("env:GCP_PROJECT_ID")
 gcpRegion = read("env:GCP_REGION")
 gcpZone = read("env:GCP_ZONE")
+gcpLocation = read("env:GCP_LOCATION")
 testRunID = read("env:FORMAE_TEST_RUN_ID")
 
 stack = new formae.Stack {
@@ -20,6 +21,7 @@ target = new formae.Target {
       project = gcpProject
       region = gcpRegion
       zone = gcpZone
+      location = gcpLocation
     }
   }
 
