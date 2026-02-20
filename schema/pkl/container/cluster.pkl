@@ -880,7 +880,7 @@ open class Cluster extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    location: formae.Resolvable|String?
+    location: (formae.Resolvable|String)?
 
     @gcp.FieldHint {
         createOnly = true
