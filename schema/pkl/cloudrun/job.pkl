@@ -259,9 +259,6 @@ open class Job extends formae.Resource {
     name: String
 
     @gcp.FieldHint
-    description: String?
-
-    @gcp.FieldHint
     labels: Mapping<String, String>?
 
     @gcp.FieldHint

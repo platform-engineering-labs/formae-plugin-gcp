@@ -18,7 +18,6 @@ forma {
     project = v.gcpProject
     region = v.gcpRegion
     name = "formae-test-job-\(v.testRunID)"
-    description = "Test Cloud Run job for plugin SDK conformance tests"
     labels = new Mapping {
       ["environment"] = "test"
       ["managed-by"] = "formae"

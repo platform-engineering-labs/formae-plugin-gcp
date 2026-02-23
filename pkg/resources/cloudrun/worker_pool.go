@@ -13,6 +13,11 @@ import (
 func workerPoolBodyBuilder(props map[string]interface{}) (map[string]interface{}, error) {
 	body := make(map[string]interface{})
 
+	// Description
+	if desc := utils.GetString(props, "description"); desc != "" {
+		body["description"] = desc
+	}
+
 	// Labels
 	if labels := getStringMap(props, "labels"); labels != nil {
 		body["labels"] = labels
@@ -25,7 +30,7 @@ func workerPoolBodyBuilder(props map[string]interface{}) (map[string]interface{}
 
 	// Template (revision template)
 	if templateProps := utils.GetObject(props, "template"); templateProps != nil {
-		body["template"] = buildRevisionTemplate(templateProps)
+		body["template"] = buildWorkerPoolRevisionTemplate(templateProps)
 	}
 
 	// Top-level scaling
@@ -42,38 +47,20 @@ func workerPoolBodyBuilder(props map[string]interface{}) (map[string]interface{}
 		}
 	}
 
-	// Instance split
-	if instanceSplit := getInstanceSplitArray(props); instanceSplit != nil {
-		body["instanceSplit"] = instanceSplit
+	// Launch stage
+	if launchStage := utils.GetString(props, "launchStage"); launchStage != "" {
+		body["launchStage"] = launchStage
 	}
 
 	return body, nil
 }
 
-// getInstanceSplitArray builds the instance split array for worker pools
-func getInstanceSplitArray(props map[string]interface{}) []map[string]interface{} {
-	if val, ok := props["instanceSplit"]; ok {
-		if arr, ok := val.([]interface{}); ok {
-			result := make([]map[string]interface{}, 0, len(arr))
-			for _, item := range arr {
-				if obj, ok := item.(map[string]interface{}); ok {
-					split := make(map[string]interface{})
-					if percent := utils.GetInt32(obj, "percent"); percent > 0 {
-						split["percent"] = percent
-					}
-					if revision := utils.GetString(obj, "revision"); revision != "" {
-						split["type"] = "INSTANCE_SPLIT_ALLOCATION_TYPE_REVISION"
-						split["revision"] = revision
-					} else {
-						split["type"] = "INSTANCE_SPLIT_ALLOCATION_TYPE_LATEST"
-					}
-					result = append(result, split)
-				}
-			}
-			return result
-		}
-	}
-	return nil
+// buildWorkerPoolRevisionTemplate wraps buildRevisionTemplate and strips fields
+// that are not supported in the WorkerPool revision template (e.g. scaling).
+func buildWorkerPoolRevisionTemplate(templateProps map[string]interface{}) map[string]interface{} {
+	template := buildRevisionTemplate(templateProps)
+	delete(template, "scaling")
+	return template
 }
 
 // workerPoolResponseTransformer transforms the API response into a normalized format

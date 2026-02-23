@@ -16,9 +16,6 @@ open class WorkerPoolRevisionTemplate extends formae.SubResource {
   revision: String?
 
   @gcp.FieldHint
-  scaling: InstanceScaling?
-
-  @gcp.FieldHint
   containers: Listing<Container>
 
   @gcp.FieldHint

@@ -28,10 +28,6 @@ forma {
       maxInstanceCount = 3
     }
     template = new worker_pool.WorkerPoolRevisionTemplate {
-      scaling = new worker_pool.InstanceScaling {
-        minInstanceCount = 1
-        maxInstanceCount = 3
-      }
       containers = new Listing {
         new worker_pool.Container {
           name = "worker"
@@ -51,11 +47,6 @@ forma {
         }
       }
     }
-    instanceSplit = new Listing {
-      new worker_pool.InstanceSplitTarget {
-        percent = 100
-        type = "INSTANCE_SPLIT_ALLOCATION_TYPE_LATEST"
-      }
-    }
+    launchStage = "BETA"
   }
 }

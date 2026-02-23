@@ -23,11 +23,6 @@ func jobBodyBuilder(props map[string]interface{}) (map[string]interface{}, error
 		body["annotations"] = annotations
 	}
 
-	// Description
-	if desc := utils.GetString(props, "description"); desc != "" {
-		body["description"] = desc
-	}
-
 	// Template (execution template)
 	if templateProps := utils.GetObject(props, "template"); templateProps != nil {
 		body["template"] = buildExecutionTemplate(templateProps)
