@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudrun/worker_pool.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new worker_pool.WorkerPool {
+    label = "plugin-sdk-test-cloudrun-worker-pool"
+    project = v.gcpProject
+    region = v.gcpRegion
+    name = "formae-test-wp-\(v.testRunID)"
+    description = "Test Cloud Run worker pool for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+    scaling = new worker_pool.WorkerPoolScaling {
+      minInstanceCount = 1
+      maxInstanceCount = 3
+    }
+    template = new worker_pool.WorkerPoolRevisionTemplate {
+      containers = new Listing {
+        new worker_pool.Container {
+          name = "worker"
+          image = "gcr.io/cloudrun/hello"
+          resources = new worker_pool.ResourceRequirements {
+            limits = new Mapping {
+              ["cpu"] = "1000m"
+              ["memory"] = "512Mi"
+            }
+          }
+          env = new Listing {
+            new worker_pool.EnvVar {
+              name = "ENVIRONMENT"
+              value = "test"
+            }
+          }
+        }
+      }
+    }
+    launchStage = "BETA"
+  }
+}

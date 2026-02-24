@@ -39,6 +39,7 @@ var CloudRunNativeID = base.NativeIDConfig{
 
 // cloudRunPathBuilder builds Cloud Run API paths with location-based scoping
 // Cloud Run v2 API format: /projects/{project}/locations/{location}/{resourceType}[/{name}]
+// Nested resources: /projects/{project}/locations/{location}/{parentType}/{parentName}/{resourceType}[/{name}]
 // Special case for Create: adds query parameter ?serviceId={name} or ?jobId={name}
 // Location must be explicitly provided in target config (no wildcards or defaults).
 func cloudRunPathBuilder(ctx base.PathContext) string {
@@ -47,7 +48,14 @@ func cloudRunPathBuilder(ctx base.PathContext) string {
 	location := ctx.Location
 
 	// Build base path
-	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, location, ctx.ResourceType)
+	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, location)
+
+	// For nested resources, include parent path segments
+	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	}
+
+	path += "/" + ctx.ResourceType
 
 	// For specific resource operations (Read, Delete, Status), append the resource name
 	if ctx.ResourceName != "" {
@@ -130,7 +138,9 @@ func extractPathFromURL(url string) string {
 }
 
 // parseCloudRunNativeID parses a Cloud Run full-path native ID into PathContext
-// Example: "projects/my-project/locations/us-central1/services/my-service"
+// Handles both top-level and nested resource paths:
+//   - 6 segments: projects/{project}/locations/{location}/{resourceType}/{name}
+//   - 8 segments: projects/{project}/locations/{location}/{parentType}/{parentName}/{resourceType}/{name}
 func parseCloudRunNativeID(nativeID string) (base.PathContext, error) {
 	parts := strings.Split(nativeID, "/")
 	if len(parts) < 6 {
@@ -139,7 +149,9 @@ func parseCloudRunNativeID(nativeID string) (base.PathContext, error) {
 
 	ctx := base.PathContext{}
 
-	// Parse: projects/{project}/locations/{location}/{resource-type}/{name}
+	// Parse known key/value segments first
+	// Collect remaining segments as resource type pairs
+	var resourceSegments []string
 	for i := 0; i < len(parts); i++ {
 		switch parts[i] {
 		case "projects":
@@ -153,13 +165,30 @@ func parseCloudRunNativeID(nativeID string) (base.PathContext, error) {
 				i++
 			}
 		default:
-			// Assume this is the resource type, and next is the name
-			if i+1 < len(parts) {
-				ctx.ResourceType = parts[i]
-				ctx.ResourceName = parts[i+1]
-				i++
-			}
+			// Collect remaining resource type/name pairs
+			resourceSegments = append(resourceSegments, parts[i])
 		}
+	}
+
+	// With resource segments, last pair is the resource, earlier pairs are parents
+	// e.g., ["services", "my-svc", "revisions", "my-rev"] → parent=services/my-svc, resource=revisions/my-rev
+	// e.g., ["jobs", "j", "executions", "e", "tasks", "t"] → parent=jobs, parentResource=j/executions/e, resource=tasks/t
+	if len(resourceSegments) >= 6 {
+		// Multi-level nesting (e.g., jobs/j/executions/e/tasks/t)
+		ctx.ParentType = resourceSegments[0]
+		ctx.ParentResource = strings.Join(resourceSegments[1:len(resourceSegments)-2], "/")
+		ctx.ResourceType = resourceSegments[len(resourceSegments)-2]
+		ctx.ResourceName = resourceSegments[len(resourceSegments)-1]
+	} else if len(resourceSegments) >= 4 {
+		// Nested resource: first pair is parent, last pair is resource
+		ctx.ParentType = resourceSegments[0]
+		ctx.ParentResource = resourceSegments[1]
+		ctx.ResourceType = resourceSegments[len(resourceSegments)-2]
+		ctx.ResourceName = resourceSegments[len(resourceSegments)-1]
+	} else if len(resourceSegments) >= 2 {
+		// Top-level resource
+		ctx.ResourceType = resourceSegments[0]
+		ctx.ResourceName = resourceSegments[1]
 	}
 
 	return ctx, nil

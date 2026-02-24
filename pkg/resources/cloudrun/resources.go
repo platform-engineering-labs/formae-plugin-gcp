@@ -16,8 +16,12 @@ import (
 
 // Resource type constants
 const (
-	ServiceResourceType = "GCP::CloudRun::Service"
-	JobResourceType     = "GCP::CloudRun::Job"
+	ServiceResourceType    = "GCP::CloudRun::Service"
+	JobResourceType        = "GCP::CloudRun::Job"
+	WorkerPoolResourceType = "GCP::CloudRun::WorkerPool"
+	RevisionResourceType   = "GCP::CloudRun::Revision"
+	ExecutionResourceType  = "GCP::CloudRun::Execution"
+	TaskResourceType       = "GCP::CloudRun::Task"
 )
 
 // cloudRunRegistry is the unified registry for all Cloud Run resources
@@ -65,6 +69,26 @@ func wrapJobResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 	return jobResponseTransformer(apiResponse, ctx)
 }
 
+func wrapWorkerPoolBodyBuilder(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	return workerPoolBodyBuilder(props)
+}
+
+func wrapWorkerPoolResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	return workerPoolResponseTransformer(apiResponse, ctx)
+}
+
+func wrapRevisionResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	return revisionResponseTransformer(apiResponse, ctx)
+}
+
+func wrapExecutionResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	return executionResponseTransformer(apiResponse, ctx)
+}
+
+func wrapTaskResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	return taskResponseTransformer(apiResponse, ctx)
+}
+
 func init() {
 	// Create the registry with common Cloud Run API configurations
 	cloudRunRegistry = base.NewResourceRegistry(
@@ -109,6 +133,79 @@ func init() {
 			RequestTransformer:  base.RequestTransformerFunc(wrapJobBodyBuilder),
 			ResponseTransformer: base.ResponseTransformerFunc(wrapJobResponseTransformer),
 		},
+		{
+			ResourceType: WorkerPoolResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "workerPools",
+				Scope:          &base.ScopeConfig{Type: base.ScopeLocationBased},
+				ParentResource: nil, // Top-level resource
+				SupportsUpdate: false,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       false,
+					FieldName:     "",
+					LocationInURL: false,
+				},
+				RequestWrapper: "",
+			},
+			RequestTransformer:  base.RequestTransformerFunc(wrapWorkerPoolBodyBuilder),
+			ResponseTransformer: base.ResponseTransformerFunc(wrapWorkerPoolResponseTransformer),
+		},
+		{
+			ResourceType: RevisionResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "revisions",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "services",
+					PropertyName:   "service",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			ResponseTransformer: base.ResponseTransformerFunc(wrapRevisionResponseTransformer),
+		},
+		{
+			ResourceType: ExecutionResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "executions",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "jobs",
+					PropertyName:   "job",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			ResponseTransformer: base.ResponseTransformerFunc(wrapExecutionResponseTransformer),
+		},
+		{
+			ResourceType: TaskResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "tasks",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "executions",
+					PropertyName:   "execution",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationRead,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			ResponseTransformer: base.ResponseTransformerFunc(wrapTaskResponseTransformer),
+		},
 	})
 
 	if err != nil {
@@ -117,7 +214,7 @@ func init() {
 
 	// Register CloudRunProvisioner with global registry for proper Create handling
 	// CloudRunProvisioner adds the required serviceId/jobId query parameters
-	cloudRunResourceTypes := []string{ServiceResourceType, JobResourceType}
+	cloudRunResourceTypes := []string{ServiceResourceType, JobResourceType, WorkerPoolResourceType}
 	for _, rt := range cloudRunResourceTypes {
 		resourceType := rt // capture by value for closure
 		registry.Register(

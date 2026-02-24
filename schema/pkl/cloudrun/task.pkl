@@ -1,0 +1,79 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+module gcp.cloudrun.task
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudRun::Task"
+
+open class TaskResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: TaskResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden name: TaskResolvable = (this) {
+        property = "name"
+    }
+
+    hidden uid: TaskResolvable = (this) {
+        property = "uid"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Task extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Read-only: unique identifier
+    @gcp.FieldHint
+    uid: String?
+
+    /// The grandparent job name
+    @gcp.FieldHint
+    job: String?
+
+    /// The parent execution name
+    @gcp.FieldHint
+    execution: String?
+
+    /// Task index within the execution
+    @gcp.FieldHint
+    index: Int?
+
+    @gcp.FieldHint
+    startTime: String?
+
+    @gcp.FieldHint
+    completionTime: String?
+
+    @gcp.FieldHint
+    logUri: String?
+
+    hidden res: TaskResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

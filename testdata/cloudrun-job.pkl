@@ -1,0 +1,51 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudrun/job.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new job.Job {
+    label = "plugin-sdk-test-cloudrun-job"
+    project = v.gcpProject
+    region = v.gcpRegion
+    name = "formae-test-job-\(v.testRunID)"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+    template = new job.ExecutionTemplate {
+      taskCount = 1
+      template = new job.TaskTemplate {
+        containers = new Listing {
+          new job.Container {
+            name = "test-container"
+            image = "gcr.io/cloudrun/hello"
+            resources = new job.ResourceRequirements {
+              limits = new Mapping {
+                ["cpu"] = "1000m"
+                ["memory"] = "512Mi"
+              }
+            }
+            env = new Listing {
+              new job.EnvVar {
+                name = "ENVIRONMENT"
+                value = "test"
+              }
+            }
+          }
+        }
+        maxRetries = 1
+        timeout = "300s"
+      }
+    }
+  }
+}
