@@ -14,18 +14,14 @@
 # The script should be idempotent - safe to run multiple times.
 # It should delete all resources matching the test resource prefix.
 #
-# Test resources typically use a naming convention like:
-#   formae-plugin-sdk-test-{run-id}-*
-#
-# Implementation varies by provider. Examples:
-#
-# AWS:
-#   - List and delete resources with test prefix using AWS CLI
-#   - Use resource tagging for easier identification
-#
-# OpenStack:
-#   - Use openstack CLI to list and delete test resources
-#   - Clean up in order: instances, volumes, networks, security groups, etc.
+# Deletion order matters due to dependencies:
+#   1. Firewalls (depend on networks)
+#   2. Subnetworks (depend on networks)
+#   3. Disks, Cloud Run services, BigQuery tables (leaf resources)
+#   4. BigQuery datasets (tables must be deleted first)
+#   5. Networks (firewalls and subnetworks must be deleted first)
+#   6. Storage buckets
+#   7. Bigtable instances
 #
 # Exit with non-zero status only for unexpected errors.
 # Missing resources (already cleaned) should not cause failures.
@@ -37,7 +33,50 @@ TEST_PREFIX="${TEST_PREFIX:-formae-plugin-sdk-test-}"
 
 echo "clean-environment.sh: Cleaning resources with prefix '${TEST_PREFIX}'"
 
-# GCP - clean up disks with test prefix
+# Helper: list and delete resources with a consistent pattern
+cleanup_resources() {
+    local label="$1"
+    local list_cmd="$2"
+    local delete_cmd="$3"
+
+    echo "Cleaning ${label}..."
+    local items
+    items=$(eval "$list_cmd" 2>/dev/null || true)
+    if [ -n "$items" ]; then
+        echo "$items" | while IFS=$'\t' read -r line; do
+            echo "  Deleting: $line"
+            eval "$delete_cmd" 2>/dev/null || true
+        done
+    else
+        echo "  No ${label} found"
+    fi
+}
+
+# --- 1. Firewalls (must delete before networks) ---
+echo "Cleaning GCP firewalls..."
+FIREWALLS=$(gcloud compute firewall-rules list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$FIREWALLS" ]; then
+    echo "$FIREWALLS" | while read -r fw; do
+        echo "  Deleting firewall: $fw"
+        gcloud compute firewall-rules delete "$fw" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No firewalls found"
+fi
+
+# --- 2. Subnetworks (must delete before networks) ---
+echo "Cleaning GCP subnetworks..."
+SUBNETWORKS=$(gcloud compute networks subnets list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$SUBNETWORKS" ]; then
+    echo "$SUBNETWORKS" | while read -r subnet region; do
+        echo "  Deleting subnetwork: $subnet (region: $region)"
+        gcloud compute networks subnets delete "$subnet" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No subnetworks found"
+fi
+
+# --- 3. Disks ---
 echo "Cleaning GCP disks..."
 DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
 if [ -n "$DISKS" ]; then
@@ -46,10 +85,75 @@ if [ -n "$DISKS" ]; then
         gcloud compute disks delete "$disk" --zone="$zone" --quiet 2>/dev/null || true
     done
 else
-    echo "  No disks found matching prefix 'formae-plugin-sdk*'"
+    echo "  No disks found"
 fi
 
-# GCP - clean up networks with test prefix
+# --- 4. Cloud Run services ---
+echo "Cleaning GCP Cloud Run services..."
+SERVICES=$(gcloud run services list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null || true)
+if [ -n "$SERVICES" ]; then
+    echo "$SERVICES" | while read -r svc region; do
+        echo "  Deleting Cloud Run service: $svc (region: $region)"
+        gcloud run services delete "$svc" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Cloud Run services found"
+fi
+
+# --- 4b. Cloud Run jobs ---
+echo "Cleaning GCP Cloud Run jobs..."
+JOBS=$(gcloud run jobs list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null || true)
+if [ -n "$JOBS" ]; then
+    echo "$JOBS" | while read -r job region; do
+        echo "  Deleting Cloud Run job: $job (region: $region)"
+        gcloud run jobs delete "$job" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Cloud Run jobs found"
+fi
+
+# --- 4c. Cloud Run worker pools ---
+echo "Cleaning GCP Cloud Run worker pools..."
+WORKER_POOLS=$(gcloud run worker-pools list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null || true)
+if [ -n "$WORKER_POOLS" ]; then
+    echo "$WORKER_POOLS" | while read -r wp region; do
+        echo "  Deleting Cloud Run worker pool: $wp (region: $region)"
+        gcloud run worker-pools delete "$wp" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Cloud Run worker pools found"
+fi
+
+# --- 5. BigQuery tables (must delete before datasets) ---
+echo "Cleaning GCP BigQuery tables..."
+DATASETS=$(bq ls --format=json --project_id="${GCP_PROJECT_ID:-}" 2>/dev/null | grep -o '"formae_plugin_sdk_test_[^"]*"' | tr -d '"' || true)
+if [ -n "$DATASETS" ]; then
+    for ds in $DATASETS; do
+        TABLES=$(bq ls --format=json "${GCP_PROJECT_ID}:${ds}" 2>/dev/null | grep -o '"formae_plugin_sdk_test_[^"]*"' | tr -d '"' || true)
+        if [ -n "$TABLES" ]; then
+            for tbl in $TABLES; do
+                echo "  Deleting table: ${ds}.${tbl}"
+                bq rm -f -t "${GCP_PROJECT_ID}:${ds}.${tbl}" 2>/dev/null || true
+            done
+        fi
+    done
+else
+    echo "  No BigQuery tables found"
+fi
+
+# --- 6. BigQuery datasets ---
+echo "Cleaning GCP BigQuery datasets..."
+DATASETS=$(bq ls --format=json --project_id="${GCP_PROJECT_ID:-}" 2>/dev/null | grep -o '"formae_plugin_sdk_test_[^"]*"' | tr -d '"' || true)
+if [ -n "$DATASETS" ]; then
+    for ds in $DATASETS; do
+        echo "  Deleting dataset: $ds"
+        bq rm -r -f -d "${GCP_PROJECT_ID}:${ds}" 2>/dev/null || true
+    done
+else
+    echo "  No BigQuery datasets found"
+fi
+
+# --- 7. Networks (after firewalls and subnetworks are deleted) ---
 echo "Cleaning GCP networks..."
 NETWORKS=$(gcloud compute networks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$NETWORKS" ]; then
@@ -58,10 +162,10 @@ if [ -n "$NETWORKS" ]; then
         gcloud compute networks delete "$network" --quiet 2>/dev/null || true
     done
 else
-    echo "  No networks found matching prefix 'formae-plugin-sdk*'"
+    echo "  No networks found"
 fi
 
-# GCP - clean up storage buckets with test prefix
+# --- 8. Storage buckets ---
 echo "Cleaning GCP storage buckets..."
 BUCKETS=$(gcloud storage buckets list --filter="name~^formae-plugin-sdk-test" --format="value(name)" 2>/dev/null || true)
 if [ -n "$BUCKETS" ]; then
@@ -70,7 +174,19 @@ if [ -n "$BUCKETS" ]; then
         gcloud storage rm -r "gs://$bucket" --quiet 2>/dev/null || true
     done
 else
-    echo "  No buckets found matching prefix 'formae-plugin-sdk-test*'"
+    echo "  No buckets found"
+fi
+
+# --- 9. Bigtable instances ---
+echo "Cleaning GCP Bigtable instances..."
+INSTANCES=$(gcloud bigtable instances list --filter="name~formae-test-instance" --format="value(name)" 2>/dev/null || true)
+if [ -n "$INSTANCES" ]; then
+    echo "$INSTANCES" | while read -r instance; do
+        echo "  Deleting Bigtable instance: $instance"
+        gcloud bigtable instances delete "$instance" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Bigtable instances found"
 fi
 
 echo ""
