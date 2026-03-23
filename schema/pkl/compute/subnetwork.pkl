@@ -85,6 +85,7 @@ open class Subnetwork extends formae.Resource {
     subnetworkId: Int?
 
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     gatewayAddress: String?
 
@@ -102,7 +103,9 @@ open class Subnetwork extends formae.Resource {
     }
     network: String|formae.Resolvable
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     purpose: String?
 
     @gcp.FieldHint
@@ -114,7 +117,9 @@ open class Subnetwork extends formae.Resource {
     @gcp.FieldHint
     privateIpGoogleAccess: Boolean?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     privateIpv6GoogleAccess: String?
 
     @gcp.FieldHint {
@@ -125,7 +130,9 @@ open class Subnetwork extends formae.Resource {
     @gcp.FieldHint
     logConfig: LogConfig?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     stackType: StackType?
 
     @gcp.FieldHint
@@ -149,7 +156,9 @@ open class Subnetwork extends formae.Resource {
     }
     ipv6GceEndpoint: Ipv6GceEndpoint?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     allowSubnetCidrRoutesOverlap: Boolean?
 
     @gcp.FieldHint {
