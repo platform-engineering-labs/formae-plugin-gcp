@@ -103,7 +103,9 @@ open class Network extends formae.Resource {
     }
     internalIpv6Range: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     networkFirewallPolicyEnforcementOrder: NetworkFirewallPolicyEnforcementOrder?
 
     @gcp.FieldHint {

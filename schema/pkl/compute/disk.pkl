@@ -185,6 +185,7 @@ open class Disk extends formae.Resource {
     /// Physical block size of the persistent disk in bytes (4096 or 16384)
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     physicalBlockSizeBytes: Int?
 
@@ -211,12 +212,14 @@ open class Disk extends formae.Resource {
     /// Whether this disk is using confidential compute mode (Hyperdisk only)
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     enableConfidentialCompute: Boolean?
 
     /// The architecture of the disk (X86_64 or ARM64)
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     architecture: Architecture?
 
