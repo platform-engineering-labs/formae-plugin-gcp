@@ -63,6 +63,9 @@ open class WorkerPoolScaling extends formae.SubResource {
 
   @gcp.FieldHint
   maxInstanceCount: Int?
+
+  @gcp.FieldHint { hasProviderDefault = true }
+  manualInstanceCount: Int?
 }
 
 @gcp.SubResourceHint
