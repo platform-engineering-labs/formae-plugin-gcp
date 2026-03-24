@@ -77,10 +77,14 @@ open class Firewall extends formae.Resource {
     }
     direction: Direction?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     disabled: Boolean?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     logConfig: LogConfig?
 
     @gcp.FieldHint {
