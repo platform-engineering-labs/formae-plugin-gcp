@@ -200,12 +200,14 @@ open class Disk extends formae.Resource {
     /// A list of features to enable on the guest operating system (for bootable disks)
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     guestOsFeatures: Listing<GuestOsFeature>?
 
     /// Any applicable license URIs
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     licenses: Listing<String>?
 
