@@ -31,11 +31,15 @@ open class TaskTemplate extends formae.SubResource {
   @gcp.FieldHint
   volumes: Listing<Volume>?
 
-  @gcp.FieldHint
+  @gcp.FieldHint {
+    hasProviderDefault = true
+  }
   serviceAccount: String?
 
   /// Execution environment (EXECUTION_ENVIRONMENT_GEN1 or EXECUTION_ENVIRONMENT_GEN2)
-  @gcp.FieldHint
+  @gcp.FieldHint {
+    hasProviderDefault = true
+  }
   executionEnvironment: String?
 
   @gcp.FieldHint

@@ -309,7 +309,9 @@ open class WorkerPool extends formae.Resource {
     template: WorkerPoolRevisionTemplate
 
     /// Top-level scaling for the worker pool
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     scaling: WorkerPoolScaling?
 
     /// Instance split across revisions
