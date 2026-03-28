@@ -8,7 +8,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.15.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.6
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.19
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.33
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.34
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
 	google.golang.org/grpc v1.78.0
