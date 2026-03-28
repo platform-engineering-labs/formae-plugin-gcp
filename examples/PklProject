@@ -5,6 +5,6 @@ dependencies {
     uri = "package://hub.platform.engineering/plugins/pkl/schema/pkl/formae/formae@0.83.0"
   }
   ["gcp"] {
-    uri = "package://hub.platform.engineering/plugins/gcp/schema/pkl/gcp/gcp@0.1.0"
+    uri = "package://hub.platform.engineering/plugins/gcp/schema/pkl/gcp/gcp@0.1.2"
   }
 }
