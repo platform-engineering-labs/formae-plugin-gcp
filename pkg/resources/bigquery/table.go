@@ -483,7 +483,9 @@ func flattenTable(metadata *bigquery.TableMetadata, project, datasetID, tableID 
 	}
 
 	if metadata.Clustering != nil {
-		props["clustering"] = metadata.Clustering.Fields
+		props["clustering"] = map[string]interface{}{
+			"fields": metadata.Clustering.Fields,
+		}
 	}
 
 	if metadata.EncryptionConfig != nil {
