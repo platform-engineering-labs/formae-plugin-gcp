@@ -447,16 +447,11 @@ func buildSchemaField(obj map[string]interface{}) *bigquery.FieldSchema {
 
 func flattenTable(metadata *bigquery.TableMetadata, project, datasetID, tableID string) map[string]interface{} {
 	props := map[string]interface{}{
-		"project":      project,
-		"datasetId":    datasetID,
-		"tableId":      tableID,
-		"name":         metadata.Name,
-		"description":  metadata.Description,
-		"type":         string(metadata.Type),
-		"createdTime":  metadata.CreationTime.Unix(),
-		"lastModified": metadata.LastModifiedTime.Unix(),
-		"numBytes":     metadata.NumBytes,
-		"numRows":      metadata.NumRows,
+		"project":     project,
+		"datasetId":   datasetID,
+		"tableId":     tableID,
+		"name":        metadata.Name,
+		"description": metadata.Description,
 	}
 
 	if metadata.Labels != nil {

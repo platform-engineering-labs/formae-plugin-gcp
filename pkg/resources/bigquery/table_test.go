@@ -669,7 +669,6 @@ func TestTable_CreateView_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, props["view"], "SELECT")
-	assert.Equal(t, "VIEW", props["type"])
 	t.Logf("View query verified")
 }
 
