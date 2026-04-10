@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 
+	"github.com/platform-engineering-labs/formae/pkg/model"
 	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 
@@ -42,22 +43,21 @@ var GKEAutopilotResourceTypes = []string{
 // =============================================================================
 
 // RateLimit returns the rate limiting configuration for this plugin.
-func (p *Plugin) RateLimit() plugin.RateLimitConfig {
-	return plugin.RateLimitConfig{
-		Scope:                            plugin.RateLimitScopeNamespace,
-		MaxRequestsPerSecondForNamespace: 1,
+func (p *Plugin) RateLimit() model.RateLimitConfig {
+	return model.RateLimitConfig{
+		MaxRequestsPerSecond: 1,
 	}
 }
 
 // DiscoveryFilters returns declarative filters for excluding resources from discovery.
 // Uses RFC 9535 JSONPath with match() regex function to filter GKE Autopilot-managed resources.
-func (p *Plugin) DiscoveryFilters() []plugin.MatchFilter {
+func (p *Plugin) DiscoveryFilters() []model.MatchFilter {
 	// GKE Autopilot resources are identified by labels like goog-gke-node, goog-gke-volume, etc.
 	// We filter these out during discovery to avoid managing resources that GKE controls.
-	return []plugin.MatchFilter{
+	return []model.MatchFilter{
 		{
 			ResourceTypes: GKEAutopilotResourceTypes,
-			Conditions: []plugin.FilterCondition{
+			Conditions: []model.FilterCondition{
 				{
 					PropertyPath:  `$.labels[?match(@, "goog-gke-.*|gke-autopilot")]`,
 					PropertyValue: "", // Any value matches (existence check)
@@ -69,8 +69,8 @@ func (p *Plugin) DiscoveryFilters() []plugin.MatchFilter {
 
 // LabelConfig returns the label extraction configuration for discovered GCP resources.
 // GCP resources typically use the "name" property as their identifier.
-func (p *Plugin) LabelConfig() plugin.LabelConfig {
-	return plugin.LabelConfig{
+func (p *Plugin) LabelConfig() model.LabelConfig {
+	return model.LabelConfig{
 		DefaultQuery:      "$.name",
 		ResourceOverrides: map[string]string{
 			// Most GCP resources use "name" property, add overrides here if needed
