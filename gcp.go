@@ -45,7 +45,8 @@ var GKEAutopilotResourceTypes = []string{
 // RateLimit returns the rate limiting configuration for this plugin.
 func (p *Plugin) RateLimit() model.RateLimitConfig {
 	return model.RateLimitConfig{
-		MaxRequestsPerSecond: 1,
+		Scope:                            model.RateLimitScopeNamespace,
+		MaxRequestsPerSecondForNamespace: 1,
 	}
 }
 
