@@ -1,0 +1,159 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.gkehub.feature
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::GKEHub::Feature"
+
+/// Common fleet-level feature names
+typealias FeatureName =
+    "configmanagement"
+  | "servicemesh"
+  | "multiclusteringress"
+  | "multiclusterservicediscovery"
+  | "appdevexperience"
+  | "policycontroller"
+  | "identityservice"
+  | "dataplanev2"
+  | String
+
+/// Config Sync source format
+typealias SourceFormat = "hierarchy"|"unstructured"
+
+/// Config Sync secret types for git/oci access
+typealias SecretType = "ssh"|"cookiefile"|"gcenode"|"gcpserviceaccount"|"token"|"none"
+
+/// Feature management modes
+typealias ManagementMode = "MANAGEMENT_AUTOMATIC"|"MANAGEMENT_MANUAL"
+
+/// Per-membership feature configuration
+@gcp.SubResourceHint
+open class MembershipFeatureSpec extends formae.SubResource {
+    /// Full membership resource name
+    /// Format: projects/{project}/locations/{location}/memberships/{membership}
+    @gcp.FieldHint
+    membership: String
+
+    /// Config management spec
+    @gcp.FieldHint
+    configmanagement: ConfigManagementMembershipSpec?
+
+    /// Mesh spec (service mesh/Istio)
+    @gcp.FieldHint
+    mesh: MeshMembershipSpec?
+}
+
+/// Config Management membership spec
+@gcp.SubResourceHint
+open class ConfigManagementMembershipSpec extends formae.SubResource {
+    /// Version of Config Management to install
+    @gcp.FieldHint
+    version: String?
+
+    /// Config Sync configuration
+    @gcp.FieldHint
+    configSync: ConfigSync?
+}
+
+/// Config Sync configuration
+@gcp.SubResourceHint
+open class ConfigSync extends formae.SubResource {
+    /// Whether to enable Config Sync
+    @gcp.FieldHint
+    enabled: Boolean?
+
+    /// Source format: "hierarchy" or "unstructured"
+    @gcp.FieldHint
+    sourceFormat: SourceFormat?
+
+    /// Git repository configuration
+    @gcp.FieldHint
+    git: GitConfig?
+}
+
+/// Git configuration for Config Sync
+@gcp.SubResourceHint
+open class GitConfig extends formae.SubResource {
+    /// Git repository URL
+    @gcp.FieldHint
+    syncRepo: String?
+
+    /// Branch to sync from
+    @gcp.FieldHint
+    syncBranch: String?
+
+    /// Directory within the repo
+    @gcp.FieldHint
+    policyDir: String?
+
+    /// Sync interval in seconds
+    @gcp.FieldHint
+    syncWaitSecs: String?
+
+    /// Secret type for git/oci access
+    @gcp.FieldHint
+    secretType: SecretType?
+}
+
+/// Service Mesh membership spec
+@gcp.SubResourceHint
+open class MeshMembershipSpec extends formae.SubResource {
+    /// Management mode for automatic or manual service mesh control
+    @gcp.FieldHint
+    management: ManagementMode?
+}
+
+/// Fleet-wide default member configuration
+@gcp.SubResourceHint
+open class FleetDefaultMemberConfig extends formae.SubResource {
+    /// Default Config Management config for new fleet members
+    @gcp.FieldHint
+    configmanagement: ConfigManagementMembershipSpec?
+
+    /// Default Mesh config for new fleet members
+    @gcp.FieldHint
+    mesh: MeshMembershipSpec?
+}
+
+open class FeatureResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: FeatureResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Feature extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: FeatureName
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Per-membership feature specs
+    @gcp.FieldHint
+    membershipSpecs: Mapping<String, MembershipFeatureSpec>?
+
+    /// Default configuration applied to new fleet members
+    @gcp.FieldHint
+    fleetDefaultMemberConfig: FleetDefaultMemberConfig?
+
+    hidden res: FeatureResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
