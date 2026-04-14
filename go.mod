@@ -6,9 +6,9 @@ require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.6
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.21
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.41
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.7-0.20260411032647-e2a29eabbb42
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23-0.20260411143348-5f69ee6e606e
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.43-0.20260409230646-c2ede25fa2ee
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
 	google.golang.org/grpc v1.78.0
@@ -22,7 +22,7 @@ require (
 	cloud.google.com/go/iam v1.5.2 // indirect
 	cloud.google.com/go/storage v1.57.1 // indirect
 	ergo.services/actor/statemachine v0.0.0-20251202053101-c0aa08b403e5 // indirect
-	ergo.services/ergo v1.999.310 // indirect
+	ergo.services/ergo v1.999.320 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/apple/pkl-go v0.12.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -38,7 +38,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/lufia/plan9stats v0.0.0-20251013123823-9fd1530e3ec3 // indirect
 	github.com/masterminds/semver v1.5.0 // indirect
@@ -89,3 +89,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace ergo.services/ergo => github.com/JeroenSoeters/ergo v1.999.320-pel.1
+
+replace ergo.services/actor/statemachine => github.com/JeroenSoeters/actor/statemachine v0.0.0-20260205190926-8b1b2eaf30f4

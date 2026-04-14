@@ -22,8 +22,10 @@ forma {
     name = "formae-plugin-sdk-test-\(v.testRunID)"
     description = "Test network for plugin SDK tests"
     autoCreateSubnetworks = false
+    networkFirewallPolicyEnforcementOrder = "AFTER_CLASSIC_FIREWALL"
     routingConfig = new network.RoutingConfig {
       routingMode = "GLOBAL"  // This is the mutable field being tested (changed from REGIONAL to GLOBAL)
+      bgpBestPathSelectionMode = "LEGACY"
     }
   }
 }

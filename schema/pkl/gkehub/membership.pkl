@@ -1,0 +1,84 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.gkehub.membership
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::GKEHub::Membership"
+
+/// GKE cluster endpoint reference for fleet membership
+@gcp.SubResourceHint
+open class GKECluster extends formae.SubResource {
+    /// Full resource link to the GKE cluster
+    /// Format: //container.googleapis.com/projects/{project}/locations/{location}/clusters/{cluster}
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    resourceLink: String|formae.Resolvable
+}
+
+/// Endpoint configuration - currently only supports GKE clusters
+@gcp.SubResourceHint
+open class MembershipEndpoint extends formae.SubResource {
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    gkeCluster: GKECluster?
+}
+
+/// Authority configuration for workload identity
+@gcp.SubResourceHint
+open class Authority extends formae.SubResource {
+    /// Identity provider for the membership
+    @gcp.FieldHint
+    issuer: String?
+}
+
+open class MembershipResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MembershipResolvable = (this) {
+        property = "name"
+    }
+
+    hidden uniqueId: MembershipResolvable = (this) {
+        property = "uniqueId"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Membership extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    endpoint: MembershipEndpoint?
+
+    @gcp.FieldHint
+    authority: Authority?
+
+    hidden res: MembershipResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
