@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.7-0.20260411032647-e2a29eabbb42
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23-0.20260411143348-5f69ee6e606e
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.43-0.20260409230646-c2ede25fa2ee
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
