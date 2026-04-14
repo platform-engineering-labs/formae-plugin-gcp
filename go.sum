@@ -103,8 +103,8 @@ github.com/platform-engineering-labs/formae/pkg/api/model v0.1.1 h1:ZMTgKwSomy2c
 github.com/platform-engineering-labs/formae/pkg/api/model v0.1.1/go.mod h1:0ncHFCsGA6b0w1kBm6m+QwJ823qAY2vL47GvoR0BTyU=
 github.com/platform-engineering-labs/formae/pkg/model v0.1.7-0.20260411032647-e2a29eabbb42 h1:WwHGGUOUn+caV/sKp3zm49bXAsWJe7VP5xG6Qu3eXHY=
 github.com/platform-engineering-labs/formae/pkg/model v0.1.7-0.20260411032647-e2a29eabbb42/go.mod h1:XmGJA7jNPX9cEGc8TxTiEDitBuEVJOddNakdTZ/bH4U=
-github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23-0.20260411143348-5f69ee6e606e h1:4POgO8ejmH+GOJBsviPhZfCMW5oFKYsYMAd2y7ok96I=
-github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23-0.20260411143348-5f69ee6e606e/go.mod h1:RlZ7kQLDEDU6yuqT1jveD+odicnKFpv3pLQZr6S+sEw=
+github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23 h1:hkLd5wO1ikVqzg2IXi2QLDIVb6H+aL+dJD4ED5U1Dds=
+github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23/go.mod h1:RlZ7kQLDEDU6yuqT1jveD+odicnKFpv3pLQZr6S+sEw=
 github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.43-0.20260409230646-c2ede25fa2ee h1:LRe4D75/mxTJTky1vcQhLzvScNTBtEnRvUHfw2JZ77o=
 github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.43-0.20260409230646-c2ede25fa2ee/go.mod h1:PljEOiOoJXYM2qKGFhEGTmo5SxundvO6Jz/8c5xMxJQ=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
