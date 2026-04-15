@@ -6,9 +6,9 @@ require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.7-0.20260411032647-e2a29eabbb42
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23-0.20260411143348-5f69ee6e606e
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.43-0.20260409230646-c2ede25fa2ee
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.23
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.1.23
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.1.42
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.254.0
 	google.golang.org/grpc v1.78.0
@@ -92,4 +92,4 @@ require (
 
 replace ergo.services/ergo => github.com/JeroenSoeters/ergo v1.999.320-pel.1
 
-replace ergo.services/actor/statemachine => github.com/JeroenSoeters/actor/statemachine v0.0.0-20260205190926-8b1b2eaf30f4
+replace ergo.services/actor/statemachine => github.com/JeroenSoeters/actor/statemachine v0.0.0-20260414171442-1ef660e4a3bc
