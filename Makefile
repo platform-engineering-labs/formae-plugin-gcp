@@ -69,6 +69,7 @@ install: build
 	@mkdir -p $(INSTALL_DIR)/schema/pkl
 	@cp bin/$(BINARY) $(INSTALL_DIR)/$(BINARY)
 	@cp -r schema/pkl/* $(INSTALL_DIR)/schema/pkl/
+	@if [ -f schema/Config.pkl ]; then cp schema/Config.pkl $(INSTALL_DIR)/schema/; fi
 	@cp formae-plugin.pkl $(INSTALL_DIR)/
 	@echo "Installed to $(INSTALL_DIR)"
 	@echo "  - Binary: $(INSTALL_DIR)/$(BINARY)"
