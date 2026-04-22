@@ -167,9 +167,12 @@ func parseContainerNativeID(nativeID string) (base.PathContext, error) {
 		path = strings.TrimPrefix(path, "v1/")
 	}
 
-	// Parse path: projects/{project}/locations/{location}/clusters/{cluster}[/nodePools/{nodePool}]
+	// Parse path: projects/{project}/(locations|zones)/{location}/clusters/{cluster}[/nodePools/{nodePool}]
+	// GCP's Container API returns selfLink with "zones/" for zonal clusters and "locations/"
+	// for regional clusters. Both are valid inputs to the v1 REST API (which prefers
+	// "locations/" but accepts legacy "zones/" paths for zonal resources).
 	parts := strings.Split(path, "/")
-	if len(parts) < 6 || parts[0] != "projects" || parts[2] != "locations" {
+	if len(parts) < 6 || parts[0] != "projects" || (parts[2] != "locations" && parts[2] != "zones") {
 		return base.PathContext{}, fmt.Errorf("invalid Container native ID format: %s", nativeID)
 	}
 
