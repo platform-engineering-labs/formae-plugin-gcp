@@ -7,7 +7,9 @@
 name = "gcp"
 version = "0.1.4"
 namespace = "GCP"
+summary = "GCP resource plugin"
 description = "Google Cloud Platform resource plugin for Formae"
+category = "cloud"
 license = "FSL-1.1-ALv2"
 minFormaeVersion = "0.84.0"
 
