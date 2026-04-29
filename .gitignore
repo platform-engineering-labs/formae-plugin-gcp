@@ -31,6 +31,7 @@ dist/
 .pkl-cache/
 *.pkl-expected.pcf
 PklProject.deps.json
+schema/pkl/VERSION
 CLAUDE.md
 .claude/
 .handoffs/
