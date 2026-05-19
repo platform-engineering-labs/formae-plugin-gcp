@@ -10,6 +10,8 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // Resource type constants
@@ -20,6 +22,7 @@ const (
 	InstanceResourceType   = "GCP::Compute::Instance"
 	NetworkResourceType    = "GCP::Compute::Network"
 	RouterResourceType     = "GCP::Compute::Router"
+	RouterNatResourceType  = "GCP::Compute::RouterNat"
 	SubnetworkResourceType = "GCP::Compute::Subnetwork"
 
 	// Load Balancer - Global resources
@@ -48,6 +51,10 @@ const (
 var computeRegistry *base.ResourceRegistry
 
 func NewComputeProvisioner(cfg *config.Config, resourceType string) (prov.Provisioner, error) {
+	if resourceType == RouterNatResourceType {
+		return NewRouterNatProvisioner(cfg), nil
+	}
+
 	if computeRegistry == nil {
 		return nil, fmt.Errorf("compute registry not initialized")
 	}
@@ -467,4 +474,19 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	registry.Register(
+		RouterNatResourceType,
+		[]resource.Operation{
+			resource.OperationCreate,
+			resource.OperationRead,
+			resource.OperationUpdate,
+			resource.OperationDelete,
+			resource.OperationList,
+			resource.OperationCheckStatus,
+		},
+		func(cfg *config.Config) prov.Provisioner {
+			return NewRouterNatProvisioner(cfg)
+		},
+	)
 }
