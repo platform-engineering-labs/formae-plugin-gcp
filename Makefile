@@ -22,7 +22,7 @@ BINARY := $(PLUGIN_NAME)
 PLUGIN_BASE_DIR := $(HOME)/.pel/formae/plugins
 INSTALL_DIR := $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)/v$(PLUGIN_VERSION)
 
-.PHONY: all build schema-version test test-unit test-integration lint verify-schema clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery conformance-test-crud-run conformance-test-discovery-run
+.PHONY: all build schema-version test test-unit test-integration lint lint-reuse add-license verify-schema schema-docs clean install help setup-credentials clean-environment conformance-test conformance-test-crud conformance-test-discovery conformance-test-crud-run conformance-test-discovery-run
 
 all: build
 
@@ -33,15 +33,7 @@ schema-version:
 ## build: Build the plugin binary and update manifest
 build: schema-version
 	$(GO) build $(GOFLAGS) -o bin/$(BINARY) .
-	@MIN_VERSION=$$($(GO) list -m -f '{{.Dir}}' github.com/platform-engineering-labs/formae/pkg/plugin 2>/dev/null | xargs -I{} grep 'MinFormaeVersion' {}/version.go 2>/dev/null | grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' | tr -d '"'); \
-	if [ -n "$$MIN_VERSION" ]; then \
-		echo "Updating minFormaeVersion to $$MIN_VERSION"; \
-		if [ "$$(uname)" = "Darwin" ]; then \
-			sed -i '' 's/^minFormaeVersion = .*/minFormaeVersion = "'"$$MIN_VERSION"'"/' formae-plugin.pkl; \
-		else \
-			sed -i 's/^minFormaeVersion = .*/minFormaeVersion = "'"$$MIN_VERSION"'"/' formae-plugin.pkl; \
-		fi; \
-	fi
+	@./scripts/update-min-formae-version.sh
 
 ## test: Run all tests
 test:
@@ -60,6 +52,14 @@ test-integration:
 lint:
 	golangci-lint run
 
+## lint-reuse: Check REUSE license compliance
+lint-reuse:
+	./scripts/lint_reuse.sh
+
+## add-license: Add license headers to source files (idempotent)
+add-license:
+	./scripts/add_license.sh
+
 ## verify-schema: Validate PKL schema files
 ## Checks that schema files are well-formed and follow formae conventions.
 verify-schema: schema-version
@@ -75,19 +75,15 @@ clean:
 
 ## install: Build and install plugin locally (binary + schema + manifest)
 ## Installs to ~/.pel/formae/plugins/<name>/v<version>/
-## Removes any existing versions of the plugin first to ensure clean state.
 install: build
 	@echo "Installing $(PLUGIN_NAME) v$(PLUGIN_VERSION) (namespace: $(PLUGIN_NAMESPACE))..."
-	@rm -rf $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)
-	@mkdir -p $(INSTALL_DIR)/schema/pkl
-	@cp bin/$(BINARY) $(INSTALL_DIR)/$(BINARY)
-	@cp -r schema/pkl/* $(INSTALL_DIR)/schema/pkl/
-	@if [ -f schema/Config.pkl ]; then cp schema/Config.pkl $(INSTALL_DIR)/schema/; fi
-	@cp formae-plugin.pkl $(INSTALL_DIR)/
+	rm -rf $(PLUGIN_BASE_DIR)/$(PLUGIN_NAME)
+	mkdir -p $(INSTALL_DIR)/schema/pkl
+	cp bin/$(BINARY) $(INSTALL_DIR)/$(BINARY)
+	cp -r schema/pkl/* $(INSTALL_DIR)/schema/pkl/
+	test -f schema/Config.pkl && cp schema/Config.pkl $(INSTALL_DIR)/schema/ || true
+	cp formae-plugin.pkl $(INSTALL_DIR)/
 	@echo "Installed to $(INSTALL_DIR)"
-	@echo "  - Binary: $(INSTALL_DIR)/$(BINARY)"
-	@echo "  - Schema: $(INSTALL_DIR)/schema/pkl/"
-	@echo "  - Manifest: $(INSTALL_DIR)/formae-plugin.pkl"
 
 ## help: Show this help message
 help:

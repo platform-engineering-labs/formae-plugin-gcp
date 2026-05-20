@@ -6,7 +6,7 @@ FSL-1.1-ALv2
 
 ## Notice
 
-Copyright ${year} ${licensor name}
+Copyright 2025 Platform Engineering Labs Inc.
 
 ## Terms and Conditions
 

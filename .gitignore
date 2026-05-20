@@ -32,6 +32,10 @@ dist/
 *.pkl-expected.pcf
 PklProject.deps.json
 schema/pkl/VERSION
+.out/
 CLAUDE.md
 .claude/
 .handoffs/
+
+# Local scratch (audits, notes, throwaway examples)
+.scratch/

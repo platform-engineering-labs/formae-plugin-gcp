@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+import "@formae/formae.pkl"
+import "@gcp/gcp.pkl"
+
+testRunID = "demo"
+
+gcpProject = "development-477117"
+
+gcpRegion: gcp.Region = "us-central1"
+
+stack: formae.Stack = new {
+    label = "gcp-kubernetes"
+    description = "GKE cluster connect-only demo stack"
+}
+
+target: formae.Target = new formae.Target {
+    label = "kubernetes-target-gcp"
+    config = new gcp.Config {
+        project = gcpProject
+        region = gcpRegion
+    }
+}
