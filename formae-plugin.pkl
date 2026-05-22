@@ -5,7 +5,7 @@
  */
 
 name = "gcp"
-version = "0.1.5"
+version = "0.1.6"
 namespace = "GCP"
 summary = "GCP resource plugin"
 description = "Google Cloud Platform resource plugin for Formae"

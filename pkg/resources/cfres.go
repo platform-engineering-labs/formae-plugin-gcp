@@ -12,6 +12,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/compute"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/container"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/gkehub"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/iam"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/sql"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/storage"
 )
