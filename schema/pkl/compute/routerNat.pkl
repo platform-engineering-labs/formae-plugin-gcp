@@ -48,11 +48,11 @@ open class RouterNatResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden name: RouterNatResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
 
     hidden selfLink: RouterNatResolvable = (this) {
-        property = "SelfLink"
+        property = "selfLink"
     }
 }
 

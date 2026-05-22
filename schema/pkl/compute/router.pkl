@@ -53,15 +53,15 @@ open class RouterResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden id: RouterResolvable = (this) {
-        property = "Id"
+        property = "id"
     }
 
     hidden selfLink: RouterResolvable = (this) {
-        property = "SelfLink"
+        property = "selfLink"
     }
 
     hidden name: RouterResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
 }
 
