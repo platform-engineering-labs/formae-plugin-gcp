@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+module gcp.iam.projectIamMember
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::IAM::ProjectIamMember"
+
+open class ProjectIamMemberResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden role: ProjectIamMemberResolvable = (this) {
+        property = "role"
+    }
+
+    hidden member: ProjectIamMemberResolvable = (this) {
+        property = "member"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "Name"
+}
+open class ProjectIamMember extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    role: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    member: String
+
+    hidden res: ProjectIamMemberResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
