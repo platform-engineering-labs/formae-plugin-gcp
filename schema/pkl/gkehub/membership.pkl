@@ -35,7 +35,9 @@ open class MembershipEndpoint extends formae.SubResource {
 @gcp.SubResourceHint
 open class Authority extends formae.SubResource {
     /// Identity provider for the membership
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     issuer: String?
 }
 

@@ -41,7 +41,9 @@ open class TargetSslProxy extends formae.Resource {
     }
     name: String
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint

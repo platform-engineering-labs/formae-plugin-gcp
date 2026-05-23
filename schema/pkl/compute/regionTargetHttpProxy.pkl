@@ -44,7 +44,9 @@ open class RegionTargetHttpProxy extends formae.Resource {
     }
     region: gcp.Region
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint
@@ -53,7 +55,9 @@ open class RegionTargetHttpProxy extends formae.Resource {
     @gcp.FieldHint
     proxyBind: Boolean?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     httpKeepAliveTimeoutSec: Int?
 
     @gcp.FieldHint {

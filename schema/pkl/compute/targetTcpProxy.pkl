@@ -41,7 +41,9 @@ open class TargetTcpProxy extends formae.Resource {
     }
     name: String
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint
@@ -50,7 +52,9 @@ open class TargetTcpProxy extends formae.Resource {
     @gcp.FieldHint
     proxyHeader: ProxyHeader?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     proxyBind: Boolean?
 
     hidden res: TargetTcpProxyResolvable = new {

@@ -57,6 +57,7 @@ open class GlobalAddress extends formae.Resource {
     description: String?
 
     @gcp.FieldHint {
+        createOnly = true
     }
     address: String?
 

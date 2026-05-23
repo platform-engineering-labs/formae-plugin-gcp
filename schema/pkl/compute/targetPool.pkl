@@ -46,7 +46,9 @@ open class TargetPool extends formae.Resource {
     }
     region: gcp.Region
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint
@@ -60,7 +62,9 @@ open class TargetPool extends formae.Resource {
     }
     sessionAffinity: SessionAffinity?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     failoverRatio: Number?
 
     @gcp.FieldHint

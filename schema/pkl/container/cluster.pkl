@@ -213,6 +213,10 @@ open class ClientCertificateConfig extends formae.SubResource {
 open class MasterAuth extends formae.SubResource {
     username: String?
     password: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
     clientCertificateConfig: ClientCertificateConfig?
 
     @gcp.FieldHint {
@@ -541,6 +545,9 @@ open class PrivateClusterConfig extends formae.SubResource {
 
     enablePrivateEndpoint: Boolean?
 
+    @gcp.FieldHint {
+        createOnly = true
+    }
     masterIpv4CidrBlock: String?
 
     @gcp.FieldHint {
@@ -557,6 +564,9 @@ open class PrivateClusterConfig extends formae.SubResource {
 
     masterGlobalAccessConfig: MasterGlobalAccessConfig?
 
+    @gcp.FieldHint {
+        createOnly = true
+    }
     privateEndpointSubnetwork: String?
 }
 
@@ -784,6 +794,9 @@ open class Cluster extends formae.Resource {
     }
     name: String
 
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint {
@@ -811,6 +824,9 @@ open class Cluster extends formae.Resource {
     }
     subnetwork: String|formae.Resolvable
 
+    @gcp.FieldHint {
+        createOnly = true
+    }
     clusterIpv4Cidr: String?
 
     @gcp.FieldHint
@@ -823,6 +839,9 @@ open class Cluster extends formae.Resource {
     }
     locations: Listing<String>?
 
+    @gcp.FieldHint {
+        createOnly = true
+    }
     enableKubernetesAlpha: Boolean?
 
     resourceLabels: Mapping<String, String>?
@@ -834,7 +853,9 @@ open class Cluster extends formae.Resource {
     @gcp.FieldHint
     networkPolicy: NetworkPolicy?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     ipAllocationPolicy: IPAllocationPolicy?
 
     @gcp.FieldHint
@@ -876,7 +897,9 @@ open class Cluster extends formae.Resource {
     @gcp.FieldHint
     notificationConfig: NotificationConfig?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     confidentialNodes: ConfidentialNodes?
 
     @gcp.FieldHint

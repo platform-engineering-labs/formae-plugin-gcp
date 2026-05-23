@@ -105,7 +105,9 @@ open class Router extends formae.Resource {
     }
     params: Params?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     region: gcp.Region
 
     hidden res: RouterResolvable = new {

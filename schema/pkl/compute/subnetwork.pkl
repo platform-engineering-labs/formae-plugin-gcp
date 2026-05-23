@@ -77,7 +77,9 @@ open class SubnetworkResolvable extends formae.Resolvable {
 open class Subnetwork extends formae.Resource {
     hidden parent = this
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint {
@@ -92,10 +94,14 @@ open class Subnetwork extends formae.Resource {
     @gcp.FieldHint
     ipCidrRange: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     reservedInternalRange: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     name: String
 
     @gcp.FieldHint {
@@ -143,10 +149,13 @@ open class Subnetwork extends formae.Resource {
     ipv6CidrRange: String?
 
     @gcp.FieldHint {
+        createOnly = true
     }
     internalIpv6Prefix: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     externalIpv6Prefix: String?
 
     @gcp.FieldHint

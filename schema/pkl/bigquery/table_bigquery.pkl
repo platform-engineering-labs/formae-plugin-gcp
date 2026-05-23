@@ -44,7 +44,9 @@ open class TimePartitioning extends formae.SubResource {
   @gcp.FieldHint
   type: String
 
-  @gcp.FieldHint
+  @gcp.FieldHint {
+      createOnly = true
+  }
   field: String?
 
   @gcp.FieldHint
@@ -57,7 +59,9 @@ open class TimePartitioning extends formae.SubResource {
 /// Range partitioning configuration
 @gcp.SubResourceHint
 open class RangePartitioning extends formae.SubResource {
-  @gcp.FieldHint
+  @gcp.FieldHint {
+      createOnly = true
+  }
   field: String
 
   @gcp.FieldHint
@@ -125,7 +129,9 @@ open class ViewDefinition extends formae.SubResource {
 /// Materialized view definition
 @gcp.SubResourceHint
 open class MaterializedViewDefinition extends formae.SubResource {
-  @gcp.FieldHint
+  @gcp.FieldHint {
+      createOnly = true
+  }
   query: String
 
   @gcp.FieldHint
