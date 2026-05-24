@@ -131,7 +131,9 @@ open class RouterNat extends formae.Resource {
     @gcp.FieldHint
     autoNetworkTier: AutoNetworkTier?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     endpointTypes: Listing<EndpointType>?
 
     hidden res: RouterNatResolvable = new {

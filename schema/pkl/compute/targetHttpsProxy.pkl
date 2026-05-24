@@ -43,7 +43,9 @@ open class TargetHttpsProxy extends formae.Resource {
     }
     name: String
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint
@@ -61,7 +63,9 @@ open class TargetHttpsProxy extends formae.Resource {
     @gcp.FieldHint
     quicOverride: QuicOverride?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     proxyBind: Boolean?
 
     @gcp.FieldHint
@@ -70,10 +74,14 @@ open class TargetHttpsProxy extends formae.Resource {
     @gcp.FieldHint
     authorizationPolicy: (String|formae.Resolvable)?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     httpKeepAliveTimeoutSec: Int?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     tlsEarlyData: TlsEarlyData?
 
     @gcp.FieldHint {

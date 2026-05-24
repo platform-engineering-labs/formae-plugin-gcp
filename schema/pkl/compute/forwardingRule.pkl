@@ -86,7 +86,9 @@ open class ForwardingRule extends formae.Resource {
     }
     region: gcp.Region
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint {
@@ -147,16 +149,22 @@ open class ForwardingRule extends formae.Resource {
     @gcp.FieldHint
     allowGlobalAccess: Boolean?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     allPorts: Boolean?
 
     @gcp.FieldHint
     metadataFilters: Listing<MetadataFilter>?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     sourceIpRanges: Listing<String>?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     serviceDirectoryRegistrations: Listing<ServiceDirectoryRegistration>?
 
     @gcp.FieldHint {
@@ -169,7 +177,9 @@ open class ForwardingRule extends formae.Resource {
     }
     serviceLabel: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     noAutomateDnsZone: Boolean?
 
     @gcp.FieldHint

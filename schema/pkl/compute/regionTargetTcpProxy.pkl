@@ -46,16 +46,22 @@ open class RegionTargetTcpProxy extends formae.Resource {
     }
     region: gcp.Region
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint
     service: (String|formae.Resolvable)
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     proxyHeader: ProxyHeader?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     proxyBind: Boolean?
 
     hidden res: RegionTargetTcpProxyResolvable = new {

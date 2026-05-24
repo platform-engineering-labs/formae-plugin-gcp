@@ -39,16 +39,22 @@ open class TargetHttpProxy extends formae.Resource {
     }
     name: String
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     description: String?
 
     @gcp.FieldHint
     urlMap: (String|formae.Resolvable)
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     proxyBind: Boolean?
 
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        createOnly = true
+    }
     httpKeepAliveTimeoutSec: Int?
 
     @gcp.FieldHint {

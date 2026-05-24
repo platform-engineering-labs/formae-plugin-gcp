@@ -19,7 +19,7 @@ forma {
   new bucket.Bucket {
     label = "plugin-sdk-test-bucket"
     name = "formae-plugin-sdk-test-\(v.testRunID)"
-    location = "europe-central2"
+    location = v.gcpRegion
     storageClass = "STANDARD"
     versioning = new bucket.Versioning {
       enabled = false
