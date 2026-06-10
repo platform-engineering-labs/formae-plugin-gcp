@@ -166,7 +166,9 @@ jobs:
   conformance-tests:
     needs: [discover-tests, pre-cleanup]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Raised from 30 to accommodate Cloud SQL (5-10 min per instance; the
+    # CRUD + discovery lifecycle creates several instances sequentially).
+    timeout-minutes: 45
     strategy:
       matrix:
         test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
@@ -209,7 +211,21 @@ jobs:
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-        run: make conformance-test-crud-run conformance-test-discovery-run TEST=${{ matrix.test-case }} PARALLEL=1
+        run: |
+          # Slow resources (Cloud SQL: 5-10 min/instance) need raised timeouts.
+          # TIMEOUT sets the per-operation poll (FORMAE_TEST_TIMEOUT); the
+          # discovery and OOB timeouts are separate env vars the SDK reads.
+          TIMEOUT_ARG=""
+          case "${{ matrix.test-case }}" in
+            cloudsql-instance)
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
+          esac
+          make conformance-test-crud-run conformance-test-discovery-run \
+            TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
 
   # Clean up test resources after all conformance tests (always runs)
   post-cleanup:
