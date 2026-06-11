@@ -88,8 +88,9 @@ jobs:
   conformance-tests:
     needs: [discover-tests, pre-cleanup]
     runs-on: ubuntu-latest
-    # Raised from 30 to accommodate Cloud SQL (5-10 min per instance).
-    timeout-minutes: 45
+    # Raised to accommodate Cloud SQL: the CRUD lifecycle provisions two
+    # instances sequentially (initial + OOB-delete re-apply, 5-15 min each).
+    timeout-minutes: 75
     strategy:
       matrix:
         test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
@@ -224,7 +225,7 @@ jobs:
           # per-operation timeout (FORMAE_TEST_TIMEOUT via TIMEOUT).
           TIMEOUT_ARG=""
           case "${{ matrix.test-case }}" in
-            cloudsql-instance) TIMEOUT_ARG="TIMEOUT=15" ;;
+            cloudsql-instance) TIMEOUT_ARG="TIMEOUT=30" ;;
           esac
           make conformance-test-crud-run TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
 
