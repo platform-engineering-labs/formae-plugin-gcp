@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/sql/database.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new database.DatabaseInstance {
+    label = "plugin-sdk-test-cloudsql-instance"
+    project = v.gcpProject
+    name = "formae-test-sql-\(v.testRunID)"
+    databaseVersion = "MYSQL_8_0"
+    region = v.gcpRegion
+    settings = new database.Settings {
+      tier = "db-f1-micro"
+      availabilityType = "ZONAL"
+      dataDiskSizeGb = 10
+      dataDiskType = "PD_SSD"
+      storageAutoResize = true
+      userLabels = new Mapping {
+        ["environment"] = "test"
+        ["managed-by"] = "formae"
+      }
+      // Org policy constraints/sql.restrictPublicIp forbids public IP on this project,
+      // so disable public IP and use private IP on the default VPC. Requires Service
+      // Networking VPC peering (google-managed-services-default) to be configured once
+      // per project (see pkg/resources/sql/database_instance_test.go setupServiceNetworking).
+      ipConfiguration = new database.IpConfiguration {
+        ipv4Enabled = false
+        privateNetwork = "projects/\(v.gcpProject)/global/networks/default"
+      }
+      backupConfiguration = new database.BackupConfiguration {
+        enabled = false
+      }
+    }
+  }
+}

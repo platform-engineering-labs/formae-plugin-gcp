@@ -102,13 +102,16 @@ clean-environment:
 	@./scripts/ci/clean-environment.sh
 
 ## conformance-test: Run all conformance tests (CRUD + discovery)
-## Usage: make conformance-test [TEST=bigquery-dataset] [PARALLEL=1] [TIMEOUT=60]
+## Usage: make conformance-test [TEST=bigquery-dataset] [PARALLEL=1] [TIMEOUT=15]
 ## Calls clean-environment before and after tests.
 ##
 ## Parameters:
-##   TEST     - Filter tests by name pattern (e.g., TEST=bigquery-dataset)
-##   PARALLEL - Concurrent tests inside the SDK (default: 1 = sequential)
-##   TIMEOUT  - Test timeout in minutes (default: 60)
+##   TEST           - Filter tests by name pattern (e.g., TEST=bigquery-dataset)
+##   PARALLEL       - Concurrent tests inside the SDK (default: 1 = sequential)
+##   TIMEOUT        - Per-operation timeout in minutes (FORMAE_TEST_TIMEOUT;
+##                    SDK default 5). Raise for slow resources, e.g. TIMEOUT=15
+##                    for Cloud SQL instances (5-10 min to create).
+##   GOTEST_TIMEOUT - Overall `go test` timeout in minutes (default: 60)
 ##
 ## The conformance SDK installs the latest released formae via orbital
 ## unless FORMAE_BINARY is set (e.g. by nightly which builds from source).
@@ -151,12 +154,12 @@ conformance-test-discovery: install
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-crud-run:
 	@echo "Running CRUD conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_PARALLEL="$(PARALLEL)" \
-		$(GO) test -tags=conformance -v -timeout $(or $(TIMEOUT),60)m ./...
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=crud FORMAE_TEST_PARALLEL="$(PARALLEL)" FORMAE_TEST_TIMEOUT="$(TIMEOUT)" \
+		$(GO) test -tags=conformance -v -timeout $(or $(GOTEST_TIMEOUT),60)m ./...
 
 ## conformance-test-discovery-run: Run only discovery tests (no cleanup)
 ## Used by CI matrix jobs where cleanup is managed separately.
 conformance-test-discovery-run:
 	@echo "Running discovery conformance tests..."
-	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_PARALLEL="$(PARALLEL)" \
-		$(GO) test -tags=conformance -v -timeout $(or $(TIMEOUT),60)m ./...
+	@FORMAE_TEST_FILTER="$(TEST)" FORMAE_TEST_TYPE=discovery FORMAE_TEST_PARALLEL="$(PARALLEL)" FORMAE_TEST_TIMEOUT="$(TIMEOUT)" \
+		$(GO) test -tags=conformance -v -timeout $(or $(GOTEST_TIMEOUT),60)m ./...

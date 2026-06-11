@@ -137,6 +137,9 @@ open class Bucket extends formae.Resource {
     @gcp.FieldHint
     logging: Logging?
 
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     metageneration: Int?
 
     @gcp.FieldHint {

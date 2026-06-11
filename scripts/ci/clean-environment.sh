@@ -189,5 +189,32 @@ else
     echo "  No Bigtable instances found"
 fi
 
+# --- 10. Cloud SQL instances ---
+# Use the sqladmin REST API directly rather than `gcloud sql instances delete`:
+# some gcloud versions add a final-backup parameter that sqladmin rejects
+# ("Final Backup Retention Days can not be set if enable_final_backup is disabled"),
+# and gcloud's credential token type is not always accepted by sqladmin. The REST
+# DELETE defaults to no final backup and works with a plain bearer token. Instances
+# still in PENDING_CREATE are accepted (the delete queues behind the create).
+echo "Cleaning GCP Cloud SQL instances..."
+SQL_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+SQL_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+if [ -n "$SQL_PROJECT" ] && [ -n "$SQL_TOKEN" ]; then
+    SQL_API="https://sqladmin.googleapis.com/v1/projects/${SQL_PROJECT}/instances"
+    SQL_INSTANCES=$(curl -s -H "Authorization: Bearer ${SQL_TOKEN}" "$SQL_API" \
+        | grep -oE '"name": *"formae-test-sql[^"]*"' \
+        | sed -E 's/.*"(formae-test-sql[^"]*)".*/\1/' || true)
+    if [ -n "$SQL_INSTANCES" ]; then
+        echo "$SQL_INSTANCES" | while read -r instance; do
+            echo "  Deleting Cloud SQL instance: $instance"
+            curl -s -X DELETE -H "Authorization: Bearer ${SQL_TOKEN}" "${SQL_API}/${instance}" >/dev/null 2>&1 || true
+        done
+    else
+        echo "  No Cloud SQL instances found"
+    fi
+else
+    echo "  Skipping Cloud SQL cleanup (no project or access token available)"
+fi
+
 echo ""
 echo "clean-environment.sh: Cleanup complete"
