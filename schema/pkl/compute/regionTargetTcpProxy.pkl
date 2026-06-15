@@ -51,7 +51,7 @@ open class RegionTargetTcpProxy extends formae.Resource {
     }
     description: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { edgeKind = "attachesTo" }
     service: (String|formae.Resolvable)
 
     @gcp.FieldHint {
