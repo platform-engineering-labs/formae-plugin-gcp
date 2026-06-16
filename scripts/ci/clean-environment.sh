@@ -100,6 +100,18 @@ else
     echo "  No disks found"
 fi
 
+# --- Backend services (global, must be deleted before their health checks) ---
+echo "Cleaning GCP backend services..."
+BACKEND_SERVICES=$(gcloud compute backend-services list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$BACKEND_SERVICES" ]; then
+    echo "$BACKEND_SERVICES" | while read -r bs; do
+        echo "  Deleting backend service: $bs"
+        gcloud compute backend-services delete "$bs" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No backend services found"
+fi
+
 # --- Health checks (global) ---
 echo "Cleaning GCP health checks..."
 HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)

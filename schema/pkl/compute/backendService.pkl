@@ -178,10 +178,10 @@ open class BackendService extends formae.Resource {
     @gcp.FieldHint
     protocol: Protocol?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     portName: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     port: Int?
 
     @gcp.FieldHint
@@ -195,19 +195,19 @@ open class BackendService extends formae.Resource {
     @gcp.FieldHint
     localityLbPolicy: LocalityLbPolicy?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     sessionAffinity: SessionAffinity?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     affinityCookieTtlSec: Int?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     connectionDraining: ConnectionDraining?
 
     @gcp.FieldHint
     cdnPolicy: CdnPolicy?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     enableCDN: Boolean?
 
     @gcp.FieldHint
@@ -228,8 +228,7 @@ open class BackendService extends formae.Resource {
     @gcp.FieldHint
     edgeSecurityPolicy: (String|formae.Resolvable)?
 
-    @gcp.FieldHint {
-    }
+    @gcp.FieldHint { hasProviderDefault = true }
     fingerprint: String?
 
     hidden res: BackendServiceResolvable = new {
