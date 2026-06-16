@@ -76,7 +76,19 @@ else
     echo "  No subnetworks found"
 fi
 
-# --- 3. Disks ---
+# --- 3. Compute instances (must be deleted before their disks) ---
+echo "Cleaning GCP compute instances..."
+GCE_INSTANCES=$(gcloud compute instances list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$GCE_INSTANCES" ]; then
+    echo "$GCE_INSTANCES" | while read -r vm zone; do
+        echo "  Deleting instance: $vm (zone: $zone)"
+        gcloud compute instances delete "$vm" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No compute instances found"
+fi
+
+# --- 4. Disks ---
 echo "Cleaning GCP disks..."
 DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
 if [ -n "$DISKS" ]; then

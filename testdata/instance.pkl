@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/instance.pkl"
+import "./config/vars.pkl" as v
+
+// The instance schema does not expose disk initializeParams, so a boot disk
+// must be created first and attached via source. The disk is referenced through
+// its resolvable so formae creates the disk before the instance (a plain string
+// URL would not establish the dependency, leaving create order undefined).
+forma {
+  // Boot disk for the instance, created from a public Debian image.
+  local bootDisk = new disk.Disk {
+    label = "plugin-sdk-test-instance-bootdisk"
+    project = v.gcpProject
+    zone = v.gcpZone
+    name = "formae-plugin-sdk-test-instance-disk-\(v.testRunID)"
+    description = "Boot disk for instance conformance test"
+    sizeGb = 10
+    type = "pd-standard"
+    sourceImage = formae.value("projects/debian-cloud/global/images/family/debian-12")
+  }
+
+  v.stack
+  v.target
+
+  bootDisk
+
+  new instance.Instance {
+    label = "plugin-sdk-test-instance"
+    project = v.gcpProject
+    zone = v.gcpZone
+    name = "formae-plugin-sdk-test-instance-\(v.testRunID)"
+    machineType = "e2-micro"
+    description = "Test instance for plugin SDK conformance tests"
+    disks = new Listing {
+      new instance.AttachedDisk {
+        boot = true
+        // autoDelete=false so the managed boot Disk resource is deleted explicitly
+        // by formae rather than auto-removed with the instance.
+        autoDelete = false
+        // Resolvable reference -> establishes disk-before-instance create ordering.
+        source = bootDisk.res.selfLink
+      }
+    }
+    // Internal IP only (no accessConfigs) to comply with the external-IP org policy.
+    networkInterfaces = new Listing {
+      new instance.NetworkInterface {
+        network = "projects/\(v.gcpProject)/global/networks/default"
+        subnetwork = "projects/\(v.gcpProject)/regions/\(v.gcpRegion)/subnetworks/default"
+      }
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}
