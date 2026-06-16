@@ -116,7 +116,87 @@ func instanceResponseTransformer(apiResponse map[string]interface{}, ctx base.Tr
 		}
 	}
 
+	// The API returns zone and machineType as full URLs; normalize to the short
+	// name form used in the schema/input so state round-trips cleanly.
+	if zone, ok := apiResponse["zone"].(string); ok && zone != "" {
+		apiResponse["zone"] = base.ExtractLastSegment(zone)
+	}
+	if machineType, ok := apiResponse["machineType"].(string); ok && machineType != "" {
+		apiResponse["machineType"] = base.ExtractLastSegment(machineType)
+	}
+
+	// Reduce disks/networkInterfaces to the schema-modeled fields and normalize
+	// URL-valued fields (source, network, subnetwork) to the "projects/..." form.
+	// The API enriches these arrays with many extra fields (deviceName, index,
+	// kind, fingerprint, stackType, ...) that are not in the schema.
+	if disks := utils.GetArray(apiResponse, "disks"); len(disks) > 0 {
+		apiResponse["disks"] = normalizeInstanceDisks(disks)
+	}
+	if ifaces := utils.GetArray(apiResponse, "networkInterfaces"); len(ifaces) > 0 {
+		apiResponse["networkInterfaces"] = normalizeInstanceNetworkInterfaces(ifaces)
+	}
+
 	return apiResponse
+}
+
+// normalizeInstanceDisks reduces each attached disk to the fields a forma
+// declares (boot, autoDelete, source). The API enriches disks with read-only
+// fields (deviceName, diskSizeGb, kind, interface, index, mode, type, licenses,
+// guestOsFeatures, architecture) that are not in the forma; dropping them keeps
+// the round-trip clean without bloating the schema. source is left as the
+// provider's full URL so it matches a resolvable boot-disk reference — formae
+// resolves the resolvable to the disk's selfLink, the same URL the instance API
+// returns (rewriting it to a "projects/..." path would break that match).
+func normalizeInstanceDisks(disks []interface{}) []interface{} {
+	result := make([]interface{}, 0, len(disks))
+	for _, d := range disks {
+		dm, ok := d.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		nd := make(map[string]interface{})
+		if v, ok := dm["boot"]; ok {
+			nd["boot"] = v
+		}
+		if v, ok := dm["autoDelete"]; ok {
+			nd["autoDelete"] = v
+		}
+		if source := utils.GetString(dm, "source"); source != "" {
+			nd["source"] = source
+		}
+		result = append(result, nd)
+	}
+	return result
+}
+
+// normalizeInstanceNetworkInterfaces keeps only the schema-modeled NetworkInterface
+// fields and rewrites network/subnetwork from full URLs to "projects/..." paths.
+func normalizeInstanceNetworkInterfaces(ifaces []interface{}) []interface{} {
+	result := make([]interface{}, 0, len(ifaces))
+	for _, i := range ifaces {
+		im, ok := i.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ni := make(map[string]interface{})
+		if network := utils.GetString(im, "network"); network != "" {
+			ni["network"] = extractProjectsPath(network)
+		}
+		if subnetwork := utils.GetString(im, "subnetwork"); subnetwork != "" {
+			ni["subnetwork"] = extractProjectsPath(subnetwork)
+		}
+		if name := utils.GetString(im, "name"); name != "" {
+			ni["name"] = name
+		}
+		if networkIP := utils.GetString(im, "networkIP"); networkIP != "" {
+			ni["networkIP"] = networkIP
+		}
+		if ac := utils.GetArray(im, "accessConfigs"); len(ac) > 0 {
+			ni["accessConfigs"] = ac
+		}
+		result = append(result, ni)
+	}
+	return result
 }
 
 // extractProjectFromSelfLink extracts the project from a Compute API selfLink

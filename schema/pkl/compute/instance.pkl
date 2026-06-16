@@ -44,13 +44,13 @@ open class NetworkInterface extends formae.SubResource {
     @gcp.FieldHint
     subnetwork: String|formae.Resolvable
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     accessConfigs: Listing<NetworkAccessConfig>?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     name: String?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     networkIP: String?
 }
 
@@ -220,7 +220,7 @@ open class Instance extends formae.Resource {
     labels: Mapping<String, String>?
 
     /// Metadata for the instance
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     metadata: Metadata?
 
     /// Service accounts for the instance
@@ -228,7 +228,7 @@ open class Instance extends formae.Resource {
     serviceAccounts: Listing<ServiceAccount>?
 
     /// Scheduling options
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     scheduling: Scheduling?
 
     // Network tags
@@ -240,7 +240,7 @@ open class Instance extends formae.Resource {
     enableDisplay: Boolean?
 
     /// Whether deletion protection is enabled
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     deletionProtection: Boolean?
 
     hidden res: InstanceResolvable = new {
