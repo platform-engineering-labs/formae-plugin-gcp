@@ -88,6 +88,18 @@ else
     echo "  No disks found"
 fi
 
+# --- Health checks (global) ---
+echo "Cleaning GCP health checks..."
+HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$HEALTH_CHECKS" ]; then
+    echo "$HEALTH_CHECKS" | while read -r hc; do
+        echo "  Deleting health check: $hc"
+        gcloud compute health-checks delete "$hc" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No health checks found"
+fi
+
 # --- 4. Cloud Run services ---
 echo "Cleaning GCP Cloud Run services..."
 SERVICES=$(gcloud run services list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null || true)
