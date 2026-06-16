@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  // Health check the backend service attaches to. Referenced via its resolvable
+  // so formae creates the health check before the backend service.
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-bs-healthcheck"
+    name = "formae-plugin-sdk-test-bs-hc-\(v.testRunID)"
+    type = "HTTP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    httpHealthCheck = new healthCheck.HttpHealthCheck {
+      port = 80
+      requestPath = "/"
+      proxyHeader = "NONE"
+    }
+  }
+
+  v.stack
+  v.target
+
+  hc
+
+  new backendService.BackendService {
+    label = "plugin-sdk-test-backend-service"
+    name = "formae-plugin-sdk-test-bs-\(v.testRunID)"
+    description = "Test backend service for plugin SDK conformance tests"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    protocol = "HTTP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+}
