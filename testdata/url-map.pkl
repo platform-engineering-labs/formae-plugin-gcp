@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/urlMap.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  // Health check + backend service the URL map routes to. Both referenced via
+  // resolvables so formae creates them before the URL map (health check ->
+  // backend service -> url map).
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-um-healthcheck"
+    name = "formae-plugin-sdk-test-um-hc-\(v.testRunID)"
+    type = "HTTP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    httpHealthCheck = new healthCheck.HttpHealthCheck {
+      port = 80
+      requestPath = "/"
+      proxyHeader = "NONE"
+    }
+  }
+
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-um-backend-service"
+    name = "formae-plugin-sdk-test-um-bs-\(v.testRunID)"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    protocol = "HTTP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+
+  new urlMap.UrlMap {
+    label = "plugin-sdk-test-url-map"
+    name = "formae-plugin-sdk-test-um-\(v.testRunID)"
+    description = "Test URL map for plugin SDK conformance tests"
+    defaultService = bs.res.selfLink
+  }
+}
