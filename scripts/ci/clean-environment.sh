@@ -100,6 +100,18 @@ else
     echo "  No disks found"
 fi
 
+# --- Global forwarding rules (must be deleted before their target proxies) ---
+echo "Cleaning GCP global forwarding rules..."
+GLOBAL_FORWARDING_RULES=$(gcloud compute forwarding-rules list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$GLOBAL_FORWARDING_RULES" ]; then
+    echo "$GLOBAL_FORWARDING_RULES" | while read -r fr; do
+        echo "  Deleting global forwarding rule: $fr"
+        gcloud compute forwarding-rules delete "$fr" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No global forwarding rules found"
+fi
+
 # --- Target HTTP proxies (global, must be deleted before their url maps) ---
 echo "Cleaning GCP target HTTP proxies..."
 TARGET_HTTP_PROXIES=$(gcloud compute target-http-proxies list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
