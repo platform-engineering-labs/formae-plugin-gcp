@@ -44,7 +44,7 @@ open class TargetHttpProxy extends formae.Resource {
     }
     description: String?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     urlMap: (String|formae.Resolvable)
 
     @gcp.FieldHint {
@@ -57,8 +57,7 @@ open class TargetHttpProxy extends formae.Resource {
     }
     httpKeepAliveTimeoutSec: Int?
 
-    @gcp.FieldHint {
-    }
+    @gcp.FieldHint { hasProviderDefault = true }
     fingerprint: String?
 
     hidden res: TargetHttpProxyResolvable = new {

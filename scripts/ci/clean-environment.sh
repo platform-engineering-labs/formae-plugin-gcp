@@ -100,6 +100,30 @@ else
     echo "  No disks found"
 fi
 
+# --- Target HTTP proxies (global, must be deleted before their url maps) ---
+echo "Cleaning GCP target HTTP proxies..."
+TARGET_HTTP_PROXIES=$(gcloud compute target-http-proxies list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$TARGET_HTTP_PROXIES" ]; then
+    echo "$TARGET_HTTP_PROXIES" | while read -r thp; do
+        echo "  Deleting target HTTP proxy: $thp"
+        gcloud compute target-http-proxies delete "$thp" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target HTTP proxies found"
+fi
+
+# --- URL maps (global, must be deleted before their backend services) ---
+echo "Cleaning GCP URL maps..."
+URL_MAPS=$(gcloud compute url-maps list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$URL_MAPS" ]; then
+    echo "$URL_MAPS" | while read -r um; do
+        echo "  Deleting URL map: $um"
+        gcloud compute url-maps delete "$um" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No URL maps found"
+fi
+
 # --- Backend services (global, must be deleted before their health checks) ---
 echo "Cleaning GCP backend services..."
 BACKEND_SERVICES=$(gcloud compute backend-services list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
