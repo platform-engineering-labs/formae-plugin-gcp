@@ -113,13 +113,11 @@ open class ForwardingRule extends formae.Resource {
 
     @gcp.FieldHint {
         outputField = "target"
-        edgeKind = "attachesTo"
     }
     targetProxy: (String|formae.Resolvable)?
 
     @gcp.FieldHint {
         createOnly = true
-        edgeKind = "attachesTo"
     }
     backendService: (String|formae.Resolvable)?
 

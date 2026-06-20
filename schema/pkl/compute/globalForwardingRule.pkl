@@ -103,7 +103,6 @@ open class GlobalForwardingRule extends formae.Resource {
 
     @gcp.FieldHint {
         outputField = "target"
-        edgeKind = "attachesTo"
     }
     targetProxy: (String|formae.Resolvable)
 

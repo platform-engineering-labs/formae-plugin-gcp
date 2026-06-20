@@ -28,7 +28,7 @@ open class PathRule extends formae.SubResource {
     @gcp.FieldHint
     paths: Listing<String>?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     service: (String|formae.Resolvable)?
 
     @gcp.FieldHint
@@ -43,7 +43,7 @@ open class PathMatcher extends formae.SubResource {
     @gcp.FieldHint
     name: String?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     defaultService: (String|formae.Resolvable)?
 
     @gcp.FieldHint
@@ -70,7 +70,7 @@ open class RouteRule extends formae.SubResource {
     @gcp.FieldHint
     matchRules: Listing<HttpRouteRuleMatch>?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     service: (String|formae.Resolvable)?
 
     @gcp.FieldHint
@@ -172,7 +172,7 @@ open class RouteAction extends formae.SubResource {
 
 @gcp.SubResourceHint
 open class WeightedBackendService extends formae.SubResource {
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     backendService: (String|formae.Resolvable)?
 
     @gcp.FieldHint
@@ -214,7 +214,7 @@ open class HttpRetryPolicy extends formae.SubResource {
 
 @gcp.SubResourceHint
 open class RequestMirrorPolicy extends formae.SubResource {
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     backendService: (String|formae.Resolvable)?
 }
 
@@ -356,7 +356,7 @@ open class RegionUrlMap extends formae.Resource {
     @gcp.FieldHint
     description: String?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     defaultService: (String|formae.Resolvable)?
 
     @gcp.FieldHint

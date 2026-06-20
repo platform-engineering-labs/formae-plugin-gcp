@@ -44,7 +44,7 @@ open class TargetHttpProxy extends formae.Resource {
     }
     description: String?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     urlMap: (String|formae.Resolvable)
 
     @gcp.FieldHint {
