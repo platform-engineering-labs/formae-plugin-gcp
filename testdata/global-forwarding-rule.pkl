@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/urlMap.pkl"
+import "@gcp/compute/targetHttpProxy.pkl"
+import "@gcp/compute/globalForwardingRule.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  // Full external HTTP load-balancer chain:
+  // HealthCheck -> BackendService -> UrlMap -> TargetHttpProxy -> GlobalForwardingRule.
+  // Everything is wired via resolvables so formae creates the chain
+  // producer-first and tears it down consumer-first under the default edge.
+  // This exercises the forwarding-rule -> proxy and proxy -> url-map delete
+  // edges that GCP guards with referential integrity (a referencer must be
+  // deleted before what it references).
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-gfr-healthcheck"
+    name = "formae-plugin-sdk-test-gfr-hc-\(v.testRunID)"
+    type = "HTTP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    httpHealthCheck = new healthCheck.HttpHealthCheck {
+      port = 80
+      requestPath = "/"
+      proxyHeader = "NONE"
+    }
+  }
+
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-gfr-backend-service"
+    name = "formae-plugin-sdk-test-gfr-bs-\(v.testRunID)"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    protocol = "HTTP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  local um = new urlMap.UrlMap {
+    label = "plugin-sdk-test-gfr-url-map"
+    name = "formae-plugin-sdk-test-gfr-um-\(v.testRunID)"
+    defaultService = bs.res.selfLink
+  }
+
+  local proxy = new targetHttpProxy.TargetHttpProxy {
+    label = "plugin-sdk-test-gfr-target-http-proxy"
+    name = "formae-plugin-sdk-test-gfr-thp-\(v.testRunID)"
+    urlMap = um.res.selfLink
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+  um
+  proxy
+
+  // Global external Application Load Balancer front end. IPAddress is omitted so
+  // GCP allocates an ephemeral external IP for the lifetime of the rule.
+  new globalForwardingRule.GlobalForwardingRule {
+    label = "plugin-sdk-test-global-forwarding-rule"
+    name = "formae-plugin-sdk-test-gfr-\(v.testRunID)"
+    description = "Test global forwarding rule for plugin SDK conformance tests"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    IPProtocol = "TCP"
+    portRange = "80"
+    targetProxy = proxy.res.selfLink
+  }
+}
