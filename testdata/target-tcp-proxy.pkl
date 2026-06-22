@@ -1,0 +1,55 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/targetTcpProxy.pkl"
+import "./config/vars.pkl" as v
+
+// TCP Proxy LB: HealthCheck (TCP) -> BackendService (TCP) -> TargetTcpProxy.
+// The backend service is referenced via its resolvable for create ordering.
+forma {
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-ttp-healthcheck"
+    name = "formae-plugin-sdk-test-ttp-hc-\(v.testRunID)"
+    type = "TCP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    tcpHealthCheck = new healthCheck.TcpHealthCheck {
+      port = 443
+      proxyHeader = "NONE"
+    }
+  }
+
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-ttp-backend-service"
+    name = "formae-plugin-sdk-test-ttp-bs-\(v.testRunID)"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    protocol = "TCP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+
+  new targetTcpProxy.TargetTcpProxy {
+    label = "plugin-sdk-test-target-tcp-proxy"
+    name = "formae-plugin-sdk-test-ttp-\(v.testRunID)"
+    description = "Test target TCP proxy for plugin SDK conformance tests"
+    service = bs.res.selfLink
+    proxyHeader = "NONE"
+  }
+}

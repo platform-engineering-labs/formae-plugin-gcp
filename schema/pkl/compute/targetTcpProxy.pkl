@@ -46,7 +46,7 @@ open class TargetTcpProxy extends formae.Resource {
     }
     description: String?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     service: (String|formae.Resolvable)
 
     @gcp.FieldHint
@@ -54,6 +54,7 @@ open class TargetTcpProxy extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     proxyBind: Boolean?
 
