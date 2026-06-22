@@ -88,6 +88,7 @@ open class GlobalForwardingRule extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     IPAddress: (String|formae.Resolvable)?
 
@@ -103,7 +104,6 @@ open class GlobalForwardingRule extends formae.Resource {
 
     @gcp.FieldHint {
         outputField = "target"
-        edgeKind = "attachesTo"
     }
     targetProxy: (String|formae.Resolvable)
 
@@ -124,6 +124,7 @@ open class GlobalForwardingRule extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     networkTier: NetworkTier?
 
@@ -155,16 +156,13 @@ open class GlobalForwardingRule extends formae.Resource {
     }
     noAutomateDnsZone: Boolean?
 
-    @gcp.FieldHint {
-    }
+    @gcp.FieldHint { hasProviderDefault = true }
     labelFingerprint: String?
 
-    @gcp.FieldHint {
-    }
+    @gcp.FieldHint { hasProviderDefault = true }
     pscConnectionId: String?
 
-    @gcp.FieldHint {
-    }
+    @gcp.FieldHint { hasProviderDefault = true }
     pscConnectionStatus: String?
 
     hidden res: GlobalForwardingRuleResolvable = new {

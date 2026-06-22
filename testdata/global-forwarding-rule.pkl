@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/urlMap.pkl"
+import "@gcp/compute/targetHttpProxy.pkl"
+import "@gcp/compute/globalForwardingRule.pkl"
+import "./config/vars.pkl" as v
+
+// Full global external HTTP load balancer frontend:
+// HealthCheck -> BackendService -> UrlMap -> TargetHttpProxy -> GlobalForwardingRule.
+// Each upstream resource is referenced via its resolvable for create ordering.
+forma {
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-gfr-healthcheck"
+    name = "formae-plugin-sdk-test-gfr-hc-\(v.testRunID)"
+    type = "HTTP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    httpHealthCheck = new healthCheck.HttpHealthCheck {
+      port = 80
+      requestPath = "/"
+      proxyHeader = "NONE"
+    }
+  }
+
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-gfr-backend-service"
+    name = "formae-plugin-sdk-test-gfr-bs-\(v.testRunID)"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    protocol = "HTTP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  local um = new urlMap.UrlMap {
+    label = "plugin-sdk-test-gfr-url-map"
+    name = "formae-plugin-sdk-test-gfr-um-\(v.testRunID)"
+    defaultService = bs.res.selfLink
+  }
+
+  local thp = new targetHttpProxy.TargetHttpProxy {
+    label = "plugin-sdk-test-gfr-target-http-proxy"
+    name = "formae-plugin-sdk-test-gfr-thp-\(v.testRunID)"
+    urlMap = um.res.selfLink
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+  um
+  thp
+
+  new globalForwardingRule.GlobalForwardingRule {
+    label = "plugin-sdk-test-global-forwarding-rule"
+    name = "formae-plugin-sdk-test-gfr-\(v.testRunID)"
+    description = "Test global forwarding rule for plugin SDK conformance tests"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    IPProtocol = "TCP"
+    portRange = "80-80"   // GCP returns port ranges in canonical "start-end" form
+
+    // IPAddress omitted -> an ephemeral global IPv4 is auto-allocated.
+    targetProxy = thp.res.selfLink
+  }
+}
