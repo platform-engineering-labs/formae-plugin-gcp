@@ -46,7 +46,7 @@ open class TargetSslProxy extends formae.Resource {
     }
     description: String?
 
-    @gcp.FieldHint { edgeKind = "attachesTo" }
+    @gcp.FieldHint
     service: (String|formae.Resolvable)
 
     @gcp.FieldHint
