@@ -12,12 +12,10 @@ import "@gcp/compute/urlMap.pkl"
 import "@gcp/compute/targetHttpProxy.pkl"
 import "./config/vars.pkl" as v
 
+// Global external HTTP LB chain: HealthCheck -> BackendService -> UrlMap ->
+// TargetHttpProxy. Each upstream resource is referenced via its resolvable so
+// formae creates them in dependency order.
 forma {
-  // HealthCheck -> BackendService -> UrlMap -> TargetHttpProxy. Each is
-  // referenced via its resolvable so formae creates them producer-first
-  // (health check -> backend service -> url map -> proxy) and, on destroy,
-  // tears them down consumer-first (proxy -> url map -> backend service ->
-  // health check) under the default edge — matching GCP referential integrity.
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-thp-healthcheck"
     name = "formae-plugin-sdk-test-thp-hc-\(v.testRunID)"

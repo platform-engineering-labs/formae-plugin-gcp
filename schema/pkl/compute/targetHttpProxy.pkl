@@ -57,8 +57,7 @@ open class TargetHttpProxy extends formae.Resource {
     }
     httpKeepAliveTimeoutSec: Int?
 
-    @gcp.FieldHint {
-    }
+    @gcp.FieldHint { hasProviderDefault = true }
     fingerprint: String?
 
     hidden res: TargetHttpProxyResolvable = new {

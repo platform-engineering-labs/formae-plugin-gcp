@@ -100,6 +100,40 @@ else
     echo "  No disks found"
 fi
 
+# --- Target TCP proxies (global, must be deleted before their backend services) ---
+echo "Cleaning GCP target TCP proxies..."
+TARGET_TCP_PROXIES=$(gcloud compute target-tcp-proxies list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$TARGET_TCP_PROXIES" ]; then
+    echo "$TARGET_TCP_PROXIES" | while read -r ttp; do
+        echo "  Deleting target TCP proxy: $ttp"
+        gcloud compute target-tcp-proxies delete "$ttp" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target TCP proxies found"
+# --- Global forwarding rules (must be deleted before their target proxies) ---
+echo "Cleaning GCP global forwarding rules..."
+GLOBAL_FORWARDING_RULES=$(gcloud compute forwarding-rules list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$GLOBAL_FORWARDING_RULES" ]; then
+    echo "$GLOBAL_FORWARDING_RULES" | while read -r fr; do
+        echo "  Deleting global forwarding rule: $fr"
+        gcloud compute forwarding-rules delete "$fr" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No global forwarding rules found"
+fi
+
+# --- URL maps (global, must be deleted before their backend services) ---
+echo "Cleaning GCP URL maps..."
+URL_MAPS=$(gcloud compute url-maps list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
+if [ -n "$URL_MAPS" ]; then
+    echo "$URL_MAPS" | while read -r um; do
+        echo "  Deleting URL map: $um"
+        gcloud compute url-maps delete "$um" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No URL maps found"
+fi
+
 # --- Backend services (global, must be deleted before their health checks) ---
 echo "Cleaning GCP backend services..."
 BACKEND_SERVICES=$(gcloud compute backend-services list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)

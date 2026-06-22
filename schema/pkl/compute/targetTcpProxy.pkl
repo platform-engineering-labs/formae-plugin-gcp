@@ -54,6 +54,7 @@ open class TargetTcpProxy extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     proxyBind: Boolean?
 

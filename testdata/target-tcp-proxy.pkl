@@ -11,13 +11,9 @@ import "@gcp/compute/backendService.pkl"
 import "@gcp/compute/targetTcpProxy.pkl"
 import "./config/vars.pkl" as v
 
+// TCP Proxy LB: HealthCheck (TCP) -> BackendService (TCP) -> TargetTcpProxy.
+// The backend service is referenced via its resolvable for create ordering.
 forma {
-  // HealthCheck -> BackendService -> TargetTcpProxy. The TCP proxy references
-  // the backend service via its resolvable, so formae creates them
-  // producer-first and tears them down consumer-first (proxy -> backend service
-  // -> health check) under the default edge — matching GCP referential
-  // integrity (the proxy must be deleted before the backend service it points
-  // at). Mirrors target-http-proxy.pkl for the TCP proxy variant.
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-ttp-healthcheck"
     name = "formae-plugin-sdk-test-ttp-hc-\(v.testRunID)"
@@ -27,7 +23,7 @@ forma {
     healthyThreshold = 2
     unhealthyThreshold = 3
     tcpHealthCheck = new healthCheck.TcpHealthCheck {
-      port = 110
+      port = 443
       proxyHeader = "NONE"
     }
   }
