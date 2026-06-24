@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/container/cluster.pkl"
+import "@gcp/container/nodepool.pkl"
+import "./config/vars.pkl" as v
+
+// Zonal GKE cluster on the default network. Using the default network/subnet
+// avoids the secondary-range (IP-alias) setup a custom VPC would require for a
+// minimal cluster. A separate node pool is created against it to exercise
+// NodePool CRUD. NOTE: GKE clusters are slow (10-15 min) - run with TIMEOUT=20.
+forma {
+  local gke = new cluster.Cluster {
+    label = "plugin-sdk-test-cluster"
+    name = "formae-plugin-sdk-test-cluster-\(v.testRunID)"
+    location = v.gcpZone
+    network = "default"
+    subnetwork = "default"
+    initialNodeCount = 1
+  }
+
+  v.stack
+  v.target
+
+  gke
+
+  new nodepool.NodePool {
+    label = "plugin-sdk-test-nodepool"
+    name = "formae-plugin-sdk-test-pool-\(v.testRunID)"
+    cluster = gke.res.name
+    location = v.gcpZone
+    initialNodeCount = 1
+  }
+}

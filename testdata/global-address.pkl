@@ -1,0 +1,22 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/globalAddress.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new globalAddress.GlobalAddress {
+    label = "plugin-sdk-test-global-address"
+    name = "formae-plugin-sdk-test-gaddr-\(v.testRunID)"
+    addressType = "EXTERNAL"
+    description = "Test global address for plugin SDK conformance tests"
+  }
+}
