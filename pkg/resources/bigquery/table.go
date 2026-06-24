@@ -33,6 +33,7 @@ func init() {
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
+			resource.OperationUpdate,
 			resource.OperationDelete,
 			resource.OperationList,
 		},
@@ -277,14 +278,51 @@ func (t *Table) Status(ctx context.Context, req *resource.StatusRequest) (*resou
 	}, nil
 }
 
-// Update is not implemented
-func (t *Table) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
+// Update updates the mutable metadata of a BigQuery table.
+func (t *Table) Update(ctx context.Context, req *resource.UpdateRequest) (*resource.UpdateResult, error) {
+	project, datasetID, tableID, err := parseTableID(req.NativeID)
+	if err != nil {
+		return bqUpdateFailure(resource.OperationErrorCodeInvalidRequest, fmt.Sprintf("Invalid native ID: %v", err)), nil
+	}
+
+	props, err := utils.ParseProperties(req.DesiredProperties)
+	if err != nil {
+		return bqUpdateFailure(resource.OperationErrorCodeInvalidRequest, fmt.Sprintf("Failed to parse properties: %v", err)), nil
+	}
+
+	client, err := t.getClient(ctx, project)
+	if err != nil {
+		return bqUpdateFailure(resource.OperationErrorCodeUnforeseenError, fmt.Sprintf("Failed to create client: %v", err)), nil
+	}
+	defer func() { _ = client.Close() }()
+
+	update := bigquery.TableMetadataToUpdate{
+		Name:        utils.GetString(props, "name"),
+		Description: utils.GetString(props, "description"),
+	}
+	if schemaFields := getSchemaFields(props, "schema"); schemaFields != nil {
+		update.Schema = schemaFields
+	}
+	for k, v := range getStringMap(props, "labels") {
+		update.SetLabel(k, v)
+	}
+
+	// etag "" => unconditional update (no optimistic-concurrency precondition)
+	metadata, err := client.Dataset(datasetID).Table(tableID).Update(ctx, update, "")
+	if err != nil {
+		return bqUpdateFailure(status.MapGCPError(err), fmt.Sprintf("Failed to update BigQuery table: %v", err)), nil
+	}
+
+	readProps := flattenTable(metadata, project, datasetID, tableID)
+	readPropsJSON, _ := json.Marshal(readProps)
+
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
-			Operation:       resource.OperationUpdate,
-			OperationStatus: resource.OperationStatusFailure,
-			ErrorCode:       resource.OperationErrorCodeNotUpdatable,
-			StatusMessage:   "Update not implemented for BigQuery table",
+			Operation:          resource.OperationUpdate,
+			NativeID:           req.NativeID,
+			OperationStatus:    resource.OperationStatusSuccess,
+			StatusMessage:      "BigQuery table updated successfully",
+			ResourceProperties: readPropsJSON,
 		},
 	}, nil
 }
