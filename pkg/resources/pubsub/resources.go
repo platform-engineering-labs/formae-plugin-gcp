@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -45,6 +47,12 @@ type PubSubProvisioner struct {
 	*base.BaseResource
 	style   createStyle
 	idParam string // query-param name for createPostQueryID style
+
+	// Update support. Pub/Sub PATCH wraps the resource under updateWrapper
+	// (e.g. "topic") alongside an "updateMask" body field. Empty updateWrapper
+	// means the resource is immutable (no Update).
+	updateWrapper string
+	mutableFields map[string]bool
 }
 
 func init() {
@@ -52,27 +60,18 @@ func init() {
 
 	err := pubsubRegistry.RegisterAll([]base.ResourceDefinition{
 		{
-			ResourceType: TopicResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "topics",
-				SupportsUpdate: false, // ponytail: labels/retention are updatable via PATCH+updateMask; defer until verified
-			},
+			ResourceType:       TopicResourceType,
+			ResourceConfig:     base.ResourceConfig{ResourceType: "topics"},
 			RequestTransformer: base.RequestTransformerFunc(stripName),
 		},
 		{
-			ResourceType: SubscriptionResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "subscriptions",
-				SupportsUpdate: false, // ponytail: PATCH+updateMask; defer until verified
-			},
+			ResourceType:       SubscriptionResourceType,
+			ResourceConfig:     base.ResourceConfig{ResourceType: "subscriptions"},
 			RequestTransformer: base.RequestTransformerFunc(stripName),
 		},
 		{
-			ResourceType: SchemaResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "schemas",
-				SupportsUpdate: false, // schemas are immutable
-			},
+			ResourceType:       SchemaResourceType,
+			ResourceConfig:     base.ResourceConfig{ResourceType: "schemas"}, // immutable
 			RequestTransformer: base.RequestTransformerFunc(stripName),
 		},
 	})
@@ -80,26 +79,41 @@ func init() {
 		panic(err)
 	}
 
-	// Override with PubSubProvisioner to handle the non-standard create paths.
-	styles := map[string]struct {
-		style   createStyle
-		idParam string
-	}{
-		TopicResourceType:        {createPut, ""},
-		SubscriptionResourceType: {createPut, ""},
-		SchemaResourceType:       {createPostQueryID, "schemaId"},
+	// Per-resource create/update conventions. Pub/Sub create uses PUT to the
+	// named resource (topics/subscriptions) or POST+?schemaId (schemas); update
+	// is a PATCH wrapping the resource under a singular key + updateMask.
+	type rconf struct {
+		style         createStyle
+		idParam       string
+		updateWrapper string          // "" => immutable
+		mutableFields map[string]bool // fields a PATCH may set
 	}
-	for rt, s := range styles {
-		resourceType, st := rt, s
+	configs := map[string]rconf{
+		TopicResourceType: {createPut, "", "topic", map[string]bool{
+			"labels": true, "messageRetentionDuration": true,
+		}},
+		SubscriptionResourceType: {createPut, "", "subscription", map[string]bool{
+			"ackDeadlineSeconds": true, "retainAckedMessages": true,
+			"messageRetentionDuration": true, "labels": true,
+		}},
+		SchemaResourceType: {createPostQueryID, "schemaId", "", nil},
+	}
+
+	for rt, c := range configs {
+		resourceType, rc := rt, c
+		ops := []resource.Operation{
+			resource.OperationCreate,
+			resource.OperationRead,
+			resource.OperationDelete,
+			resource.OperationList,
+			resource.OperationCheckStatus,
+		}
+		if rc.updateWrapper != "" {
+			ops = append(ops, resource.OperationUpdate)
+		}
 		registry.Register(
 			resourceType,
-			[]resource.Operation{
-				resource.OperationCreate,
-				resource.OperationRead,
-				resource.OperationDelete,
-				resource.OperationList,
-				resource.OperationCheckStatus,
-			},
+			ops,
 			func(cfg *config.Config) prov.Provisioner {
 				def := pubsubRegistry.Definitions[resourceType]
 				baseResource := &base.BaseResource{
@@ -110,7 +124,13 @@ func init() {
 					NativeIDConfig:     PubSubNativeID,
 					RequestTransformer: def.RequestTransformer,
 				}
-				return &PubSubProvisioner{BaseResource: baseResource, style: st.style, idParam: st.idParam}
+				return &PubSubProvisioner{
+					BaseResource:  baseResource,
+					style:         rc.style,
+					idParam:       rc.idParam,
+					updateWrapper: rc.updateWrapper,
+					mutableFields: rc.mutableFields,
+				}
 			},
 		)
 	}
@@ -198,6 +218,78 @@ func (p *PubSubProvisioner) Create(ctx context.Context, req *resource.CreateRequ
 			ResourceProperties: propsJSON,
 		},
 	}, nil
+}
+
+// Update overrides BaseResource.Update for Pub/Sub's PATCH convention: the
+// resource is wrapped under a singular key ("topic"/"subscription") alongside
+// an "updateMask" body field listing only the mutable fields being set.
+func (p *PubSubProvisioner) Update(ctx context.Context, req *resource.UpdateRequest) (*resource.UpdateResult, error) {
+	if p.updateWrapper == "" {
+		return updateFailure(req.NativeID, resource.OperationErrorCodeNotUpdatable,
+			fmt.Sprintf("%s does not support updates", p.ResourceConfig.ResourceType)), nil
+	}
+
+	client, err := transport.NewClient(ctx, p.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+
+	var props map[string]interface{}
+	if err := json.Unmarshal(req.DesiredProperties, &props); err != nil {
+		return updateFailure(req.NativeID, resource.OperationErrorCodeInvalidRequest,
+			fmt.Sprintf("failed to parse properties: %v", err)), nil
+	}
+
+	pathCtx, err := base.ParseNativeID(p.NativeIDConfig, req.NativeID)
+	if err != nil {
+		return updateFailure(req.NativeID, resource.OperationErrorCodeInvalidRequest,
+			fmt.Sprintf("invalid native ID: %v", err)), nil
+	}
+	pathCtx.ResourceType = p.ResourceConfig.ResourceType
+
+	// Keep only mutable fields; build the updateMask from exactly those.
+	resourceBody := make(map[string]interface{})
+	fields := make([]string, 0, len(props))
+	for k, v := range props {
+		if p.mutableFields[k] {
+			resourceBody[k] = v
+			fields = append(fields, k)
+		}
+	}
+	sort.Strings(fields)
+
+	body := map[string]interface{}{
+		p.updateWrapper: resourceBody,
+		"updateMask":    strings.Join(fields, ","),
+	}
+
+	url := base.NewURLBuilder(p.APIConfig, pathCtx).ResourceURL(pathCtx.ResourceName)
+	_, err = client.SendRequest(ctx, transport.RequestOptions{Method: "PATCH", URL: url, Body: body})
+	if err != nil {
+		transportErr := transport.WrapError(err, fmt.Sprintf("failed to update %s", req.ResourceType))
+		return updateFailure(req.NativeID, transport.ToResourceErrorCode(transportErr.Code), transportErr.Message), nil
+	}
+
+	return &resource.UpdateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationUpdate,
+			NativeID:        req.NativeID,
+			OperationStatus: resource.OperationStatusSuccess,
+			StatusMessage:   "Resource updated successfully",
+		},
+	}, nil
+}
+
+func updateFailure(nativeID string, code resource.OperationErrorCode, msg string) *resource.UpdateResult {
+	return &resource.UpdateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationUpdate,
+			OperationStatus: resource.OperationStatusFailure,
+			ErrorCode:       code,
+			StatusMessage:   msg,
+			NativeID:        nativeID,
+		},
+	}
 }
 
 func createFailure(code resource.OperationErrorCode, msg string) *resource.CreateResult {

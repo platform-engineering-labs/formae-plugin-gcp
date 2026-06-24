@@ -37,10 +37,11 @@ func init() {
 		{
 			ResourceType: SecretResourceType,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "secrets",
-				SupportsUpdate: false, // ponytail: labels updatable via PATCH+updateMask; defer until verified
+				ResourceType:       "secrets",
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true, // PATCH ?updateMask=<body fields>
 			},
-			RequestTransformer: base.RequestTransformerFunc(stripName),
+			RequestTransformer: base.RequestTransformerFunc(secretRequestTransformer),
 		},
 	})
 	if err != nil {
@@ -52,6 +53,7 @@ func init() {
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
+			resource.OperationUpdate,
 			resource.OperationDelete,
 			resource.OperationList,
 			resource.OperationCheckStatus,
@@ -71,12 +73,21 @@ func init() {
 	)
 }
 
-// stripName removes the "name" property from the request body; the short secret
-// ID is carried in the ?secretId query parameter.
-func stripName(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+// secretMutableFields are the fields a Secret PATCH may modify. replication and
+// name are createOnly and must not appear in an update body / updateMask.
+var secretMutableFields = map[string]bool{"labels": true}
+
+// secretRequestTransformer shapes the request body per operation:
+//   - Create: drop "name" (carried in ?secretId); keep replication + labels.
+//   - Update: keep only mutable fields so updateMask never names an immutable
+//     field (which Secret Manager would reject).
+func secretRequestTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
 	body := make(map[string]interface{}, len(props))
 	for k, v := range props {
 		if k == "name" {
+			continue
+		}
+		if ctx.Operation == resource.OperationUpdate && !secretMutableFields[k] {
 			continue
 		}
 		body[k] = v

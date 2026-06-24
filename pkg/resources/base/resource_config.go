@@ -43,6 +43,13 @@ type ResourceConfig struct {
 	// Example: map[string]string{"mostDisruptiveAllowedAction": "REFRESH"}
 	UpdateQueryParams map[string]string
 
+	// UpdateMaskFromBody, when true, appends an "updateMask" query parameter
+	// listing the top-level fields of the (transformed) request body, e.g.
+	// "?updateMask=labels,description". Required by many GCP PATCH endpoints
+	// (Secret Manager, DNS, ...) that use a query-param field mask. Computed
+	// from the body so a full-reconcile PATCH masks exactly the fields it sends.
+	UpdateMaskFromBody bool
+
 	// OptimisticLocking defines optimistic locking configuration
 	OptimisticLocking *OptimisticLockingConfig
 

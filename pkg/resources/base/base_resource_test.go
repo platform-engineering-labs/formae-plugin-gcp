@@ -296,3 +296,18 @@ func TestCompositeTransformer(t *testing.T) {
 	assert.NotContains(t, clusterData, "creationTimestamp")
 	assert.NotContains(t, clusterData, "selfLink")
 }
+
+func TestBuildUpdateMask(t *testing.T) {
+	t.Run("disabled returns empty", func(t *testing.T) {
+		assert.Equal(t, "", buildUpdateMask(false, map[string]interface{}{"labels": 1}))
+	})
+
+	t.Run("empty body returns empty", func(t *testing.T) {
+		assert.Equal(t, "", buildUpdateMask(true, map[string]interface{}{}))
+	})
+
+	t.Run("sorted comma-separated field list", func(t *testing.T) {
+		body := map[string]interface{}{"labels": 1, "ackDeadlineSeconds": 2, "description": 3}
+		assert.Equal(t, "ackDeadlineSeconds,description,labels", buildUpdateMask(true, body))
+	})
+}
