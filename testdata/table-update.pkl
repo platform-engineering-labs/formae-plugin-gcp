@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigquery/dataset.pkl"
+import "@gcp/bigquery/table_bigquery.pkl" as table
+import "./config/vars.pkl" as v
+
+local testDatasetId = "formae_plugin_sdk_test_\(v.testRunID)"
+
+forma {
+  v.stack
+  v.target
+
+  // Parent dataset for the table (unchanged)
+  new dataset.Dataset {
+    label = "plugin-sdk-test-dataset-for-table"
+    project = v.gcpProject
+    datasetId = testDatasetId
+    name = "Plugin SDK Test Dataset for Table"
+    description = "Test dataset for table conformance tests"
+    location = v.gcpRegion
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+
+  // Test table - mutable fields (name, description, labels) changed to exercise Update
+  new table.Table {
+    label = "plugin-sdk-test-table"
+    project = v.gcpProject
+    datasetId = testDatasetId                                        // Same (createOnly)
+    tableId = "formae_plugin_sdk_test_table_\(v.testRunID)"          // Same (createOnly identifier)
+    name = "Plugin SDK Test Table (updated)"                         // Changed (mutable)
+    description = "Updated table for plugin SDK conformance tests"   // Changed (mutable)
+    schema = new Listing {
+      new table.SchemaField {
+        name = "id"
+        type = "INTEGER"
+        mode = "REQUIRED"
+        description = "Unique identifier"
+      }
+      new table.SchemaField {
+        name = "name"
+        type = "STRING"
+        mode = "NULLABLE"
+        description = "Name field"
+      }
+      new table.SchemaField {
+        name = "created_at"
+        type = "TIMESTAMP"
+        mode = "NULLABLE"
+        description = "Creation timestamp"
+      }
+      new table.SchemaField {
+        name = "active"
+        type = "BOOLEAN"
+        mode = "NULLABLE"
+        description = "Active flag"
+      }
+    }
+    timePartitioning = new table.TimePartitioning {
+      type = "DAY"
+      field = "created_at"
+    }
+    labels = new Mapping {
+      ["environment"] = "production"   // Changed (mutable)
+      ["managed-by"] = "formae"
+    }
+  }
+}
