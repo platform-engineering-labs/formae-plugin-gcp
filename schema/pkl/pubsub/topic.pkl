@@ -1,0 +1,50 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Pub/Sub Topic
+///
+/// A named resource to which messages are sent by publishers.
+module gcp.pubsub.topic
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::PubSub::Topic"
+
+open class TopicResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: TopicResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Topic extends formae.Resource {
+    hidden parent = this
+
+    /// Short topic ID (e.g. "my-topic"). The API returns the full resource
+    /// path "projects/{project}/topics/{id}".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// How long to retain unacknowledged messages, e.g. "604800s".
+    @gcp.FieldHint
+    messageRetentionDuration: String?
+
+    hidden res: TopicResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
