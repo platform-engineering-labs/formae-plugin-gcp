@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/route.pkl"
+import "./config/vars.pkl" as v
+
+// Static route in the default network to the default internet gateway.
+forma {
+  v.stack
+  v.target
+
+  new route.Route {
+    label = "plugin-sdk-test-route"
+    name = "formae-plugin-sdk-test-route-\(v.testRunID)"
+    description = "Test route for plugin SDK conformance tests"
+    network = "projects/\(v.gcpProject)/global/networks/default"
+    destRange = "10.123.0.0/24"
+    priority = 1000
+    nextHopGateway = "projects/\(v.gcpProject)/global/gateways/default-internet-gateway"
+  }
+}

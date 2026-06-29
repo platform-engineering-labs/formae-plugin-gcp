@@ -1,0 +1,23 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/managedZone.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new managedZone.ManagedZone {
+    label = "plugin-sdk-test-managed-zone"
+    name = "formae-test-zone-\(v.testRunID)"
+    dnsName = "formae-test-\(v.testRunID).example.com."
+    description = "Test managed zone for plugin SDK conformance tests"
+    visibility = "public"
+  }
+}

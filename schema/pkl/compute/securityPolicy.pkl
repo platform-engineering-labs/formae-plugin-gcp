@@ -1,0 +1,92 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute SecurityPolicy (Cloud Armor)
+///
+/// A set of rules matching incoming requests to a backend service.
+module gcp.compute.securityPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::SecurityPolicy"
+
+typealias SecurityPolicyType = "CLOUD_ARMOR"|"CLOUD_ARMOR_EDGE"|"CLOUD_ARMOR_NETWORK"
+
+@gcp.SubResourceHint
+open class MatchConfig extends formae.SubResource {
+    @gcp.FieldHint
+    srcIpRanges: Listing<String>
+}
+
+@gcp.SubResourceHint
+open class Match extends formae.SubResource {
+    /// Predefined expression, e.g. "SRC_IPS_V1".
+    @gcp.FieldHint
+    versionedExpr: String?
+
+    @gcp.FieldHint
+    config: MatchConfig?
+}
+
+@gcp.SubResourceHint
+open class Rule extends formae.SubResource {
+    /// e.g. "allow" or "deny(403)".
+    @gcp.FieldHint
+    action: String
+
+    @gcp.FieldHint
+    priority: Int
+
+    @gcp.FieldHint
+    match: Match
+
+    @gcp.FieldHint
+    description: String?
+}
+
+open class SecurityPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden selfLink: SecurityPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: SecurityPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class SecurityPolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: SecurityPolicyType?
+
+    /// Rules evaluated in priority order. A default rule (priority
+    /// 2147483647) must be present.
+    @gcp.FieldHint
+    rules: Listing<Rule>?
+
+    hidden res: SecurityPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

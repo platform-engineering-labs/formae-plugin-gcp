@@ -16,14 +16,16 @@ import (
 
 // Resource type constants
 const (
-	AddressResourceType    = "GCP::Compute::Address"
-	DiskResourceType       = "GCP::Compute::Disk"
-	FirewallResourceType   = "GCP::Compute::Firewall"
-	InstanceResourceType   = "GCP::Compute::Instance"
-	NetworkResourceType    = "GCP::Compute::Network"
-	RouterResourceType     = "GCP::Compute::Router"
-	RouterNatResourceType  = "GCP::Compute::RouterNat"
-	SubnetworkResourceType = "GCP::Compute::Subnetwork"
+	AddressResourceType        = "GCP::Compute::Address"
+	DiskResourceType           = "GCP::Compute::Disk"
+	FirewallResourceType       = "GCP::Compute::Firewall"
+	InstanceResourceType       = "GCP::Compute::Instance"
+	NetworkResourceType        = "GCP::Compute::Network"
+	RouterResourceType         = "GCP::Compute::Router"
+	RouterNatResourceType      = "GCP::Compute::RouterNat"
+	SubnetworkResourceType     = "GCP::Compute::Subnetwork"
+	RouteResourceType          = "GCP::Compute::Route"
+	SecurityPolicyResourceType = "GCP::Compute::SecurityPolicy"
 
 	// Load Balancer - Global resources
 	GlobalAddressResourceType        = "GCP::Compute::GlobalAddress"
@@ -198,6 +200,37 @@ func init() {
 					Type: base.ScopeGlobal,
 				},
 				SupportsUpdate:    false, // Addresses are immutable
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: nil,
+		},
+
+		// Route - Global static custom routes within a VPC network
+		{
+			ResourceType: RouteResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "routes",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeGlobal,
+				},
+				SupportsUpdate:    false, // Routes are immutable
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: nil,
+		},
+
+		// Security Policy - Cloud Armor global security policy
+		{
+			ResourceType: SecurityPolicyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "securityPolicies",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeGlobal,
+				},
+				// ponytail: update needs fingerprint optimistic locking; defer until verified
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
