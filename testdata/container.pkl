@@ -22,6 +22,16 @@ forma {
     network = "default"
     subnetwork = "default"
     initialNodeCount = 1
+    // VPC-native + private nodes: the project's compute.vmExternalIpAccess org
+    // policy blocks external IPs on nodes, so nodes must be private.
+    ipAllocationPolicy = new cluster.IPAllocationPolicy {
+      useIpAliases = true
+    }
+    privateClusterConfig = new cluster.PrivateClusterConfig {
+      enablePrivateNodes = true
+      enablePrivateEndpoint = false
+      masterIpv4CidrBlock = "172.16.0.0/28"
+    }
   }
 
   v.stack
