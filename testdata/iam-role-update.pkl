@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/iam/role.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new role.Role {
+    label = "plugin-sdk-test-role"
+    name = "formae_sdk_test_role_\(v.testRunID)"   // Same (createOnly)
+    title = "Formae SDK Test Role (updated)"        // Changed (mutable)
+    description = "Updated custom role for plugin SDK conformance tests"  // Changed
+    includedPermissions = new Listing {             // Changed (mutable)
+      "resourcemanager.projects.get"
+      "resourcemanager.projects.list"
+    }
+    stage = "BETA"   // Changed (mutable)
+  }
+}
