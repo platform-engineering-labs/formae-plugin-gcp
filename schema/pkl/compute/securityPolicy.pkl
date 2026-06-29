@@ -46,6 +46,18 @@ open class Rule extends formae.SubResource {
 
     @gcp.FieldHint
     description: String?
+
+    /// Whether the rule is in preview (server-defaulted to false).
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    preview: Boolean?
+
+    /// Server-set type tag (e.g. "compute#securityPolicyRule").
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    kind: String?
 }
 
 open class SecurityPolicyResolvable extends formae.Resolvable {

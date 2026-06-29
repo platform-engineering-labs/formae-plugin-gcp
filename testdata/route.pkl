@@ -18,9 +18,10 @@ forma {
     label = "plugin-sdk-test-route"
     name = "formae-plugin-sdk-test-route-\(v.testRunID)"
     description = "Test route for plugin SDK conformance tests"
-    network = "projects/\(v.gcpProject)/global/networks/default"
+    // Full self-link URLs - the Compute API canonicalizes refs to this form.
+    network = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
     destRange = "10.123.0.0/24"
     priority = 1000
-    nextHopGateway = "projects/\(v.gcpProject)/global/gateways/default-internet-gateway"
+    nextHopGateway = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/gateways/default-internet-gateway"
   }
 }
