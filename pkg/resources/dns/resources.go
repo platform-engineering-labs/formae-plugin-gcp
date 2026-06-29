@@ -25,6 +25,7 @@ func init() {
 				ResourceType:   "managedZones",
 				SupportsUpdate: false, // ponytail: description/labels are patchable; defer until verified
 			},
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 	})
 	if err != nil {

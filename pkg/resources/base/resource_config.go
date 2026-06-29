@@ -56,6 +56,11 @@ type ResourceConfig struct {
 	// RequestWrapper wraps the request body in a field (e.g., "cluster", "nodePool")
 	// Used by Container API which requires {"cluster": {...}} instead of {...}
 	RequestWrapper string
+
+	// ListItemsKey overrides the JSON key holding the array of items in a List
+	// response. Defaults to trying "items" then the resource type. Set when the
+	// API uses a different key (e.g. IAM serviceAccounts.list -> "accounts").
+	ListItemsKey string
 }
 
 // ScopeConfig defines how a resource is scoped

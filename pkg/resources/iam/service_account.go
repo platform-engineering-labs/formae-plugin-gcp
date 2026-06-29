@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -47,13 +48,27 @@ func init() {
 func newServiceAccountProvisioner(cfg *config.Config) prov.Provisioner {
 	return &ServiceAccountProvisioner{
 		BaseResource: &base.BaseResource{
-			Config:          cfg,
-			APIConfig:       IAMAPI,
-			OperationConfig: IAMOperations,
-			ResourceConfig:  base.ResourceConfig{ResourceType: "serviceAccounts", SupportsUpdate: false},
-			NativeIDConfig:  IAMNativeID,
+			Config:              cfg,
+			APIConfig:           IAMAPI,
+			OperationConfig:     IAMOperations,
+			ResourceConfig:      base.ResourceConfig{ResourceType: "serviceAccounts", SupportsUpdate: false, ListItemsKey: "accounts"},
+			NativeIDConfig:      IAMNativeID,
+			ResponseTransformer: base.ResponseTransformerFunc(serviceAccountResponseTransformer),
 		},
 	}
+}
+
+// serviceAccountResponseTransformer normalizes the "name" property to the
+// declared accountId. The API returns name="projects/{p}/serviceAccounts/{email}"
+// and email="{accountId}@{project}.iam.gserviceaccount.com"; the accountId is the
+// local part of the email.
+func serviceAccountResponseTransformer(apiResponse map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	if email, ok := apiResponse["email"].(string); ok {
+		if at := strings.Index(email, "@"); at > 0 {
+			apiResponse["name"] = email[:at]
+		}
+	}
+	return apiResponse
 }
 
 // Create POSTs to the collection with {"accountId": <name>, "serviceAccount": {...}}.
@@ -93,6 +108,11 @@ func (p *ServiceAccountProvisioner) Create(ctx context.Context, req *resource.Cr
 	}
 
 	nativeID := extractIAMNativeID(response.Body, pathCtx)
-	propsJSON, _ := json.Marshal(response.Body)
+	respBody := p.ResponseTransformer.Transform(response.Body, base.TransformContext{
+		Project:      pathCtx.Project,
+		ResourceType: pathCtx.ResourceType,
+		Operation:    resource.OperationCreate,
+	})
+	propsJSON, _ := json.Marshal(respBody)
 	return createSuccess(nativeID, propsJSON), nil
 }

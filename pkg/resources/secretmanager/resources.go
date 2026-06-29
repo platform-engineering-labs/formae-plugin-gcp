@@ -41,7 +41,8 @@ func init() {
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true, // PATCH ?updateMask=<body fields>
 			},
-			RequestTransformer: base.RequestTransformerFunc(secretRequestTransformer),
+			RequestTransformer:  base.RequestTransformerFunc(secretRequestTransformer),
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 	})
 	if err != nil {
@@ -61,12 +62,13 @@ func init() {
 		func(cfg *config.Config) prov.Provisioner {
 			def := secretManagerRegistry.Definitions[SecretResourceType]
 			baseResource := &base.BaseResource{
-				Config:             cfg,
-				APIConfig:          SecretManagerAPI,
-				OperationConfig:    SecretManagerOperations,
-				ResourceConfig:     def.ResourceConfig,
-				NativeIDConfig:     SecretManagerNativeID,
-				RequestTransformer: def.RequestTransformer,
+				Config:              cfg,
+				APIConfig:           SecretManagerAPI,
+				OperationConfig:     SecretManagerOperations,
+				ResourceConfig:      def.ResourceConfig,
+				NativeIDConfig:      SecretManagerNativeID,
+				RequestTransformer:  def.RequestTransformer,
+				ResponseTransformer: def.ResponseTransformer,
 			}
 			return &SecretProvisioner{BaseResource: baseResource}
 		},
@@ -92,6 +94,22 @@ func secretRequestTransformer(props map[string]interface{}, ctx base.TransformCo
 		}
 		body[k] = v
 	}
+
+	// On create, the API requires a replication policy. An empty automatic{}
+	// marker can be pruned before it reaches the plugin, so re-assert it.
+	if ctx.Operation != resource.OperationUpdate {
+		repl, _ := body["replication"].(map[string]interface{})
+		if repl == nil {
+			repl = map[string]interface{}{}
+		}
+		_, hasAuto := repl["automatic"]
+		_, hasUM := repl["userManaged"]
+		if !hasAuto && !hasUM {
+			repl["automatic"] = map[string]interface{}{}
+		}
+		body["replication"] = repl
+	}
+
 	return body, nil
 }
 
@@ -144,7 +162,15 @@ func (p *SecretProvisioner) Create(ctx context.Context, req *resource.CreateRequ
 	}
 
 	nativeID := p.OperationConfig.NativeIDExtractor(response.Body, pathCtx)
-	propsJSON, _ := json.Marshal(response.Body)
+	respBody := response.Body
+	if p.ResponseTransformer != nil {
+		respBody = p.ResponseTransformer.Transform(respBody, base.TransformContext{
+			Project:      pathCtx.Project,
+			ResourceType: pathCtx.ResourceType,
+			Operation:    resource.OperationCreate,
+		})
+	}
+	propsJSON, _ := json.Marshal(respBody)
 
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{

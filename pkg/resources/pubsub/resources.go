@@ -60,19 +60,22 @@ func init() {
 
 	err := pubsubRegistry.RegisterAll([]base.ResourceDefinition{
 		{
-			ResourceType:       TopicResourceType,
-			ResourceConfig:     base.ResourceConfig{ResourceType: "topics"},
-			RequestTransformer: base.RequestTransformerFunc(stripName),
+			ResourceType:        TopicResourceType,
+			ResourceConfig:      base.ResourceConfig{ResourceType: "topics"},
+			RequestTransformer:  base.RequestTransformerFunc(stripName),
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 		{
-			ResourceType:       SubscriptionResourceType,
-			ResourceConfig:     base.ResourceConfig{ResourceType: "subscriptions"},
-			RequestTransformer: base.RequestTransformerFunc(stripName),
+			ResourceType:        SubscriptionResourceType,
+			ResourceConfig:      base.ResourceConfig{ResourceType: "subscriptions"},
+			RequestTransformer:  base.RequestTransformerFunc(subscriptionCreateTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(subscriptionResponseTransformer),
 		},
 		{
-			ResourceType:       SchemaResourceType,
-			ResourceConfig:     base.ResourceConfig{ResourceType: "schemas"}, // immutable
-			RequestTransformer: base.RequestTransformerFunc(stripName),
+			ResourceType:        SchemaResourceType,
+			ResourceConfig:      base.ResourceConfig{ResourceType: "schemas"}, // immutable
+			RequestTransformer:  base.RequestTransformerFunc(stripName),
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 	})
 	if err != nil {
@@ -117,12 +120,13 @@ func init() {
 			func(cfg *config.Config) prov.Provisioner {
 				def := pubsubRegistry.Definitions[resourceType]
 				baseResource := &base.BaseResource{
-					Config:             cfg,
-					APIConfig:          PubSubAPI,
-					OperationConfig:    PubSubOperations,
-					ResourceConfig:     def.ResourceConfig,
-					NativeIDConfig:     PubSubNativeID,
-					RequestTransformer: def.RequestTransformer,
+					Config:              cfg,
+					APIConfig:           PubSubAPI,
+					OperationConfig:     PubSubOperations,
+					ResourceConfig:      def.ResourceConfig,
+					NativeIDConfig:      PubSubNativeID,
+					RequestTransformer:  def.RequestTransformer,
+					ResponseTransformer: def.ResponseTransformer,
 				}
 				return &PubSubProvisioner{
 					BaseResource:  baseResource,
@@ -148,6 +152,32 @@ func stripName(props map[string]interface{}, _ base.TransformContext) (map[strin
 		body[k] = v
 	}
 	return body, nil
+}
+
+// subscriptionCreateTransformer drops "name" and expands "topic" to the full
+// resource path the API requires (the schema/refs carry the short topic name).
+func subscriptionCreateTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body, _ := stripName(props, ctx)
+	if topic, ok := body["topic"].(string); ok && topic != "" && !strings.HasPrefix(topic, "projects/") {
+		body["topic"] = fmt.Sprintf("projects/%s/topics/%s", ctx.Project, topic)
+	}
+	return body, nil
+}
+
+// subscriptionResponseTransformer normalizes the full-path "name" and "topic"
+// fields back to their short forms so stored state matches declared state.
+func subscriptionResponseTransformer(apiResponse map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	shortenField(apiResponse, "name")
+	shortenField(apiResponse, "topic")
+	return apiResponse
+}
+
+func shortenField(m map[string]interface{}, key string) {
+	if v, ok := m[key].(string); ok {
+		if i := strings.LastIndex(v, "/"); i >= 0 {
+			m[key] = v[i+1:]
+		}
+	}
 }
 
 // Create overrides BaseResource.Create for Pub/Sub's PUT / POST?id conventions.
@@ -206,8 +236,18 @@ func (p *PubSubProvisioner) Create(ctx context.Context, req *resource.CreateRequ
 		return createFailure(transport.ToResourceErrorCode(transportErr.Code), transportErr.Message), nil
 	}
 
+	// Native ID is the full resource path - compute it before the response
+	// transformer shortens "name".
 	nativeID := p.OperationConfig.NativeIDExtractor(response.Body, pathCtx)
-	propsJSON, _ := json.Marshal(response.Body)
+	respBody := response.Body
+	if p.ResponseTransformer != nil {
+		respBody = p.ResponseTransformer.Transform(respBody, base.TransformContext{
+			Project:      pathCtx.Project,
+			ResourceType: pathCtx.ResourceType,
+			Operation:    resource.OperationCreate,
+		})
+	}
+	propsJSON, _ := json.Marshal(respBody)
 
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{

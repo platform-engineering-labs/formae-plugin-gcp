@@ -195,3 +195,17 @@ func (t *ProjectResponseTransformer) Transform(apiResponse map[string]interface{
 
 // AddProjectResponseTransformer is a convenience instance of ProjectResponseTransformer
 var AddProjectResponseTransformer = &ProjectResponseTransformer{}
+
+// ShortNameResponseTransformer rewrites a full-path "name" field
+// (e.g. "projects/p/topics/my-topic") to its last segment ("my-topic"). Many
+// GCP APIs (Pub/Sub, Secret Manager, DNS, IAM) echo the full resource path in
+// "name", but users declare - and reconcile against - the short identifier.
+// No-op when name is absent or already short.
+var ShortNameResponseTransformer = ResponseTransformerFunc(func(apiResponse map[string]interface{}, _ TransformContext) map[string]interface{} {
+	if name, ok := apiResponse["name"].(string); ok {
+		if i := strings.LastIndex(name, "/"); i >= 0 {
+			apiResponse["name"] = name[i+1:]
+		}
+	}
+	return apiResponse
+})

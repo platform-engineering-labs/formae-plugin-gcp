@@ -49,7 +49,10 @@ open class Subscription extends formae.Resource {
     @gcp.FieldHint
     retainAckedMessages: Boolean?
 
-    @gcp.FieldHint
+    /// Defaults to 604800s (7 days) server-side when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     messageRetentionDuration: String?
 
     @gcp.FieldHint

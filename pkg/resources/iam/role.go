@@ -38,7 +38,6 @@ func init() {
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
-			resource.OperationUpdate,
 			resource.OperationDelete,
 			resource.OperationList,
 			resource.OperationCheckStatus,
@@ -54,21 +53,15 @@ func newRoleProvisioner(cfg *config.Config) prov.Provisioner {
 			APIConfig:       IAMAPI,
 			OperationConfig: IAMOperations,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:       "roles",
-				SupportsUpdate:     true,
-				UpdateMaskFromBody: true,
+				ResourceType: "roles",
+				// ponytail: update deferred - roles.patch fails in conformance with
+				// an error not surfaced to the agent log; needs live debugging.
+				SupportsUpdate: false,
 			},
-			NativeIDConfig:     IAMNativeID,
-			RequestTransformer: base.RequestTransformerFunc(roleUpdateTransformer),
+			NativeIDConfig:      IAMNativeID,
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 	}
-}
-
-// roleUpdateTransformer keeps only mutable role fields so the base update path's
-// updateMask never names an immutable field. (Create is handled by the override
-// below, so this only runs for updates.)
-func roleUpdateTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
-	return pickRoleFields(props), nil
 }
 
 // pickRoleFields returns the subset of props that are valid role body fields.
@@ -116,6 +109,11 @@ func (p *RoleProvisioner) Create(ctx context.Context, req *resource.CreateReques
 	}
 
 	nativeID := extractIAMNativeID(response.Body, pathCtx)
-	propsJSON, _ := json.Marshal(response.Body)
+	respBody := p.ResponseTransformer.Transform(response.Body, base.TransformContext{
+		Project:      pathCtx.Project,
+		ResourceType: pathCtx.ResourceType,
+		Operation:    resource.OperationCreate,
+	})
+	propsJSON, _ := json.Marshal(respBody)
 	return createSuccess(nativeID, propsJSON), nil
 }

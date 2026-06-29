@@ -11,9 +11,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // buildUpdateMask returns a comma-separated, sorted list of the body's top-level
@@ -433,6 +433,17 @@ func (b *BaseResource) parseListResponse(
 			if itemMap, ok := item.(map[string]interface{}); ok {
 				if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
 					nativeIDs = append(nativeIDs, nativeID)
+				}
+			}
+		}
+	} else if key := b.ResourceConfig.ListItemsKey; key != "" {
+		// Try the configured items key (e.g. IAM serviceAccounts.list -> "accounts")
+		if items, ok := responseBody[key].([]interface{}); ok {
+			for _, item := range items {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
+						nativeIDs = append(nativeIDs, nativeID)
+					}
 				}
 			}
 		}
