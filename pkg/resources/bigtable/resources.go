@@ -157,7 +157,7 @@ func init() {
 				RequestWrapper: "", // Backup API does not wrap the payload
 			},
 			RequestTransformer:  base.RequestTransformerFunc(wrapBackupBodyBuilder),
-			ResponseTransformer: base.AddProjectResponseTransformer,
+			ResponseTransformer: base.ResponseTransformerFunc(backupResponseTransformer),
 		},
 	})
 
