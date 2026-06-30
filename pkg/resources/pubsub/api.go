@@ -16,6 +16,8 @@ var PubSubAPI = base.APIConfig{
 	BaseURL:     "https://pubsub.googleapis.com/v1",
 	APIVersion:  "v1",
 	PathBuilder: pubsubPathBuilder,
+	// Pub/Sub uses pageSize and rejects the Compute-style "maxResults" with 400.
+	Pagination: &base.PaginationConfig{PageSizeParam: "pageSize", PageTokenParam: "pageToken"},
 }
 
 // PubSubOperations - Pub/Sub admin operations are synchronous (no LRO).

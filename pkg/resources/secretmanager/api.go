@@ -16,6 +16,8 @@ var SecretManagerAPI = base.APIConfig{
 	BaseURL:     "https://secretmanager.googleapis.com/v1",
 	APIVersion:  "v1",
 	PathBuilder: secretManagerPathBuilder,
+	// Secret Manager uses pageSize and rejects "maxResults" with 400.
+	Pagination: &base.PaginationConfig{PageSizeParam: "pageSize", PageTokenParam: "pageToken"},
 }
 
 // SecretManagerOperations - Secret Manager admin operations are synchronous.

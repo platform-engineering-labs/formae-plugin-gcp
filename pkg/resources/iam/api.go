@@ -16,6 +16,8 @@ var IAMAPI = base.APIConfig{
 	BaseURL:     "https://iam.googleapis.com/v1",
 	APIVersion:  "v1",
 	PathBuilder: iamPathBuilder,
+	// IAM uses pageSize and rejects "maxResults" with 400.
+	Pagination: &base.PaginationConfig{PageSizeParam: "pageSize", PageTokenParam: "pageToken"},
 }
 
 // IAMOperations - IAM admin operations are synchronous.
