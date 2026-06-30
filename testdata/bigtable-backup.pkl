@@ -1,0 +1,61 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/table.pkl" as btTable
+import "@gcp/bigtable/backup.pkl" as backup
+import "./config/vars.pkl" as v
+
+// Backups require a PRODUCTION instance and live in a cluster, taken from an
+// existing table. Resolvable refs (inst.res.name / tbl.res.name) make formae
+// order instance -> table -> backup and feed the correct values (the instance
+// stores its short name; the table stores its full path = backup.sourceTable).
+forma {
+  local inst = new instance.Instance {
+    label = "plugin-sdk-test-backup-instance"
+    project = v.gcpProject
+    name = "formae-test-instance-bkp-\(v.testRunID)"
+    displayName = "Plugin SDK Backup Test Instance"
+    type = "PRODUCTION"
+    clusters = new Mapping {
+      ["cluster1"] = new instance.ClusterConfig {
+        location = "\(v.gcpRegion)-a"
+        defaultStorageType = "SSD"
+        serveNodes = 1
+      }
+    }
+  }
+
+  local tbl = new btTable.Table {
+    label = "plugin-sdk-test-backup-table"
+    project = v.gcpProject
+    instance = inst.res.name
+    name = "formae-test-bkp-table-\(v.testRunID)"
+    columnFamilies = new Mapping {
+      ["cf1"] = new btTable.ColumnFamily {
+        name = "cf1"
+      }
+    }
+  }
+
+  v.stack
+  v.target
+
+  inst
+  tbl
+
+  new backup.Backup {
+    label = "plugin-sdk-test-backup"
+    project = v.gcpProject
+    instance = inst.res.name
+    cluster = "cluster1"
+    name = "formae-test-backup-\(v.testRunID)"
+    sourceTable = tbl.res.name
+    expireTime = "2030-01-01T00:00:00Z"
+  }
+}

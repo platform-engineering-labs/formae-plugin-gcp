@@ -72,10 +72,12 @@ open class Table extends formae.Resource {
     }
     project: String
 
+    /// Parent instance short ID. Reference Instance.res.name so formae orders
+    /// the instance before the table.
     @gcp.FieldHint {
         createOnly = true
     }
-    instance: String
+    instance: (String|formae.Resolvable)
 
     @gcp.FieldHint {
         createOnly = true

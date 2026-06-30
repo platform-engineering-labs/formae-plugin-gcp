@@ -19,6 +19,7 @@ const (
 	InstanceResourceType = "GCP::Bigtable::Instance"
 	ClusterResourceType  = "GCP::Bigtable::Cluster"
 	TableResourceType    = "GCP::Bigtable::Table"
+	BackupResourceType   = "GCP::Bigtable::Backup"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -60,6 +61,10 @@ func wrapClusterBodyBuilder(props map[string]interface{}, ctx base.TransformCont
 
 func wrapTableBodyBuilder(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
 	return tableBodyBuilder(props)
+}
+
+func wrapBackupBodyBuilder(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	return backupBodyBuilder(props)
 }
 
 func init() {
@@ -131,6 +136,29 @@ func init() {
 			RequestTransformer:  base.RequestTransformerFunc(wrapTableBodyBuilder),
 			ResponseTransformer: base.AddProjectResponseTransformer,
 		},
+		{
+			ResourceType: BackupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "backups",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				// ponytail: expireTime is updatable via PATCH, but leaving update
+				// off until a conformance test exercises the path against live GCP.
+				SupportsUpdate: false,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       false,
+					FieldName:     "",
+					LocationInURL: false,
+				},
+				RequestWrapper: "", // Backup API does not wrap the payload
+			},
+			RequestTransformer:  base.RequestTransformerFunc(wrapBackupBodyBuilder),
+			ResponseTransformer: base.ResponseTransformerFunc(backupResponseTransformer),
+		},
 	})
 
 	if err != nil {
@@ -139,7 +167,7 @@ func init() {
 
 	// Override registrations with BigtableProvisioner for proper Create handling
 	// BigtableProvisioner adds the required instance_id/cluster_id/table_id query parameters
-	bigtableResourceTypes := []string{InstanceResourceType, ClusterResourceType, TableResourceType}
+	bigtableResourceTypes := []string{InstanceResourceType, ClusterResourceType, TableResourceType, BackupResourceType}
 	for _, rt := range bigtableResourceTypes {
 		resourceType := rt // capture by value for closure
 		registry.Register(

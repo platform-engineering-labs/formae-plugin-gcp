@@ -52,10 +52,12 @@ open class Backup extends formae.Resource {
     }
     project: String
 
+    /// Parent instance short ID. Reference Instance.res.name so formae orders
+    /// the instance before the backup.
     @gcp.FieldHint {
         createOnly = true
     }
-    instance: String
+    instance: (String|formae.Resolvable)
 
     @gcp.FieldHint {
         createOnly = true
@@ -67,10 +69,13 @@ open class Backup extends formae.Resource {
     }
     name: String
 
+    /// Full source-table path. Reference Table.res.name (the API returns the
+    /// full path) so formae orders the table before the backup and the value
+    /// matches what the API echoes.
     @gcp.FieldHint {
         createOnly = true
     }
-    sourceTable: String
+    sourceTable: (String|formae.Resolvable)
 
     @gcp.FieldHint
     expireTime: String
