@@ -814,18 +814,13 @@ open class Cluster extends formae.Resource {
 
     monitoringService: String?
 
-    // Reference network/subnet by selfLink (server-generated) so formae creates
-    // them before the cluster; the API echoes the short name, so mark
-    // provider-default to avoid a selfLink-vs-name Verify mismatch.
     @gcp.FieldHint {
         createOnly = true
-        hasProviderDefault = true
     }
     network: String|formae.Resolvable
 
     @gcp.FieldHint {
         createOnly = true
-        hasProviderDefault = true
     }
     subnetwork: String|formae.Resolvable
 

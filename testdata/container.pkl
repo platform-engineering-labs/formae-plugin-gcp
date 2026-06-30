@@ -60,10 +60,12 @@ forma {
     label = "plugin-sdk-test-cluster"
     name = "formae-plugin-sdk-test-cluster-\(v.testRunID)"
     location = v.gcpZone
-    // selfLink (server-generated) forces formae to finish creating the subnet
-    // before the cluster - using the short name raced and GKE saw "subnet not found".
-    network = net.res.selfLink
-    subnetwork = subnet.res.selfLink
+    // GKE wants the network/subnet by name (rejects the https selfLink form).
+    // NOTE: still WIP - cluster control plane comes up but node provisioning
+    // hits a transient "subnetwork not found" race; needs subnet-propagation
+    // handling (provisioner retry or a formae ordering edge), not a fixture tweak.
+    network = net.res.name
+    subnetwork = subnet.res.name
     initialNodeCount = 1
     ipAllocationPolicy = new cluster.IPAllocationPolicy {
       useIpAliases = true
