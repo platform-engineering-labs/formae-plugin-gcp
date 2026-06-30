@@ -60,8 +60,10 @@ forma {
     label = "plugin-sdk-test-cluster"
     name = "formae-plugin-sdk-test-cluster-\(v.testRunID)"
     location = v.gcpZone
-    network = net.res.name
-    subnetwork = subnet.res.name
+    // selfLink (server-generated) forces formae to finish creating the subnet
+    // before the cluster - using the short name raced and GKE saw "subnet not found".
+    network = net.res.selfLink
+    subnetwork = subnet.res.selfLink
     initialNodeCount = 1
     ipAllocationPolicy = new cluster.IPAllocationPolicy {
       useIpAliases = true
