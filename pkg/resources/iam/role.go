@@ -75,6 +75,23 @@ func pickRoleFields(props map[string]interface{}) map[string]interface{} {
 	return body
 }
 
+// Read treats a soft-deleted custom role as gone. roles.delete only marks the
+// role deleted (recoverable ~7 days) and roles.get keeps returning it with
+// deleted=true, which would otherwise make formae believe it still exists.
+func (p *RoleProvisioner) Read(ctx context.Context, req *resource.ReadRequest) (*resource.ReadResult, error) {
+	res, err := p.BaseResource.Read(ctx, req)
+	if err != nil || res == nil || res.Properties == "" {
+		return res, err
+	}
+	var props map[string]interface{}
+	if json.Unmarshal([]byte(res.Properties), &props) == nil {
+		if deleted, ok := props["deleted"].(bool); ok && deleted {
+			return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
+		}
+	}
+	return res, nil
+}
+
 // Create POSTs to the collection with ?roleId=<name> and {"role": {...}}.
 func (p *RoleProvisioner) Create(ctx context.Context, req *resource.CreateRequest) (*resource.CreateResult, error) {
 	client, err := transport.NewClient(ctx, p.Config)
