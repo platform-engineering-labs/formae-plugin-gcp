@@ -375,6 +375,7 @@ open class RegionUrlMap extends formae.Resource {
     headerAction: HeaderAction?
 
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     fingerprint: String?
 
