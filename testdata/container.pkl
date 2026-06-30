@@ -6,26 +6,67 @@
 
 amends "@formae/forma.pkl"
 
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
 import "@gcp/container/cluster.pkl"
 import "@gcp/container/nodepool.pkl"
 import "./config/vars.pkl" as v
 
-// Zonal GKE cluster on the default network. Using the default network/subnet
-// avoids the secondary-range (IP-alias) setup a custom VPC would require for a
-// minimal cluster. A separate node pool is created against it to exercise
-// NodePool CRUD. NOTE: GKE clusters are slow (10-15 min) - run with TIMEOUT=20.
+// Self-contained GKE fixture. The project's compute.vmExternalIpAccess org
+// policy forbids external IPs on nodes, so the cluster must use private nodes.
+// Private nodes need egress to pull images: privateIpGoogleAccess=true on the
+// subnet gives them Google-API access (Artifact Registry/GCR) without Cloud NAT.
+// VPC-native (IP aliasing) needs named pod/service secondary ranges on the
+// subnet. Resolvable refs order network -> subnet -> cluster -> nodepool.
+// NOTE: GKE is slow (~10-15 min) - run with TIMEOUT=25.
 forma {
+  local net = new network.Network {
+    label = "plugin-sdk-test-gke-network"
+    name = "formae-plugin-sdk-test-gke-net-\(v.testRunID)"
+    description = "GKE test VPC"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "REGIONAL"
+    }
+  }
+
+  local subnet = new subnetwork.Subnetwork {
+    label = "plugin-sdk-test-gke-subnet"
+    name = "formae-plugin-sdk-test-gke-subnet-\(v.testRunID)"
+    description = "GKE test subnet (VPC-native, private google access)"
+    network = net.res.selfLink
+    ipCidrRange = "10.40.0.0/24"
+    region = v.gcpRegion
+    privateIpGoogleAccess = true
+    secondaryIpRanges = new Listing {
+      new subnetwork.SecondaryIpRange {
+        rangeName = "gke-pods"
+        ipCidrRange = "10.41.0.0/16"
+      }
+      new subnetwork.SecondaryIpRange {
+        rangeName = "gke-services"
+        ipCidrRange = "10.42.0.0/20"
+      }
+    }
+  }
+
+  v.stack
+  v.target
+
+  net
+  subnet
+
   local gke = new cluster.Cluster {
     label = "plugin-sdk-test-cluster"
     name = "formae-plugin-sdk-test-cluster-\(v.testRunID)"
     location = v.gcpZone
-    network = "default"
-    subnetwork = "default"
+    network = net.res.name
+    subnetwork = subnet.res.name
     initialNodeCount = 1
-    // VPC-native + private nodes: the project's compute.vmExternalIpAccess org
-    // policy blocks external IPs on nodes, so nodes must be private.
     ipAllocationPolicy = new cluster.IPAllocationPolicy {
       useIpAliases = true
+      clusterSecondaryRangeName = "gke-pods"
+      servicesSecondaryRangeName = "gke-services"
     }
     privateClusterConfig = new cluster.PrivateClusterConfig {
       enablePrivateNodes = true
@@ -33,9 +74,6 @@ forma {
       masterIpv4CidrBlock = "172.16.0.0/28"
     }
   }
-
-  v.stack
-  v.target
 
   gke
 
