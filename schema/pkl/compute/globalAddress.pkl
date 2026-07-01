@@ -58,6 +58,7 @@ open class GlobalAddress extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     address: String?
 
@@ -88,10 +89,12 @@ open class GlobalAddress extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     networkTier: NetworkTier?
 
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     status: String?
 

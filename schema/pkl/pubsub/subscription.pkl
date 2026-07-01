@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Pub/Sub Subscription
+///
+/// A named resource representing the stream of messages from a single topic,
+/// to be delivered to the subscribing application.
+module gcp.pubsub.subscription
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::PubSub::Subscription"
+
+open class SubscriptionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SubscriptionResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Subscription extends formae.Resource {
+    hidden parent = this
+
+    /// Short subscription ID (e.g. "my-sub").
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The topic to subscribe to, as a full path
+    /// "projects/{project}/topics/{topic}" or a Topic resolvable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    topic: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    ackDeadlineSeconds: Int?
+
+    @gcp.FieldHint
+    retainAckedMessages: Boolean?
+
+    /// Defaults to 604800s (7 days) server-side when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    messageRetentionDuration: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: SubscriptionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

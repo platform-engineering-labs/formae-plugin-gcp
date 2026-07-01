@@ -1,0 +1,55 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Pub/Sub Schema
+///
+/// A schema resource describing the structure of Pub/Sub messages.
+module gcp.pubsub.schema
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::PubSub::Schema"
+
+typealias SchemaType = "AVRO"|"PROTOCOL_BUFFER"
+
+open class SchemaResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SchemaResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Schema extends formae.Resource {
+    hidden parent = this
+
+    /// Short schema ID (e.g. "my-schema"). Schemas are immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: SchemaType
+
+    /// The definition of the schema (Avro JSON or Protobuf text).
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    definition: String
+
+    hidden res: SchemaResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

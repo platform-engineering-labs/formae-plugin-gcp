@@ -43,12 +43,24 @@ type ResourceConfig struct {
 	// Example: map[string]string{"mostDisruptiveAllowedAction": "REFRESH"}
 	UpdateQueryParams map[string]string
 
+	// UpdateMaskFromBody, when true, appends an "updateMask" query parameter
+	// listing the top-level fields of the (transformed) request body, e.g.
+	// "?updateMask=labels,description". Required by many GCP PATCH endpoints
+	// (Secret Manager, DNS, ...) that use a query-param field mask. Computed
+	// from the body so a full-reconcile PATCH masks exactly the fields it sends.
+	UpdateMaskFromBody bool
+
 	// OptimisticLocking defines optimistic locking configuration
 	OptimisticLocking *OptimisticLockingConfig
 
 	// RequestWrapper wraps the request body in a field (e.g., "cluster", "nodePool")
 	// Used by Container API which requires {"cluster": {...}} instead of {...}
 	RequestWrapper string
+
+	// ListItemsKey overrides the JSON key holding the array of items in a List
+	// response. Defaults to trying "items" then the resource type. Set when the
+	// API uses a different key (e.g. IAM serviceAccounts.list -> "accounts").
+	ListItemsKey string
 }
 
 // ScopeConfig defines how a resource is scoped

@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute Route
+///
+/// A static custom route in a VPC network. Routes are immutable.
+module gcp.compute.route
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Route"
+
+open class RouteResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden selfLink: RouteResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RouteResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Route extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// The VPC network this route applies to (selfLink/URL or Resolvable).
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)
+
+    /// Destination CIDR range (e.g. "10.0.0.0/16").
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    destRange: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    priority: Int?
+
+    /// Next hop as the default internet gateway URL, e.g.
+    /// "projects/{project}/global/gateways/default-internet-gateway".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    nextHopGateway: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    tags: Listing<String>?
+
+    hidden res: RouteResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

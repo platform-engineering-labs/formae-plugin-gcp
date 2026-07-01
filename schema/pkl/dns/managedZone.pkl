@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS ManagedZone
+///
+/// A container for DNS records of the same DNS name suffix.
+module gcp.dns.managedZone
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::ManagedZone"
+
+typealias ZoneVisibility = "public"|"private"
+
+open class ManagedZoneResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ManagedZoneResolvable = (this) {
+        property = "name"
+    }
+
+    hidden dnsName: ManagedZoneResolvable = (this) {
+        property = "dnsName"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ManagedZone extends formae.Resource {
+    hidden parent = this
+
+    /// User-assigned zone name (e.g. "my-zone").
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The DNS name suffix, with a trailing dot (e.g. "example.com.").
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    dnsName: String
+
+    @gcp.FieldHint
+    description: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    visibility: ZoneVisibility?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ManagedZoneResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

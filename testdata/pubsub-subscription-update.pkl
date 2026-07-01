@@ -1,0 +1,34 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/pubsub/topic.pkl"
+import "@gcp/pubsub/subscription.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  local t = new topic.Topic {
+    label = "plugin-sdk-test-sub-topic"
+    name = "formae-plugin-sdk-test-sub-topic-\(v.testRunID)"
+  }
+
+  v.stack
+  v.target
+
+  t
+
+  new subscription.Subscription {
+    label = "plugin-sdk-test-pubsub-subscription"
+    name = "formae-plugin-sdk-test-sub-\(v.testRunID)"   // Same (createOnly)
+    topic = t.res.name                                   // Same (createOnly)
+    ackDeadlineSeconds = 60                              // Changed (mutable)
+    labels = new Mapping {
+      ["environment"] = "production"   // Changed (mutable)
+      ["managed-by"] = "formae"
+    }
+  }
+}

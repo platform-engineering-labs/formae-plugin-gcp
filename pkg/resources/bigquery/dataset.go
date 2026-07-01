@@ -32,6 +32,7 @@ func init() {
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
+			resource.OperationUpdate,
 			resource.OperationDelete,
 			resource.OperationList,
 		},
@@ -271,16 +272,68 @@ func (d *Dataset) Status(ctx context.Context, req *resource.StatusRequest) (*res
 	}, nil
 }
 
-// Update is not implemented
-func (d *Dataset) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
+// Update updates the mutable metadata of a BigQuery dataset.
+func (d *Dataset) Update(ctx context.Context, req *resource.UpdateRequest) (*resource.UpdateResult, error) {
+	project, datasetID, err := parseDatasetID(req.NativeID)
+	if err != nil {
+		return bqUpdateFailure(resource.OperationErrorCodeInvalidRequest, fmt.Sprintf("Invalid native ID: %v", err)), nil
+	}
+
+	props, err := utils.ParseProperties(req.DesiredProperties)
+	if err != nil {
+		return bqUpdateFailure(resource.OperationErrorCodeInvalidRequest, fmt.Sprintf("Failed to parse properties: %v", err)), nil
+	}
+
+	client, err := d.getClient(ctx, project)
+	if err != nil {
+		return bqUpdateFailure(resource.OperationErrorCodeUnforeseenError, fmt.Sprintf("Failed to create client: %v", err)), nil
+	}
+	defer func() { _ = client.Close() }()
+
+	update := bigquery.DatasetMetadataToUpdate{
+		Name:        utils.GetString(props, "name"),
+		Description: utils.GetString(props, "description"),
+	}
+	if expirationMs := utils.GetInt64(props, "defaultTableExpirationMs"); expirationMs > 0 {
+		update.DefaultTableExpiration = time.Duration(expirationMs) * time.Millisecond
+	}
+	if partitionMs := utils.GetInt64(props, "defaultPartitionExpirationMs"); partitionMs > 0 {
+		update.DefaultPartitionExpiration = time.Duration(partitionMs) * time.Millisecond
+	}
+	for k, v := range getStringMap(props, "labels") {
+		update.SetLabel(k, v)
+	}
+
+	// etag "" => unconditional update (no optimistic-concurrency precondition)
+	metadata, err := client.Dataset(datasetID).Update(ctx, update, "")
+	if err != nil {
+		return bqUpdateFailure(status.MapGCPError(err), fmt.Sprintf("Failed to update BigQuery dataset: %v", err)), nil
+	}
+
+	readProps := flattenDataset(metadata, project, datasetID)
+	readPropsJSON, _ := json.Marshal(readProps)
+
+	return &resource.UpdateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:          resource.OperationUpdate,
+			NativeID:           req.NativeID,
+			OperationStatus:    resource.OperationStatusSuccess,
+			StatusMessage:      "BigQuery dataset updated successfully",
+			ResourceProperties: readPropsJSON,
+		},
+	}, nil
+}
+
+// bqUpdateFailure builds a failed UpdateResult for BigQuery resources.
+func bqUpdateFailure(code resource.OperationErrorCode, msg string) *resource.UpdateResult {
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationUpdate,
 			OperationStatus: resource.OperationStatusFailure,
-			ErrorCode:       resource.OperationErrorCodeNotUpdatable,
-			StatusMessage:   "Update not implemented for BigQuery dataset",
+			ErrorCode:       code,
+			StatusMessage:   msg,
 		},
-	}, nil
+	}
 }
 
 // Helper functions

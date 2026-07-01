@@ -8,11 +8,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
+
+// buildUpdateMask returns a comma-separated, sorted list of the body's top-level
+// field names for use as a GCP "updateMask" query parameter, or "" when masking
+// is disabled or the body is empty.
+func buildUpdateMask(enabled bool, body map[string]interface{}) string {
+	if !enabled || len(body) == 0 {
+		return ""
+	}
+	fields := make([]string, 0, len(body))
+	for k := range body {
+		fields = append(fields, k)
+	}
+	sort.Strings(fields)
+	return strings.Join(fields, ",")
+}
 
 // buildPathContext builds a PathContext from target config and properties
 func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[string]interface{}) PathContext {
@@ -210,6 +227,9 @@ func (b *BaseResource) performUpdate(
 		}
 	}
 
+	// Compute an updateMask from the (unwrapped) body fields if configured.
+	updateMask := buildUpdateMask(b.ResourceConfig.UpdateMaskFromBody, body)
+
 	// Apply request wrapper if configured
 	if b.ResourceConfig.RequestWrapper != "" {
 		body = map[string]interface{}{
@@ -227,6 +247,9 @@ func (b *BaseResource) performUpdate(
 	// Add any configured update query parameters
 	if len(b.ResourceConfig.UpdateQueryParams) > 0 {
 		url, _ = transport.AddQueryParams(url, b.ResourceConfig.UpdateQueryParams)
+	}
+	if updateMask != "" {
+		url, _ = transport.AddQueryParam(url, "updateMask", updateMask)
 	}
 
 	response, err := client.SendRequest(ctx, transport.RequestOptions{
@@ -410,6 +433,17 @@ func (b *BaseResource) parseListResponse(
 			if itemMap, ok := item.(map[string]interface{}); ok {
 				if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
 					nativeIDs = append(nativeIDs, nativeID)
+				}
+			}
+		}
+	} else if key := b.ResourceConfig.ListItemsKey; key != "" {
+		// Try the configured items key (e.g. IAM serviceAccounts.list -> "accounts")
+		if items, ok := responseBody[key].([]interface{}); ok {
+			for _, item := range items {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					if nativeID := b.extractNativeIDFromItem(itemMap, pathCtx); nativeID != "" {
+						nativeIDs = append(nativeIDs, nativeID)
+					}
 				}
 			}
 		}

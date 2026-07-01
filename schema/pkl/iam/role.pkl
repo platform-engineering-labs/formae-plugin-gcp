@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP IAM custom Role (project-level)
+///
+/// A named collection of permissions that can be granted to principals.
+module gcp.iam.role
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::IAM::Role"
+
+typealias RoleStage = "ALPHA"|"BETA"|"GA"|"DEPRECATED"|"DISABLED"|"EAP"
+
+open class RoleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RoleResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Role extends formae.Resource {
+    hidden parent = this
+
+    /// The roleId (3-64 chars; letters, digits, underscores and periods - no
+    /// hyphens). The API returns the full path "projects/{project}/roles/{id}".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    title: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    includedPermissions: Listing<String>?
+
+    @gcp.FieldHint
+    stage: RoleStage?
+
+    hidden res: RoleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
