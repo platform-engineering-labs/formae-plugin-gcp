@@ -1,0 +1,90 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NetworkEndpointGroup (regional, serverless)
+///
+/// A serverless NEG lets a load balancer's backend service target a serverless
+/// backend - here a Cloud Run service. This is the backend a Cloud-Run-fronted
+/// external HTTPS load balancer points at. NEGs are immutable, so every field
+/// is createOnly.
+module gcp.compute.networkEndpointGroup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NetworkEndpointGroup"
+
+typealias NetworkEndpointType = "SERVERLESS"|"GCE_VM_IP_PORT"|"INTERNET_IP_PORT"|"INTERNET_FQDN_PORT"
+
+/// Cloud Run serverless backend selector. Set `service` to route the NEG to a
+/// Cloud Run service in the NEG's region.
+@gcp.SubResourceHint
+open class CloudRun extends formae.SubResource {
+    @gcp.FieldHint
+    service: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    tag: String?
+
+    @gcp.FieldHint
+    urlMask: String?
+}
+
+open class NetworkEndpointGroupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NetworkEndpointGroupResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: NetworkEndpointGroupResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: NetworkEndpointGroupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NetworkEndpointGroup extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// SERVERLESS for a Cloud Run backend.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkEndpointType: NetworkEndpointType
+
+    /// Cloud Run backend selector (for networkEndpointType = "SERVERLESS").
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    cloudRun: CloudRun?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    hidden res: NetworkEndpointGroupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

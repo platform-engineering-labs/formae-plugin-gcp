@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudrun/service.pkl"
+import "@gcp/cloudrun/serviceIamMember.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  // Cloud Run service the invoker binding targets. Referenced via its
+  // resolvable so formae creates it before setting the IAM policy (setIamPolicy
+  // requires the service to exist).
+  local svc = new service.Service {
+    label = "plugin-sdk-test-iam-svc"
+    project = v.gcpProject
+    region = v.gcpRegion
+    name = "formae-test-iamsvc-\(v.testRunID)"
+    ingress = "INGRESS_TRAFFIC_ALL"
+    template = new service.RevisionTemplate {
+      containers = new Listing {
+        new service.Container {
+          image = "gcr.io/cloudrun/hello"
+        }
+      }
+    }
+  }
+
+  v.stack
+  v.target
+
+  svc
+
+  // Grant public invoke access. location matches the service's region so the
+  // provisioner resolves the same service path.
+  new serviceIamMember.ServiceIamMember {
+    label = "plugin-sdk-test-run-invoker"
+    service = svc.res.name
+    location = v.gcpRegion
+    role = "roles/run.invoker"
+    member = "allUsers"
+  }
+}

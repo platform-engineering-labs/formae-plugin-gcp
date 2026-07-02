@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Run ServiceIamMember
+///
+/// A single (role, member) binding on a Cloud Run service's IAM policy, managed
+/// as read-modify-write so sibling bindings survive. Granting
+/// roles/run.invoker to allUsers is how a service is made publicly reachable
+/// (the piece the plugin previously could not express). All fields are
+/// createOnly: a change plans a replace.
+module gcp.cloudrun.serviceIamMember
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudRun::ServiceIamMember"
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "service"
+}
+open class ServiceIamMember extends formae.Resource {
+    hidden parent = this
+
+    /// Target Cloud Run service: its short name (resolved against the target's
+    /// project and location) or a full "projects/{p}/locations/{loc}/services/{s}"
+    /// path. Reference a Service resource's resolvable to order creation.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    service: (String|formae.Resolvable)
+
+    /// Region/location of the service. Defaults to the target's location (then
+    /// region) when omitted.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    location: String?
+
+    /// Project of the service. Defaults to the target's project when omitted.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    project: String?
+
+    /// IAM role, e.g. "roles/run.invoker".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    role: String
+
+    /// IAM member, e.g. "allUsers", "user:a@b.com", "serviceAccount:x@y.iam.gserviceaccount.com".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    member: String
+}

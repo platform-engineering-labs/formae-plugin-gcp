@@ -1,0 +1,86 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute InstanceGroup (zonal, unmanaged)
+///
+/// An unmanaged instance group is a named, zonal collection of VMs that a
+/// load balancer's backend service can target. This resource manages the group
+/// object and its named ports; instance membership (addInstances /
+/// removeInstances) is managed separately and is not modelled here yet.
+module gcp.compute.instanceGroup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::InstanceGroup"
+
+/// A name -> port mapping the backend service references by port name.
+@gcp.SubResourceHint
+open class NamedPort extends formae.SubResource {
+    @gcp.FieldHint
+    name: String
+
+    @gcp.FieldHint
+    port: Int
+}
+
+open class InstanceGroupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: InstanceGroupResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: InstanceGroupResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: InstanceGroupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class InstanceGroup extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    zone: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)?
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    subnetwork: (String|formae.Resolvable)?
+
+    /// Named ports the backend service can reference. Mutable via setNamedPorts.
+    @gcp.FieldHint
+    namedPorts: Listing<NamedPort>?
+
+    hidden res: InstanceGroupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
