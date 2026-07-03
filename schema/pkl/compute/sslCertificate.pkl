@@ -1,0 +1,90 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute SslCertificate (global)
+///
+/// A certificate a target HTTPS proxy serves. Two flavours:
+///   MANAGED      Google provisions and renews a cert for `managed.domains`.
+///   SELF_MANAGED you supply `certificate` (PEM chain) and `privateKey` (PEM).
+///
+/// Certificates are immutable, so every field is createOnly. `privateKey` is
+/// write-only: sent on create, never returned on read.
+module gcp.compute.sslCertificate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::SslCertificate"
+
+typealias SslCertificateType = "MANAGED"|"SELF_MANAGED"
+
+open class SslCertificateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: SslCertificateResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: SslCertificateResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: SslCertificateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class SslCertificate extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// MANAGED (default) or SELF_MANAGED.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    type: SslCertificateType?
+
+    /// Domains a MANAGED certificate covers. Google provisions the cert once
+    /// each domain's DNS points at the load balancer IP. The provisioner nests
+    /// this into the API's `managed.domains` (the field name `managed` is
+    /// reserved by the base Resource class, so it is flattened here).
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    managedDomains: Listing<String>?
+
+    /// PEM certificate chain. Set for type = "SELF_MANAGED".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    certificate: String?
+
+    /// PEM private key. Set for type = "SELF_MANAGED". Write-only.
+    @gcp.FieldHint {
+        createOnly = true
+        writeOnly = true
+    }
+    privateKey: String?
+
+    hidden res: SslCertificateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

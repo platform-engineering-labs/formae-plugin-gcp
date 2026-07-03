@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudrun/service.pkl"
+import "@gcp/cloudrun/serviceIamMember.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  // Cloud Run service the invoker binding targets. Referenced via its
+  // resolvable so formae creates it before setting the IAM policy (setIamPolicy
+  // requires the service to exist).
+  local svc = new service.Service {
+    label = "plugin-sdk-test-iam-svc"
+    project = v.gcpProject
+    region = v.gcpRegion
+    name = "formae-test-iamsvc-\(v.testRunID)"
+    ingress = "INGRESS_TRAFFIC_ALL"
+    template = new service.RevisionTemplate {
+      containers = new Listing {
+        new service.Container {
+          image = "gcr.io/cloudrun/hello"
+        }
+      }
+    }
+  }
+
+  v.stack
+  v.target
+
+  svc
+
+  // Grant invoke access to a specific principal. location matches the service's
+  // region so the provisioner resolves the same service path.
+  //
+  // The real public use case is member = "allUsers", but many orgs enforce
+  // Domain Restricted Sharing (iam.allowedPolicyMemberDomains), which rejects
+  // allUsers with a 400 failedPrecondition. Conformance therefore binds a
+  // permitted principal (the test project's own service account) - the exact
+  // same create/get/set/delete code path, without depending on the org allowing
+  // public members.
+  new serviceIamMember.ServiceIamMember {
+    label = "plugin-sdk-test-run-invoker"
+    service = svc.res.name
+    location = v.gcpRegion
+    role = "roles/run.invoker"
+    member = "serviceAccount:formae-tester@\(v.gcpProject).iam.gserviceaccount.com"
+  }
+}

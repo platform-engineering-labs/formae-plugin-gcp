@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/instanceGroup.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Unmanaged zonal instance group with a named port. Instance membership is
+  // managed out of band; this exercises the group object lifecycle.
+  new instanceGroup.InstanceGroup {
+    label = "plugin-sdk-test-instance-group"
+    name = "formae-plugin-sdk-test-ig-\(v.testRunID)"
+    description = "Test unmanaged instance group for plugin SDK conformance tests"
+    zone = v.gcpZone
+    namedPorts = new Listing {
+      new instanceGroup.NamedPort {
+        name = "http"
+        port = 80
+      }
+    }
+  }
+}

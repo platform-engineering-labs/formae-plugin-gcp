@@ -1,0 +1,29 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/networkEndpointGroup.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  // Serverless NEG pointing at a Cloud Run service by name. The service name
+  // is resolved when a load balancer attaches the NEG, so the service need not
+  // exist for the NEG's own create/read/delete lifecycle.
+  new networkEndpointGroup.NetworkEndpointGroup {
+    label = "plugin-sdk-test-neg"
+    name = "formae-plugin-sdk-test-neg-\(v.testRunID)"
+    description = "Test serverless NEG for plugin SDK conformance tests"
+    networkEndpointType = "SERVERLESS"
+    region = v.gcpRegion
+    cloudRun = new networkEndpointGroup.CloudRun {
+      service = "formae-plugin-sdk-test-svc-\(v.testRunID)"
+    }
+  }
+}

@@ -27,6 +27,11 @@ const (
 	RouteResourceType          = "GCP::Compute::Route"
 	SecurityPolicyResourceType = "GCP::Compute::SecurityPolicy"
 
+	// Load Balancer backends + certificate
+	InstanceGroupResourceType        = "GCP::Compute::InstanceGroup"
+	NetworkEndpointGroupResourceType = "GCP::Compute::NetworkEndpointGroup"
+	SslCertificateResourceType       = "GCP::Compute::SslCertificate"
+
 	// Load Balancer - Global resources
 	GlobalAddressResourceType        = "GCP::Compute::GlobalAddress"
 	HealthCheckResourceType          = "GCP::Compute::HealthCheck"
@@ -187,6 +192,56 @@ func init() {
 			},
 			RequestTransformer:  nil,
 			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
+		// ==================== Load Balancer - Backends + Certificate ====================
+
+		// SSL Certificate - Global managed/self-managed cert for HTTPS proxies.
+		// Immutable (create + delete only).
+		{
+			ResourceType: SslCertificateResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "sslCertificates",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeGlobal,
+				},
+				SupportsUpdate:    false, // Certificates are immutable
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(sslCertificateRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(sslCertificateResponseTransformer),
+		},
+
+		// Network Endpoint Group - Regional serverless NEG (Cloud Run backend).
+		// Immutable (create + delete only).
+		{
+			ResourceType: NetworkEndpointGroupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "networkEndpointGroups",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    false, // NEGs are immutable
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
+		// Instance Group - Zonal unmanaged instance group (GCE VM backend).
+		// namedPorts are mutable; instance membership is managed out of band.
+		{
+			ResourceType: InstanceGroupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "instanceGroups",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeZonal,
+				},
+				SupportsUpdate:    false, // group object immutable; namedPorts via setNamedPorts (follow-up)
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.ZoneResponseTransformer,
 		},
 
 		// ==================== Load Balancer - Global Resources ====================
