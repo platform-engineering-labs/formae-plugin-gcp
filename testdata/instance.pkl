@@ -7,6 +7,8 @@
 amends "@formae/forma.pkl"
 import "@formae/formae.pkl"
 
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
 import "@gcp/compute/disk.pkl"
 import "@gcp/compute/instance.pkl"
 import "./config/vars.pkl" as v
@@ -15,6 +17,21 @@ import "./config/vars.pkl" as v
 // must be created first and attached via source. The disk is referenced through
 // its resolvable so formae creates the disk before the instance (a plain string
 // URL would not establish the dependency, leaving create order undefined).
+// Managed network + subnet the instance attaches to, referenced by self-link so
+// they round-trip against the API's returned full URLs (PLA-265).
+local net = new network.Network {
+  label = "plugin-sdk-test-instance-net"
+  name = "formae-plugin-sdk-test-inst-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-instance-subnet"
+  name = "formae-plugin-sdk-test-inst-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.90.0.0/24"
+}
+
 forma {
   // Boot disk for the instance, created from a public Debian image.
   local bootDisk = new disk.Disk {
@@ -31,6 +48,8 @@ forma {
   v.stack
   v.target
 
+  net
+  subnet
   bootDisk
 
   new instance.Instance {
@@ -53,8 +72,8 @@ forma {
     // Internal IP only (no accessConfigs) to comply with the external-IP org policy.
     networkInterfaces = new Listing {
       new instance.NetworkInterface {
-        network = "projects/\(v.gcpProject)/global/networks/default"
-        subnetwork = "projects/\(v.gcpProject)/regions/\(v.gcpRegion)/subnetworks/default"
+        network = net.res.selfLink
+        subnetwork = subnet.res.selfLink
       }
     }
     labels = new Mapping {

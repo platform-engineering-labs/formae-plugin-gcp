@@ -155,8 +155,11 @@ func normalizeInstanceDisks(disks []interface{}) []interface{} {
 			continue
 		}
 		nd := make(map[string]interface{})
-		if v, ok := dm["boot"]; ok {
-			nd["boot"] = v
+		// Only surface boot when true: GCP returns boot=false for data disks, but
+		// a forma leaves boot unset on non-boot attachments, so echoing boot=false
+		// would drift an unchanged forma into an update (PLA-265).
+		if v, ok := dm["boot"].(bool); ok && v {
+			nd["boot"] = true
 		}
 		if v, ok := dm["autoDelete"]; ok {
 			nd["autoDelete"] = v
@@ -179,11 +182,15 @@ func normalizeInstanceNetworkInterfaces(ifaces []interface{}) []interface{} {
 			continue
 		}
 		ni := make(map[string]interface{})
+		// Keep network/subnetwork as the provider's full self-link URL so they
+		// match resolvable references (vpc.res.selfLink) - the same URL the API
+		// returns. Rewriting to a "projects/..." path drifts an unchanged forma
+		// into a replace (PLA-265); this mirrors attached-disk `source`.
 		if network := utils.GetString(im, "network"); network != "" {
-			ni["network"] = extractProjectsPath(network)
+			ni["network"] = network
 		}
 		if subnetwork := utils.GetString(im, "subnetwork"); subnetwork != "" {
-			ni["subnetwork"] = extractProjectsPath(subnetwork)
+			ni["subnetwork"] = subnetwork
 		}
 		if name := utils.GetString(im, "name"); name != "" {
 			ni["name"] = name
