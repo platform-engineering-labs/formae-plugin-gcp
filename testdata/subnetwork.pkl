@@ -12,27 +12,31 @@ import "./config/vars.pkl" as v
 
 local testNetworkName = "formae-plugin-sdk-test-net-\(v.testRunID)"
 
+// Parent network for the subnetwork. Referenced via its resolvable self-link so
+// formae orders creation and the stored network round-trips against the API's
+// returned full URL (see PLA-265).
+local net = new network.Network {
+  label = "plugin-sdk-test-network-for-subnet"
+  name = testNetworkName
+  description = "Test network for subnetwork conformance test"
+  autoCreateSubnetworks = false
+  routingConfig = new network.RoutingConfig {
+    routingMode = "REGIONAL"
+  }
+}
+
 forma {
   v.stack
   v.target
 
-  // Parent network for the subnetwork
-  new network.Network {
-    label = "plugin-sdk-test-network-for-subnet"
-    name = testNetworkName
-    description = "Test network for subnetwork conformance test"
-    autoCreateSubnetworks = false
-    routingConfig = new network.RoutingConfig {
-      routingMode = "REGIONAL"
-    }
-  }
+  net
 
   // Test subnetwork
   new subnetwork.Subnetwork {
     label = "plugin-sdk-test-subnetwork"
     name = "formae-plugin-sdk-test-subnet-\(v.testRunID)"
     description = "Test subnetwork for plugin SDK conformance tests"
-    network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
+    network = net.res.selfLink
     ipCidrRange = "10.0.0.0/24"
     region = v.gcpRegion
     privateIpGoogleAccess = true

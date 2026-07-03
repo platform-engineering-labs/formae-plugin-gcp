@@ -5,14 +5,17 @@
 package compute
 
 import (
-	"strings"
-
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 )
 
 // subnetworkResponseTransformer normalizes the Subnetwork API response:
 // 1. Extracts region name from full URL
-// 2. Strips the full API URL prefix from the network field
+//
+// The `network` field is left as the provider's full self-link URL so it matches
+// a resolvable network reference (`net.res.selfLink`) - the same URL the API
+// returns. Rewriting it to a "projects/..." path would break that match and make
+// an unchanged forma re-apply plan a spurious replace (see PLA-265). This mirrors
+// how attached-disk `source` is handled on the Instance resource.
 func subnetworkResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	result := make(map[string]interface{})
 
@@ -24,11 +27,6 @@ func subnetworkResponseTransformer(apiResponse map[string]interface{}, ctx base.
 	// Extract region name from full URL
 	if region, ok := result["region"].(string); ok && region != "" {
 		result["region"] = base.ExtractLastSegment(region)
-	}
-
-	// Normalize network URL: strip the API prefix to get project-relative path
-	if network, ok := result["network"].(string); ok && network != "" {
-		result["network"] = strings.TrimPrefix(network, computeAPIPrefix)
 	}
 
 	return result
