@@ -21,6 +21,10 @@ const type = "GCP::CloudRun::ServiceIamMember"
 @gcp.ResourceHint {
     type = module.type
     identifier = "service"
+    // A single (role, member) binding on a service's IAM policy is not
+    // enumerable across services for discovery (no cheap cross-service policy
+    // listing), mirroring ProjectIamMember. The binding is managed explicitly.
+    discoverable = false
 }
 open class ServiceIamMember extends formae.Resource {
     hidden parent = this
