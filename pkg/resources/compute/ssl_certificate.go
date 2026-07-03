@@ -25,3 +25,19 @@ func sslCertificateRequestTransformer(props map[string]interface{}, _ base.Trans
 	}
 	return body, nil
 }
+
+// sslCertificateResponseTransformer is the inverse: it lifts the API's
+// managed.domains back to the flattened managedDomains field so the read state
+// round-trips against the desired state.
+func sslCertificateResponseTransformer(apiResponse map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	result := make(map[string]interface{}, len(apiResponse))
+	for k, v := range apiResponse {
+		result[k] = v
+	}
+	if managed, ok := apiResponse["managed"].(map[string]interface{}); ok {
+		if domains, ok := managed["domains"]; ok {
+			result["managedDomains"] = domains
+		}
+	}
+	return result
+}

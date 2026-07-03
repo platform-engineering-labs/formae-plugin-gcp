@@ -21,10 +21,8 @@ forma {
     name = "formae-plugin-sdk-test-cert-\(v.testRunID)"
     description = "Test managed SSL certificate for plugin SDK conformance tests"
     type = "MANAGED"
-    managed = new sslCertificate.Managed {
-      domains = new Listing {
-        "formae-\(v.testRunID).example.com"
-      }
+    managedDomains = new Listing {
+      "formae-\(v.testRunID).example.com"
     }
   }
 }

@@ -22,10 +22,11 @@ import (
 
 const ServiceIamMemberResourceType = "GCP::CloudRun::ServiceIamMember"
 
-// NativeID format: "{service}|{role}|{member}". The service segment is stored
-// exactly as supplied (short name or full path) so Read echoes back the same
-// representation the desired state used. Roles contain "/", members contain
-// ":"; neither contains "|".
+// NativeID format: "{location}|{project}|{service}|{role}|{member}". location
+// and project may be empty (when the target supplies them); service, role and
+// member are always present. Every segment is stored exactly as supplied so
+// Read round-trips the same fields the desired state used. Roles contain "/",
+// members contain ":"/"@"; none contain "|".
 const siamDelim = "|"
 
 // setIamPolicy can race on etag; three tries covers typical contention.
@@ -64,8 +65,8 @@ func init() {
 
 type serviceIamMemberProps struct {
 	Service  string `json:"service"`
-	Location string `json:"location"`
-	Project  string `json:"project"`
+	Location string `json:"location,omitempty"`
+	Project  string `json:"project,omitempty"`
 	Role     string `json:"role"`
 	Member   string `json:"member"`
 }
@@ -119,16 +120,22 @@ func servicePath(service string, cfg *config.Config, propLocation, propProject s
 	return fmt.Sprintf("projects/%s/locations/%s/services/%s", project, location, service), nil
 }
 
-func siamBuildNativeID(service, role, member string) string {
-	return service + siamDelim + role + siamDelim + member
+func siamBuildNativeID(location, project, service, role, member string) string {
+	return strings.Join([]string{location, project, service, role, member}, siamDelim)
 }
 
-func siamParseNativeID(id string) (service, role, member string, err error) {
-	parts := strings.SplitN(id, siamDelim, 3)
-	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return "", "", "", fmt.Errorf("invalid ServiceIamMember NativeID: %q", id)
+func siamParseNativeID(id string) (p serviceIamMemberProps, err error) {
+	parts := strings.SplitN(id, siamDelim, 5)
+	if len(parts) != 5 || parts[2] == "" || parts[3] == "" || parts[4] == "" {
+		return serviceIamMemberProps{}, fmt.Errorf("invalid ServiceIamMember NativeID: %q", id)
 	}
-	return parts[0], parts[1], parts[2], nil
+	return serviceIamMemberProps{
+		Location: parts[0],
+		Project:  parts[1],
+		Service:  parts[2],
+		Role:     parts[3],
+		Member:   parts[4],
+	}, nil
 }
 
 func siamProps(raw json.RawMessage) (*serviceIamMemberProps, error) {
@@ -254,19 +261,22 @@ func (p *ServiceIamMemberProvisioner) Create(ctx context.Context, request *resou
 		return siamCreateFailure(siamMapError(err), err.Error()), nil
 	}
 
-	// Echo desired props back verbatim so the stored state matches the plan.
-	echo, _ := json.Marshal(serviceIamMemberProps{Service: props.Service, Role: props.Role, Member: props.Member})
-	return siamCreateSuccess(siamBuildNativeID(props.Service, props.Role, props.Member), echo), nil
+	// Echo desired props back verbatim (omitempty drops unset location/project)
+	// so the stored state matches the plan, and carry every field in the nativeID
+	// so Read reproduces it.
+	echo, _ := json.Marshal(*props)
+	nativeID := siamBuildNativeID(props.Location, props.Project, props.Service, props.Role, props.Member)
+	return siamCreateSuccess(nativeID, echo), nil
 }
 
 func (p *ServiceIamMemberProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
-	service, role, member, err := siamParseNativeID(request.NativeID)
+	props, err := siamParseNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 
 	cfg := siamCfg(request.TargetConfig, p.cfg)
-	resourcePath, err := servicePath(service, cfg, "", "")
+	resourcePath, err := servicePath(props.Service, cfg, props.Location, props.Project)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
@@ -281,11 +291,13 @@ func (p *ServiceIamMemberProvisioner) Read(ctx context.Context, request *resourc
 		return &resource.ReadResult{ErrorCode: siamMapError(err)}, nil
 	}
 
-	if !siamHasMember(policy, role, member) {
+	if !siamHasMember(policy, props.Role, props.Member) {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
 	}
 
-	propsJSON, _ := json.Marshal(serviceIamMemberProps{Service: service, Role: role, Member: member})
+	// Echo the same fields (omitempty drops unset location/project) so the read
+	// state round-trips against the desired state.
+	propsJSON, _ := json.Marshal(props)
 	return &resource.ReadResult{
 		ResourceType: request.ResourceType,
 		Properties:   string(propsJSON),
@@ -304,13 +316,13 @@ func (p *ServiceIamMemberProvisioner) Update(ctx context.Context, request *resou
 }
 
 func (p *ServiceIamMemberProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
-	service, role, member, err := siamParseNativeID(request.NativeID)
+	props, err := siamParseNativeID(request.NativeID)
 	if err != nil {
 		return siamDeleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 
 	cfg := siamCfg(request.TargetConfig, p.cfg)
-	resourcePath, err := servicePath(service, cfg, "", "")
+	resourcePath, err := servicePath(props.Service, cfg, props.Location, props.Project)
 	if err != nil {
 		return siamDeleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
@@ -322,7 +334,7 @@ func (p *ServiceIamMemberProvisioner) Delete(ctx context.Context, request *resou
 
 	// A missing service (404) means the binding is gone too - idempotent success.
 	if err := p.withRetryOnConflict(ctx, svc, resourcePath, func(policy *run.GoogleIamV1Policy) bool {
-		return siamRemoveMember(policy, role, member)
+		return siamRemoveMember(policy, props.Role, props.Member)
 	}); err != nil {
 		if code := siamMapError(err); code != resource.OperationErrorCodeNotFound {
 			return siamDeleteFailure(code, err.Error()), nil

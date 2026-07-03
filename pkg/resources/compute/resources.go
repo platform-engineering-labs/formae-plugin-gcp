@@ -209,7 +209,7 @@ func init() {
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  base.RequestTransformerFunc(sslCertificateRequestTransformer),
-			ResponseTransformer: nil,
+			ResponseTransformer: base.ResponseTransformerFunc(sslCertificateResponseTransformer),
 		},
 
 		// Network Endpoint Group - Regional serverless NEG (Cloud Run backend).

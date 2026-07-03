@@ -140,6 +140,12 @@ func (p *SecretVersionProvisioner) Read(ctx context.Context, request *resource.R
 		return &resource.ReadResult{ErrorCode: transport.ToResourceErrorCode(transportErr.Code)}, nil
 	}
 
+	// A destroyed version still GETs (state=DESTROYED) rather than 404ing. Treat
+	// it as gone so an out-of-band destroy surfaces as a deletion, not drift.
+	if utils.GetString(response.Body, "state") == "DESTROYED" {
+		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
+	}
+
 	name := utils.GetString(response.Body, "name")
 	if name == "" {
 		name = request.NativeID

@@ -34,13 +34,20 @@ forma {
 
   svc
 
-  // Grant public invoke access. location matches the service's region so the
-  // provisioner resolves the same service path.
+  // Grant invoke access to a specific principal. location matches the service's
+  // region so the provisioner resolves the same service path.
+  //
+  // The real public use case is member = "allUsers", but many orgs enforce
+  // Domain Restricted Sharing (iam.allowedPolicyMemberDomains), which rejects
+  // allUsers with a 400 failedPrecondition. Conformance therefore binds a
+  // permitted principal (the test project's own service account) - the exact
+  // same create/get/set/delete code path, without depending on the org allowing
+  // public members.
   new serviceIamMember.ServiceIamMember {
     label = "plugin-sdk-test-run-invoker"
     service = svc.res.name
     location = v.gcpRegion
     role = "roles/run.invoker"
-    member = "allUsers"
+    member = "serviceAccount:formae-tester@\(v.gcpProject).iam.gserviceaccount.com"
   }
 }
