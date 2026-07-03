@@ -345,10 +345,51 @@ func (p *ServiceIamMemberProvisioner) Delete(ctx context.Context, request *resou
 }
 
 func (p *ServiceIamMemberProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
-	// Enumerating every binding requires walking every service's policy. Cloud
-	// Run has no cheap cross-service policy listing, so return empty (discovery
-	// of individual bindings is out of scope, matching ProjectIamMember's intent).
-	return &resource.ListResult{}, nil
+	cfg := siamCfg(request.TargetConfig, p.cfg)
+	location := cfg.Location
+	if location == "" {
+		location = cfg.Region
+	}
+	if cfg.Project == "" || location == "" {
+		return &resource.ListResult{}, nil
+	}
+
+	svc, err := p.newService(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enumerate every (role, member) binding on every service in the region:
+	// list services, then GetIamPolicy each. Cloud Run has no cross-service
+	// policy listing, so this walk is the only way to surface bindings.
+	parent := fmt.Sprintf("projects/%s/locations/%s", cfg.Project, location)
+	var serviceNames []string
+	err = svc.Projects.Locations.Services.List(parent).Pages(ctx, func(page *run.GoogleCloudRunV2ListServicesResponse) error {
+		for _, s := range page.Services {
+			serviceNames = append(serviceNames, s.Name) // full resource path
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []string
+	for _, name := range serviceNames {
+		policy, err := svc.Projects.Locations.Services.GetIamPolicy(name).Context(ctx).Do()
+		if err != nil {
+			return nil, err
+		}
+		short := name[strings.LastIndex(name, "/")+1:]
+		for _, b := range policy.Bindings {
+			for _, m := range b.Members {
+				// project omitted (empty): Read falls back to the target project,
+				// matching how managed bindings store it.
+				ids = append(ids, siamBuildNativeID(location, "", short, b.Role, m))
+			}
+		}
+	}
+	return &resource.ListResult{NativeIDs: ids}, nil
 }
 
 func (p *ServiceIamMemberProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {

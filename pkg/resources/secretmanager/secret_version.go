@@ -200,12 +200,7 @@ func (p *SecretVersionProvisioner) List(ctx context.Context, request *resource.L
 	if cfg.Project == "" && p.cfg != nil {
 		cfg.Project = p.cfg.Project
 	}
-
-	// Versions live under a parent secret. Enumerate only when the caller names
-	// one (via AdditionalProperties["secret"]); otherwise there is nothing to
-	// list without walking every secret in the project.
-	secretID := request.AdditionalProperties["secret"]
-	if secretID == "" || cfg.Project == "" {
+	if cfg.Project == "" {
 		return &resource.ListResult{}, nil
 	}
 
@@ -214,24 +209,95 @@ func (p *SecretVersionProvisioner) List(ctx context.Context, request *resource.L
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
 
-	parent := parentPath(secretID, cfg.Project)
-	url := fmt.Sprintf("%s/%s/versions", SecretManagerAPI.BaseURL, parent)
-	response, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
-	if err != nil {
-		return nil, transport.WrapError(err, fmt.Sprintf("failed to list versions of secret '%s'", secretID))
+	// A caller may scope to one parent secret (AdditionalProperties["secret"]);
+	// otherwise enumerate every version of every secret in the project. Versions
+	// have no project-wide list endpoint, so discovery walks secrets first.
+	var secretPaths []string
+	if scoped := request.AdditionalProperties["secret"]; scoped != "" {
+		secretPaths = []string{parentPath(scoped, cfg.Project)}
+	} else {
+		secretPaths, err = p.listSecretPaths(ctx, client, cfg.Project)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var ids []string
-	if versions, ok := response.Body["versions"].([]interface{}); ok {
-		for _, v := range versions {
-			if vm, ok := v.(map[string]interface{}); ok {
-				if name := utils.GetString(vm, "name"); name != "" {
-					ids = append(ids, name)
+	for _, secretPath := range secretPaths {
+		versionIDs, err := p.listVersionNames(ctx, client, secretPath)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, versionIDs...)
+	}
+	return &resource.ListResult{NativeIDs: ids}, nil
+}
+
+// listSecretPaths returns the full path of every secret in the project,
+// following pagination.
+func (p *SecretVersionProvisioner) listSecretPaths(ctx context.Context, client *transport.Client, project string) ([]string, error) {
+	var paths []string
+	pageToken := ""
+	for {
+		url := fmt.Sprintf("%s/projects/%s/secrets", SecretManagerAPI.BaseURL, project)
+		if pageToken != "" {
+			url, _ = transport.AddQueryParams(url, map[string]string{"pageToken": pageToken})
+		}
+		response, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
+		if err != nil {
+			return nil, transport.WrapError(err, "failed to list secrets")
+		}
+		if secrets, ok := response.Body["secrets"].([]interface{}); ok {
+			for _, s := range secrets {
+				if sm, ok := s.(map[string]interface{}); ok {
+					if name := utils.GetString(sm, "name"); name != "" {
+						paths = append(paths, name)
+					}
 				}
 			}
 		}
+		pageToken = utils.GetString(response.Body, "nextPageToken")
+		if pageToken == "" {
+			break
+		}
 	}
-	return &resource.ListResult{NativeIDs: ids}, nil
+	return paths, nil
+}
+
+// listVersionNames returns the full name of every non-destroyed version under a
+// secret path, following pagination.
+func (p *SecretVersionProvisioner) listVersionNames(ctx context.Context, client *transport.Client, secretPath string) ([]string, error) {
+	var ids []string
+	pageToken := ""
+	for {
+		url := fmt.Sprintf("%s/%s/versions", SecretManagerAPI.BaseURL, secretPath)
+		if pageToken != "" {
+			url, _ = transport.AddQueryParams(url, map[string]string{"pageToken": pageToken})
+		}
+		response, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
+		if err != nil {
+			return nil, transport.WrapError(err, fmt.Sprintf("failed to list versions of '%s'", secretPath))
+		}
+		if versions, ok := response.Body["versions"].([]interface{}); ok {
+			for _, v := range versions {
+				if vm, ok := v.(map[string]interface{}); ok {
+					// A destroyed version still lists; Read maps it to NotFound,
+					// so skip it here to keep discovery consistent.
+					if utils.GetString(vm, "state") == "DESTROYED" {
+						continue
+					}
+					if name := utils.GetString(vm, "name"); name != "" {
+						ids = append(ids, name)
+					}
+				}
+			}
+		}
+		pageToken = utils.GetString(response.Body, "nextPageToken")
+		if pageToken == "" {
+			break
+		}
+	}
+	return ids, nil
 }
 
 func (p *SecretVersionProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
