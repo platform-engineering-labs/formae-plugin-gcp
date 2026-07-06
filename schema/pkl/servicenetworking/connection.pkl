@@ -47,10 +47,17 @@ open class Connection extends formae.Resource {
 
     /// Names of the reserved peering ranges (compute GlobalAddress of
     /// purpose = VPC_PEERING) allocated for the service producer.
+    ///
+    /// Reference the range(s) by resolvable (`range.res.name`) so this connection
+    /// is created after them. Optional + write-only in the type: the reference is
+    /// what matters (it orders creation), and the provisioner discovers the actual
+    /// VPC_PEERING ranges on the network at apply time rather than trusting the
+    /// passed value - which can arrive unresolved on a same-apply resolution race.
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
-    reservedPeeringRanges: Listing<String|formae.Resolvable>
+    reservedPeeringRanges: Listing<String|formae.Resolvable>?
 
     /// The producer service to peer with. Defaults to Service Networking itself
     /// (used by Cloud SQL, Memorystore, etc.).

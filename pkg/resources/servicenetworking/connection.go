@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"google.golang.org/api/cloudresourcemanager/v1"
+	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 	servicenetworking "google.golang.org/api/servicenetworking/v1"
 
@@ -121,9 +122,6 @@ func (p *ConnectionProvisioner) Create(ctx context.Context, request *resource.Cr
 	if props.Network == "" {
 		return createFailure(resource.OperationErrorCodeInvalidRequest, "network is required"), nil
 	}
-	if len(props.ReservedPeeringRanges) == 0 {
-		return createFailure(resource.OperationErrorCodeInvalidRequest, "reservedPeeringRanges is required"), nil
-	}
 
 	cfg := cfgFrom(request.TargetConfig, p.cfg)
 	sn, crm, err := p.clients(ctx, cfg)
@@ -134,9 +132,23 @@ func (p *ConnectionProvisioner) Create(ctx context.Context, request *resource.Cr
 	if err != nil {
 		return createFailure(mapErr(err), err.Error()), nil
 	}
-	ranges := make([]string, len(props.ReservedPeeringRanges))
-	for i, r := range props.ReservedPeeringRanges {
-		ranges[i] = lastSegment(r)
+
+	// Derive the peering range names. The reservedPeeringRanges resolvable exists
+	// to order this connection after the range (that dependency edge is honoured),
+	// but its VALUE can arrive unresolved due to a same-apply resolution race, so
+	// we do not trust it: prefer any explicit non-empty names, else discover the
+	// VPC_PEERING ranges on this network via the Compute API (the edge guarantees
+	// they exist by now).
+	ranges := validNames(props.ReservedPeeringRanges)
+	if len(ranges) == 0 {
+		ranges, err = discoverPeeringRanges(ctx, cfg, props.Network)
+		if err != nil {
+			return createFailure(mapErr(err), fmt.Sprintf("discover peering ranges: %v", err)), nil
+		}
+	}
+	if len(ranges) == 0 {
+		return createFailure(resource.OperationErrorCodeInvalidRequest,
+			"no VPC_PEERING reserved ranges found on the network; create a compute GlobalAddress with purpose=VPC_PEERING first"), nil
 	}
 
 	parent := "services/" + serviceOf(&props)
@@ -148,22 +160,59 @@ func (p *ConnectionProvisioner) Create(ctx context.Context, request *resource.Cr
 		return createFailure(mapErr(err), err.Error()), nil
 	}
 
-	// NativeID is the (project-number) network path; identity is one connection
-	// per network. The create operation is long-running - report InProgress and
-	// let Status poll it.
+	// NativeID is the network as supplied (self-link or path) so Read round-trips
+	// against the desired value. The create operation is long-running - report
+	// InProgress and let Status poll it.
 	return &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        netPath,
+			NativeID:        props.Network,
 			RequestID:       op.Name,
 			ResourceProperties: mustJSON(connectionProps{
 				Network:               props.Network,
-				ReservedPeeringRanges: props.ReservedPeeringRanges,
+				ReservedPeeringRanges: ranges,
 				Service:               props.Service,
 			}),
 		},
 	}, nil
+}
+
+// validNames returns the non-empty short names from a reservedPeeringRanges
+// input, dropping any unresolved-ref envelopes / empty entries.
+func validNames(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, r := range in {
+		if n := lastSegment(r); n != "" && !strings.Contains(n, "$") && !strings.Contains(n, "{") {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// discoverPeeringRanges lists the VPC_PEERING GlobalAddresses reserved on the
+// given network and returns their names.
+func discoverPeeringRanges(ctx context.Context, cfg *config.Config, networkRef string) ([]string, error) {
+	opts, err := cfg.ToClientOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	c, err := compute.NewService(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	netName := lastSegment(networkRef)
+	out := []string{}
+	// Filter in Go (avoids server-side filter-syntax pitfalls on enum fields).
+	err = c.GlobalAddresses.List(cfg.Project).Pages(ctx, func(page *compute.AddressList) error {
+		for _, a := range page.Items {
+			if a.Purpose == "VPC_PEERING" && lastSegment(a.Network) == netName {
+				out = append(out, a.Name)
+			}
+		}
+		return nil
+	})
+	return out, err
 }
 
 func (p *ConnectionProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
@@ -197,19 +246,33 @@ func (p *ConnectionProvisioner) Status(ctx context.Context, request *resource.St
 			StatusMessage: fmt.Sprintf("operation failed: %s", op.Error.Message), NativeID: request.NativeID,
 		}}, nil
 	}
-	return &resource.StatusResult{ProgressResult: &resource.ProgressResult{
+	// On success, re-assert the resource properties so the stored state carries
+	// reservedPeeringRanges after the async create completes (the create's
+	// InProgress properties are otherwise superseded by this Status result). Best
+	// effort: if the connection is gone (e.g. this was a delete op) skip.
+	props := &resource.ProgressResult{
 		Operation: resource.OperationCheckStatus, OperationStatus: resource.OperationStatusSuccess, NativeID: request.NativeID,
-	}}, nil
+	}
+	if ranges, derr := discoverPeeringRanges(ctx, cfg, request.NativeID); derr == nil && len(ranges) > 0 {
+		props.ResourceProperties = mustJSON(connectionProps{Network: request.NativeID, ReservedPeeringRanges: ranges})
+	}
+	return &resource.StatusResult{ProgressResult: props}, nil
 }
 
 func (p *ConnectionProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
 	cfg := cfgFrom(request.TargetConfig, p.cfg)
-	sn, _, err := p.clients(ctx, cfg)
+	sn, crm, err := p.clients(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	// NativeID is the project-number network path. List connections for it.
-	resp, err := sn.Services.Connections.List("services/" + defaultService).Network(request.NativeID).Context(ctx).Do()
+	// NativeID is the network as supplied; the API lists by the project-number
+	// path, so convert for the query but echo the NativeID back so state
+	// round-trips against the desired network reference.
+	netPath, err := networkPath(crm, cfg.Project, request.NativeID)
+	if err != nil {
+		return &resource.ReadResult{ErrorCode: mapErr(err)}, nil
+	}
+	resp, err := sn.Services.Connections.List("services/" + defaultService).Network(netPath).Context(ctx).Do()
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: mapErr(err)}, nil
 	}
@@ -217,7 +280,15 @@ func (p *ConnectionProvisioner) Read(ctx context.Context, request *resource.Read
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
 	}
 	c := resp.Connections[0]
-	propsJSON := mustJSON(connectionProps{Network: request.NativeID, ReservedPeeringRanges: c.ReservedPeeringRanges})
+	ranges := c.ReservedPeeringRanges
+	// The List response can omit reservedPeeringRanges; fall back to the ranges
+	// actually reserved on the network so read state always carries them.
+	if len(ranges) == 0 {
+		if discovered, derr := discoverPeeringRanges(ctx, cfg, request.NativeID); derr == nil {
+			ranges = discovered
+		}
+	}
+	propsJSON := mustJSON(connectionProps{Network: request.NativeID, ReservedPeeringRanges: ranges})
 	return &resource.ReadResult{ResourceType: request.ResourceType, Properties: string(propsJSON)}, nil
 }
 
@@ -230,13 +301,17 @@ func (p *ConnectionProvisioner) Update(ctx context.Context, request *resource.Up
 
 func (p *ConnectionProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
 	cfg := cfgFrom(request.TargetConfig, p.cfg)
-	sn, _, err := p.clients(ctx, cfg)
+	sn, crm, err := p.clients(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	netPath, err := networkPath(crm, cfg.Project, request.NativeID)
+	if err != nil {
+		return deleteFailure(mapErr(err), err.Error()), nil
+	}
 	// Find the peering name to address the connection; the consumer network is
-	// the NativeID (already the project-number path).
-	resp, err := sn.Services.Connections.List("services/" + defaultService).Network(request.NativeID).Context(ctx).Do()
+	// the project-number path.
+	resp, err := sn.Services.Connections.List("services/" + defaultService).Network(netPath).Context(ctx).Do()
 	if err != nil {
 		if code := mapErr(err); code == resource.OperationErrorCodeNotFound {
 			return deleteSuccess(request.NativeID), nil
@@ -251,8 +326,8 @@ func (p *ConnectionProvisioner) Delete(ctx context.Context, request *resource.De
 		peering = "servicenetworking-googleapis-com"
 	}
 	name := fmt.Sprintf("services/%s/connections/%s", defaultService, peering)
-	_, err = sn.Services.Connections.DeleteConnection(name, &servicenetworking.DeleteConnectionRequest{
-		ConsumerNetwork: request.NativeID,
+	op, err := sn.Services.Connections.DeleteConnection(name, &servicenetworking.DeleteConnectionRequest{
+		ConsumerNetwork: netPath,
 	}).Context(ctx).Do()
 	if err != nil {
 		if code := mapErr(err); code == resource.OperationErrorCodeNotFound {
@@ -260,7 +335,15 @@ func (p *ConnectionProvisioner) Delete(ctx context.Context, request *resource.De
 		}
 		return deleteFailure(mapErr(err), err.Error()), nil
 	}
-	return deleteSuccess(request.NativeID), nil
+	// Peering removal is long-running; report InProgress and let Status poll the
+	// operation so the resource is only considered gone once the peering is
+	// actually torn down.
+	return &resource.DeleteResult{ProgressResult: &resource.ProgressResult{
+		Operation:       resource.OperationDelete,
+		OperationStatus: resource.OperationStatusInProgress,
+		NativeID:        request.NativeID,
+		RequestID:       op.Name,
+	}}, nil
 }
 
 func (p *ConnectionProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
