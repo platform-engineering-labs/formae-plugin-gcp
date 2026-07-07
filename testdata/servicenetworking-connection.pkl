@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/globalAddress.pkl"
+import "@gcp/servicenetworking/connection.pkl"
+import "./config/vars.pkl" as v
+
+// Consumer VPC + the reserved internal range the service producer peers into.
+local net = new network.Network {
+  label = "plugin-sdk-test-psa-net"
+  name = "formae-plugin-sdk-test-psa-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local peerRange = new globalAddress.GlobalAddress {
+  label = "plugin-sdk-test-psa-range"
+  name = "formae-plugin-sdk-test-psa-range-\(v.testRunID)"
+  addressType = "INTERNAL"
+  purpose = "VPC_PEERING"
+  prefixLength = 16
+  network = net.res.selfLink
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  peerRange
+
+  new connection.Connection {
+    label = "plugin-sdk-test-psa-connection"
+    network = net.res.selfLink
+    reservedPeeringRanges = new Listing {
+      peerRange.res.name
+    }
+  }
+}

@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Service Networking Connection (Private Service Access)
+///
+/// Establishes the VPC peering between your network and Google's service
+/// producer network that private-IP managed services (e.g. private-IP Cloud SQL)
+/// require. Pair it with a compute GlobalAddress of `purpose = VPC_PEERING` that
+/// reserves the range, then set a Cloud SQL instance's
+/// `ipConfiguration.privateNetwork` to the same network with `ipv4Enabled = false`.
+///
+/// The connection is immutable in practice (a range change is a replace), so
+/// every field is createOnly.
+module gcp.servicenetworking.connection
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ServiceNetworking::Connection"
+
+open class ConnectionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    /// The VPC peering name the service producer created.
+    hidden peering: ConnectionResolvable = (this) {
+        property = "peering"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "network"
+}
+open class Connection extends formae.Resource {
+    hidden parent = this
+
+    /// Consumer VPC network. A network name, a `projects/{p}/global/networks/{n}`
+    /// path, or a resolvable self-link; the provisioner resolves it to the
+    /// project-number form the API requires.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: (String|formae.Resolvable)
+
+    /// Names of the reserved peering ranges (compute GlobalAddress of
+    /// purpose = VPC_PEERING) allocated for the service producer.
+    ///
+    /// Reference the range(s) by resolvable (`range.res.name`) so this connection
+    /// is created after them. Optional + write-only in the type: the reference is
+    /// what matters (it orders creation), and the provisioner discovers the actual
+    /// VPC_PEERING ranges on the network at apply time rather than trusting the
+    /// passed value - which can arrive unresolved on a same-apply resolution race.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    reservedPeeringRanges: Listing<String|formae.Resolvable>?
+
+    /// The producer service to peer with. Defaults to Service Networking itself
+    /// (used by Cloud SQL, Memorystore, etc.).
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    service: String?
+
+    hidden res: ConnectionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

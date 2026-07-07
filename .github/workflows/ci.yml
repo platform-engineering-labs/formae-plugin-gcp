@@ -226,6 +226,26 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=30
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
               ;;
+            servicenetworking-connection)
+              # PSA connections are async and global (VPC peering); create and
+              # especially discovery take longer than the 2m default to surface
+              # in inventory. Raise the discovery/OOB windows accordingly.
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
+            url-map|target-http-proxy|region-http-lb|global-forwarding-rule)
+              # Load-balancer chains create 3-5 dependent resources serially
+              # (health-check -> backend-service -> url-map -> proxy -> rule).
+              # The CRUD lifecycle already runs ~4m13s on a good day - 84% of
+              # the 5m default - so any per-op or operator-startup jitter tips
+              # it over. Give the chain headroom.
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
           esac
           make conformance-test-crud-run conformance-test-discovery-run \
             TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
