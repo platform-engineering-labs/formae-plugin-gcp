@@ -124,6 +124,30 @@ else
     echo "  No global forwarding rules found"
 fi
 
+# --- Regional forwarding rules (region-http-lb test) ---
+echo "Cleaning GCP regional forwarding rules..."
+REGIONAL_FORWARDING_RULES=$(gcloud compute forwarding-rules list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==2' || true)
+if [ -n "$REGIONAL_FORWARDING_RULES" ]; then
+    echo "$REGIONAL_FORWARDING_RULES" | while read -r fr region; do
+        echo "  Deleting regional forwarding rule: $fr (region: $region)"
+        gcloud compute forwarding-rules delete "$fr" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional forwarding rules found"
+fi
+
+# --- Regional target HTTP proxies (region-http-lb test) ---
+echo "Cleaning GCP regional target HTTP proxies..."
+REGIONAL_HTTP_PROXIES=$(gcloud compute target-http-proxies list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==2' || true)
+if [ -n "$REGIONAL_HTTP_PROXIES" ]; then
+    echo "$REGIONAL_HTTP_PROXIES" | while read -r thp region; do
+        echo "  Deleting regional target HTTP proxy: $thp (region: $region)"
+        gcloud compute target-http-proxies delete "$thp" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional target HTTP proxies found"
+fi
+
 # --- Target HTTP proxies (global, must be deleted before their url maps) ---
 echo "Cleaning GCP target HTTP proxies..."
 TARGET_HTTP_PROXIES=$(gcloud compute target-http-proxies list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
@@ -148,6 +172,18 @@ else
     echo "  No URL maps found"
 fi
 
+# --- Regional URL maps (region-http-lb test) ---
+echo "Cleaning GCP regional URL maps..."
+REGIONAL_URL_MAPS=$(gcloud compute url-maps list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==2' || true)
+if [ -n "$REGIONAL_URL_MAPS" ]; then
+    echo "$REGIONAL_URL_MAPS" | while read -r um region; do
+        echo "  Deleting regional URL map: $um (region: $region)"
+        gcloud compute url-maps delete "$um" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional URL maps found"
+fi
+
 # --- Backend services (global, must be deleted before their health checks) ---
 echo "Cleaning GCP backend services..."
 BACKEND_SERVICES=$(gcloud compute backend-services list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
@@ -160,9 +196,21 @@ else
     echo "  No backend services found"
 fi
 
+# --- Regional backend services (region-http-lb test) ---
+echo "Cleaning GCP regional backend services..."
+REGIONAL_BACKEND_SERVICES=$(gcloud compute backend-services list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==2' || true)
+if [ -n "$REGIONAL_BACKEND_SERVICES" ]; then
+    echo "$REGIONAL_BACKEND_SERVICES" | while read -r bs region; do
+        echo "  Deleting regional backend service: $bs (region: $region)"
+        gcloud compute backend-services delete "$bs" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional backend services found"
+fi
+
 # --- Health checks (global) ---
 echo "Cleaning GCP health checks..."
-HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==1{print $1}' || true)
 if [ -n "$HEALTH_CHECKS" ]; then
     echo "$HEALTH_CHECKS" | while read -r hc; do
         echo "  Deleting health check: $hc"
@@ -170,6 +218,18 @@ if [ -n "$HEALTH_CHECKS" ]; then
     done
 else
     echo "  No health checks found"
+fi
+
+# --- Regional health checks (region-http-lb test) ---
+echo "Cleaning GCP regional health checks..."
+REGIONAL_HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==2' || true)
+if [ -n "$REGIONAL_HEALTH_CHECKS" ]; then
+    echo "$REGIONAL_HEALTH_CHECKS" | while read -r hc region; do
+        echo "  Deleting regional health check: $hc (region: $region)"
+        gcloud compute health-checks delete "$hc" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional health checks found"
 fi
 
 # --- 4. Cloud Run services ---
@@ -235,6 +295,39 @@ if [ -n "$DATASETS" ]; then
     done
 else
     echo "  No BigQuery datasets found"
+fi
+
+# --- 6b. Private Service Access (servicenetworking connections + peering
+#         addresses) must be torn down before their networks. The connection
+#         is a VPC peering keyed by (service, network); delete it via the
+#         servicenetworking REST API (force=true removes the peering), then the
+#         reserved VPC_PEERING global addresses it consumed. ---
+echo "Cleaning GCP Private Service Access connections..."
+PSA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+PSA_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+if [ -n "$PSA_PROJECT" ] && [ -n "$PSA_TOKEN" ]; then
+    PSA_NETWORKS=$(gcloud compute networks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$PSA_NETWORKS" ]; then
+        echo "$PSA_NETWORKS" | while read -r net; do
+            echo "  Deleting PSA connection on network: $net"
+            curl -s -X DELETE -H "Authorization: Bearer ${PSA_TOKEN}" \
+                "https://servicenetworking.googleapis.com/v1/services/servicenetworking.googleapis.com/connections/-?force=true&consumerNetwork=projects/${PSA_PROJECT}/global/networks/${net}" \
+                >/dev/null 2>&1 || true
+        done
+    fi
+else
+    echo "  Skipping PSA cleanup (no project or access token available)"
+fi
+
+echo "Cleaning GCP global (VPC_PEERING) addresses..."
+GLOBAL_ADDRESSES=$(gcloud compute addresses list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$GLOBAL_ADDRESSES" ]; then
+    echo "$GLOBAL_ADDRESSES" | while read -r addr; do
+        echo "  Deleting global address: $addr"
+        gcloud compute addresses delete "$addr" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No global addresses found"
 fi
 
 # --- 7. Networks (after firewalls and subnetworks are deleted) ---
