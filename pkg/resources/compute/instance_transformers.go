@@ -350,8 +350,16 @@ func buildServiceAccounts(accounts []interface{}) []map[string]interface{} {
 }
 
 func buildMetadata(metadataMap map[string]interface{}) map[string]interface{} {
-	items := make([]map[string]interface{}, 0, len(metadataMap))
-	for key, value := range metadataMap {
+	// Schema shape is `metadata { items: Mapping<String,String> }`, so the real
+	// key/value pairs live under "items". The GCE API wants
+	// `metadata { items: [{key,value}] }`. Read the inner map; fall back to
+	// treating metadataMap itself as the pairs if there is no "items" key.
+	pairs := metadataMap
+	if inner := utils.GetObject(metadataMap, "items"); inner != nil {
+		pairs = inner
+	}
+	items := make([]map[string]interface{}, 0, len(pairs))
+	for key, value := range pairs {
 		if str, ok := value.(string); ok {
 			items = append(items, map[string]interface{}{
 				"key":   key,
