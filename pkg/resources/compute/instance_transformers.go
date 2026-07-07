@@ -294,6 +294,10 @@ func buildDisks(disks []interface{}, project, zone string) []map[string]interfac
 		ad["boot"] = utils.GetBool(diskMap, "boot")
 		ad["autoDelete"] = utils.GetBool(diskMap, "autoDelete")
 
+		if deviceName := utils.GetString(diskMap, "deviceName"); deviceName != "" {
+			ad["deviceName"] = deviceName
+		}
+
 		if source := utils.GetString(diskMap, "source"); source != "" {
 			ad["source"] = source
 		}
