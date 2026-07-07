@@ -28,6 +28,14 @@ open class ConnectionResolvable extends formae.Resolvable {
     hidden peering: ConnectionResolvable = (this) {
         property = "peering"
     }
+
+    /// The consumer network the connection peered. Reference this from a
+    /// private-IP consumer (e.g. `sqlInstance.settings.ipConfiguration
+    /// .privateNetwork = conn.res.network`) so the consumer is created only
+    /// after Private Service Access is established.
+    hidden network: ConnectionResolvable = (this) {
+        property = "network"
+    }
 }
 
 @gcp.ResourceHint {

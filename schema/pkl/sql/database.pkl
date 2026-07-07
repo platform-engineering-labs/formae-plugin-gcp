@@ -193,8 +193,13 @@ open class IpConfiguration extends formae.SubResource {
   @gcp.FieldHint
   ipv4Enabled: Boolean?
 
+  /// The VPC network for a private-IP instance, as a network path
+  /// (`projects/{p}/global/networks/{n}`) or a resolvable self-link. Accepting
+  /// a resolvable lets the instance depend on the Private Service Access
+  /// connection (reference `connection.res.network`) so it is created only
+  /// after the VPC peering exists.
   @gcp.FieldHint
-  privateNetwork: String?
+  privateNetwork: (String|formae.Resolvable)?
 
   @gcp.FieldHint { hasProviderDefault = true }
   requireSsl: Boolean?

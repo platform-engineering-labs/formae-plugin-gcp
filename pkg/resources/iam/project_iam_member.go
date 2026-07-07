@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/googleapi"
@@ -27,6 +28,25 @@ const nativeIDDelim = "|"
 // setIamPolicy can race on etag with parallel writers. Three tries is
 // enough for typical contention without masking real bugs.
 const maxSetPolicyAttempts = 3
+
+// A principal created in the same apply (e.g. the service account a binding
+// references) is eventually consistent: setIamPolicy can return 400 "does not
+// exist" for a few seconds after the account's create call returns. Retry
+// those with backoff (1+2+4+8 = ~15s worst case) so a same-apply SA + binding
+// does not race. Without an ordering edge (member is a plain string, not a
+// resolvable ref to the SA) the binding can even run before the SA create.
+const maxMemberPropagationAttempts = 5
+
+// isMemberNotYetPropagated reports whether err is the transient
+// "Service account ... does not exist" 400 that a not-yet-propagated principal
+// produces (as opposed to a genuinely missing member, which is a real error).
+func isMemberNotYetPropagated(err error) bool {
+	var ge *googleapi.Error
+	if !errors.As(err, &ge) || ge.Code != 400 {
+		return false
+	}
+	return strings.Contains(ge.Message, "does not exist")
+}
 
 // ProjectIamMemberProvisioner manages a single (role, member) binding on
 // a GCP project's IAM policy. Each operation is read-modify-write on the
@@ -195,11 +215,22 @@ func (p *ProjectIamMemberProvisioner) Create(ctx context.Context, request *resou
 		return nil, err
 	}
 
-	_, err = p.withRetryOnConflict(ctx, svc, props.Project, func(policy *cloudresourcemanager.Policy) bool {
-		return addMember(policy, props.Role, props.Member)
-	})
-	if err != nil {
-		return createFailure(mapGoogleErrorCode(err), err.Error()), nil
+	for attempt := 0; ; attempt++ {
+		_, err = p.withRetryOnConflict(ctx, svc, props.Project, func(policy *cloudresourcemanager.Policy) bool {
+			return addMember(policy, props.Role, props.Member)
+		})
+		if err == nil {
+			break
+		}
+		if attempt >= maxMemberPropagationAttempts-1 || !isMemberNotYetPropagated(err) {
+			return createFailure(mapGoogleErrorCode(err), err.Error()), nil
+		}
+		// Member (e.g. a same-apply service account) not yet propagated; back off.
+		select {
+		case <-ctx.Done():
+			return createFailure(resource.OperationErrorCodeServiceInternalError, ctx.Err().Error()), nil
+		case <-time.After(time.Duration(1<<attempt) * time.Second):
+		}
 	}
 
 	return createSuccess(buildNativeID(props.Project, props.Role, props.Member), request.Properties), nil
