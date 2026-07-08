@@ -46,8 +46,20 @@ func diskResponseTransformer(apiResponse map[string]interface{}, ctx base.Transf
 		apiResponse["sourceImage"] = extractProjectsPath(sourceImage)
 	}
 
-	apiResponse["physicalBlockSizeBytes"] = utils.GetInt64(apiResponse, "physicalBlockSizeBytes")
 	apiResponse["project"] = ctx.Project
+
+	// Drop provider-assigned "noise": fields GCP always populates that no forma
+	// declares, so they otherwise read back as perpetual drift. These are all
+	// server-set (createOnly) and not part of any managed intent.
+	for _, k := range []string{
+		"licenses",
+		"guestOsFeatures",
+		"architecture",
+		"enableConfidentialCompute",
+		"physicalBlockSizeBytes",
+	} {
+		delete(apiResponse, k)
+	}
 
 	return apiResponse
 }

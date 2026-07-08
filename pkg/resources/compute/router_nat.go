@@ -262,6 +262,17 @@ func (p *RouterNatProvisioner) Read(
 	out["router"] = router
 	out["region"] = region
 
+	// Drop provider-assigned "noise": fields GCP always populates that no forma
+	// declares, so they otherwise read back as perpetual drift.
+	for _, k := range []string{
+		"enableEndpointIndependentMapping",
+		"type",
+		"autoNetworkTier",
+		"endpointTypes",
+	} {
+		delete(out, k)
+	}
+
 	propsJSON, _ := json.Marshal(out)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }

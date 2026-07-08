@@ -18,17 +18,14 @@ func networkResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 		result[k] = v
 	}
 
-	// Filter out bgpBestPathSelectionMode from routingConfig
-	// This is a read-only field that the API returns but is not part of the schema
-	if routingConfig, ok := result["routingConfig"].(map[string]interface{}); ok {
-		filteredConfig := make(map[string]interface{})
-		for k, v := range routingConfig {
-			// Skip bgpBestPathSelectionMode - it's a read-only field not in the schema
-			if k != "bgpBestPathSelectionMode" {
-				filteredConfig[k] = v
-			}
-		}
-		result["routingConfig"] = filteredConfig
+	// Drop provider-assigned "noise": fields GCP always populates that no forma
+	// declares, so they otherwise read back as perpetual drift.
+	for _, k := range []string{
+		"routingConfig",
+		"mtu",
+		"networkFirewallPolicyEnforcementOrder",
+	} {
+		delete(result, k)
 	}
 
 	return result
