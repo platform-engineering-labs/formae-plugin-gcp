@@ -228,12 +228,13 @@ jobs:
               ;;
             servicenetworking-connection)
               # PSA connections are async and global (VPC peering); create and
-              # especially discovery take longer than the 2m default to surface
-              # in inventory. Raise the discovery/OOB windows accordingly.
-              TIMEOUT_ARG="TIMEOUT=15"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
-              export FORMAE_TEST_OOB_TIMEOUT=15
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              # especially discovery take longer to surface in inventory than any
+              # other resource. Give them the same 30m window as Cloud SQL - 15m
+              # was borderline and timed out under load.
+              TIMEOUT_ARG="TIMEOUT=30"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
+              export FORMAE_TEST_OOB_TIMEOUT=30
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
               ;;
             url-map|target-http-proxy|region-http-lb|global-forwarding-rule)
               # Load-balancer chains create 3-5 dependent resources serially
