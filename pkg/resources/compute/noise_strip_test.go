@@ -24,8 +24,10 @@ func TestResponseTransformersDropProviderNoise(t *testing.T) {
 			"architecture":              "X86_64",
 			"enableConfidentialCompute": false,
 			"physicalBlockSizeBytes":    "4096",
+			"lastAttachTimestamp":       "2026-01-01T00:00:00Z",
+			"users":                     []interface{}{"projects/p/zones/z/instances/vm"},
 		}, ctx)
-		for _, k := range []string{"licenses", "guestOsFeatures", "architecture", "enableConfidentialCompute", "physicalBlockSizeBytes"} {
+		for _, k := range []string{"licenses", "guestOsFeatures", "architecture", "enableConfidentialCompute", "physicalBlockSizeBytes", "lastAttachTimestamp", "users"} {
 			if _, ok := out[k]; ok {
 				t.Errorf("disk: %q not stripped", k)
 			}
@@ -41,8 +43,10 @@ func TestResponseTransformersDropProviderNoise(t *testing.T) {
 			"routingConfig":                         map[string]interface{}{"routingMode": "REGIONAL"},
 			"mtu":                                   1460,
 			"networkFirewallPolicyEnforcementOrder": "AFTER_CLASSIC_FIREWALL",
+			"subnetworks":                           []interface{}{"projects/p/regions/r/subnetworks/s"},
+			"peerings":                              []interface{}{map[string]interface{}{"name": "servicenetworking"}},
 		}, ctx)
-		for _, k := range []string{"routingConfig", "mtu", "networkFirewallPolicyEnforcementOrder"} {
+		for _, k := range []string{"routingConfig", "mtu", "networkFirewallPolicyEnforcementOrder", "subnetworks", "peerings"} {
 			if _, ok := out[k]; ok {
 				t.Errorf("network: %q not stripped", k)
 			}
@@ -57,9 +61,12 @@ func TestResponseTransformersDropProviderNoise(t *testing.T) {
 			"name":                        "r1",
 			"region":                      "https://www.googleapis.com/compute/v1/projects/p/regions/us-central1",
 			"encryptedInterconnectRouter": false,
+			"nats":                        []interface{}{map[string]interface{}{"name": "nat1"}},
 		}, ctx)
-		if _, ok := out["encryptedInterconnectRouter"]; ok {
-			t.Error("router: encryptedInterconnectRouter not stripped")
+		for _, k := range []string{"encryptedInterconnectRouter", "nats"} {
+			if _, ok := out[k]; ok {
+				t.Errorf("router: %q not stripped", k)
+			}
 		}
 		if out["region"] != "us-central1" {
 			t.Errorf("router: region not normalized: %#v", out["region"])

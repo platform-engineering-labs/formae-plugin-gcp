@@ -24,6 +24,10 @@ func networkResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 		"routingConfig",
 		"mtu",
 		"networkFirewallPolicyEnforcementOrder",
+		// Mirrors of separately-managed resources; reporting them here drifts the
+		// network whenever a subnet (Subnetwork) or PSA peering (Connection) attaches.
+		"subnetworks",
+		"peerings",
 	} {
 		delete(result, k)
 	}

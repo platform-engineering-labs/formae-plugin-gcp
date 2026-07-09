@@ -12,6 +12,9 @@ import "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bas
 func routerResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	result := base.RegionResponseTransformer.Transform(apiResponse, ctx)
 	delete(result, "encryptedInterconnectRouter")
+	// nats are a separate managed resource (RouterNat); the router read must not
+	// mirror them or it drifts every time a NAT is attached.
+	delete(result, "nats")
 	return result
 }
 

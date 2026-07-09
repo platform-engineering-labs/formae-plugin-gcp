@@ -259,7 +259,12 @@ func (p *RouterNatProvisioner) Read(
 	for k, v := range nat {
 		out[k] = v
 	}
-	out["router"] = router
+	// Return router as its full selfLink URL so it round-trips against a
+	// resolvable reference (router = someRouter.res.selfLink); a bare name would
+	// drift against the resolved full URL (see PLA-265).
+	out["router"] = fmt.Sprintf(
+		"https://www.googleapis.com/compute/v1/projects/%s/regions/%s/routers/%s",
+		project, region, router)
 	out["region"] = region
 
 	// Drop provider-assigned "noise": fields GCP always populates that no forma
@@ -269,6 +274,7 @@ func (p *RouterNatProvisioner) Read(
 		"type",
 		"autoNetworkTier",
 		"endpointTypes",
+		"effectiveTcpTimeWaitTimeoutSec", // server-computed read-only value → drift noise
 	} {
 		delete(out, k)
 	}

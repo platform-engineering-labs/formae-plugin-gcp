@@ -57,6 +57,8 @@ func diskResponseTransformer(apiResponse map[string]interface{}, ctx base.Transf
 		"architecture",
 		"enableConfidentialCompute",
 		"physicalBlockSizeBytes",
+		"lastAttachTimestamp", // volatile: changes on every VM attach → drift noise
+		"users",               // mirror of the Instance that attached this disk → drift noise
 	} {
 		delete(apiResponse, k)
 	}
