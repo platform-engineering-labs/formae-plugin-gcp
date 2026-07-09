@@ -48,17 +48,14 @@ func diskResponseTransformer(apiResponse map[string]interface{}, ctx base.Transf
 
 	apiResponse["project"] = ctx.Project
 
-	// Drop provider-assigned "noise": fields GCP always populates that no forma
-	// declares, so they otherwise read back as perpetual drift. These are all
-	// server-set (createOnly) and not part of any managed intent.
+	// Drop read-only fields that are NOT in the schema and churn as other
+	// resources attach - they otherwise read back as perpetual drift. Schema
+	// fields GCP defaults (licenses, guestOsFeatures, architecture,
+	// enableConfidentialCompute, physicalBlockSizeBytes) carry hasProviderDefault
+	// instead, so a user who declares one still gets drift detection.
 	for _, k := range []string{
-		"licenses",
-		"guestOsFeatures",
-		"architecture",
-		"enableConfidentialCompute",
-		"physicalBlockSizeBytes",
-		"lastAttachTimestamp", // volatile: changes on every VM attach → drift noise
-		"users",               // mirror of the Instance that attached this disk → drift noise
+		"lastAttachTimestamp", // volatile: changes on every VM attach
+		"users",               // mirror of the Instance that attached this disk
 	} {
 		delete(apiResponse, k)
 	}

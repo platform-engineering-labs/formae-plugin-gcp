@@ -88,9 +88,10 @@ open class Network extends formae.Resource {
     }
     autoCreateSubnetworks: Boolean?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     routingConfig: RoutingConfig?
 
+    @gcp.FieldHint { hasProviderDefault = true }
     mtu: Int?
 
     @gcp.FieldHint {

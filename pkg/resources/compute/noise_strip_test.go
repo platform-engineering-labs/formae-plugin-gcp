@@ -27,9 +27,17 @@ func TestResponseTransformersDropProviderNoise(t *testing.T) {
 			"lastAttachTimestamp":       "2026-01-01T00:00:00Z",
 			"users":                     []interface{}{"projects/p/zones/z/instances/vm"},
 		}, ctx)
-		for _, k := range []string{"licenses", "guestOsFeatures", "architecture", "enableConfidentialCompute", "physicalBlockSizeBytes", "lastAttachTimestamp", "users"} {
+		// Only non-schema churners are stripped.
+		for _, k := range []string{"lastAttachTimestamp", "users"} {
 			if _, ok := out[k]; ok {
 				t.Errorf("disk: %q not stripped", k)
+			}
+		}
+		// Schema fields (hasProviderDefault handles their drift) must be RETAINED
+		// so a user who declares one still gets drift detection.
+		for _, k := range []string{"licenses", "guestOsFeatures", "architecture", "enableConfidentialCompute", "physicalBlockSizeBytes"} {
+			if _, ok := out[k]; !ok {
+				t.Errorf("disk: schema field %q wrongly stripped", k)
 			}
 		}
 		if out["name"] != "d1" || out["sourceImage"] != "projects/cos-cloud/global/images/cos-1" {
@@ -46,9 +54,14 @@ func TestResponseTransformersDropProviderNoise(t *testing.T) {
 			"subnetworks":                           []interface{}{"projects/p/regions/r/subnetworks/s"},
 			"peerings":                              []interface{}{map[string]interface{}{"name": "servicenetworking"}},
 		}, ctx)
-		for _, k := range []string{"routingConfig", "mtu", "networkFirewallPolicyEnforcementOrder", "subnetworks", "peerings"} {
+		for _, k := range []string{"subnetworks", "peerings"} {
 			if _, ok := out[k]; ok {
 				t.Errorf("network: %q not stripped", k)
+			}
+		}
+		for _, k := range []string{"routingConfig", "mtu", "networkFirewallPolicyEnforcementOrder"} {
+			if _, ok := out[k]; !ok {
+				t.Errorf("network: schema field %q wrongly stripped", k)
 			}
 		}
 		if out["name"] != "n1" {
@@ -63,10 +76,11 @@ func TestResponseTransformersDropProviderNoise(t *testing.T) {
 			"encryptedInterconnectRouter": false,
 			"nats":                        []interface{}{map[string]interface{}{"name": "nat1"}},
 		}, ctx)
-		for _, k := range []string{"encryptedInterconnectRouter", "nats"} {
-			if _, ok := out[k]; ok {
-				t.Errorf("router: %q not stripped", k)
-			}
+		if _, ok := out["nats"]; ok {
+			t.Error("router: nats not stripped")
+		}
+		if _, ok := out["encryptedInterconnectRouter"]; !ok {
+			t.Error("router: schema field encryptedInterconnectRouter wrongly stripped")
 		}
 		if out["region"] != "us-central1" {
 			t.Errorf("router: region not normalized: %#v", out["region"])

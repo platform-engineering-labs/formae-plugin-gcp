@@ -11,9 +11,9 @@ import "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bas
 // perpetual drift).
 func routerResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	result := base.RegionResponseTransformer.Transform(apiResponse, ctx)
-	delete(result, "encryptedInterconnectRouter")
-	// nats are a separate managed resource (RouterNat); the router read must not
-	// mirror them or it drifts every time a NAT is attached.
+	// nats are a separate managed resource (RouterNat, not in the Router schema);
+	// the router read must not mirror them or it drifts every time a NAT attaches.
+	// encryptedInterconnectRouter is a schema field → handled by hasProviderDefault.
 	delete(result, "nats")
 	return result
 }

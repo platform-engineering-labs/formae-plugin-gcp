@@ -20,12 +20,12 @@ func networkResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 
 	// Drop provider-assigned "noise": fields GCP always populates that no forma
 	// declares, so they otherwise read back as perpetual drift.
+	// Mirrors of separately-managed resources (not in the Network schema);
+	// reporting them here drifts the network whenever a subnet (Subnetwork) or
+	// PSA peering (Connection) attaches. Schema fields GCP defaults
+	// (routingConfig, mtu, networkFirewallPolicyEnforcementOrder) carry
+	// hasProviderDefault instead of being stripped.
 	for _, k := range []string{
-		"routingConfig",
-		"mtu",
-		"networkFirewallPolicyEnforcementOrder",
-		// Mirrors of separately-managed resources; reporting them here drifts the
-		// network whenever a subnet (Subnetwork) or PSA peering (Connection) attaches.
 		"subnetworks",
 		"peerings",
 	} {

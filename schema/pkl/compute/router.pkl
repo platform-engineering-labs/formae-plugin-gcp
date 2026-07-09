@@ -89,6 +89,7 @@ open class Router extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     encryptedInterconnectRouter: Boolean?
 

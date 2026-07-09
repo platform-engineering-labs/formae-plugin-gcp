@@ -117,7 +117,7 @@ open class RouterNat extends formae.Resource {
     @gcp.FieldHint
     logConfig: LogConfig?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     enableEndpointIndependentMapping: Boolean?
 
     @gcp.FieldHint
@@ -125,14 +125,16 @@ open class RouterNat extends formae.Resource {
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     `type`: NatType?
 
-    @gcp.FieldHint
+    @gcp.FieldHint { hasProviderDefault = true }
     autoNetworkTier: AutoNetworkTier?
 
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     endpointTypes: Listing<EndpointType>?
 

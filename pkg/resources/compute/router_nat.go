@@ -267,17 +267,12 @@ func (p *RouterNatProvisioner) Read(
 		project, region, router)
 	out["region"] = region
 
-	// Drop provider-assigned "noise": fields GCP always populates that no forma
-	// declares, so they otherwise read back as perpetual drift.
-	for _, k := range []string{
-		"enableEndpointIndependentMapping",
-		"type",
-		"autoNetworkTier",
-		"endpointTypes",
-		"effectiveTcpTimeWaitTimeoutSec", // server-computed read-only value → drift noise
-	} {
-		delete(out, k)
-	}
+	// effectiveTcpTimeWaitTimeoutSec is a server-computed read-only value not in
+	// the schema → strip it or it reads back as perpetual drift. The schema
+	// fields GCP defaults (enableEndpointIndependentMapping, type, autoNetworkTier,
+	// endpointTypes) carry hasProviderDefault instead, so a user who declares one
+	// still gets drift detection.
+	delete(out, "effectiveTcpTimeWaitTimeoutSec")
 
 	propsJSON, _ := json.Marshal(out)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
