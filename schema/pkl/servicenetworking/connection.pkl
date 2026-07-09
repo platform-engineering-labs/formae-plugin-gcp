@@ -41,6 +41,11 @@ open class ConnectionResolvable extends formae.Resolvable {
 @gcp.ResourceHint {
     type = module.type
     identifier = "network"
+    // A PSA connection is a VPC-peering side-effect keyed by the consumer
+    // network, not an independently listable/discoverable resource - the
+    // discovery inventory never reliably surfaces it. Manage it via the network;
+    // exclude it from discovery (and the discovery conformance test).
+    discoverable = false
 }
 open class Connection extends formae.Resource {
     hidden parent = this
