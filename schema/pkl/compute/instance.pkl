@@ -84,11 +84,12 @@ class AttachedDisk {
 
   /// Stable device name under the guest OS. Sets the `/dev/disk/by-id/google-<deviceName>`
   /// symlink, so a data disk can be found deterministically (e.g. a persistent
-  /// identity disk mounted by a startup script). Defaults to the disk name if unset.
-  /// writeOnly: the API always echoes a deviceName (enrichment), and the disk
-  /// response is normalized to boot/autoDelete/source, so it is not read back or
-  /// drift-compared - it is a create-time input only.
-  @gcp.FieldHint { createOnly = true; writeOnly = true }
+  /// identity disk mounted by a startup script).
+  /// hasProviderDefault: GCP auto-assigns a deviceName ("persistent-disk-N") when
+  /// one is not declared; the disk response keeps deviceName so a declared value
+  /// round-trips, and hasProviderDefault suppresses the auto value as drift for
+  /// disks that do not set one.
+  @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
   deviceName: String?
 
   /// Source disk URL

@@ -167,6 +167,12 @@ func normalizeInstanceDisks(disks []interface{}) []interface{} {
 		if source := utils.GetString(dm, "source"); source != "" {
 			nd["source"] = source
 		}
+		// Keep deviceName so a forma that sets it round-trips instead of drifting.
+		// It is hasProviderDefault in the schema, so a disk that does NOT declare
+		// one (GCP auto-assigns "persistent-disk-N") is not treated as drift.
+		if dn := utils.GetString(dm, "deviceName"); dn != "" {
+			nd["deviceName"] = dn
+		}
 		result = append(result, nd)
 	}
 	return result
