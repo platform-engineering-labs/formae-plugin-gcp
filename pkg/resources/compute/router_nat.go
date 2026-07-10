@@ -259,8 +259,20 @@ func (p *RouterNatProvisioner) Read(
 	for k, v := range nat {
 		out[k] = v
 	}
-	out["router"] = router
+	// Return router as its full selfLink URL so it round-trips against a
+	// resolvable reference (router = someRouter.res.selfLink); a bare name would
+	// drift against the resolved full URL (see PLA-265).
+	out["router"] = fmt.Sprintf(
+		"https://www.googleapis.com/compute/v1/projects/%s/regions/%s/routers/%s",
+		project, region, router)
 	out["region"] = region
+
+	// effectiveTcpTimeWaitTimeoutSec is a server-computed read-only value not in
+	// the schema → strip it or it reads back as perpetual drift. The schema
+	// fields GCP defaults (enableEndpointIndependentMapping, type, autoNetworkTier,
+	// endpointTypes) carry hasProviderDefault instead, so a user who declares one
+	// still gets drift detection.
+	delete(out, "effectiveTcpTimeWaitTimeoutSec")
 
 	propsJSON, _ := json.Marshal(out)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil

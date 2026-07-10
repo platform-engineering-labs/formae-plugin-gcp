@@ -28,11 +28,24 @@ open class ConnectionResolvable extends formae.Resolvable {
     hidden peering: ConnectionResolvable = (this) {
         property = "peering"
     }
+
+    /// The consumer network the connection peered. Reference this from a
+    /// private-IP consumer (e.g. `sqlInstance.settings.ipConfiguration
+    /// .privateNetwork = conn.res.network`) so the consumer is created only
+    /// after Private Service Access is established.
+    hidden network: ConnectionResolvable = (this) {
+        property = "network"
+    }
 }
 
 @gcp.ResourceHint {
     type = module.type
     identifier = "network"
+    // A PSA connection is a VPC-peering side-effect keyed by the consumer
+    // network, not an independently listable/discoverable resource - the
+    // discovery inventory never reliably surfaces it. Manage it via the network;
+    // exclude it from discovery (and the discovery conformance test).
+    discoverable = false
 }
 open class Connection extends formae.Resource {
     hidden parent = this

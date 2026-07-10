@@ -18,17 +18,18 @@ func networkResponseTransformer(apiResponse map[string]interface{}, ctx base.Tra
 		result[k] = v
 	}
 
-	// Filter out bgpBestPathSelectionMode from routingConfig
-	// This is a read-only field that the API returns but is not part of the schema
-	if routingConfig, ok := result["routingConfig"].(map[string]interface{}); ok {
-		filteredConfig := make(map[string]interface{})
-		for k, v := range routingConfig {
-			// Skip bgpBestPathSelectionMode - it's a read-only field not in the schema
-			if k != "bgpBestPathSelectionMode" {
-				filteredConfig[k] = v
-			}
-		}
-		result["routingConfig"] = filteredConfig
+	// Drop provider-assigned "noise": fields GCP always populates that no forma
+	// declares, so they otherwise read back as perpetual drift.
+	// Mirrors of separately-managed resources (not in the Network schema);
+	// reporting them here drifts the network whenever a subnet (Subnetwork) or
+	// PSA peering (Connection) attaches. Schema fields GCP defaults
+	// (routingConfig, mtu, networkFirewallPolicyEnforcementOrder) carry
+	// hasProviderDefault instead of being stripped.
+	for _, k := range []string{
+		"subnetworks",
+		"peerings",
+	} {
+		delete(result, k)
 	}
 
 	return result

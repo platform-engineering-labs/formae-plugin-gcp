@@ -191,7 +191,7 @@ func init() {
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
-			ResponseTransformer: base.RegionResponseTransformer,
+			ResponseTransformer: RouterResponseTransformer,
 		},
 
 		// ==================== Load Balancer - Backends + Certificate ====================

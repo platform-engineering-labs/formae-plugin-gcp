@@ -46,8 +46,19 @@ func diskResponseTransformer(apiResponse map[string]interface{}, ctx base.Transf
 		apiResponse["sourceImage"] = extractProjectsPath(sourceImage)
 	}
 
-	apiResponse["physicalBlockSizeBytes"] = utils.GetInt64(apiResponse, "physicalBlockSizeBytes")
 	apiResponse["project"] = ctx.Project
+
+	// Drop read-only fields that are NOT in the schema and churn as other
+	// resources attach - they otherwise read back as perpetual drift. Schema
+	// fields GCP defaults (licenses, guestOsFeatures, architecture,
+	// enableConfidentialCompute, physicalBlockSizeBytes) carry hasProviderDefault
+	// instead, so a user who declares one still gets drift detection.
+	for _, k := range []string{
+		"lastAttachTimestamp", // volatile: changes on every VM attach
+		"users",               // mirror of the Instance that attached this disk
+	} {
+		delete(apiResponse, k)
+	}
 
 	return apiResponse
 }

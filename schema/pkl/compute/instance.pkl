@@ -82,6 +82,15 @@ class AttachedDisk {
   /// Disk mode (READ_WRITE or READ_ONLY)
   mode: String?
 
+  /// Stable device name under the guest OS. Sets the `/dev/disk/by-id/google-<deviceName>`
+  /// symlink, so a data disk can be found deterministically (e.g. a persistent
+  /// identity disk mounted by a startup script). Defaults to the disk name if unset.
+  /// writeOnly: the API always echoes a deviceName (enrichment), and the disk
+  /// response is normalized to boot/autoDelete/source, so it is not read back or
+  /// drift-compared - it is a create-time input only.
+  @gcp.FieldHint { createOnly = true; writeOnly = true }
+  deviceName: String?
+
   /// Source disk URL
   source: (String|formae.Resolvable)?
 

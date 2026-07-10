@@ -393,5 +393,32 @@ else
     echo "  Skipping Cloud SQL cleanup (no project or access token available)"
 fi
 
+# --- 11. Secret Manager secrets (secret + secret-version tests) ---
+# Not cleaned before => leaked secrets cause AlreadyExists on re-run. Deleting a
+# secret removes its versions, so this covers both test resource types.
+echo "Cleaning GCP Secret Manager secrets..."
+SECRETS=$(gcloud secrets list --filter="name~^formae-plugin-sdk-test" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SECRETS" ]; then
+    echo "$SECRETS" | while read -r secret; do
+        echo "  Deleting secret: $secret"
+        gcloud secrets delete "$secret" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No secrets found"
+fi
+
+# --- 12. IAM service accounts (iam-service-account test) ---
+echo "Cleaning GCP IAM service accounts..."
+SA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+SERVICE_ACCOUNTS=$(gcloud iam service-accounts list --filter="email~^formae-plugin-sdk-test" --format="value(email)" 2>/dev/null || true)
+if [ -n "$SERVICE_ACCOUNTS" ]; then
+    echo "$SERVICE_ACCOUNTS" | while read -r sa; do
+        echo "  Deleting service account: $sa"
+        gcloud iam service-accounts delete "$sa" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No service accounts found"
+fi
+
 echo ""
 echo "clean-environment.sh: Cleanup complete"
