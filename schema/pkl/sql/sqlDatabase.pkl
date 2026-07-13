@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud SQL Database
+///
+/// A single database inside a Cloud SQL instance (the SQL-level `CREATE
+/// DATABASE`). A fresh instance ships only the engine's default database, so
+/// declare one of these to have an application database created and managed.
+module gcp.sql.sqlDatabase
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::SQL::Database"
+
+open class DatabaseResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: DatabaseResolvable = (this) {
+        property = "Id"
+    }
+
+    hidden name: DatabaseResolvable = (this) {
+        property = "name"
+    }
+}
+
+/// GCP Cloud SQL Database resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Database extends formae.Resource {
+    hidden parent = this
+
+    /// GCP project ID
+    @gcp.FieldHint { createOnly = true }
+    project: String
+
+    /// The Cloud SQL instance this database lives in. A name or a resolvable
+    /// reference to a DatabaseInstance (`dbInstance.res.name`) so the database
+    /// is created only after the instance exists.
+    @gcp.FieldHint { createOnly = true }
+    instance: String|formae.Resolvable
+
+    /// Database name
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Character set (server assigns an engine default if omitted)
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    charset: String?
+
+    /// Collation (server assigns an engine default if omitted)
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    collation: String?
+
+    // --- Provider-populated output fields ---
+    /// Resource kind (sql#database)
+    @gcp.FieldHint { hasProviderDefault = true }
+    kind: String?
+
+    /// Self link URL (server-assigned)
+    @gcp.FieldHint { hasProviderDefault = true }
+    selfLink: String?
+
+    /// Etag for optimistic locking (server-assigned)
+    @gcp.FieldHint { hasProviderDefault = true }
+    etag: String?
+
+    hidden res: DatabaseResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
