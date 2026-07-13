@@ -23,14 +23,15 @@ func databaseInstanceResponseTransformer(apiResponse map[string]interface{}) map
 		}
 	}
 
-	// Normalize ipConfiguration.privateNetwork to the "projects/..." path the
-	// API accepts and that a network resolvable reference resolves to. Cloud SQL
-	// echoes it back as a full "https://www.googleapis.com/compute/v1/projects/..."
-	// URL, which would otherwise drift against the declared value.
+	// Normalize ipConfiguration.privateNetwork to the full compute selfLink form.
+	// The forma declares this from a network resolvable's .selfLink (a full
+	// "https://www.googleapis.com/compute/v1/projects/..." URL), but Cloud SQL
+	// stores/echoes the bare "projects/..." path, which would otherwise drift.
+	// Expand the short path back to the selfLink so it round-trips.
 	if ipc, ok := settings["ipConfiguration"].(map[string]interface{}); ok {
 		if pn, ok := ipc["privateNetwork"].(string); ok {
-			if i := strings.Index(pn, "projects/"); i >= 0 {
-				ipc["privateNetwork"] = pn[i:]
+			if strings.HasPrefix(pn, "projects/") {
+				ipc["privateNetwork"] = "https://www.googleapis.com/compute/v1/" + pn
 			}
 		}
 	}
