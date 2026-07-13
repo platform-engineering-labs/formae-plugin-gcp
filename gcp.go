@@ -83,8 +83,24 @@ func (p *Plugin) LabelConfig() model.LabelConfig {
 // CRUD Operations
 // =============================================================================
 
+// stripNonFailureMessage clears StatusMessage on any non-failure result. The CLI
+// renders StatusMessage as a resource's "reason:", which should explain a failure
+// — not narrate normal progress ("networks creation in progress") or success. So
+// a reason is only surfaced when the operation actually failed.
+func stripNonFailureMessage(pr *resource.ProgressResult) {
+	if pr != nil && pr.OperationStatus != resource.OperationStatusFailure {
+		pr.StatusMessage = ""
+	}
+}
+
 // Create provisions a new GCP resource.
-func (p *Plugin) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
+func (p *Plugin) Create(ctx context.Context, request *resource.CreateRequest) (res *resource.CreateResult, err error) {
+	defer func() {
+		if res != nil {
+			stripNonFailureMessage(res.ProgressResult)
+		}
+	}()
+
 	targetConfig := config.FromTargetConfig(request.TargetConfig)
 
 	// Check for custom provisioner
@@ -118,7 +134,13 @@ func (p *Plugin) Read(ctx context.Context, request *resource.ReadRequest) (*reso
 }
 
 // Update modifies an existing GCP resource.
-func (p *Plugin) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
+func (p *Plugin) Update(ctx context.Context, request *resource.UpdateRequest) (res *resource.UpdateResult, err error) {
+	defer func() {
+		if res != nil {
+			stripNonFailureMessage(res.ProgressResult)
+		}
+	}()
+
 	if registry.HasProvisioner(request.ResourceType, resource.OperationUpdate) {
 		provisioner := registry.Get(request.ResourceType, resource.OperationUpdate, config.FromTargetConfig(request.TargetConfig))
 		return provisioner.Update(ctx, request)
@@ -133,7 +155,13 @@ func (p *Plugin) Update(ctx context.Context, request *resource.UpdateRequest) (*
 }
 
 // Delete removes a GCP resource.
-func (p *Plugin) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
+func (p *Plugin) Delete(ctx context.Context, request *resource.DeleteRequest) (res *resource.DeleteResult, err error) {
+	defer func() {
+		if res != nil {
+			stripNonFailureMessage(res.ProgressResult)
+		}
+	}()
+
 	if registry.HasProvisioner(request.ResourceType, resource.OperationDelete) {
 		provisioner := registry.Get(request.ResourceType, resource.OperationDelete, config.FromTargetConfig(request.TargetConfig))
 		return provisioner.Delete(ctx, request)
@@ -148,7 +176,13 @@ func (p *Plugin) Delete(ctx context.Context, request *resource.DeleteRequest) (*
 }
 
 // Status checks the progress of an async GCP operation.
-func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
+func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (res *resource.StatusResult, err error) {
+	defer func() {
+		if res != nil {
+			stripNonFailureMessage(res.ProgressResult)
+		}
+	}()
+
 	if request.ResourceType != "" {
 		if registry.HasProvisioner(request.ResourceType, resource.OperationCheckStatus) {
 			provisioner := registry.Get(request.ResourceType, resource.OperationCheckStatus, config.FromTargetConfig(request.TargetConfig))
