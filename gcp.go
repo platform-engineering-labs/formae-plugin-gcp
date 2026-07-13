@@ -46,7 +46,7 @@ var GKEAutopilotResourceTypes = []string{
 func (p *Plugin) RateLimit() model.RateLimitConfig {
 	return model.RateLimitConfig{
 		Scope:                            model.RateLimitScopeNamespace,
-		MaxRequestsPerSecondForNamespace: 1,
+		MaxRequestsPerSecondForNamespace: 10,
 	}
 }
 
