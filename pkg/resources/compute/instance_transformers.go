@@ -136,7 +136,31 @@ func instanceResponseTransformer(apiResponse map[string]interface{}, ctx base.Tr
 		apiResponse["networkInterfaces"] = normalizeInstanceNetworkInterfaces(ifaces)
 	}
 
+	// The schema models metadata as `items: Mapping<String,String>`, but the API
+	// returns `items: [{key,value}]` plus a server "fingerprint"/"kind". Convert
+	// the array back to the map form (inverse of buildMetadata) and drop the
+	// provider fields so read-back matches the declared value instead of drifting
+	// (which would otherwise trigger a spurious instance update on every reapply).
+	if md := utils.GetObject(apiResponse, "metadata"); md != nil {
+		apiResponse["metadata"] = normalizeInstanceMetadata(md)
+	}
+
 	return apiResponse
+}
+
+// normalizeInstanceMetadata converts the GCE API metadata shape
+// ({items: [{key,value}], fingerprint, kind}) back to the schema shape
+// ({items: {key: value}}), the inverse of buildMetadata.
+func normalizeInstanceMetadata(md map[string]interface{}) map[string]interface{} {
+	pairs := map[string]interface{}{}
+	for _, it := range utils.GetArray(md, "items") {
+		if im, ok := it.(map[string]interface{}); ok {
+			if k := utils.GetString(im, "key"); k != "" {
+				pairs[k] = im["value"]
+			}
+		}
+	}
+	return map[string]interface{}{"items": pairs}
 }
 
 // normalizeInstanceDisks reduces each attached disk to the fields a forma
@@ -167,15 +191,36 @@ func normalizeInstanceDisks(disks []interface{}) []interface{} {
 		if source := utils.GetString(dm, "source"); source != "" {
 			nd["source"] = source
 		}
-		// Keep deviceName so a forma that sets it round-trips instead of drifting.
-		// It is hasProviderDefault in the schema, so a disk that does NOT declare
-		// one (GCP auto-assigns "persistent-disk-N") is not treated as drift.
-		if dn := utils.GetString(dm, "deviceName"); dn != "" {
+		// Keep an explicitly-declared deviceName so it round-trips, but drop GCP's
+		// auto-assigned "persistent-disk-N" (given to disks that do not declare one).
+		// hasProviderDefault only suppresses this at patch generation; the drift
+		// gate compares raw, so echoing the auto value would trigger a spurious
+		// instance update on every reapply.
+		if dn := utils.GetString(dm, "deviceName"); dn != "" && !autoDeviceName(dn) {
 			nd["deviceName"] = dn
 		}
 		result = append(result, nd)
 	}
 	return result
+}
+
+// autoDeviceName reports whether a deviceName is GCP's auto-assigned form
+// ("persistent-disk-0", "persistent-disk-1", ...) rather than one a forma set.
+func autoDeviceName(name string) bool {
+	const prefix = "persistent-disk-"
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	suffix := name[len(prefix):]
+	if suffix == "" {
+		return false
+	}
+	for _, r := range suffix {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // normalizeInstanceNetworkInterfaces keeps only the schema-modeled NetworkInterface
