@@ -469,11 +469,18 @@ func (b *BaseResource) Status(
 	done, err := b.OperationConfig.OperationStatusChecker(response.Body)
 
 	if err != nil {
+		// A transient operation failure (e.g. Cloud SQL "being accessed by other
+		// users" while sessions drain) is reported as NotStabilized so formae core
+		// re-runs the operation instead of failing the resource.
+		code := resource.OperationErrorCodeServiceInternalError
+		if b.OperationConfig.RetryableError != nil && b.OperationConfig.RetryableError(err) {
+			code = resource.OperationErrorCodeNotStabilized
+		}
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
 				OperationStatus: resource.OperationStatusFailure,
-				ErrorCode:       resource.OperationErrorCodeServiceInternalError,
+				ErrorCode:       code,
 				StatusMessage:   err.Error(),
 				RequestID:       request.RequestID,
 				NativeID:        nativeID,

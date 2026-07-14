@@ -27,6 +27,13 @@ type OperationConfig struct {
 	// Returns (done=true, err=error) on failure
 	// Returns (done=false, err=nil) if still in progress
 	OperationStatusChecker func(operationResponse map[string]interface{}) (done bool, err error)
+
+	// RetryableError, if set, reports whether a completed-with-error operation is
+	// transient and should be reported as NotStabilized (so formae core retries
+	// the operation) rather than a terminal failure. Example: Cloud SQL's
+	// "database ... is being accessed by other users", which clears once the
+	// server reaps lingering sessions after the client disconnects.
+	RetryableError func(err error) bool
 }
 
 // OperationResult represents the result of checking operation status

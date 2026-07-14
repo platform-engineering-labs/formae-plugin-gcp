@@ -55,6 +55,14 @@ var SQLOperations = base.OperationConfig{
 
 		return isDone, nil
 	},
+
+	// A database delete right after its client disconnects can fail with
+	// "database ... is being accessed by other users" — Cloud SQL reaps lingering
+	// sessions on a lag. Treat it as retryable so formae core re-runs the delete
+	// until the sessions clear, instead of failing the teardown.
+	RetryableError: func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "is being accessed by other users")
+	},
 }
 
 // SQLNativeID defines native ID format for SQL resources
