@@ -240,9 +240,18 @@ func (p *ConnectionProvisioner) Status(ctx context.Context, request *resource.St
 		}}, nil
 	}
 	if op.Error != nil {
+		// Deleting a PSA connection right after the Cloud SQL instance is gone
+		// fails with "Producer services ... are still using this connection" —
+		// Google's producer side releases the connection asynchronously (minutes).
+		// Report NotStabilized so formae's operator retries the delete with backoff
+		// until the producer releases, instead of failing the teardown.
+		code := resource.OperationErrorCodeServiceInternalError
+		if isProducerStillUsing(op.Error.Message) {
+			code = resource.OperationErrorCodeNotStabilized
+		}
 		return &resource.StatusResult{ProgressResult: &resource.ProgressResult{
 			Operation: resource.OperationCheckStatus, OperationStatus: resource.OperationStatusFailure,
-			ErrorCode:     resource.OperationErrorCodeServiceInternalError,
+			ErrorCode:     code,
 			StatusMessage: fmt.Sprintf("operation failed: %s", op.Error.Message), NativeID: request.NativeID,
 		}}, nil
 	}
@@ -350,6 +359,14 @@ func (p *ConnectionProvisioner) List(ctx context.Context, request *resource.List
 	// A connection is scoped to a specific network; there is no project-wide list
 	// without one. Discovery of PSA connections is out of scope.
 	return &resource.ListResult{}, nil
+}
+
+// isProducerStillUsing reports whether a delete-operation error is the transient
+// "Producer services ... are still using this connection" that Cloud SQL leaves
+// behind while it asynchronously releases the PSA connection after its instance
+// is deleted. It clears on its own after a few minutes, so it is retryable.
+func isProducerStillUsing(msg string) bool {
+	return strings.Contains(msg, "still using this connection")
 }
 
 func mapErr(err error) resource.OperationErrorCode {
