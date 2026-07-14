@@ -290,6 +290,13 @@ func (p *ProjectIamMemberProvisioner) Delete(ctx context.Context, request *resou
 		return removeMember(policy, role, member)
 	})
 	if err != nil {
+		// Idempotent delete: if the principal no longer exists (e.g. the service
+		// account was deleted before its bindings — members are plain strings, not
+		// resolvable refs, so formae can't order them), the binding is effectively
+		// gone. GCP returns 400 "... does not exist"; treat that as success.
+		if isMemberNotYetPropagated(err) {
+			return deleteSuccess(request.NativeID), nil
+		}
 		return deleteFailure(mapGoogleErrorCode(err), err.Error()), nil
 	}
 
