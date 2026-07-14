@@ -145,11 +145,30 @@ class Scheduling {
   provisioningModel: String?
 }
 
-/// Metadata key-value pairs
+/// A single instance metadata entry (matches the GCE API's items[] shape)
+@gcp.SubResourceHint
+class MetadataItem {
+  /// Metadata key (e.g. "startup-script", "ssh-keys")
+  @gcp.FieldHint
+  key: String
+
+  /// Metadata value
+  @gcp.FieldHint
+  value: String
+}
+
+/// Instance metadata. Mirrors the GCE API: `items` is an array of {key,value}
+/// entries plus a server-managed `fingerprint`.
 @gcp.SubResourceHint
 class Metadata {
-  /// Metadata items as key-value pairs
-  items: Mapping<String, String>?
+  /// Metadata entries
+  @gcp.FieldHint
+  items: Listing<MetadataItem>?
+
+  /// Optimistic-lock token for in-place metadata updates. Server-assigned and
+  /// changes on every write, so it is a provider default, never user-declared.
+  @gcp.FieldHint { hasProviderDefault = true }
+  fingerprint: String?
 }
 
 /// Tags for the instance

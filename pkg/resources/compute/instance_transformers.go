@@ -54,9 +54,10 @@ func instanceBodyBuilder(props map[string]interface{}, ctx base.TransformContext
 		body["serviceAccounts"] = buildServiceAccounts(serviceAccounts)
 	}
 
-	// Metadata
+	// Metadata — the schema mirrors the API ({items:[{key,value}], fingerprint}),
+	// so it passes straight through.
 	if metadataMap := utils.GetObject(props, "metadata"); metadataMap != nil {
-		body["metadata"] = buildMetadata(metadataMap)
+		body["metadata"] = metadataMap
 	}
 
 	// Tags
@@ -136,31 +137,14 @@ func instanceResponseTransformer(apiResponse map[string]interface{}, ctx base.Tr
 		apiResponse["networkInterfaces"] = normalizeInstanceNetworkInterfaces(ifaces)
 	}
 
-	// The schema models metadata as `items: Mapping<String,String>`, but the API
-	// returns `items: [{key,value}]` plus a server "fingerprint"/"kind". Convert
-	// the array back to the map form (inverse of buildMetadata) and drop the
-	// provider fields so read-back matches the declared value instead of drifting
-	// (which would otherwise trigger a spurious instance update on every reapply).
+	// The schema mirrors the API metadata shape ({items:[{key,value}], fingerprint}),
+	// so items and fingerprint round-trip as-is. Only drop "kind" (sql#/compute#
+	// discriminator), which is pure response noise not modeled in the schema.
 	if md := utils.GetObject(apiResponse, "metadata"); md != nil {
-		apiResponse["metadata"] = normalizeInstanceMetadata(md)
+		delete(md, "kind")
 	}
 
 	return apiResponse
-}
-
-// normalizeInstanceMetadata converts the GCE API metadata shape
-// ({items: [{key,value}], fingerprint, kind}) back to the schema shape
-// ({items: {key: value}}), the inverse of buildMetadata.
-func normalizeInstanceMetadata(md map[string]interface{}) map[string]interface{} {
-	pairs := map[string]interface{}{}
-	for _, it := range utils.GetArray(md, "items") {
-		if im, ok := it.(map[string]interface{}); ok {
-			if k := utils.GetString(im, "key"); k != "" {
-				pairs[k] = im["value"]
-			}
-		}
-	}
-	return map[string]interface{}{"items": pairs}
 }
 
 // normalizeInstanceDisks reduces each attached disk to the fields a forma
@@ -402,29 +386,6 @@ func buildServiceAccounts(accounts []interface{}) []map[string]interface{} {
 		result = append(result, sa)
 	}
 	return result
-}
-
-func buildMetadata(metadataMap map[string]interface{}) map[string]interface{} {
-	// Schema shape is `metadata { items: Mapping<String,String> }`, so the real
-	// key/value pairs live under "items". The GCE API wants
-	// `metadata { items: [{key,value}] }`. Read the inner map; fall back to
-	// treating metadataMap itself as the pairs if there is no "items" key.
-	pairs := metadataMap
-	if inner := utils.GetObject(metadataMap, "items"); inner != nil {
-		pairs = inner
-	}
-	items := make([]map[string]interface{}, 0, len(pairs))
-	for key, value := range pairs {
-		if str, ok := value.(string); ok {
-			items = append(items, map[string]interface{}{
-				"key":   key,
-				"value": str,
-			})
-		}
-	}
-	return map[string]interface{}{
-		"items": items,
-	}
 }
 
 func buildScheduling(schedulingMap map[string]interface{}) map[string]interface{} {
