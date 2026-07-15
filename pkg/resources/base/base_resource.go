@@ -265,6 +265,13 @@ func (b *BaseResource) Delete(
 			}, nil
 		}
 
+		// A transient delete failure (e.g. Cloud SQL returns "being accessed by
+		// other users" synchronously on the delete request while sessions drain)
+		// is reported as NotStabilized so formae core retries, instead of failing.
+		if b.OperationConfig.RetryableError != nil && b.OperationConfig.RetryableError(err) {
+			return b.deleteFailureResult(nativeID, resource.OperationErrorCodeNotStabilized, wrappedErr.Message), nil
+		}
+
 		return b.deleteFailureResult(nativeID, errorCode, wrappedErr.Message), nil
 	}
 
