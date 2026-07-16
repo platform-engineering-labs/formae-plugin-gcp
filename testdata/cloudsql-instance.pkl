@@ -35,7 +35,10 @@ forma {
       // per project (see pkg/resources/sql/database_instance_test.go setupServiceNetworking).
       ipConfiguration = new database.IpConfiguration {
         ipv4Enabled = false
-        privateNetwork = "projects/\(v.gcpProject)/global/networks/default"
+        // Full compute selfLink form — the plugin canonicalizes privateNetwork to
+        // this on read (matching what the Cloud SQL API returns), so declare it in
+        // the same form for a clean round-trip.
+        privateNetwork = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
       }
       backupConfiguration = new database.BackupConfiguration {
         enabled = false
