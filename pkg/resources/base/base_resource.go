@@ -265,6 +265,13 @@ func (b *BaseResource) Delete(
 			}, nil
 		}
 
+		// A transient delete failure (e.g. Cloud SQL returns "being accessed by
+		// other users" synchronously on the delete request while sessions drain)
+		// is reported as NotStabilized so formae core retries, instead of failing.
+		if b.OperationConfig.RetryableError != nil && b.OperationConfig.RetryableError(err) {
+			return b.deleteFailureResult(nativeID, resource.OperationErrorCodeNotStabilized, wrappedErr.Message), nil
+		}
+
 		return b.deleteFailureResult(nativeID, errorCode, wrappedErr.Message), nil
 	}
 
@@ -469,11 +476,18 @@ func (b *BaseResource) Status(
 	done, err := b.OperationConfig.OperationStatusChecker(response.Body)
 
 	if err != nil {
+		// A transient operation failure (e.g. Cloud SQL "being accessed by other
+		// users" while sessions drain) is reported as NotStabilized so formae core
+		// re-runs the operation instead of failing the resource.
+		code := resource.OperationErrorCodeServiceInternalError
+		if b.OperationConfig.RetryableError != nil && b.OperationConfig.RetryableError(err) {
+			code = resource.OperationErrorCodeNotStabilized
+		}
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
 				OperationStatus: resource.OperationStatusFailure,
-				ErrorCode:       resource.OperationErrorCodeServiceInternalError,
+				ErrorCode:       code,
 				StatusMessage:   err.Error(),
 				RequestID:       request.RequestID,
 				NativeID:        nativeID,

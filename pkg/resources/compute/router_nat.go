@@ -267,12 +267,23 @@ func (p *RouterNatProvisioner) Read(
 		project, region, router)
 	out["region"] = region
 
-	// effectiveTcpTimeWaitTimeoutSec is a server-computed read-only value not in
-	// the schema → strip it or it reads back as perpetual drift. The schema
-	// fields GCP defaults (enableEndpointIndependentMapping, type, autoNetworkTier,
-	// endpointTypes) carry hasProviderDefault instead, so a user who declares one
-	// still gets drift detection.
-	delete(out, "effectiveTcpTimeWaitTimeoutSec")
+	// Strip provider-populated fields that no forma declares, or they read back
+	// as perpetual drift. RouterNat is a CUSTOM provisioner, and hasProviderDefault
+	// suppression is not applied to custom-provisioner resources at patch-gen
+	// (verified: the schema carries the hint but the field still drifts), so unlike
+	// the config-driven resources we cannot rely on the hint here — we strip.
+	// TODO: drop this once RouterNat is config-driven or core honors
+	// hasProviderDefault for custom provisioners; a user who explicitly sets one
+	// of these (e.g. type=PRIVATE) will not get drift detection on it until then.
+	for _, k := range []string{
+		"effectiveTcpTimeWaitTimeoutSec", // server-computed read-only value
+		"enableEndpointIndependentMapping",
+		"type",
+		"autoNetworkTier",
+		"endpointTypes",
+	} {
+		delete(out, k)
+	}
 
 	propsJSON, _ := json.Marshal(out)
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil

@@ -15,6 +15,7 @@ import (
 // Resource type constants
 const (
 	DatabaseInstanceResourceType = "GCP::SQL::DatabaseInstance"
+	DatabaseResourceType         = "GCP::SQL::Database"
 )
 
 // sqlRegistry is the unified registry for all SQL resources
@@ -69,6 +70,25 @@ func init() {
 			},
 			RequestTransformer:  nil, // Pass through properties
 			ResponseTransformer: wrapResponseTransformer(databaseInstanceResponseTransformer),
+		},
+		{
+			ResourceType: DatabaseResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "databases",
+				// A database is nested under its instance:
+				// /projects/{p}/instances/{instance}/databases/{name}
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled: false,
+				},
+			},
+			RequestTransformer:  nil, // Pass through properties
+			ResponseTransformer: nil,
 		},
 	})
 

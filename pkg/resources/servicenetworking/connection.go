@@ -87,6 +87,39 @@ func (p *ConnectionProvisioner) clients(ctx context.Context, cfg *config.Config)
 	return sn, crm, nil
 }
 
+// removePeeringFallback severs a stuck PSA connection by deleting the consumer
+// VPC's "servicenetworking-googleapis-com" peering directly via the Compute API,
+// then waits for that (quick) global operation. This is the documented recovery
+// for a connection the producer won't release, and unblocks the reserved-range
+// and VPC deletes. Network is any reference form; the peering lives on the
+// consumer network in this project.
+func (p *ConnectionProvisioner) removePeeringFallback(ctx context.Context, cfg *config.Config, network string) error {
+	opts, err := cfg.ToClientOptions(ctx)
+	if err != nil {
+		return fmt.Errorf("client options: %w", err)
+	}
+	cs, err := compute.NewService(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("compute client: %w", err)
+	}
+	networkName := lastSegment(network)
+	op, err := cs.Networks.RemovePeering(cfg.Project, networkName, &compute.NetworksRemovePeeringRequest{
+		Name: "servicenetworking-googleapis-com",
+	}).Context(ctx).Do()
+	if err != nil {
+		// Peering already gone (e.g. a prior attempt removed it) → nothing to do.
+		if code := mapErr(err); code == resource.OperationErrorCodeNotFound {
+			return nil
+		}
+		return fmt.Errorf("remove peering: %w", err)
+	}
+	// Wait for the global operation to finish (removePeering is fast).
+	if _, err := cs.GlobalOperations.Wait(cfg.Project, op.Name).Context(ctx).Do(); err != nil {
+		return fmt.Errorf("await peering removal: %w", err)
+	}
+	return nil
+}
+
 // lastSegment returns the final path element (handles a bare name, a
 // projects/.../networks/name path, and a full self-link URL).
 func lastSegment(s string) string {
@@ -240,6 +273,28 @@ func (p *ConnectionProvisioner) Status(ctx context.Context, request *resource.St
 		}}, nil
 	}
 	if op.Error != nil {
+		// Deleting a PSA connection right after the Cloud SQL instance is gone
+		// fails with "Producer services ... are still using this connection" —
+		// Google's producer side releases the connection asynchronously (many
+		// minutes), so the clean servicenetworking delete can't succeed in time.
+		// Fall back to removing the consumer VPC peering directly (the documented
+		// workaround): it severs the connection immediately and unblocks the
+		// reserved range + VPC deletion. The producer-side record is orphaned in
+		// Google's project, which is harmless — the consumer network is clean and
+		// a later PSA create re-establishes the peering.
+		if isProducerStillUsing(op.Error.Message) {
+			if err := p.removePeeringFallback(ctx, cfg, request.NativeID); err != nil {
+				return &resource.StatusResult{ProgressResult: &resource.ProgressResult{
+					Operation: resource.OperationCheckStatus, OperationStatus: resource.OperationStatusFailure,
+					ErrorCode:     mapErr(err),
+					StatusMessage: fmt.Sprintf("producer still using connection; peering-removal fallback failed: %v", err),
+					NativeID:      request.NativeID,
+				}}, nil
+			}
+			return &resource.StatusResult{ProgressResult: &resource.ProgressResult{
+				Operation: resource.OperationCheckStatus, OperationStatus: resource.OperationStatusSuccess, NativeID: request.NativeID,
+			}}, nil
+		}
 		return &resource.StatusResult{ProgressResult: &resource.ProgressResult{
 			Operation: resource.OperationCheckStatus, OperationStatus: resource.OperationStatusFailure,
 			ErrorCode:     resource.OperationErrorCodeServiceInternalError,
@@ -350,6 +405,14 @@ func (p *ConnectionProvisioner) List(ctx context.Context, request *resource.List
 	// A connection is scoped to a specific network; there is no project-wide list
 	// without one. Discovery of PSA connections is out of scope.
 	return &resource.ListResult{}, nil
+}
+
+// isProducerStillUsing reports whether a delete-operation error is the transient
+// "Producer services ... are still using this connection" that Cloud SQL leaves
+// behind while it asynchronously releases the PSA connection after its instance
+// is deleted. It clears on its own after a few minutes, so it is retryable.
+func isProducerStillUsing(msg string) bool {
+	return strings.Contains(msg, "still using this connection")
 }
 
 func mapErr(err error) resource.OperationErrorCode {

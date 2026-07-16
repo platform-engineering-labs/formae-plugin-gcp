@@ -55,6 +55,14 @@ var SQLOperations = base.OperationConfig{
 
 		return isDone, nil
 	},
+
+	// A database delete right after its client disconnects can fail with
+	// "database ... is being accessed by other users" — Cloud SQL reaps lingering
+	// sessions on a lag. Treat it as retryable so formae core re-runs the delete
+	// until the sessions clear, instead of failing the teardown.
+	RetryableError: func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "is being accessed by other users")
+	},
 }
 
 // SQLNativeID defines native ID format for SQL resources
@@ -64,13 +72,19 @@ var SQLNativeID = base.NativeIDConfig{
 	Parser:       parseSQLNativeID,
 }
 
-// sqlPathBuilder builds SQL API paths
-// Format: /projects/{project}/{resourceType}/{name}
+// sqlPathBuilder builds SQL API paths.
+// Top-level:  /projects/{project}/{resourceType}/{name}          (e.g. instances)
+// Nested:     /projects/{project}/{parentType}/{parent}/{resourceType}/{name}
+//             (e.g. databases under an instance)
 func sqlPathBuilder(ctx base.PathContext) string {
-	if ctx.ResourceName != "" {
-		return fmt.Sprintf("/projects/%s/%s/%s", ctx.Project, ctx.ResourceType, ctx.ResourceName)
+	prefix := fmt.Sprintf("/projects/%s", ctx.Project)
+	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		prefix = fmt.Sprintf("%s/%s/%s", prefix, ctx.ParentType, ctx.ParentResource)
 	}
-	return fmt.Sprintf("/projects/%s/%s", ctx.Project, ctx.ResourceType)
+	if ctx.ResourceName != "" {
+		return fmt.Sprintf("%s/%s/%s", prefix, ctx.ResourceType, ctx.ResourceName)
+	}
+	return fmt.Sprintf("%s/%s", prefix, ctx.ResourceType)
 }
 
 // extractSQLNativeID extracts the native ID from SQL API response
@@ -86,21 +100,41 @@ func extractSQLNativeID(response map[string]interface{}, ctx base.PathContext) s
 		return ""
 	}
 
-	// Build full path native ID
+	// Nested resource (e.g. a database under an instance):
+	// projects/{project}/{parentType}/{parent}/{resourceType}/{name}
+	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		return fmt.Sprintf("projects/%s/%s/%s/%s/%s", ctx.Project, ctx.ParentType, ctx.ParentResource, ctx.ResourceType, name)
+	}
+
+	// Top-level resource: projects/{project}/{resourceType}/{name}
 	return fmt.Sprintf("projects/%s/%s/%s", ctx.Project, ctx.ResourceType, name)
 }
 
-// parseSQLNativeID parses a SQL native ID into PathContext
-// Format: projects/{project}/{resourceType}/{name}
+// parseSQLNativeID parses a SQL native ID into PathContext. Handles both the
+// top-level form (projects/{project}/{resourceType}/{name}) and the nested form
+// (projects/{project}/{parentType}/{parent}/{resourceType}/{name}).
 func parseSQLNativeID(nativeID string) (base.PathContext, error) {
 	parts := strings.Split(nativeID, "/")
-	if len(parts) != 4 || parts[0] != "projects" {
-		return base.PathContext{}, fmt.Errorf("invalid SQL native ID format: %s (expected: projects/{project}/{resourceType}/{name})", nativeID)
+	if parts[0] != "projects" {
+		return base.PathContext{}, fmt.Errorf("invalid SQL native ID format: %s", nativeID)
 	}
 
-	return base.PathContext{
-		Project:      parts[1],
-		ResourceType: parts[2],
-		ResourceName: parts[3],
-	}, nil
+	switch len(parts) {
+	case 4: // projects/{project}/{resourceType}/{name}
+		return base.PathContext{
+			Project:      parts[1],
+			ResourceType: parts[2],
+			ResourceName: parts[3],
+		}, nil
+	case 6: // projects/{project}/{parentType}/{parent}/{resourceType}/{name}
+		return base.PathContext{
+			Project:        parts[1],
+			ParentType:     parts[2],
+			ParentResource: parts[3],
+			ResourceType:   parts[4],
+			ResourceName:   parts[5],
+		}, nil
+	default:
+		return base.PathContext{}, fmt.Errorf("invalid SQL native ID format: %s (expected 4 or 6 path segments)", nativeID)
+	}
 }

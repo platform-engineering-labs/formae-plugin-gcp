@@ -54,9 +54,10 @@ func instanceBodyBuilder(props map[string]interface{}, ctx base.TransformContext
 		body["serviceAccounts"] = buildServiceAccounts(serviceAccounts)
 	}
 
-	// Metadata
+	// Metadata — the schema mirrors the API ({items:[{key,value}], fingerprint}),
+	// so it passes straight through.
 	if metadataMap := utils.GetObject(props, "metadata"); metadataMap != nil {
-		body["metadata"] = buildMetadata(metadataMap)
+		body["metadata"] = metadataMap
 	}
 
 	// Tags
@@ -136,6 +137,13 @@ func instanceResponseTransformer(apiResponse map[string]interface{}, ctx base.Tr
 		apiResponse["networkInterfaces"] = normalizeInstanceNetworkInterfaces(ifaces)
 	}
 
+	// The schema mirrors the API metadata shape ({items:[{key,value}], fingerprint}),
+	// so items and fingerprint round-trip as-is. Only drop "kind" (sql#/compute#
+	// discriminator), which is pure response noise not modeled in the schema.
+	if md := utils.GetObject(apiResponse, "metadata"); md != nil {
+		delete(md, "kind")
+	}
+
 	return apiResponse
 }
 
@@ -167,9 +175,36 @@ func normalizeInstanceDisks(disks []interface{}) []interface{} {
 		if source := utils.GetString(dm, "source"); source != "" {
 			nd["source"] = source
 		}
+		// Keep an explicitly-declared deviceName so it round-trips, but drop GCP's
+		// auto-assigned "persistent-disk-N" (given to disks that do not declare one).
+		// hasProviderDefault only suppresses this at patch generation; the drift
+		// gate compares raw, so echoing the auto value would trigger a spurious
+		// instance update on every reapply.
+		if dn := utils.GetString(dm, "deviceName"); dn != "" && !autoDeviceName(dn) {
+			nd["deviceName"] = dn
+		}
 		result = append(result, nd)
 	}
 	return result
+}
+
+// autoDeviceName reports whether a deviceName is GCP's auto-assigned form
+// ("persistent-disk-0", "persistent-disk-1", ...) rather than one a forma set.
+func autoDeviceName(name string) bool {
+	const prefix = "persistent-disk-"
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	suffix := name[len(prefix):]
+	if suffix == "" {
+		return false
+	}
+	for _, r := range suffix {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // normalizeInstanceNetworkInterfaces keeps only the schema-modeled NetworkInterface
@@ -351,29 +386,6 @@ func buildServiceAccounts(accounts []interface{}) []map[string]interface{} {
 		result = append(result, sa)
 	}
 	return result
-}
-
-func buildMetadata(metadataMap map[string]interface{}) map[string]interface{} {
-	// Schema shape is `metadata { items: Mapping<String,String> }`, so the real
-	// key/value pairs live under "items". The GCE API wants
-	// `metadata { items: [{key,value}] }`. Read the inner map; fall back to
-	// treating metadataMap itself as the pairs if there is no "items" key.
-	pairs := metadataMap
-	if inner := utils.GetObject(metadataMap, "items"); inner != nil {
-		pairs = inner
-	}
-	items := make([]map[string]interface{}, 0, len(pairs))
-	for key, value := range pairs {
-		if str, ok := value.(string); ok {
-			items = append(items, map[string]interface{}{
-				"key":   key,
-				"value": str,
-			})
-		}
-	}
-	return map[string]interface{}{
-		"items": items,
-	}
 }
 
 func buildScheduling(schedulingMap map[string]interface{}) map[string]interface{} {
