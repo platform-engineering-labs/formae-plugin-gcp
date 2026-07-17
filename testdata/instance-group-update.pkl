@@ -14,13 +14,10 @@ import "@gcp/compute/instance.pkl"
 import "@gcp/compute/instanceGroup.pkl"
 import "./config/vars.pkl" as v
 
-// Self-contained instance-group membership test. Creates a VM (with its own
-// net/subnet/boot-disk, mirroring instance.pkl) and an unmanaged zonal group
-// that lists the VM as a member with a named port. This exercises
-// create-then-attach (instanceGroups.insert + addInstances) and the
-// listInstances read-back. The paired instance-group-update.pkl then removes
-// the member and changes the named port to exercise removeInstances +
-// setNamedPorts (NativeID must stay stable — update, not replace).
+// Update variant of instance-group.pkl: the VM/net/subnet/disk are unchanged,
+// but the group drops its member (removeInstances) and changes the named port
+// (setNamedPorts with fingerprint). The group's NativeID must stay stable —
+// this is an in-place update, not a replace.
 local net = new network.Network {
   label = "plugin-sdk-test-ig-net"
   name = "formae-plugin-sdk-test-ig-net-\(v.testRunID)"
@@ -60,7 +57,6 @@ forma {
         source = bootDisk.res.selfLink
       }
     }
-    // Internal IP only (external-IP org policy).
     networkInterfaces = new Listing {
       new instance.NetworkInterface {
         network = net.res.selfLink
@@ -82,16 +78,13 @@ forma {
     name = "formae-plugin-sdk-test-ig-\(v.testRunID)"
     description = "Test unmanaged instance group with a VM member"
     zone = v.gcpZone
+    // Named port changed (80 -> 49684) exercises setNamedPorts with fingerprint.
     namedPorts = new Listing {
       new instanceGroup.NamedPort {
-        name = "http"
-        port = 80
+        name = "formae"
+        port = 49684
       }
     }
-    // Resolvable reference -> establishes VM-before-group-attach ordering and
-    // round-trips against the API's returned full self-link URL (PLA-265).
-    instances = new Listing {
-      memberVm.res.selfLink
-    }
+    // Member dropped exercises removeInstances; the read then omits `instances`.
   }
 }

@@ -247,6 +247,16 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=15
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
               ;;
+            instance-group)
+              # Creates a VM chain (network -> subnet -> boot-disk -> instance)
+              # then the group + synchronous member attach, and the update does
+              # removeInstances + setNamedPorts. More serial work than a plain
+              # instance, so give it the same headroom as the LB chains.
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
           esac
           make conformance-test-crud-run conformance-test-discovery-run \
             TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
