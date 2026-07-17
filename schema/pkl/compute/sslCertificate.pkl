@@ -77,11 +77,14 @@ open class SslCertificate extends formae.Resource {
     certificate: String?
 
     /// PEM private key. Set for type = "SELF_MANAGED". Write-only.
+    /// Accepts a `formae.Value` (e.g. `formae.value(read(...).text).opaque`) so
+    /// callers can keep the key out of plans/state readably, the same way
+    /// disk.sourceImage accepts a wrapped value.
     @gcp.FieldHint {
         createOnly = true
         writeOnly = true
     }
-    privateKey: String?
+    privateKey: (String|formae.Value)?
 
     hidden res: SslCertificateResolvable = new {
         label = parent.label
