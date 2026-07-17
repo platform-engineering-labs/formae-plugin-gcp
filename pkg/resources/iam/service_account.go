@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -18,18 +17,6 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
-)
-
-// saReadPropagationAttempts / saReadPropagationDelay bound how long Read tolerates
-// a post-create 404. A freshly created IAM service account is not immediately
-// readable (eventual consistency): serviceAccounts.get can 404 for a few seconds.
-// A force-sync in that window would read NotFound and drop the SA from inventory
-// (observed as the intermittent conformance "got 0 after sync" flake). Retrying
-// the read briefly absorbs the lag. Genuinely-absent SAs still resolve to
-// NotFound, just after the bounded wait.
-const (
-	saReadPropagationAttempts = 6
-	saReadPropagationDelay    = 2 * time.Second
 )
 
 const ServiceAccountResourceType = "GCP::IAM::ServiceAccount"
@@ -82,30 +69,6 @@ func serviceAccountResponseTransformer(apiResponse map[string]interface{}, _ bas
 		}
 	}
 	return apiResponse
-}
-
-// Read wraps the base read to tolerate IAM eventual consistency: a service
-// account can 404 for a few seconds after creation, so a NotFound is retried
-// briefly before being reported. This prevents a force-sync soon after create
-// from dropping the SA from inventory.
-func (p *ServiceAccountProvisioner) Read(ctx context.Context, req *resource.ReadRequest) (*resource.ReadResult, error) {
-	var res *resource.ReadResult
-	var err error
-	for attempt := 0; attempt < saReadPropagationAttempts; attempt++ {
-		res, err = p.BaseResource.Read(ctx, req)
-		if err != nil || res.ErrorCode != resource.OperationErrorCodeNotFound {
-			return res, err
-		}
-		if attempt == saReadPropagationAttempts-1 {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return res, err
-		case <-time.After(saReadPropagationDelay):
-		}
-	}
-	return res, err
 }
 
 // Create POSTs to the collection with {"accountId": <name>, "serviceAccount": {...}}.
