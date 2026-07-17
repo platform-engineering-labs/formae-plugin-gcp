@@ -175,6 +175,19 @@ func mergeMembershipIntoProps(props map[string]interface{}, members []string) {
 	props["instances"] = sorted
 }
 
+// stripProviderEchoedFields drops network/subnetwork from a read-back. They are
+// createOnly resolvable scalars: formae extracts resolvable scalars out of the
+// forma's rendered Properties, so they are never in the desired/expected set,
+// yet GCP echoes them on instanceGroups.get once a member is attached (it
+// derives them from the member's NIC). Echoing them back reads as perpetual
+// "not expected" drift, so they are stripped — mirroring RouterNat dropping
+// provider-populated fields. A forma still sets them on create (needed so the
+// group lands on the member's network); they just do not round-trip on read.
+func stripProviderEchoedFields(props map[string]interface{}) {
+	delete(props, "network")
+	delete(props, "subnetwork")
+}
+
 // stripInstancesForInsert removes members from the insert body; membership is
 // attached after the group exists (cf. sslCertificateRequestTransformer).
 func stripInstancesForInsert(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
@@ -340,6 +353,7 @@ func (p *InstanceGroupProvisioner) Read(ctx context.Context, request *resource.R
 	if err := json.Unmarshal([]byte(res.Properties), &props); err != nil {
 		return nil, fmt.Errorf("failed to parse base read properties: %w", err)
 	}
+	stripProviderEchoedFields(props)
 	mergeMembershipIntoProps(props, members)
 
 	propsJSON, err := json.Marshal(props)

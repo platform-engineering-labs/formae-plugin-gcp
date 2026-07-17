@@ -185,6 +185,34 @@ func TestDecodeReconcileNotOurs(t *testing.T) {
 	}
 }
 
+// network/subnetwork are createOnly resolvable scalars: the eval extracts them
+// out of the forma's Properties (so they are absent from the conformance
+// "expected" set), yet GCP echoes them on read once a member is attached.
+// Echoing them back reads as "not expected" drift, so the read strips them
+// (GCP derives them from membership). instances/namedPorts must survive.
+func TestStripProviderEchoedFields(t *testing.T) {
+	props := map[string]interface{}{
+		"name":       "ig",
+		"network":    "https://www.googleapis.com/compute/v1/projects/p/global/networks/vpc",
+		"subnetwork": "https://www.googleapis.com/compute/v1/projects/p/regions/r/subnetworks/s",
+		"namedPorts": []interface{}{map[string]interface{}{"name": "formae", "port": float64(49684)}},
+		"instances":  []string{vmA},
+	}
+	stripProviderEchoedFields(props)
+	if _, ok := props["network"]; ok {
+		t.Error("network should be stripped")
+	}
+	if _, ok := props["subnetwork"]; ok {
+		t.Error("subnetwork should be stripped")
+	}
+	if _, ok := props["namedPorts"]; !ok {
+		t.Error("namedPorts must survive")
+	}
+	if _, ok := props["instances"]; !ok {
+		t.Error("instances must survive")
+	}
+}
+
 func TestNamedPortsEqual(t *testing.T) {
 	a := []interface{}{map[string]interface{}{"name": "formae", "port": float64(49684)}}
 	b := []interface{}{map[string]interface{}{"name": "formae", "port": float64(49684)}}
