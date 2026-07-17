@@ -148,6 +148,43 @@ func TestStripInstancesForInsert(t *testing.T) {
 	}
 }
 
+// The reconcile plan (desired members + named ports) rides in the RequestID
+// alongside the pending operation path, so Status can re-derive the next verb
+// statelessly across polls and restarts.
+func TestEncodeDecodeReconcile(t *testing.T) {
+	np := []interface{}{map[string]interface{}{"name": "formae", "port": float64(49684)}}
+	rid := encodeReconcile("projects/p/zones/z/operations/op-1", []string{vmB, vmA}, np)
+
+	opPath, members, ports, ok := decodeReconcile(rid)
+	if !ok {
+		t.Fatal("decode failed")
+	}
+	if opPath != "projects/p/zones/z/operations/op-1" {
+		t.Errorf("opPath: got %q", opPath)
+	}
+	if !reflect.DeepEqual(members, []string{vmB, vmA}) {
+		t.Errorf("members: got %v", members)
+	}
+	if !namedPortsEqual(ports, np) {
+		t.Errorf("namedPorts: got %v", ports)
+	}
+}
+
+func TestDecodeReconcileEmptyOpAndNoMembers(t *testing.T) {
+	// Update encodes an empty op path (Status reconciles immediately).
+	opPath, members, ports, ok := decodeReconcile(encodeReconcile("", nil, nil))
+	if !ok || opPath != "" || len(members) != 0 || len(ports) != 0 {
+		t.Errorf("got op=%q members=%v ports=%v ok=%v", opPath, members, ports, ok)
+	}
+}
+
+func TestDecodeReconcileNotOurs(t *testing.T) {
+	// A bare operation path (no reconcile suffix) is not ours -> ok=false.
+	if _, _, _, ok := decodeReconcile("projects/p/zones/z/operations/op-1"); ok {
+		t.Error("bare op path should decode ok=false")
+	}
+}
+
 func TestNamedPortsEqual(t *testing.T) {
 	a := []interface{}{map[string]interface{}{"name": "formae", "port": float64(49684)}}
 	b := []interface{}{map[string]interface{}{"name": "formae", "port": float64(49684)}}

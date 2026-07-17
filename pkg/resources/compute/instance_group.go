@@ -6,10 +6,12 @@ package compute
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -206,6 +208,44 @@ func namedPortMap(ports []interface{}) map[string]interface{} {
 	return m
 }
 
+// igmDelim separates the pending operation path from the base64 reconcile plan
+// in a RequestID. Membership + named-port verbs are async and there can be
+// several per reconcile, so — rather than blocking the Create/Update RPC — the
+// desired state rides in the RequestID and Status drives one verb per poll,
+// re-deriving the remaining work from live state each time (idempotent,
+// restart-safe). Mirrors RouterNat encoding its NAT id in the RequestID.
+const igmDelim = "|igm="
+
+type reconcilePlan struct {
+	M  []string      `json:"m"`
+	NP []interface{} `json:"np"`
+}
+
+// encodeReconcile packs the pending op path + desired plan into a RequestID.
+func encodeReconcile(opPath string, members []string, namedPorts []interface{}) string {
+	b, _ := json.Marshal(reconcilePlan{M: members, NP: namedPorts})
+	return opPath + igmDelim + base64.RawURLEncoding.EncodeToString(b)
+}
+
+// decodeReconcile is the inverse; ok=false means the RequestID carries no plan
+// (a bare op path), so callers fall back to a plain operation poll.
+func decodeReconcile(requestID string) (opPath string, members []string, namedPorts []interface{}, ok bool) {
+	i := strings.Index(requestID, igmDelim)
+	if i < 0 {
+		return requestID, nil, nil, false
+	}
+	opPath = requestID[:i]
+	raw, err := base64.RawURLEncoding.DecodeString(requestID[i+len(igmDelim):])
+	if err != nil {
+		return opPath, nil, nil, false
+	}
+	var p reconcilePlan
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return opPath, nil, nil, false
+	}
+	return opPath, p.M, p.NP, true
+}
+
 // ---------------------------------------------------------------------------
 // Provisioner methods
 // ---------------------------------------------------------------------------
@@ -238,19 +278,6 @@ func (p *InstanceGroupProvisioner) issueVerb(
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
 	return p.OperationConfig.OperationURLBuilder(pathCtx, opID), nil
-}
-
-// waitOp blocks until the given compute operation completes.
-func (p *InstanceGroupProvisioner) waitOp(ctx context.Context, client *transport.Client, opPath string) error {
-	waiter := transport.NewOperationWaiter(client, opPath, fmt.Sprintf("%s/%s", p.APIConfig.BaseURL, opPath))
-	result, err := waiter.Wait(ctx)
-	if err != nil {
-		return err
-	}
-	if result.Status != transport.OperationStatusSuccess {
-		return fmt.Errorf("operation %s: %s", opPath, result.Message)
-	}
-	return nil
 }
 
 // listMembers reads live membership via paginated listInstances.
@@ -322,60 +349,37 @@ func (p *InstanceGroupProvisioner) Read(ctx context.Context, request *resource.R
 	return &resource.ReadResult{Properties: string(propsJSON)}, nil
 }
 
-// Create inserts the group (members stripped by the request transformer), waits
-// for it to exist, then attaches the desired members.
+// Create inserts the group (members stripped by the request transformer;
+// namedPorts ride along on the insert body) and returns InProgress immediately.
+// The insert op path plus the desired member set are packed into the RequestID
+// so Status attaches members once the group exists — the Create RPC must return
+// fast (blocking it past the operator deadline fails the create).
 func (p *InstanceGroupProvisioner) Create(ctx context.Context, request *resource.CreateRequest) (*resource.CreateResult, error) {
 	var props map[string]interface{}
 	if err := json.Unmarshal(request.Properties, &props); err != nil {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("invalid properties: %v", err)), nil
 	}
-	members := desiredMembers(props)
 
 	res, err := p.BaseResource.Create(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	if res.ProgressResult == nil ||
-		res.ProgressResult.OperationStatus == resource.OperationStatusFailure ||
-		len(members) == 0 {
+	if res.ProgressResult == nil || res.ProgressResult.OperationStatus == resource.OperationStatusFailure {
 		return res, nil
 	}
 
-	// Attach members once the group exists. Do it synchronously so the group is
-	// non-empty by the time formae polls Status.
-	client, err := transport.NewClient(ctx, p.Config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transport client: %w", err)
-	}
-	if err := p.waitOp(ctx, client, res.ProgressResult.RequestID); err != nil {
-		return createFailure(resource.OperationErrorCodeServiceInternalError,
-			fmt.Sprintf("group insert did not complete: %v", err)), nil
-	}
-
-	groupURL, pathCtx, err := p.groupURL(request.TargetConfig, res.ProgressResult.NativeID)
-	if err != nil {
-		return createFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-	}
-	opPath, err := p.issueVerb(ctx, client, groupURL+"/addInstances", instancesVerbBody(members), pathCtx)
-	if err != nil {
-		return createFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-	}
-
-	return &resource.CreateResult{
-		ProgressResult: &resource.ProgressResult{
-			Operation:       resource.OperationCreate,
-			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        res.ProgressResult.NativeID,
-			RequestID:       opPath,
-			StatusMessage:   "instance group member attach in progress",
-		},
-	}, nil
+	// Pack the desired plan onto the insert op path; Status reconciles membership
+	// (and namedPorts, defensively) after the insert completes.
+	res.ProgressResult.RequestID = encodeReconcile(
+		res.ProgressResult.RequestID, desiredMembers(props), utils.GetArray(props, "namedPorts"))
+	res.ProgressResult.StatusMessage = "instance group creation in progress"
+	return res, nil
 }
 
-// Update reconciles membership (addInstances/removeInstances) and namedPorts
-// (setNamedPorts). Intermediate operations are awaited synchronously; the final
-// one is returned InProgress so base Status reports it and reads back.
+// Update returns InProgress immediately with the desired plan encoded and no
+// pending op (empty op path); Status does the whole membership + namedPorts
+// reconcile, one verb per poll, so the Update RPC never blocks.
 func (p *InstanceGroupProvisioner) Update(ctx context.Context, request *resource.UpdateRequest) (*resource.UpdateResult, error) {
 	var desired map[string]interface{}
 	if err := json.Unmarshal(request.DesiredProperties, &desired); err != nil {
@@ -383,82 +387,13 @@ func (p *InstanceGroupProvisioner) Update(ctx context.Context, request *resource
 			fmt.Sprintf("invalid desired properties: %v", err)), nil
 	}
 
-	client, err := transport.NewClient(ctx, p.Config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transport client: %w", err)
-	}
-	groupURL, pathCtx, err := p.groupURL(request.TargetConfig, request.NativeID)
-	if err != nil {
-		return updateFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
-	}
-
-	// Current group state: GET for fingerprint + namedPorts, listInstances for members.
-	getResp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: groupURL})
-	if err != nil {
-		wrapped := transport.WrapError(err, "failed to read instance group")
-		return updateFailure(transport.ToResourceErrorCode(wrapped.Code), wrapped.Message), nil
-	}
-	currentMembers, err := p.listMembers(ctx, client, groupURL)
-	if err != nil {
-		return updateFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-	}
-
-	toAdd, toRemove := diffMembers(desiredMembers(desired), currentMembers)
-
-	// Build the ordered list of verbs to issue.
-	type verb struct {
-		url  string
-		body map[string]interface{}
-	}
-	var verbs []verb
-	if len(toAdd) > 0 {
-		verbs = append(verbs, verb{groupURL + "/addInstances", instancesVerbBody(toAdd)})
-	}
-	if len(toRemove) > 0 {
-		verbs = append(verbs, verb{groupURL + "/removeInstances", instancesVerbBody(toRemove)})
-	}
-	desiredPorts := utils.GetArray(desired, "namedPorts")
-	currentPorts := utils.GetArray(getResp.Body, "namedPorts")
-	if !namedPortsEqual(desiredPorts, currentPorts) {
-		fingerprint := utils.GetString(getResp.Body, "fingerprint")
-		verbs = append(verbs, verb{groupURL + "/setNamedPorts", setNamedPortsBody(desiredPorts, fingerprint)})
-	}
-
-	if len(verbs) == 0 {
-		// Nothing to do — report success with a fresh read.
-		return &resource.UpdateResult{
-			ProgressResult: &resource.ProgressResult{
-				Operation:       resource.OperationUpdate,
-				OperationStatus: resource.OperationStatusSuccess,
-				NativeID:        request.NativeID,
-				StatusMessage:   "instance group already reconciled",
-			},
-		}, nil
-	}
-
-	var lastOp string
-	for i, v := range verbs {
-		opPath, err := p.issueVerb(ctx, client, v.url, v.body, pathCtx)
-		if err != nil {
-			return updateFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-		}
-		// Await intermediate operations so verbs apply in order; leave the last
-		// one for formae's Status poll.
-		if i < len(verbs)-1 {
-			if err := p.waitOp(ctx, client, opPath); err != nil {
-				return updateFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
-			}
-		}
-		lastOp = opPath
-	}
-
 	return &resource.UpdateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationUpdate,
 			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
-			RequestID:       lastOp,
-			StatusMessage:   "instance group reconcile in progress",
+			RequestID:       encodeReconcile("", desiredMembers(desired), utils.GetArray(desired, "namedPorts")),
+			StatusMessage:   "instance group reconcile pending",
 		},
 	}, nil
 }
@@ -474,23 +409,130 @@ func (p *InstanceGroupProvisioner) List(ctx context.Context, request *resource.L
 	return p.BaseResource.List(ctx, request)
 }
 
-// Status delegates to the base and reads back on success (like DiskProvisioner),
-// so the reported properties include reconciled membership.
+// Status is the reconcile engine. It (1) waits for any pending compute
+// operation encoded in the RequestID, then (2) re-derives the remaining work
+// from live state and issues at most one verb (addInstances, then
+// removeInstances, then setNamedPorts), returning InProgress until the group
+// matches the desired plan — at which point it reads back and reports Success.
+// Re-deriving from live state each poll makes it idempotent and restart-safe.
 func (p *InstanceGroupProvisioner) Status(ctx context.Context, request *resource.StatusRequest) (*resource.StatusResult, error) {
-	result, err := p.BaseResource.Status(ctx, request)
-	if err != nil {
-		return nil, err
+	opPath, members, namedPorts, ok := decodeReconcile(request.RequestID)
+	if !ok {
+		// No reconcile plan (shouldn't happen from our Create/Update) — fall back
+		// to a plain operation poll so we never silently drop membership.
+		return p.BaseResource.Status(ctx, request)
 	}
-	if result.ProgressResult.OperationStatus == resource.OperationStatusSuccess &&
-		result.ProgressResult.NativeID != "" {
-		readResult, err := p.Read(ctx, &resource.ReadRequest{
-			NativeID:     result.ProgressResult.NativeID,
-			ResourceType: request.ResourceType,
-			TargetConfig: request.TargetConfig,
+
+	client, err := transport.NewClient(ctx, p.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+	groupURL, pathCtx, err := p.groupURL(request.TargetConfig, request.NativeID)
+	if err != nil {
+		return p.statusFailure(request, resource.OperationErrorCodeInvalidRequest, err.Error()), nil
+	}
+
+	// (1) Wait for the pending operation, if any.
+	if opPath != "" {
+		resp, err := client.SendRequest(ctx, transport.RequestOptions{
+			Method: "GET", URL: fmt.Sprintf("%s/%s", p.APIConfig.BaseURL, opPath),
 		})
-		if err == nil && readResult.ErrorCode == "" {
-			result.ProgressResult.ResourceProperties = []byte(readResult.Properties)
+		if err != nil {
+			wrapped := transport.WrapError(err, "failed to get operation status")
+			return p.statusFailure(request, transport.ToResourceErrorCode(wrapped.Code), wrapped.Message), nil
+		}
+		done, checkErr := p.OperationConfig.OperationStatusChecker(resp.Body)
+		if checkErr != nil {
+			return p.statusFailure(request, resource.OperationErrorCodeServiceInternalError, checkErr.Error()), nil
+		}
+		if !done {
+			return p.statusInProgress(request, "operation in progress"), nil
 		}
 	}
-	return result, nil
+
+	// (2) Re-derive remaining work from live state and issue at most one verb.
+	current, err := p.listMembers(ctx, client, groupURL)
+	if err != nil {
+		return p.statusFailure(request, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
+	}
+	getResp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: groupURL})
+	if err != nil {
+		wrapped := transport.WrapError(err, "failed to read instance group")
+		return p.statusFailure(request, transport.ToResourceErrorCode(wrapped.Code), wrapped.Message), nil
+	}
+	toAdd, toRemove := diffMembers(members, current)
+
+	var verbURL string
+	var body map[string]interface{}
+	switch {
+	case len(toAdd) > 0:
+		verbURL, body = groupURL+"/addInstances", instancesVerbBody(toAdd)
+	case len(toRemove) > 0:
+		verbURL, body = groupURL+"/removeInstances", instancesVerbBody(toRemove)
+	case !namedPortsEqual(namedPorts, utils.GetArray(getResp.Body, "namedPorts")):
+		verbURL = groupURL + "/setNamedPorts"
+		body = setNamedPortsBody(namedPorts, utils.GetString(getResp.Body, "fingerprint"))
+	default:
+		// Fully reconciled — read back and report success.
+		return p.statusSuccess(ctx, request), nil
+	}
+
+	newOp, err := p.issueVerb(ctx, client, verbURL, body, pathCtx)
+	if err != nil {
+		return p.statusFailure(request, resource.OperationErrorCodeServiceInternalError, err.Error()), nil
+	}
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        request.NativeID,
+			RequestID:       encodeReconcile(newOp, members, namedPorts),
+			StatusMessage:   "instance group reconcile in progress",
+		},
+	}, nil
+}
+
+func (p *InstanceGroupProvisioner) statusInProgress(request *resource.StatusRequest, msg string) *resource.StatusResult {
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        request.NativeID,
+			RequestID:       request.RequestID,
+			StatusMessage:   msg,
+		},
+	}
+}
+
+func (p *InstanceGroupProvisioner) statusFailure(request *resource.StatusRequest, code resource.OperationErrorCode, msg string) *resource.StatusResult {
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusFailure,
+			ErrorCode:       code,
+			StatusMessage:   msg,
+			NativeID:        request.NativeID,
+			RequestID:       request.RequestID,
+		},
+	}
+}
+
+func (p *InstanceGroupProvisioner) statusSuccess(ctx context.Context, request *resource.StatusRequest) *resource.StatusResult {
+	result := &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusSuccess,
+			NativeID:        request.NativeID,
+			StatusMessage:   "instance group reconcile completed",
+		},
+	}
+	readResult, err := p.Read(ctx, &resource.ReadRequest{
+		NativeID:     request.NativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	if err == nil && readResult.ErrorCode == "" {
+		result.ProgressResult.ResourceProperties = []byte(readResult.Properties)
+	}
+	return result
 }
