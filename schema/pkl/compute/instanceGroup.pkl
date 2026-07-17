@@ -8,8 +8,8 @@
 ///
 /// An unmanaged instance group is a named, zonal collection of VMs that a
 /// load balancer's backend service can target. This resource manages the group
-/// object and its named ports; instance membership (addInstances /
-/// removeInstances) is managed separately and is not modelled here yet.
+/// object, its named ports, and its VM membership. Membership is reconciled via
+/// the addInstances / removeInstances verbs and named ports via setNamedPorts.
 module gcp.compute.instanceGroup
 
 import "../gcp.pkl"
@@ -78,6 +78,11 @@ open class InstanceGroup extends formae.Resource {
     /// Named ports the backend service can reference. Mutable via setNamedPorts.
     @gcp.FieldHint
     namedPorts: Listing<NamedPort>?
+
+    /// VM members of this group, as instance self-links (or Instance resolvables).
+    /// Reconciled via addInstances / removeInstances.
+    @gcp.FieldHint
+    instances: Listing<String|formae.Resolvable>?
 
     hidden res: InstanceGroupResolvable = new {
         label = parent.label
