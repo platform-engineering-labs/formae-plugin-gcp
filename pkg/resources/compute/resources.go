@@ -62,6 +62,10 @@ func NewComputeProvisioner(cfg *config.Config, resourceType string) (prov.Provis
 		return NewRouterNatProvisioner(cfg), nil
 	}
 
+	if resourceType == InstanceGroupResourceType {
+		return newInstanceGroupProvisioner(cfg), nil
+	}
+
 	if computeRegistry == nil {
 		return nil, fmt.Errorf("compute registry not initialized")
 	}
@@ -228,21 +232,9 @@ func init() {
 			ResponseTransformer: base.RegionResponseTransformer,
 		},
 
-		// Instance Group - Zonal unmanaged instance group (GCE VM backend).
-		// namedPorts are mutable; instance membership is managed out of band.
-		{
-			ResourceType: InstanceGroupResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType: "instanceGroups",
-				Scope: &base.ScopeConfig{
-					Type: base.ScopeZonal,
-				},
-				SupportsUpdate:    false, // group object immutable; namedPorts via setNamedPorts (follow-up)
-				OptimisticLocking: nil,
-			},
-			RequestTransformer:  nil,
-			ResponseTransformer: base.ZoneResponseTransformer,
-		},
+		// Note: InstanceGroupResourceType is registered separately in
+		// instance_group.go with a custom provisioner (membership reconcile via
+		// addInstances/removeInstances + namedPorts via setNamedPorts).
 
 		// ==================== Load Balancer - Global Resources ====================
 
