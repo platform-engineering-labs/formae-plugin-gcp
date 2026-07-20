@@ -23,10 +23,11 @@ const ServiceAccountResourceType = "GCP::IAM::ServiceAccount"
 
 // ServiceAccountProvisioner manages IAM service accounts. Read/Delete/List use
 // the generic base engine off the full resource path
-// ("projects/{p}/serviceAccounts/{email}"); only Create needs an override
-// because the create body nests the account under "serviceAccount" alongside an
-// "accountId" sibling. Update (displayName/description) is deferred - it uses a
-// body-wrapped PATCH that needs its own override.
+// ("projects/{p}/serviceAccounts/{email}"). Create is overridden because the
+// create body nests the account under "serviceAccount" alongside an "accountId"
+// sibling, and it returns InProgress; Status is overridden to wait out IAM
+// eventual consistency (see below). Update (displayName/description) is
+// deferred - it uses a body-wrapped PATCH that needs its own override.
 type ServiceAccountProvisioner struct {
 	*base.BaseResource
 }
@@ -108,11 +109,98 @@ func (p *ServiceAccountProvisioner) Create(ctx context.Context, req *resource.Cr
 	}
 
 	nativeID := extractIAMNativeID(response.Body, pathCtx)
-	respBody := p.ResponseTransformer.Transform(response.Body, base.TransformContext{
-		Project:      pathCtx.Project,
-		ResourceType: pathCtx.ResourceType,
-		Operation:    resource.OperationCreate,
-	})
-	propsJSON, _ := json.Marshal(respBody)
-	return createSuccess(nativeID, propsJSON), nil
+	if nativeID == "" {
+		return createFailure(resource.OperationErrorCodeServiceInternalError,
+			"service account create response had no resource name"), nil
+	}
+
+	// A freshly created service account is eventually consistent: it does not
+	// appear in serviceAccounts.list for a short window after create. Return
+	// InProgress and let Status poll until it is listable, so the create only
+	// completes once a subsequent sync/inventory is guaranteed to find it.
+	return &resource.CreateResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCreate,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        nativeID,
+			RequestID:       nativeID,
+			StatusMessage:   "service account created; waiting for read consistency",
+		},
+	}, nil
+}
+
+// Status confirms the service account has become eventually consistent — it is
+// InProgress until the account shows up in serviceAccounts.list, which is the
+// same read path a force-sync / inventory uses (the create otherwise completes
+// before the SA is listable, and a sync in that window drops it → the "got 0"
+// flake). Once listed, it reads the account back for the final properties.
+//
+// Only reached for the create flow: delete is synchronous (base returns Success
+// with no RequestID) and update is unsupported, so neither polls Status.
+func (p *ServiceAccountProvisioner) Status(ctx context.Context, req *resource.StatusRequest) (*resource.StatusResult, error) {
+	listed, err := p.isListed(ctx, req)
+	if err != nil {
+		return &resource.StatusResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationCheckStatus,
+				OperationStatus: resource.OperationStatusFailure,
+				ErrorCode:       resource.OperationErrorCodeServiceInternalError,
+				NativeID:        req.NativeID,
+				StatusMessage:   fmt.Sprintf("service account list failed during consistency check: %v", err),
+			},
+		}, nil
+	}
+
+	if listed {
+		// Listable — read back for the canonical properties.
+		if read, rerr := p.Read(ctx, &resource.ReadRequest{
+			NativeID: req.NativeID, ResourceType: req.ResourceType, TargetConfig: req.TargetConfig,
+		}); rerr == nil && read.ErrorCode == "" {
+			return &resource.StatusResult{
+				ProgressResult: &resource.ProgressResult{
+					Operation:          resource.OperationCheckStatus,
+					OperationStatus:    resource.OperationStatusSuccess,
+					NativeID:           req.NativeID,
+					ResourceProperties: []byte(read.Properties),
+					StatusMessage:      "service account is listable",
+				},
+			}, nil
+		}
+		// Listed but not yet readable — keep waiting for full consistency.
+	}
+
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        req.NativeID,
+			RequestID:       req.RequestID,
+			StatusMessage:   "waiting for service account to appear in list",
+		},
+	}, nil
+}
+
+// isListed reports whether req.NativeID appears in serviceAccounts.list,
+// following pagination.
+func (p *ServiceAccountProvisioner) isListed(ctx context.Context, req *resource.StatusRequest) (bool, error) {
+	var pageToken *string
+	for {
+		res, err := p.List(ctx, &resource.ListRequest{
+			ResourceType: req.ResourceType,
+			TargetConfig: req.TargetConfig,
+			PageToken:    pageToken,
+		})
+		if err != nil {
+			return false, err
+		}
+		for _, id := range res.NativeIDs {
+			if id == req.NativeID {
+				return true, nil
+			}
+		}
+		if res.NextPageToken == nil || *res.NextPageToken == "" {
+			return false, nil
+		}
+		pageToken = res.NextPageToken
+	}
 }
