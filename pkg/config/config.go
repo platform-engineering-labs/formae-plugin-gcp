@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"os"
 
+	"cloud.google.com/go/auth/credentials"
 	"google.golang.org/api/option"
 	pkgmodel "github.com/platform-engineering-labs/formae/pkg/model"
 )
@@ -38,33 +39,39 @@ type Config struct {
 // ToClientOptions converts the config to Google API client options.
 // Credentials are read from environment variables (GCP_CREDENTIALS_JSON or GCP_CREDENTIALS_FILE)
 // to avoid storing sensitive data in the target config/database.
-func (c *Config) ToClientOptions(ctx context.Context) ([]option.ClientOption, error) {
-	var opts []option.ClientOption
-
-	// Handle credentials from environment variables
-	// Priority: GCP_CREDENTIALS_JSON > GCP_CREDENTIALS_FILE > ADC
-	if credJSON := os.Getenv("GCP_CREDENTIALS_JSON"); credJSON != "" {
-		// Use inline JSON credentials from environment
-		opts = append(opts, option.WithCredentialsJSON([]byte(credJSON)))
-	} else if credFile := os.Getenv("GCP_CREDENTIALS_FILE"); credFile != "" {
-		// Use credentials file path from environment
-		opts = append(opts, option.WithCredentialsFile(credFile))
-	}
-	// If neither is specified, Application Default Credentials (ADC) will be used
-
-	// Add custom scopes if specified
-	if len(c.Scopes) > 0 {
-		opts = append(opts, option.WithScopes(c.Scopes...))
-	} else {
+func (c *Config) ToClientOptions(_ context.Context) ([]option.ClientOption, error) {
+	// Determine scopes so credentials are minted with them.
+	scopes := c.Scopes
+	if len(scopes) == 0 {
 		// Default scopes for compute, storage, and IAM
-		opts = append(opts, option.WithScopes(
+		scopes = []string{
 			"https://www.googleapis.com/auth/cloud-platform",
 			"https://www.googleapis.com/auth/compute",
 			"https://www.googleapis.com/auth/devstorage.full_control",
-		))
+		}
 	}
 
-	return opts, nil
+	// Resolve credentials from environment variables, falling back to ADC.
+	// Priority: GCP_CREDENTIALS_JSON > GCP_CREDENTIALS_FILE > ADC.
+	//
+	// The CredentialsJSON/CredentialsFile overrides are marked deprecated
+	// (SA1019) because accepting a credential config from an *untrusted* source
+	// is risky. Here the source is the operator's own environment variables —
+	// the documented, trusted interface of this plugin — so the override is
+	// intentional.
+	detectOpts := &credentials.DetectOptions{Scopes: scopes}
+	if credJSON := os.Getenv("GCP_CREDENTIALS_JSON"); credJSON != "" {
+		detectOpts.CredentialsJSON = []byte(credJSON) //nolint:staticcheck // trusted operator-provided credentials via env var
+	} else if credFile := os.Getenv("GCP_CREDENTIALS_FILE"); credFile != "" {
+		detectOpts.CredentialsFile = credFile //nolint:staticcheck // trusted operator-provided credentials via env var
+	}
+
+	creds, err := credentials.DetectDefault(detectOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return []option.ClientOption{option.WithAuthCredentials(creds)}, nil
 }
 
 // FromTargetConfig converts a target config JSON to GCP config
