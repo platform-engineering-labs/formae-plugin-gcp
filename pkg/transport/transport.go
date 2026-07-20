@@ -12,9 +12,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"google.golang.org/api/googleapi"
 	htransport "google.golang.org/api/transport/http"
 )
@@ -119,6 +121,17 @@ func (c *Client) SendRequest(ctx context.Context, opts RequestOptions) (*Respons
 	// Execute request
 	response, err := c.httpClient.Do(req)
 	if err != nil {
+		if isReauthError(err) {
+			plugin.LoggerFromContext(ctx).Warn(
+				"GCP reauth required: Workspace org reauth policy returned `invalid_rapt`. "+
+					"Re-authenticate with `gcloud auth application-default login`, or switch to a "+
+					"service account by setting GOOGLE_APPLICATION_CREDENTIALS — service accounts "+
+					"are not subject to reauth policies",
+				"err", err.Error(),
+				"url", requestURL,
+				"method", opts.Method,
+			)
+		}
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
@@ -153,6 +166,19 @@ func (c *Client) SendRequest(ctx context.Context, opts RequestOptions) (*Respons
 		Body:       responseBody,
 		Headers:    response.Header,
 	}, nil
+}
+
+// isReauthError detects the `invalid_rapt` / reauth-required OAuth response
+// that Google Workspace organizations issue when their reauth policy expires
+// an ADC session. Mirrors the detection in formae-plugin-k8s's GKE auth
+// provider — both plugins hit the same failure mode independently.
+func isReauthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	m := err.Error()
+	return strings.Contains(m, "invalid_rapt") ||
+		strings.Contains(m, "reauth related error")
 }
 
 // AddQueryParam adds a query parameter to a URL
