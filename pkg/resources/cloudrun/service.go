@@ -250,6 +250,12 @@ func getVolumesArray(props map[string]interface{}) []map[string]interface{} {
 						if defaultMode := utils.GetInt32(secret, "defaultMode"); defaultMode > 0 {
 							secretMap["defaultMode"] = defaultMode
 						}
+						// Items map a secret version to a mount path (Cloud Run v2
+						// volumes[].secret.items[]{version,path}); required to mount a
+						// config secret at a known filename.
+						if items := getSecretItemsArray(secret); items != nil {
+							secretMap["items"] = items
+						}
 						volume["secret"] = secretMap
 					}
 
@@ -281,6 +287,37 @@ func getVolumesArray(props map[string]interface{}) []map[string]interface{} {
 		}
 	}
 	return nil
+}
+
+// getSecretItemsArray builds the secret volume items array (version -> path).
+func getSecretItemsArray(secret map[string]interface{}) []map[string]interface{} {
+	val, ok := secret["items"]
+	if !ok {
+		return nil
+	}
+	arr, ok := val.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]map[string]interface{}, 0, len(arr))
+	for _, item := range arr {
+		obj, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		it := make(map[string]interface{})
+		if version := utils.GetString(obj, "version"); version != "" {
+			it["version"] = version
+		}
+		if path := utils.GetString(obj, "path"); path != "" {
+			it["path"] = path
+		}
+		if mode := utils.GetInt32(obj, "mode"); mode > 0 {
+			it["mode"] = mode
+		}
+		result = append(result, it)
+	}
+	return result
 }
 
 // getTrafficArray builds the traffic array

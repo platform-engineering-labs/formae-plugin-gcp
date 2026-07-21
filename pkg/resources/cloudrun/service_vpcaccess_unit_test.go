@@ -68,6 +68,38 @@ func TestFilterTemplateKeepsVpcAccess(t *testing.T) {
 	assert.Equal(t, "PRIVATE_RANGES_ONLY", vpc["egress"])
 }
 
+// TestGetVolumesSecretItems asserts a secret volume with items (version->path)
+// survives the request build — needed to mount a config secret at a known path
+// (the whole-config-as-secret Cloud Run path). Cloud Run v2 wire shape:
+// volumes[].secret.items[]{version,path}.
+func TestGetVolumesSecretItems(t *testing.T) {
+	props := map[string]interface{}{
+		"volumes": []interface{}{
+			map[string]interface{}{
+				"name": "config",
+				"secret": map[string]interface{}{
+					"secret": "formae-agent-config",
+					"items": []interface{}{
+						map[string]interface{}{"version": "latest", "path": "formae.conf.pkl"},
+					},
+				},
+			},
+		},
+	}
+
+	vols := getVolumesArray(props)
+	require.Len(t, vols, 1)
+	sec, ok := vols[0]["secret"].(map[string]interface{})
+	require.True(t, ok, "volume must carry secret")
+	assert.Equal(t, "formae-agent-config", sec["secret"])
+
+	items, ok := sec["items"].([]map[string]interface{})
+	require.True(t, ok, "secret must carry items slice")
+	require.Len(t, items, 1)
+	assert.Equal(t, "latest", items[0]["version"])
+	assert.Equal(t, "formae.conf.pkl", items[0]["path"])
+}
+
 // TestServiceResponseRoundTripVpcAccess asserts the full read path returns vpcAccess
 // in properties, so desired == actual on reapply.
 func TestServiceResponseRoundTripVpcAccess(t *testing.T) {
