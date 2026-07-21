@@ -170,8 +170,10 @@ open class Volume extends formae.SubResource {
 
 @gcp.SubResourceHint
 open class SecretVolumeSource extends formae.SubResource {
+  /// Secret name. Accepts a resolvable so a service can depend on an in-stack
+  /// Secret and be created after it (resolved to the name string at apply).
   @gcp.FieldHint
-  secret: String
+  secret: (String|formae.Resolvable)
 
   @gcp.FieldHint
   items: Listing<SecretVolumeItem>?
