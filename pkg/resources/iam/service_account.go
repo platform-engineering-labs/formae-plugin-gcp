@@ -21,13 +21,19 @@ import (
 
 const ServiceAccountResourceType = "GCP::IAM::ServiceAccount"
 
-// ServiceAccountProvisioner manages IAM service accounts. Read/Delete/List use
-// the generic base engine off the full resource path
+// deleteStatusPrefix marks a Status RequestID as belonging to the delete flow
+// (create uses the bare NativeID). See Status for why the two are distinguished.
+const deleteStatusPrefix = "delete:"
+
+// ServiceAccountProvisioner manages IAM service accounts. Read/List use the
+// generic base engine off the full resource path
 // ("projects/{p}/serviceAccounts/{email}"). Create is overridden because the
 // create body nests the account under "serviceAccount" alongside an "accountId"
-// sibling, and it returns InProgress; Status is overridden to wait out IAM
-// eventual consistency (see below). Update (displayName/description) is
-// deferred - it uses a body-wrapped PATCH that needs its own override.
+// sibling, and it returns InProgress. Delete delegates the DELETE to the base
+// engine but also returns InProgress. Both Create and Delete rely on Status to
+// wait out IAM eventual consistency in opposite directions (see below). Update
+// (displayName/description) is deferred - it uses a body-wrapped PATCH that
+// needs its own override.
 type ServiceAccountProvisioner struct {
 	*base.BaseResource
 }
@@ -129,15 +135,83 @@ func (p *ServiceAccountProvisioner) Create(ctx context.Context, req *resource.Cr
 	}, nil
 }
 
-// Status confirms the service account has become eventually consistent — it is
-// InProgress until the account shows up in serviceAccounts.list, which is the
-// same read path a force-sync / inventory uses (the create otherwise completes
-// before the SA is listable, and a sync in that window drops it → the "got 0"
-// flake). Once listed, it reads the account back for the final properties.
-//
-// Only reached for the create flow: delete is synchronous (base returns Success
-// with no RequestID) and update is unsupported, so neither polls Status.
+// Delete removes the service account and returns InProgress, delegating the
+// actual DELETE (and 404-already-gone handling) to the base engine. Deletion is
+// eventually consistent the same way create is: the account keeps showing up in
+// serviceAccounts.list for a window after the DELETE returns. A synchronous
+// Success here lets a sync in that window re-observe the account and fail to
+// tombstone it (the OOB-delete inventory-removal flake). Returning InProgress
+// makes Status poll until the account is gone from list, mirroring Create.
+func (p *ServiceAccountProvisioner) Delete(ctx context.Context, req *resource.DeleteRequest) (*resource.DeleteResult, error) {
+	res, err := p.BaseResource.Delete(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	// Propagate failures unchanged; only a successful DELETE flips to InProgress.
+	if res.ProgressResult == nil || res.ProgressResult.OperationStatus != resource.OperationStatusSuccess {
+		return res, nil
+	}
+	return &resource.DeleteResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationDelete,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        req.NativeID,
+			RequestID:       deleteStatusPrefix + req.NativeID,
+			StatusMessage:   "service account deleted; waiting for it to disappear from list",
+		},
+	}, nil
+}
+
+// deleteStatus is InProgress until the service account no longer appears in
+// serviceAccounts.list — the inverse of the create consistency check. Once the
+// account is gone from list, a subsequent sync/inventory is guaranteed to
+// tombstone it, so the delete completes.
+func (p *ServiceAccountProvisioner) deleteStatus(ctx context.Context, req *resource.StatusRequest) (*resource.StatusResult, error) {
+	listed, err := p.isListed(ctx, req)
+	if err != nil {
+		return &resource.StatusResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationCheckStatus,
+				OperationStatus: resource.OperationStatusFailure,
+				ErrorCode:       resource.OperationErrorCodeServiceInternalError,
+				NativeID:        req.NativeID,
+				StatusMessage:   fmt.Sprintf("service account list failed during delete consistency check: %v", err),
+			},
+		}, nil
+	}
+	if !listed {
+		return &resource.StatusResult{
+			ProgressResult: &resource.ProgressResult{
+				Operation:       resource.OperationCheckStatus,
+				OperationStatus: resource.OperationStatusSuccess,
+				NativeID:        req.NativeID,
+				StatusMessage:   "service account no longer listable",
+			},
+		}, nil
+	}
+	return &resource.StatusResult{
+		ProgressResult: &resource.ProgressResult{
+			Operation:       resource.OperationCheckStatus,
+			OperationStatus: resource.OperationStatusInProgress,
+			NativeID:        req.NativeID,
+			RequestID:       req.RequestID,
+			StatusMessage:   "waiting for service account to disappear from list",
+		},
+	}, nil
+}
+
+// Status confirms the service account has become eventually consistent. For the
+// create flow it is InProgress until the account shows up in
+// serviceAccounts.list, which is the same read path a force-sync / inventory
+// uses (the create otherwise completes before the SA is listable, and a sync in
+// that window drops it → the "got 0" flake). Once listed, it reads the account
+// back for the final properties. The delete flow (RequestID carries
+// deleteStatusPrefix) is the inverse and routes to deleteStatus.
 func (p *ServiceAccountProvisioner) Status(ctx context.Context, req *resource.StatusRequest) (*resource.StatusResult, error) {
+	if strings.HasPrefix(req.RequestID, deleteStatusPrefix) {
+		return p.deleteStatus(ctx, req)
+	}
+
 	listed, err := p.isListed(ctx, req)
 	if err != nil {
 		return &resource.StatusResult{
