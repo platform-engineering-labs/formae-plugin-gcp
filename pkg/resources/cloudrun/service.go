@@ -370,6 +370,7 @@ func filterTemplate(template map[string]interface{}) map[string]interface{} {
 		"volumes":                       true,
 		"executionEnvironment":          true,
 		"maxInstanceRequestConcurrency": true,
+		"vpcAccess":                     true,
 		// Note: serviceAccount is in schema but we exclude API-generated defaults
 	}
 
