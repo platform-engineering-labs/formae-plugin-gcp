@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.9]
+
+### Added
+
+- `GCP::Compute::InstanceGroup` now manages VM membership via an `instances`
+  field (instance self-links or `Instance` resolvables), reconciled with
+  `addInstances` / `removeInstances`; `namedPorts` are now mutable via
+  `setNamedPorts`. This lets a GCE VM back an external HTTPS load balancer.
+
+### Changed
+
+- `GCP::Compute::SslCertificate.privateKey` accepts a wrapped value
+  (`formae.value(read(...).text).opaque`), keeping the PEM private key out of
+  rendered plans and stored state.
+
+### Fixed
+
+- `GCP::Compute::SslCertificate` SELF_MANAGED certificates now send
+  `certificate` / `privateKey` nested under `selfManaged`, as the API requires.
+  Creation previously failed with "Self-managed certificate details must be
+  specified if type = SELF_MANAGED".
+- `GCP::IAM::ServiceAccount` creation now accounts for IAM eventual consistency:
+  the create completes only once the account is listable, so a synchronization
+  or discovery run immediately after create no longer drops it from inventory.
+- `GCP::Compute::InstanceGroup` read no longer surfaces provider-populated
+  `network` / `subnetwork` as spurious drift.
+
 ## [0.1.8]
 
 ### Added
