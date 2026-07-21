@@ -3,6 +3,7 @@ module github.com/platform-engineering-labs/formae-plugin-gcp
 go 1.26.0
 
 require (
+	cloud.google.com/go/auth v0.20.0
 	cloud.google.com/go/bigquery v1.76.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.22.0
@@ -16,7 +17,6 @@ require (
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.20.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.7.0 // indirect
