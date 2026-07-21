@@ -36,6 +36,37 @@ open class RevisionTemplate extends formae.SubResource {
 
   @gcp.FieldHint
   maxInstanceRequestConcurrency: Int?
+
+  /// VPC access configuration (Serverless VPC Access connector or Direct VPC egress).
+  @gcp.FieldHint
+  vpcAccess: VpcAccess?
+}
+
+@gcp.SubResourceHint
+open class VpcAccess extends formae.SubResource {
+  /// Serverless VPC Access connector (mutually exclusive with networkInterfaces).
+  @gcp.FieldHint
+  connector: (String|formae.Resolvable)?
+
+  /// Egress setting: ALL_TRAFFIC or PRIVATE_RANGES_ONLY.
+  @gcp.FieldHint
+  egress: String?
+
+  /// Direct VPC egress network interfaces (mutually exclusive with connector).
+  @gcp.FieldHint
+  networkInterfaces: Listing<VpcNetworkInterface>?
+}
+
+@gcp.SubResourceHint
+open class VpcNetworkInterface extends formae.SubResource {
+  @gcp.FieldHint
+  network: (String|formae.Resolvable)?
+
+  @gcp.FieldHint
+  subnetwork: (String|formae.Resolvable)?
+
+  @gcp.FieldHint
+  tags: Listing<String>?
 }
 
 @gcp.SubResourceHint
