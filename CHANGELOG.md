@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.8]
+
+### Added
+
+- Pub/Sub resources — `GCP::PubSub::Topic`, `GCP::PubSub::Subscription`, and
+  `GCP::PubSub::Schema`.
+- Secret Manager — `GCP::SecretManager::Secret` (automatic, Google-managed
+  replication by default).
+- Cloud DNS — `GCP::DNS::ManagedZone` for public and private DNS zones.
+- IAM — `GCP::IAM::ServiceAccount` for service accounts and `GCP::IAM::Role`
+  for custom project roles.
+- Compute — `GCP::Compute::Route` for static VPC routes and
+  `GCP::Compute::SecurityPolicy` for Cloud Armor policies.
+
+### Changed
+
+- `GCP::BigQuery::Dataset` and `GCP::BigQuery::Table` now support updates.
+  Previously create/delete only; mutable fields such as description, labels,
+  and (for tables) schema can now be changed in place.
+
 ## [0.1.7]
 
 ### Added
