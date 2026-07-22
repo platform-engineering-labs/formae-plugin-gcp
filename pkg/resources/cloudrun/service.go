@@ -5,6 +5,8 @@
 package cloudrun
 
 import (
+	"strings"
+
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 )
@@ -346,6 +348,19 @@ func getTrafficArray(props map[string]interface{}) []map[string]interface{} {
 	return nil
 }
 
+// toRelativeComputePath converts a full Compute selfLink URL to the relative
+// resource path Cloud Run's networkInterface expects. A selfLink like
+// "https://www.googleapis.com/compute/v1/projects/p/global/networks/n" becomes
+// "projects/p/global/networks/n". Values that are already relative (or bare) are
+// returned unchanged.
+func toRelativeComputePath(s string) string {
+	const marker = "/compute/v1/"
+	if i := strings.Index(s, marker); i != -1 {
+		return s[i+len(marker):]
+	}
+	return s
+}
+
 // buildVpcAccess builds the VPC access configuration for services
 func buildVpcAccess(vpcProps map[string]interface{}) map[string]interface{} {
 	vpcAccess := make(map[string]interface{})
@@ -376,11 +391,15 @@ func getServiceNetworkInterfacesArray(props map[string]interface{}) []map[string
 			for _, item := range arr {
 				if obj, ok := item.(map[string]interface{}); ok {
 					ni := make(map[string]interface{})
+					// Cloud Run's networkInterface wants a RELATIVE resource path
+					// (projects/.../global/networks/...), not the full selfLink URL a
+					// Resolvable resolves to — normalize so a forma can reference the
+					// network/subnetwork by resolvable (preserving create-order edges).
 					if network := utils.GetString(obj, "network"); network != "" {
-						ni["network"] = network
+						ni["network"] = toRelativeComputePath(network)
 					}
 					if subnetwork := utils.GetString(obj, "subnetwork"); subnetwork != "" {
-						ni["subnetwork"] = subnetwork
+						ni["subnetwork"] = toRelativeComputePath(subnetwork)
 					}
 					if tags := getStringArray(obj, "tags"); tags != nil {
 						ni["tags"] = tags

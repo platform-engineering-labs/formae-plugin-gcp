@@ -49,6 +49,22 @@ func vpcAccessTemplate() map[string]interface{} {
 	}
 }
 
+// TestToRelativeComputePath asserts selfLink URLs are normalized to the relative
+// resource path Cloud Run's networkInterface requires, while relative/bare values
+// pass through unchanged.
+func TestToRelativeComputePath(t *testing.T) {
+	cases := map[string]string{
+		"https://www.googleapis.com/compute/v1/projects/p/global/networks/n":        "projects/p/global/networks/n",
+		"https://www.googleapis.com/compute/v1/projects/p/regions/r/subnetworks/s":  "projects/p/regions/r/subnetworks/s",
+		"projects/p/global/networks/n":                                              "projects/p/global/networks/n",
+		"formae-vpc":                                                                "formae-vpc",
+		"":                                                                          "",
+	}
+	for in, want := range cases {
+		assert.Equal(t, want, toRelativeComputePath(in), in)
+	}
+}
+
 // TestServiceBodyBuilderVpcAccess asserts the request body nests template.vpcAccess
 // with the exact Cloud Run v2 wire shape (egress + networkInterfaces[].network/subnetwork).
 func TestServiceBodyBuilderVpcAccess(t *testing.T) {
