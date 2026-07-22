@@ -141,6 +141,16 @@ func (p *CloudRunProvisioner) Create(
 	}, nil
 }
 
+// provisionedDespiteInProgress reports whether an in-progress Cloud Run *service*
+// create should be re-checked for existence and treated as provisioned. Only
+// services need this (min-instances keeps a failing revision warming so the LRO
+// never completes); jobs/workerPools/revisions complete normally.
+func provisionedDespiteInProgress(pr *resource.ProgressResult, resourceTypeAPI string) bool {
+	return pr != nil &&
+		pr.OperationStatus == resource.OperationStatusInProgress &&
+		resourceTypeAPI == "services"
+}
+
 // createFailureResult creates a failure result
 func createFailureResult(errorCode resource.OperationErrorCode, message string) *resource.CreateResult {
 	return &resource.CreateResult{
@@ -162,6 +172,27 @@ func (p *CloudRunProvisioner) Status(
 	result, err := p.BaseResource.Status(ctx, request)
 	if err != nil {
 		return result, err
+	}
+
+	// A Cloud Run service with min-instances keeps a failing revision warming
+	// indefinitely, so the create LRO never reaches done and Status would poll
+	// forever. Infra provisioning is complete once the service object exists;
+	// revision/container health is a runtime concern, not a create blocker. If
+	// the create is still in progress but the service object already exists,
+	// report success. Real API/spec errors surface as Failure (LRO done+error),
+	// not InProgress, so this never masks a genuine provisioning failure.
+	if provisionedDespiteInProgress(result.ProgressResult, p.resourceTypeAPI) && request.NativeID != "" {
+		readResult, rerr := p.Read(ctx, &resource.ReadRequest{
+			ResourceType: request.ResourceType,
+			NativeID:     request.NativeID,
+			TargetConfig: request.TargetConfig,
+		})
+		if rerr == nil && readResult != nil && readResult.ErrorCode == "" && readResult.Properties != "" {
+			result.ProgressResult.OperationStatus = resource.OperationStatusSuccess
+			result.ProgressResult.ResourceProperties = json.RawMessage(readResult.Properties)
+			result.ProgressResult.StatusMessage = "Cloud Run service provisioned (revision readiness is a runtime concern, not gated by create)"
+			return result, nil
+		}
 	}
 
 	// If operation is still in progress or failed, return as-is

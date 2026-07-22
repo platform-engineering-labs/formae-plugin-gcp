@@ -12,9 +12,23 @@ import (
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestProvisionedDespiteInProgress guards the min-instances hang fix: only an
+// in-progress *service* create is re-checked for existence.
+func TestProvisionedDespiteInProgress(t *testing.T) {
+	inProgress := &resource.ProgressResult{OperationStatus: resource.OperationStatusInProgress}
+	success := &resource.ProgressResult{OperationStatus: resource.OperationStatusSuccess}
+
+	assert.True(t, provisionedDespiteInProgress(inProgress, "services"), "in-progress service create")
+	assert.False(t, provisionedDespiteInProgress(inProgress, "jobs"), "jobs complete normally")
+	assert.False(t, provisionedDespiteInProgress(inProgress, "workerPools"), "workerPools complete normally")
+	assert.False(t, provisionedDespiteInProgress(success, "services"), "already succeeded")
+	assert.False(t, provisionedDespiteInProgress(nil, "services"), "no progress result")
+}
 
 // vpcAccessTemplate returns a RevisionTemplate props map with Direct VPC egress set,
 // as it arrives from the Pkl schema (nested []interface{} / map[string]interface{}).
