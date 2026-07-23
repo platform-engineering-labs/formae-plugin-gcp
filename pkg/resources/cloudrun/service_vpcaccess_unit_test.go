@@ -12,9 +12,23 @@ import (
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestProvisionedDespiteInProgress guards the min-instances hang fix: only an
+// in-progress *service* create is re-checked for existence.
+func TestProvisionedDespiteInProgress(t *testing.T) {
+	inProgress := &resource.ProgressResult{OperationStatus: resource.OperationStatusInProgress}
+	success := &resource.ProgressResult{OperationStatus: resource.OperationStatusSuccess}
+
+	assert.True(t, provisionedDespiteInProgress(inProgress, "services"), "in-progress service create")
+	assert.False(t, provisionedDespiteInProgress(inProgress, "jobs"), "jobs complete normally")
+	assert.False(t, provisionedDespiteInProgress(inProgress, "workerPools"), "workerPools complete normally")
+	assert.False(t, provisionedDespiteInProgress(success, "services"), "already succeeded")
+	assert.False(t, provisionedDespiteInProgress(nil, "services"), "no progress result")
+}
 
 // vpcAccessTemplate returns a RevisionTemplate props map with Direct VPC egress set,
 // as it arrives from the Pkl schema (nested []interface{} / map[string]interface{}).
@@ -32,6 +46,22 @@ func vpcAccessTemplate() map[string]interface{} {
 				},
 			},
 		},
+	}
+}
+
+// TestToRelativeComputePath asserts selfLink URLs are normalized to the relative
+// resource path Cloud Run's networkInterface requires, while relative/bare values
+// pass through unchanged.
+func TestToRelativeComputePath(t *testing.T) {
+	cases := map[string]string{
+		"https://www.googleapis.com/compute/v1/projects/p/global/networks/n":        "projects/p/global/networks/n",
+		"https://www.googleapis.com/compute/v1/projects/p/regions/r/subnetworks/s":  "projects/p/regions/r/subnetworks/s",
+		"projects/p/global/networks/n":                                              "projects/p/global/networks/n",
+		"formae-vpc":                                                                "formae-vpc",
+		"":                                                                          "",
+	}
+	for in, want := range cases {
+		assert.Equal(t, want, toRelativeComputePath(in), in)
 	}
 }
 
