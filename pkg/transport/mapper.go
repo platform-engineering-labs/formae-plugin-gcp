@@ -29,6 +29,8 @@ func ToResourceErrorCode(code ErrorCode) resource.OperationErrorCode {
 		return resource.OperationErrorCodeServiceInternalError
 	case ErrorCodeTimeout:
 		return resource.OperationErrorCodeServiceTimeout
+	case ErrorCodeNetworkFailure:
+		return resource.OperationErrorCodeNetworkFailure
 	case ErrorCodeCancelled:
 		return resource.OperationErrorCodeUnforeseenError
 	case ErrorCodeNotStabilized:
@@ -96,6 +98,8 @@ func FromResourceErrorCode(code resource.OperationErrorCode) ErrorCode {
 		return ErrorCodeInternalError
 	case resource.OperationErrorCodeServiceTimeout:
 		return ErrorCodeTimeout
+	case resource.OperationErrorCodeNetworkFailure:
+		return ErrorCodeNetworkFailure
 	case resource.OperationErrorCodeNotStabilized:
 		return ErrorCodeNotStabilized
 	case resource.OperationErrorCodeUnforeseenError:

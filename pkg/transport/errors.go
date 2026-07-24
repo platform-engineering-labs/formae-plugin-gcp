@@ -5,9 +5,13 @@
 package transport
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"os"
+	"syscall"
 
 	"google.golang.org/api/googleapi"
 )
@@ -42,6 +46,10 @@ const (
 
 	// ErrorCodeTimeout indicates operation exceeded time limit
 	ErrorCodeTimeout ErrorCode = "TIMEOUT"
+
+	// ErrorCodeNetworkFailure indicates a client-side transport failure with no
+	// HTTP response (connection refused, DNS failure) — the endpoint is unreachable
+	ErrorCodeNetworkFailure ErrorCode = "NETWORK_FAILURE"
 
 	// ErrorCodeCancelled indicates operation was cancelled
 	ErrorCodeCancelled ErrorCode = "CANCELLED"
@@ -105,54 +113,125 @@ func ClassifyError(err error) ErrorCode {
 		return te.Code
 	}
 
-	// Try to extract googleapi.Error using errors.As for proper unwrapping
-	// This will recursively unwrap errors including fmt.wrapError
-	var gerr *googleapi.Error
-	if !errors.As(err, &gerr) {
-		// Not a googleapi error - check if it's a wrapped error with string matching
-		errMsg := err.Error()
-
-		// Try to identify error types from error messages as fallback
-		if containsAny(errMsg, "404", "not found", "does not exist") {
-			return ErrorCodeResourceNotFound
-		}
-		if containsAny(errMsg, "401", "403", "unauthorized", "permission denied") {
-			return ErrorCodeUnauthorized
-		}
-		if containsAny(errMsg, "409", "already exists", "conflict") {
-			return ErrorCodeAlreadyExists
-		}
-		if containsAny(errMsg, "429", "rate limit", "quota exceeded") {
-			return ErrorCodeThrottling
-		}
-		if containsAny(errMsg, "500", "502", "503", "internal error") {
-			return ErrorCodeInternalError
-		}
-
-		// Not a googleapi error and no recognizable pattern - unknown
-		return ErrorCodeUnknown
-	}
-
-	// Map HTTP status codes to error codes
-	switch gerr.Code {
-	case 400:
-		// Check for specific 400 error types
-		return classifyBadRequestError(gerr)
-	case 401, 403:
+	// Auth/credential/token-fetch failures surface WITHOUT an HTTP response and,
+	// when wrapped by net/http, become a *url.Error that satisfies net.Error.
+	// Catch them BEFORE classifyTransportError below, or a healthy GCP endpoint
+	// gets misread as unreachable over a stale credential.
+	if isAuthError(err) {
 		return ErrorCodeUnauthorized
-	case 404:
-		return ErrorCodeResourceNotFound
-	case 409:
-		return ErrorCodeAlreadyExists
-	case 412:
-		return ErrorCodeConcurrencyConflict
-	case 429:
-		return ErrorCodeThrottling
-	case 500, 502, 503:
-		return ErrorCodeInternalError
-	default:
-		return ErrorCodeUnknown
 	}
+
+	// A googleapi.Error means the endpoint answered with an HTTP status.
+	// errors.As unwraps recursively, including fmt.wrapError.
+	var gerr *googleapi.Error
+	if errors.As(err, &gerr) {
+		switch gerr.Code {
+		case 400:
+			// Check for specific 400 error types
+			return classifyBadRequestError(gerr)
+		case 401, 403:
+			return ErrorCodeUnauthorized
+		case 404:
+			return ErrorCodeResourceNotFound
+		case 409:
+			return ErrorCodeAlreadyExists
+		case 412:
+			return ErrorCodeConcurrencyConflict
+		case 429:
+			return ErrorCodeThrottling
+		case 500, 502, 503:
+			return ErrorCodeInternalError
+		default:
+			return ErrorCodeUnknown
+		}
+	}
+
+	// No HTTP response: a client-side transport failure (endpoint unreachable).
+	// This is the health signal formae's target reaper keys off.
+	if code, ok := classifyTransportError(err); ok {
+		return code
+	}
+
+	// String-match fallback for wrapped errors that carry no typed value.
+	errMsg := err.Error()
+	if containsAny(errMsg, "404", "not found", "does not exist") {
+		return ErrorCodeResourceNotFound
+	}
+	if containsAny(errMsg, "401", "403", "unauthorized", "permission denied") {
+		return ErrorCodeUnauthorized
+	}
+	if containsAny(errMsg, "409", "already exists", "conflict") {
+		return ErrorCodeAlreadyExists
+	}
+	if containsAny(errMsg, "429", "rate limit", "quota exceeded") {
+		return ErrorCodeThrottling
+	}
+	if containsAny(errMsg, "500", "502", "503", "internal error") {
+		return ErrorCodeInternalError
+	}
+
+	// Not recognizable - unknown
+	return ErrorCodeUnknown
+}
+
+// isAuthError reports whether err is an OAuth/credential/token-retrieval failure
+// rather than a problem reaching the GCP endpoint. These fail before (or
+// independent of) any HTTP response, so they must never be classified as a
+// network/timeout transport failure — the endpoint is typically healthy and the
+// fix is to refresh credentials, not to reap the target. isReauthError
+// (transport.go) covers the Workspace `invalid_rapt` reauth case.
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if isReauthError(err) {
+		return true
+	}
+	return containsAny(err.Error(),
+		"oauth2: cannot fetch token",
+		"could not find default credentials",
+		"google: could not fetch",
+		"failed to obtain token",
+		"invalid_grant",
+	)
+}
+
+// classifyTransportError maps a client-side transport failure (no HTTP response
+// received: connection refused, DNS failure, dial/read timeout) to the health
+// signal the formae target reaper keys off. Returns ok=false for anything else.
+//
+// It matches CONCRETE net types (unwrapping the *url.Error the http client wraps
+// around the RoundTripper error) and the deadline sentinels — never the
+// net.Error interface, which an auth-wrapped *url.Error would also satisfy. Auth
+// failures are excluded upstream in ClassifyError before this runs.
+func classifyTransportError(err error) (ErrorCode, bool) {
+	if err == nil {
+		return "", false
+	}
+
+	// A genuine dial/read deadline against the endpoint.
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+		return ErrorCodeTimeout, true
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if opErr.Timeout() {
+			return ErrorCodeTimeout, true
+		}
+		return ErrorCodeNetworkFailure, true
+	}
+
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return ErrorCodeNetworkFailure, true
+	}
+
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return ErrorCodeNetworkFailure, true
+	}
+
+	return "", false
 }
 
 // classifyBadRequestError provides finer-grained classification of 400 errors
