@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.10]
+
+### Added
+
+- `GCP::CloudRun::Service` exposes `template.vpcAccess`, letting a service
+  route egress through a Serverless VPC connector or direct VPC network
+  (`connector`, `networkInterfaces`, `egress`).
+
+### Fixed
+
+- `GCP::CloudRun::Service` create no longer hangs: the operation is now
+  polled to completion, and `selfLink` is normalized so a create-then-read
+  cycle no longer reports spurious drift.
+- `GCP::IAM::ServiceAccount` delete is now async, completing only once the
+  account has left the list, so a delete immediately followed by a
+  synchronization or discovery run no longer resurrects it.
+- Transport-layer read errors are now classified: authentication failures and
+  unreachable endpoints map to distinct Formae error codes instead of a
+  generic failure, improving diagnostics on misconfigured credentials or
+  network issues.
+
 ## [0.1.9]
 
 ### Added
