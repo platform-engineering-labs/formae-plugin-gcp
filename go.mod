@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigquery v1.72.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.15.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.23
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.26-0.20260723233823-5d2d78366521
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.0
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.4
 	github.com/stretchr/testify v1.11.1
