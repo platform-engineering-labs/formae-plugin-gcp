@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.11]
+
+### Changed
+
+- Genuine secret-value fields are now typed `formae.SecretValue` so their values are hashed at rest end-to-end (previously stored in cleartext on the read/actual-state path). Covers `GCP::Compute::BackendService` and `GCP::Compute::RegionBackendService` `oauth2ClientSecret`, `GCP::Container::Cluster` master-auth `password`, and `GCP::SQL::Database` `rootPassword`. Requires a formae agent on the matching release; `minFormaeVersion` is bumped to 0.88.0.
+
 ## [0.1.10]
 
 ### Added

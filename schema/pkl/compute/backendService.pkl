@@ -135,7 +135,7 @@ open class Iap extends formae.SubResource {
     oauth2ClientId: String?
 
     @gcp.FieldHint
-    oauth2ClientSecret: String?
+    oauth2ClientSecret: (String|formae.Resolvable|formae.Value|formae.SecretValue)?
 }
 
 open class BackendServiceResolvable extends formae.Resolvable {
