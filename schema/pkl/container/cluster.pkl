@@ -212,7 +212,7 @@ open class ClientCertificateConfig extends formae.SubResource {
 @gcp.SubResourceHint
 open class MasterAuth extends formae.SubResource {
     username: String?
-    password: String?
+    password: (String|formae.Resolvable|formae.Value|formae.SecretValue)?
 
     @gcp.FieldHint {
         createOnly = true

@@ -358,7 +358,7 @@ open class DatabaseInstance extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    rootPassword: String?
+    rootPassword: (String|formae.Resolvable|formae.Value|formae.SecretValue)?
 
     /// Master instance name (for read replicas)
     @gcp.FieldHint {

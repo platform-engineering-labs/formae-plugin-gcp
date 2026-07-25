@@ -5,13 +5,13 @@
  */
 
 name = "gcp"
-version = "0.1.6"
+version = "0.1.11"
 namespace = "GCP"
 summary = "GCP resource plugin"
 description = "Google Cloud Platform resource plugin for Formae"
 category = "cloud"
 license = "FSL-1.1-ALv2"
-minFormaeVersion = "0.86.0"
+minFormaeVersion = "0.88.0"
 
 output {
   renderer = new JsonRenderer {}
