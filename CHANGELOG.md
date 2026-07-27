@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.12]
+
+### Changed
+
+- Bump examples to the latest formae 0.88.0 schema.
+
 ## [0.1.11]
 
 ### Changed
