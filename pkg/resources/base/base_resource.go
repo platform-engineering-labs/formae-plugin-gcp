@@ -56,6 +56,17 @@ func (b *BaseResource) Create(
 		}
 	}
 
+	// Some GCP APIs take the resource id as a create-time query parameter
+	// (e.g. ?repositoryId=, ?instanceId=) rather than in the request body. Pull
+	// it from the "name" property and drop name from the body before wrapping.
+	var createIDValue string
+	if b.ResourceConfig.CreateIDParam != "" {
+		if id, ok := body["name"].(string); ok && id != "" {
+			createIDValue = id
+			delete(body, "name")
+		}
+	}
+
 	// Apply request wrapper if configured
 	if b.ResourceConfig.RequestWrapper != "" {
 		body = map[string]interface{}{
@@ -66,6 +77,11 @@ func (b *BaseResource) Create(
 	// Build URL
 	urlBuilder := NewURLBuilder(b.APIConfig, pathCtx)
 	url := urlBuilder.CollectionURL()
+	if createIDValue != "" {
+		if u, qErr := transport.AddQueryParam(url, b.ResourceConfig.CreateIDParam, createIDValue); qErr == nil {
+			url = u
+		}
+	}
 
 	// Send create request
 	response, err := client.SendRequest(ctx, transport.RequestOptions{
@@ -468,9 +484,15 @@ func (b *BaseResource) Status(
 		}, nil
 	}
 
-	// Extract native ID from operation response (use empty PathContext since we don't need it for extraction)
+	// Prefer the NativeID established by the initial Create/Update — the
+	// operation-poll response frequently omits the created resource's path
+	// (e.g. Artifact Registry), which would otherwise blank a good NativeID on
+	// completion. Fall back to extracting it from the operation response.
 	pathCtx := PathContext{}
-	nativeID := b.OperationConfig.NativeIDExtractor(response.Body, pathCtx)
+	nativeID := request.NativeID
+	if nativeID == "" {
+		nativeID = b.OperationConfig.NativeIDExtractor(response.Body, pathCtx)
+	}
 
 	// Check if operation is complete
 	done, err := b.OperationConfig.OperationStatusChecker(response.Body)
