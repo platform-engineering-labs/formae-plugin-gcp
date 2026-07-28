@@ -52,23 +52,40 @@ open class Queue extends formae.Resource {
 }
 
 /// Controls the dispatch rate of tasks from the queue.
-class RateLimits {
+@gcp.SubResourceHint
+open class RateLimits extends formae.SubResource {
     maxDispatchesPerSecond: Number?
+    /// GCP computes this from maxDispatchesPerSecond when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     maxBurstSize: Int?
     maxConcurrentDispatches: Int?
 }
 
 /// Controls task retry behaviour.
-class RetryConfig {
+@gcp.SubResourceHint
+open class RetryConfig extends formae.SubResource {
     maxAttempts: Int?
     maxRetryDuration: String?
+    /// GCP defaults minBackoff/maxBackoff/maxDoublings when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     minBackoff: String?
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     maxBackoff: String?
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     maxDoublings: Int?
 }
 
 /// Controls sampling of operation logs to Cloud Logging.
-class StackdriverLoggingConfig {
+@gcp.SubResourceHint
+open class StackdriverLoggingConfig extends formae.SubResource {
     /// Fraction of operations to log, in [0.0, 1.0].
     samplingRatio: Number
 }

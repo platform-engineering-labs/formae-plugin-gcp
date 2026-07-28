@@ -50,7 +50,10 @@ open class Job extends formae.Resource {
     timeZone: String?
 
     /// How long the scheduler waits for the target to respond (e.g. "180s").
-    @gcp.FieldHint
+    /// GCP defaults this to "180s" when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     attemptDeadline: String?
 
     @gcp.FieldHint
@@ -69,16 +72,22 @@ open class Job extends formae.Resource {
 }
 
 /// Fires an HTTP request at the scheduled time.
-class HttpTarget {
+@gcp.SubResourceHint
+open class HttpTarget extends formae.SubResource {
     uri: String
     httpMethod: HttpMethod?
     /// Base64-encoded request body.
     body: String?
+    /// GCP injects default headers (e.g. User-Agent: Google-Cloud-Scheduler).
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     headers: Mapping<String, String>?
 }
 
 /// Publishes a message to a Pub/Sub topic at the scheduled time.
-class PubsubTarget {
+@gcp.SubResourceHint
+open class PubsubTarget extends formae.SubResource {
     /// Fully-qualified topic (e.g. "projects/p/topics/t").
     topicName: String
     /// Base64-encoded message payload.
@@ -87,7 +96,8 @@ class PubsubTarget {
 }
 
 /// Retry behaviour for failed job executions.
-class RetryConfig {
+@gcp.SubResourceHint
+open class RetryConfig extends formae.SubResource {
     retryCount: Int?
     maxRetryDuration: String?
     minBackoffDuration: String?
