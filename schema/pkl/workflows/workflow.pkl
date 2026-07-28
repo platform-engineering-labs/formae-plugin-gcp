@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Workflows Workflow
+///
+/// A serverless workflow that orchestrates a series of steps. Location-scoped;
+/// create and delete are long-running operations.
+module gcp.workflows.workflow
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Workflows::Workflow"
+
+typealias CallLogLevel = "CALL_LOG_LEVEL_UNSPECIFIED"|"LOG_ALL_CALLS"|"LOG_ERRORS_ONLY"|"LOG_NONE"
+
+open class WorkflowResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: WorkflowResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Workflow extends formae.Resource {
+    hidden parent = this
+
+    /// Short workflow id (e.g. "my-workflow"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Workflow code to be executed (YAML or JSON source). Size limit 128KB.
+    @gcp.FieldHint
+    sourceContents: String
+
+    /// Description of the workflow provided by the user.
+    @gcp.FieldHint
+    description: String?
+
+    /// Labels associated with this workflow.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Service account for the workflow's identity. GCP defaults to the
+    /// project's default service account when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    serviceAccount: String?
+
+    /// Level of platform logging for calls during executions. GCP populates a
+    /// default when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    callLogLevel: CallLogLevel?
+
+    /// Customer-managed encryption key (KMS crypto key name). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    cryptoKeyName: String?
+
+    hidden res: WorkflowResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

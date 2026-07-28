@@ -1,0 +1,22 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/workflows/workflow.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new workflow.Workflow {
+    label = "plugin-sdk-test-workflow"
+    name = "formae-test-wf-\(v.testRunID)"
+    description = "Test Workflow for plugin SDK conformance tests"
+    sourceContents = "main:\n  steps:\n    - done:\n        return: \"ok\"\n"
+  }
+}
