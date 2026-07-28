@@ -1,0 +1,25 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/memcache/memcacheInstance.pkl" as instance
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new instance.Instance {
+    label = "plugin-sdk-test-memcache-instance"
+    name = "formae-test-memcache-\(v.testRunID)"
+    nodeCount = 1
+    nodeConfig = new instance.NodeConfig {
+      cpuCount = 1
+      memorySizeMb = 1024
+    }
+  }
+}

@@ -1,0 +1,89 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Memorystore for Memcached Instance
+///
+/// A Memorystore for Memcached instance. Location-scoped (location is a GCP
+/// region); create and delete are long-running operations.
+module gcp.memcache.instance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Memcache::Instance"
+
+typealias MemcacheVersion = "MEMCACHE_1_5"|"MEMCACHE_1_6_15"
+
+/// Configuration for the Memcached nodes of the instance.
+@gcp.SubResourceHint
+open class NodeConfig extends formae.SubResource {
+    /// Number of CPUs per Memcached node.
+    @gcp.FieldHint
+    cpuCount: Int
+
+    /// Memory size in MiB for each Memcached node.
+    @gcp.FieldHint
+    memorySizeMb: Int
+}
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Short instance id (e.g. "my-cache"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Number of nodes in the Memcached instance.
+    @gcp.FieldHint
+    nodeCount: Int
+
+    /// Configuration for the Memcached nodes.
+    @gcp.FieldHint
+    nodeConfig: NodeConfig
+
+    /// Major version of Memcached software. GCP defaults to the latest
+    /// supported version when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    memcacheVersion: MemcacheVersion?
+
+    /// Full name of the Compute Engine network the instance is connected to.
+    /// GCP defaults to the "default" network when unset. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    authorizedNetwork: String?
+
+    /// Resource labels representing user-provided metadata.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Zones in which Memcached nodes should be provisioned. GCP defaults to all
+    /// zones in the region when unset.
+    @gcp.FieldHint
+    zones: Listing<String>?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
