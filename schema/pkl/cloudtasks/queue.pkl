@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Tasks Queue
+///
+/// A queue that holds and dispatches tasks at a controlled rate. The queue is
+/// location-scoped; the location comes from the target config.
+module gcp.cloudtasks.queue
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudTasks::Queue"
+
+open class QueueResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: QueueResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Queue extends formae.Resource {
+    hidden parent = this
+
+    /// Short queue name (e.g. "email-jobs"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    rateLimits: RateLimits?
+
+    @gcp.FieldHint
+    retryConfig: RetryConfig?
+
+    @gcp.FieldHint
+    stackdriverLoggingConfig: StackdriverLoggingConfig?
+
+    hidden res: QueueResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
+
+/// Controls the dispatch rate of tasks from the queue.
+class RateLimits {
+    maxDispatchesPerSecond: Number?
+    maxBurstSize: Int?
+    maxConcurrentDispatches: Int?
+}
+
+/// Controls task retry behaviour.
+class RetryConfig {
+    maxAttempts: Int?
+    maxRetryDuration: String?
+    minBackoff: String?
+    maxBackoff: String?
+    maxDoublings: Int?
+}
+
+/// Controls sampling of operation logs to Cloud Logging.
+class StackdriverLoggingConfig {
+    /// Fraction of operations to log, in [0.0, 1.0].
+    samplingRatio: Number
+}

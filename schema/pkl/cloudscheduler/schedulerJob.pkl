@@ -1,0 +1,96 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Scheduler Job
+///
+/// A cron-style scheduled unit of work that fires an HTTP or Pub/Sub target.
+/// The job is location-scoped; the location comes from the target config.
+module gcp.cloudscheduler.schedulerJob
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudScheduler::Job"
+
+typealias HttpMethod = "POST"|"GET"|"HEAD"|"PUT"|"DELETE"|"PATCH"|"OPTIONS"
+
+open class JobResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: JobResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Job extends formae.Resource {
+    hidden parent = this
+
+    /// Short job name (e.g. "nightly-report"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Cron schedule string (e.g. "0 2 * * *"). Required by Cloud Scheduler.
+    @gcp.FieldHint
+    schedule: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// IANA time zone for the schedule (e.g. "Etc/UTC"). Defaults to UTC.
+    @gcp.FieldHint
+    timeZone: String?
+
+    /// How long the scheduler waits for the target to respond (e.g. "180s").
+    @gcp.FieldHint
+    attemptDeadline: String?
+
+    @gcp.FieldHint
+    httpTarget: HttpTarget?
+
+    @gcp.FieldHint
+    pubsubTarget: PubsubTarget?
+
+    @gcp.FieldHint
+    retryConfig: RetryConfig?
+
+    hidden res: JobResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
+
+/// Fires an HTTP request at the scheduled time.
+class HttpTarget {
+    uri: String
+    httpMethod: HttpMethod?
+    /// Base64-encoded request body.
+    body: String?
+    headers: Mapping<String, String>?
+}
+
+/// Publishes a message to a Pub/Sub topic at the scheduled time.
+class PubsubTarget {
+    /// Fully-qualified topic (e.g. "projects/p/topics/t").
+    topicName: String
+    /// Base64-encoded message payload.
+    data: String?
+    attributes: Mapping<String, String>?
+}
+
+/// Retry behaviour for failed job executions.
+class RetryConfig {
+    retryCount: Int?
+    maxRetryDuration: String?
+    minBackoffDuration: String?
+    maxBackoffDuration: String?
+    maxDoublings: Int?
+}
