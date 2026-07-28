@@ -1,0 +1,153 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Eventarc Trigger
+///
+/// Routes events matching a set of CloudEvents attribute filters to a
+/// destination (Cloud Run service, Workflow, or HTTP endpoint). Location-scoped;
+/// create and delete are long-running operations.
+module gcp.eventarc.trigger
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Eventarc::Trigger"
+
+/// A single CloudEvents attribute filter. All filters must match for a trigger
+/// to fire.
+@gcp.SubResourceHint
+open class EventFilter extends formae.SubResource {
+    /// CloudEvents attribute to filter on (e.g. "type").
+    @gcp.FieldHint
+    attribute: String
+
+    /// Required value the attribute must have (or path-pattern when operator set).
+    @gcp.FieldHint
+    value: String
+
+    /// Optional match operator (e.g. "match-path-pattern"). Exact match when unset.
+    @gcp.FieldHint
+    operator: String?
+}
+
+/// Cloud Run invocation target.
+@gcp.SubResourceHint
+open class CloudRun extends formae.SubResource {
+    /// Short name of the target Cloud Run service.
+    @gcp.FieldHint
+    service: String
+
+    /// Region the target Cloud Run service is deployed in.
+    @gcp.FieldHint
+    region: String
+
+    /// Relative path on the service to deliver events to. Defaults to "/".
+    @gcp.FieldHint
+    path: String?
+}
+
+/// HTTP endpoint invocation target.
+@gcp.SubResourceHint
+open class HttpEndpoint extends formae.SubResource {
+    /// URI of the HTTP endpoint. Must start with "http://" or "https://".
+    @gcp.FieldHint
+    uri: String
+}
+
+/// Destination of the events. Exactly one target must be set.
+@gcp.SubResourceHint
+open class Destination extends formae.SubResource {
+    /// Cloud Run service target.
+    @gcp.FieldHint
+    cloudRun: CloudRun?
+
+    /// Workflow resource name target
+    /// ("projects/{p}/locations/{l}/workflows/{w}").
+    @gcp.FieldHint
+    workflow: String?
+
+    /// HTTP endpoint target.
+    @gcp.FieldHint
+    httpEndpoint: HttpEndpoint?
+}
+
+/// Pub/Sub transport details. GCP creates and manages the underlying topic.
+@gcp.SubResourceHint
+open class Pubsub extends formae.SubResource {
+    /// Pub/Sub topic ("projects/{p}/topics/{t}"). GCP creates one when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    topic: String?
+}
+
+/// Transport intermediaries created for the trigger. GCP populates this.
+@gcp.SubResourceHint
+open class Transport extends formae.SubResource {
+    /// Pub/Sub transport. GCP creates a topic when the trigger is created.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    pubsub: Pubsub?
+}
+
+open class TriggerResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: TriggerResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Trigger extends formae.Resource {
+    hidden parent = this
+
+    /// Short trigger id (e.g. "my-trigger"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// CloudEvents attribute filters. All must match for the trigger to fire.
+    @gcp.FieldHint
+    eventFilters: Listing<EventFilter>
+
+    /// Where matching events are delivered.
+    @gcp.FieldHint
+    destination: Destination
+
+    /// Service account the trigger uses to authenticate event delivery.
+    /// GCP may populate a default when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    serviceAccount: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Transport intermediaries. GCP creates a Pub/Sub topic on creation.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    transport: Transport?
+
+    /// Channel to associate with the trigger for third-party events. GCP
+    /// populates the default Google-sources channel when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    channel: String?
+
+    hidden res: TriggerResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
