@@ -79,7 +79,9 @@ open class Instance extends formae.Resource {
 
     /// Zones in which Memcached nodes should be provisioned. GCP defaults to all
     /// zones in the region when unset.
-    @gcp.FieldHint
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     zones: Listing<String>?
 
     hidden res: InstanceResolvable = new {
