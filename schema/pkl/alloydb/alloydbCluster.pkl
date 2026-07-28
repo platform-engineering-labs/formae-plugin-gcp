@@ -23,7 +23,6 @@ open class NetworkConfig extends formae.SubResource {
     /// created (e.g. "projects/{project}/global/networks/{network}"). Immutable.
     @gcp.FieldHint {
         createOnly = true
-        hasProviderDefault = true
     }
     network: String
 
