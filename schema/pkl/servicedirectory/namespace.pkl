@@ -1,0 +1,49 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Service Directory Namespace
+///
+/// A container for services. Namespaces group services together and define
+/// permissions for a collection of services. Location-scoped; create, update
+/// and delete are synchronous.
+module gcp.servicedirectory.namespace
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ServiceDirectory::Namespace"
+
+open class NamespaceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: NamespaceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Namespace extends formae.Resource {
+    hidden parent = this
+
+    /// Short namespace id (e.g. "my-namespace"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Optional resource labels. No more than 64 user labels; keys and values
+    /// no longer than 63 characters.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: NamespaceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
