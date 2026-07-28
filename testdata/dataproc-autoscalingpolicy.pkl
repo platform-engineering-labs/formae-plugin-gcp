@@ -20,7 +20,7 @@ forma {
       yarnConfig = new {
         scaleUpFactor = 0.5
         scaleDownFactor = 0.5
-        gracefulDecommissionTimeout = "1h"
+        gracefulDecommissionTimeout = "3600s"
       }
     }
     workerConfig = new {
