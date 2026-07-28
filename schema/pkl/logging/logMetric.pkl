@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Logging LogMetric
+///
+/// A logs-based metric. Counts (or extracts values from) log entries that
+/// match an advanced logs filter, exposing them as a Cloud Monitoring metric.
+module gcp.logging.logMetric
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::LogMetric"
+
+open class LogMetricResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: LogMetricResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class LogMetric extends formae.Resource {
+    hidden parent = this
+
+    /// The client-assigned metric identifier (e.g. "error_count").
+    /// Limited to 100 characters: A-Z, a-z, 0-9 and [_.-/].
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Required. An advanced logs filter used to match log entries
+    /// (e.g. `resource.type="gce_instance"`).
+    @gcp.FieldHint
+    filter: String
+
+    /// A description of this metric, used in documentation.
+    @gcp.FieldHint
+    description: String?
+
+    /// If set to true, this metric is disabled and generates no points.
+    @gcp.FieldHint
+    disabled: Boolean?
+
+    /// A value extractor (EXTRACT / REGEXP_EXTRACT) required for DISTRIBUTION
+    /// value-type metrics to extract values from a log entry.
+    @gcp.FieldHint
+    valueExtractor: String?
+
+    /// A map from a label key to an extractor expression used to populate the
+    /// label value from a log entry field.
+    @gcp.FieldHint
+    labelExtractors: Mapping<String, String>?
+
+    hidden res: LogMetricResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
