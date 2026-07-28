@@ -9,7 +9,12 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 )
 
-const NotificationChannelResourceType = "GCP::Monitoring::NotificationChannel"
+const (
+	NotificationChannelResourceType = "GCP::Monitoring::NotificationChannel"
+	GroupResourceType               = "GCP::Monitoring::Group"
+	UptimeCheckConfigResourceType   = "GCP::Monitoring::UptimeCheckConfig"
+	AlertPolicyResourceType         = "GCP::Monitoring::AlertPolicy"
+)
 
 // The API field "type" (e.g. "email", "slack") collides with formae.Resource's
 // reserved "type" (the GCP::Svc::Resource string). The PKL schema exposes it as
@@ -63,6 +68,38 @@ func init() {
 					channelTypeFromAPI,
 				},
 			},
+		},
+		{
+			ResourceType: GroupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "groups",
+				Scope:          &base.ScopeConfig{Type: base.ScopeProjectLevel},
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPut, // groups.update is a full PUT
+			},
+			ResponseTransformer: base.ShortNameResponseTransformer,
+		},
+		{
+			ResourceType: UptimeCheckConfigResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:       "uptimeCheckConfigs",
+				Scope:              &base.ScopeConfig{Type: base.ScopeProjectLevel},
+				SupportsUpdate:     true,
+				UpdateMethod:       base.UpdateMethodPatch,
+				UpdateMaskFromBody: true,
+			},
+			ResponseTransformer: base.ShortNameResponseTransformer,
+		},
+		{
+			ResourceType: AlertPolicyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:       "alertPolicies",
+				Scope:              &base.ScopeConfig{Type: base.ScopeProjectLevel},
+				SupportsUpdate:     true,
+				UpdateMethod:       base.UpdateMethodPatch,
+				UpdateMaskFromBody: true,
+			},
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 	})
 	if err != nil {

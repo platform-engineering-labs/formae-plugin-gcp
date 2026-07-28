@@ -1,0 +1,112 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Monitoring UptimeCheckConfig
+///
+/// A recurring check that an HTTP/TCP endpoint is reachable.
+/// Project-scoped; the resource name is assigned by the API on create.
+module gcp.monitoring.uptimeCheckConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::UptimeCheckConfig"
+
+open class UptimeCheckConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: UptimeCheckConfigResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class UptimeCheckConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Server-assigned resource name ("projects/{p}/uptimeCheckConfigs/{id}").
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    name: String?
+
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint
+    monitoredResource: MonitoredResource
+
+    @gcp.FieldHint
+    httpCheck: HttpCheck?
+
+    @gcp.FieldHint
+    tcpCheck: TcpCheck?
+
+    /// How often to run the check (e.g. "60s", "300s").
+    @gcp.FieldHint
+    period: String?
+
+    /// Per-attempt timeout (e.g. "10s").
+    @gcp.FieldHint
+    timeout: String?
+
+    @gcp.FieldHint
+    contentMatchers: Listing<ContentMatcher>?
+
+    @gcp.FieldHint
+    selectedRegions: Listing<String>?
+
+    /// GCP defaults this (e.g. "STATIC_IP_CHECKERS") when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    checkerType: String?
+
+    @gcp.FieldHint
+    userLabels: Mapping<String, String>?
+
+    hidden res: UptimeCheckConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
+
+/// The resource being checked (for HTTP/TCP checks, usually type "uptime_url").
+@gcp.SubResourceHint
+open class MonitoredResource extends formae.SubResource {
+    type: String
+    /// e.g. { ["host"] = "example.com" }. GCP injects project_id.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    labels: Mapping<String, String>?
+}
+
+/// HTTP(S) check settings.
+@gcp.SubResourceHint
+open class HttpCheck extends formae.SubResource {
+    path: String?
+    port: Int?
+    requestMethod: String?
+    useSsl: Boolean?
+    validateSsl: Boolean?
+}
+
+/// TCP check settings.
+@gcp.SubResourceHint
+open class TcpCheck extends formae.SubResource {
+    port: Int
+}
+
+/// Matches response content to determine success.
+@gcp.SubResourceHint
+open class ContentMatcher extends formae.SubResource {
+    content: String
+    matcher: String?
+}

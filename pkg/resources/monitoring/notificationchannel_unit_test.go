@@ -61,13 +61,19 @@ func TestMonitoringPathAndNativeID(t *testing.T) {
 	}
 }
 
-func TestNotificationChannelRegistered(t *testing.T) {
-	for _, op := range []resource.Operation{
+func TestMonitoringResourcesRegistered(t *testing.T) {
+	crudl := []resource.Operation{
 		resource.OperationCreate, resource.OperationRead,
 		resource.OperationUpdate, resource.OperationDelete, resource.OperationList,
+	}
+	for _, rt := range []string{
+		NotificationChannelResourceType, GroupResourceType,
+		UptimeCheckConfigResourceType, AlertPolicyResourceType,
 	} {
-		if !registry.HasProvisioner(NotificationChannelResourceType, op) {
-			t.Errorf("%s not registered for %v", NotificationChannelResourceType, op)
+		for _, op := range crudl {
+			if !registry.HasProvisioner(rt, op) {
+				t.Errorf("%s not registered for %v", rt, op)
+			}
 		}
 	}
 }
