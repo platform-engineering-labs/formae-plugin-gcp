@@ -1,0 +1,104 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP AlloyDB Cluster
+///
+/// A cluster of AlloyDB for PostgreSQL databases. Location-scoped; create and
+/// delete are long-running operations. A cluster requires a VPC network with
+/// private services access configured.
+module gcp.alloydb.alloydbCluster
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AlloyDB::Cluster"
+
+/// Network configuration for the cluster.
+@gcp.SubResourceHint
+open class NetworkConfig extends formae.SubResource {
+    /// The resource link for the VPC network in which cluster resources are
+    /// created (e.g. "projects/{project}/global/networks/{network}"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String
+
+    /// Name of the allocated IP range for the private IP AlloyDB cluster.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    allocatedIpRange: String?
+}
+
+/// Initial database user to create during cluster creation. Input only.
+@gcp.SubResourceHint
+open class InitialUser extends formae.SubResource {
+    /// The database username.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    user: String
+
+    /// The initial password for the user. Opaque; input only.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    password: String
+}
+
+open class ClusterResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ClusterResolvable = (this) {
+        property = "name"
+    }
+}
+
+/// GCP AlloyDB Cluster resource
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Cluster extends formae.Resource {
+    hidden parent = this
+
+    /// Short cluster id (e.g. "my-cluster"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// VPC network configuration. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    networkConfig: NetworkConfig
+
+    /// The database engine major version (e.g. "POSTGRES_15"). GCP selects a
+    /// default when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    databaseVersion: String?
+
+    /// Initial database user to set up during cluster creation. Input only.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    initialUser: InitialUser?
+
+    /// User-settable, human-readable display name for the cluster.
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ClusterResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
