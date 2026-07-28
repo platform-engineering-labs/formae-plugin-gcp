@@ -17,7 +17,7 @@ forma {
     label = "plugin-sdk-test-spanner-instance"
     name = "formae-test-\(v.testRunID)"
     config = "projects/development-477117/instanceConfigs/regional-us-central1"
-    displayName = "Plugin SDK Test Spanner Instance"
+    displayName = "Formae SDK Test Spanner"
     processingUnits = 100
   }
 }
