@@ -30,6 +30,7 @@ func init() {
 				ResourceType:   "autoscalingPolicies",
 				Scope:          &base.ScopeConfig{Type: base.ScopeRegional},
 				SupportsUpdate: false, // update is a PUT; defer until verified
+				ListItemsKey:   "policies", // list response is {"policies":[...]}, not "items"
 			},
 			Operations: []resource.Operation{
 				resource.OperationCreate,
