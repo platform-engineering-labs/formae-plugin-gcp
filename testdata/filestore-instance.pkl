@@ -1,0 +1,35 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/filestore/filestoreInstance.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new filestoreInstance.Instance {
+    label = "plugin-sdk-test-filestore-instance"
+    name = "formae-test-fs-\(v.testRunID)"
+    tier = "BASIC_HDD"
+    fileShares {
+      new {
+        name = "share1"
+        capacityGb = 1024
+      }
+    }
+    networks {
+      new {
+        network = "default"
+        modes {
+          "MODE_IPV4"
+        }
+      }
+    }
+  }
+}

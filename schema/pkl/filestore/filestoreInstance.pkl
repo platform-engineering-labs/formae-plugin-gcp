@@ -1,0 +1,129 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Filestore Instance
+///
+/// A managed NFS file server. Location-scoped; create, patch and delete are
+/// long-running operations.
+module gcp.filestore.filestoreInstance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Filestore::Instance"
+
+/// A file system share exported by the instance. For this API version only a
+/// single file share is supported.
+@gcp.SubResourceHint
+open class FileShareConfig extends formae.SubResource {
+    /// The name of the file share (1-16 chars for the basic tier, 1-63 for
+    /// high-scale/enterprise). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// File share capacity in gigabytes (GB). Filestore defines 1 GB as
+    /// 1024^3 bytes.
+    @gcp.FieldHint
+    capacityGb: Int
+}
+
+/// A VPC network to which the instance is connected. For this API version only
+/// a single network is supported.
+@gcp.SubResourceHint
+open class NetworkConfig extends formae.SubResource {
+    /// The name of the Compute Engine VPC network to which the instance is
+    /// connected. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String
+
+    /// Internet protocol versions for which the instance has IP addresses
+    /// assigned (e.g. "MODE_IPV4"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    modes: Listing<String>
+
+    /// Network connect mode. GCP defaults to "DIRECT_PEERING" when unset.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    connectMode: String?
+
+    /// Reserved IP range (CIDR or named address range). GCP allocates one when
+    /// unset. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    reservedIpRange: String?
+}
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Short instance id (e.g. "my-fs"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Service tier of the instance (e.g. "BASIC_HDD", "BASIC_SSD",
+    /// "STANDARD", "ZONAL", "REGIONAL", "ENTERPRISE"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    tier: String
+
+    /// File system shares on the instance.
+    @gcp.FieldHint
+    fileShares: Listing<FileShareConfig>
+
+    /// VPC networks to which the instance is connected.
+    @gcp.FieldHint
+    networks: Listing<NetworkConfig>
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Access protocol for all shares in the instance. GCP defaults to
+    /// "NFS_V3" when unset. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    protocol: String?
+
+    /// Customer-managed KMS key name used for data encryption. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    kmsKeyName: String?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
