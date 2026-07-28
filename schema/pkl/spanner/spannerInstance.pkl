@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Spanner Instance
+///
+/// A Cloud Spanner instance. Project-scoped; create is a long-running operation
+/// and delete completes synchronously. The instance id is sent as a body field
+/// and the resource is wrapped under "instance" by the plugin's request
+/// transformer.
+module gcp.spanner.instance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Spanner::Instance"
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Short instance id (e.g. "my-instance"). Immutable after creation.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The instance configuration, as a full path
+    /// (e.g. "projects/{project}/instanceConfigs/regional-us-central1").
+    /// Immutable after creation.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    config: String
+
+    /// The descriptive name for this instance as it appears in UIs.
+    @gcp.FieldHint
+    displayName: String
+
+    /// The number of processing units allocated to this instance. At most one
+    /// of processingUnits or nodeCount may be set; GCP computes the other.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    processingUnits: Int?
+
+    /// The number of nodes allocated to this instance. At most one of nodeCount
+    /// or processingUnits may be set; GCP computes the other.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    nodeCount: Int?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
