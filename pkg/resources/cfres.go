@@ -13,6 +13,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/compute"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/container"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/dns"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/gkebackup"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/gkehub"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/iam"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/pubsub"
