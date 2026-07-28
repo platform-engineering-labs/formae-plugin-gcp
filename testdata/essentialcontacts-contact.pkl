@@ -1,0 +1,22 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/essentialcontacts/contact.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new contact.Contact {
+    label = "plugin-sdk-test-contact"
+    email = "formae-test-\(v.testRunID)@example.com"
+    notificationCategorySubscriptions = new Listing { "ALL" }
+    languageTag = "en-US"
+  }
+}
