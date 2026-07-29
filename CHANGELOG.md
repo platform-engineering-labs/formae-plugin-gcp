@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.13]
+
+### Fixed
+
+- `GCP::SecretManager::SecretVersion` `data` (the secret payload) was typed
+  plain `String`, so it could not be marked opaque and was stored in cleartext
+  in desired state. It now accepts `formae.Value`/`formae.SecretValue`
+  (opaque-by-default), matching `GCP::SQL::Database` `rootPassword`, so the
+  payload is hashed at rest end-to-end regardless of how it is supplied.
+  Backward compatible: a plain `String` is still accepted. The `secret-version`
+  conformance test asserts the round-trip: the plain payload is hashed at rest
+  and verified by SHA-256 digest.
+
+### Changed
+
+- Bump `plugin-conformance-tests` to v0.2.6, which verifies opaque secret
+  fields against their authored plaintext by SHA-256 digest (v0.2.5 compared
+  the hashed value to cleartext and could not exercise opaque payloads).
+
 ## [0.1.12]
 
 ### Changed

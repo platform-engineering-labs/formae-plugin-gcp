@@ -1,0 +1,21 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificateauthority/caPool.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new caPool.CaPool {
+    label = "plugin-sdk-test-capool"
+    name = "formae-test-pool-\(v.testRunID)"
+    tier = "ENTERPRISE"
+  }
+}

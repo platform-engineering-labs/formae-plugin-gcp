@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Connectivity Hub
+///
+/// A Network Connectivity Center hub. Hubs are global resources (they live under
+/// locations/global); create and delete are long-running operations.
+module gcp.networkconnectivity.hub
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkConnectivity::Hub"
+
+open class HubResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: HubResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Hub extends formae.Resource {
+    hidden parent = this
+
+    /// Short hub id (e.g. "my-hub"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// An optional description of the hub.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Policy mode of the hub (PRESET or CUSTOM). GCP defaults to PRESET when
+    /// unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    policyMode: String?
+
+    /// Preset topology (MESH or STAR). Only used when policyMode = PRESET; GCP
+    /// defaults to MESH in that case, else PRESET_TOPOLOGY_UNSPECIFIED.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    presetTopology: String?
+
+    /// Whether Private Service Connect connection propagation is enabled. GCP
+    /// defaults to false.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    exportPsc: Boolean?
+
+    hidden res: HubResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
