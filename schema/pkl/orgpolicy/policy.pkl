@@ -1,0 +1,104 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Organization Policy (project-scoped)
+///
+/// A Policy configures a constraint on a Google Cloud resource. This schema
+/// covers project-level policies (`projects/{project}/policies/{constraint}`).
+/// The policy id IS the constraint name (e.g. "iam.disableServiceAccountKeyCreation").
+module gcp.orgpolicy.policy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::OrgPolicy::Policy"
+
+/// Allowed/denied values for list constraints.
+@gcp.SubResourceHint
+open class StringValues extends formae.SubResource {
+    /// Values allowed at this resource (list constraints only).
+    @gcp.FieldHint
+    allowedValues: Listing<String>?
+
+    /// Values denied at this resource (list constraints only).
+    @gcp.FieldHint
+    deniedValues: Listing<String>?
+}
+
+/// A single rule expressing the policy.
+///
+/// For boolean constraints, set `enforce`. For list constraints, set exactly one
+/// of `allowAll`, `denyAll`, or `values`.
+@gcp.SubResourceHint
+open class PolicyRule extends formae.SubResource {
+    /// If true the policy is enforced (boolean/custom/managed constraints).
+    @gcp.FieldHint
+    enforce: Boolean?
+
+    /// Allow all values (list constraints only).
+    @gcp.FieldHint
+    allowAll: Boolean?
+
+    /// Deny all values (list constraints only).
+    @gcp.FieldHint
+    denyAll: Boolean?
+
+    /// Explicit allowed/denied values (list constraints only).
+    @gcp.FieldHint
+    values: StringValues?
+}
+
+/// The policy specification (constraint configuration).
+@gcp.SubResourceHint
+open class PolicySpec extends formae.SubResource {
+    /// Rules for this policy. Boolean constraints require exactly one rule
+    /// with no condition.
+    @gcp.FieldHint
+    rules: Listing<PolicyRule>?
+
+    /// Inheritance behavior (list constraints only).
+    @gcp.FieldHint
+    inheritFromParent: Boolean?
+
+    /// Restore the constraint default, ignoring policies set above this
+    /// resource. When set, `rules` must be empty.
+    @gcp.FieldHint
+    reset: Boolean?
+}
+
+open class PolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Policy extends formae.Resource {
+    hidden parent = this
+
+    /// Short constraint id (e.g. "iam.disableServiceAccountKeyCreation"). The
+    /// API stores and returns the full path
+    /// "projects/{projectNumber}/policies/{constraint}"; the provisioner expands
+    /// this on create and shortens it back on read. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Constraint configuration.
+    @gcp.FieldHint
+    spec: PolicySpec?
+
+    hidden res: PolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
