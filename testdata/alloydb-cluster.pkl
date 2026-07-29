@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/alloydb/alloydbCluster.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new alloydbCluster.Cluster {
+    label = "plugin-sdk-test-alloydb-cluster"
+    name = "formae-test-cluster-\(v.testRunID)"
+    networkConfig = new {
+      network = "projects/development-477117/global/networks/default"
+    }
+    displayName = "Formae AlloyDB conformance test cluster"
+  }
+}
