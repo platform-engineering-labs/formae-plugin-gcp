@@ -1,0 +1,99 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Monitoring AlertPolicy
+///
+/// A policy that fires notifications when its conditions are met.
+/// Project-scoped; the resource name is assigned by the API on create.
+module gcp.monitoring.alertPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::AlertPolicy"
+
+open class AlertPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AlertPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class AlertPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Server-assigned resource name ("projects/{p}/alertPolicies/{id}").
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    name: String?
+
+    @gcp.FieldHint
+    displayName: String
+
+    /// How conditions combine: "AND", "OR", "AND_WITH_MATCHING_RESOURCE".
+    @gcp.FieldHint
+    combiner: String?
+
+    /// GCP defaults this to true when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    enabled: Boolean?
+
+    @gcp.FieldHint
+    conditions: Listing<Condition>
+
+    /// Notification channel resource names to notify.
+    @gcp.FieldHint
+    notificationChannels: Listing<String>?
+
+    hidden res: AlertPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
+
+/// A single alerting condition.
+@gcp.SubResourceHint
+open class Condition extends formae.SubResource {
+    /// Server-assigned condition name.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    name: String?
+
+    displayName: String?
+
+    conditionThreshold: ConditionThreshold?
+}
+
+/// A metric-threshold condition.
+@gcp.SubResourceHint
+open class ConditionThreshold extends formae.SubResource {
+    /// Monitoring filter selecting the time series to evaluate.
+    filter: String
+    /// e.g. "COMPARISON_GT", "COMPARISON_LT".
+    comparison: String?
+    thresholdValue: Number?
+    /// e.g. "60s".
+    duration: String?
+    aggregations: Listing<Aggregation>?
+}
+
+/// Time-series aggregation applied before comparison.
+@gcp.SubResourceHint
+open class Aggregation extends formae.SubResource {
+    alignmentPeriod: String?
+    perSeriesAligner: String?
+    crossSeriesReducer: String?
+    groupByFields: Listing<String>?
+}
