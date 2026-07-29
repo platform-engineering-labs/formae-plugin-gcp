@@ -1,0 +1,163 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Datastream Connection Profile
+///
+/// A connection profile defines the connectivity to a source or destination
+/// used by Datastream streams. Location-scoped; create and delete are
+/// long-running operations.
+module gcp.datastream.connectionProfile
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Datastream::ConnectionProfile"
+
+/// Profile for connecting to a Cloud Storage destination.
+@gcp.SubResourceHint
+open class GcsProfile extends formae.SubResource {
+    /// The Cloud Storage bucket name.
+    @gcp.FieldHint
+    bucket: String
+
+    /// The root path inside the Cloud Storage bucket.
+    @gcp.FieldHint
+    rootPath: String?
+}
+
+/// Profile for connecting to a PostgreSQL source.
+@gcp.SubResourceHint
+open class PostgresqlProfile extends formae.SubResource {
+    /// Hostname for the PostgreSQL connection.
+    @gcp.FieldHint
+    hostname: String
+
+    /// Username for the PostgreSQL connection.
+    @gcp.FieldHint
+    username: String
+
+    /// Database for the PostgreSQL connection.
+    @gcp.FieldHint
+    database: String
+
+    /// Password for the PostgreSQL connection.
+    @gcp.FieldHint
+    password: String?
+
+    /// Port for the PostgreSQL connection. GCP defaults to 5432 when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    port: Int?
+}
+
+/// Profile for connecting to a MySQL source.
+@gcp.SubResourceHint
+open class MysqlProfile extends formae.SubResource {
+    /// Hostname for the MySQL connection.
+    @gcp.FieldHint
+    hostname: String
+
+    /// Username for the MySQL connection.
+    @gcp.FieldHint
+    username: String
+
+    /// Password for the MySQL connection.
+    @gcp.FieldHint
+    password: String?
+
+    /// Port for the MySQL connection. GCP defaults to 3306 when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    port: Int?
+}
+
+/// Profile for connecting to an Oracle source.
+@gcp.SubResourceHint
+open class OracleProfile extends formae.SubResource {
+    /// Hostname for the Oracle connection.
+    @gcp.FieldHint
+    hostname: String
+
+    /// Username for the Oracle connection.
+    @gcp.FieldHint
+    username: String
+
+    /// Database service for the Oracle connection.
+    @gcp.FieldHint
+    databaseService: String
+
+    /// Password for the Oracle connection.
+    @gcp.FieldHint
+    password: String?
+
+    /// Port for the Oracle connection. GCP defaults to 1521 when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    port: Int?
+}
+
+/// Static Service IP connectivity. An empty object selecting Datastream's
+/// static outbound IPs for source connectivity.
+@gcp.SubResourceHint
+open class StaticServiceIpConnectivity extends formae.SubResource {
+}
+
+open class ConnectionProfileResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ConnectionProfileResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ConnectionProfile extends formae.Resource {
+    hidden parent = this
+
+    /// Short connection profile id (e.g. "my-profile"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Human-readable display name.
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Profile for connecting to a Cloud Storage destination.
+    @gcp.FieldHint
+    gcsProfile: GcsProfile?
+
+    /// Profile for connecting to a PostgreSQL source.
+    @gcp.FieldHint
+    postgresqlProfile: PostgresqlProfile?
+
+    /// Profile for connecting to a MySQL source.
+    @gcp.FieldHint
+    mysqlProfile: MysqlProfile?
+
+    /// Profile for connecting to an Oracle source.
+    @gcp.FieldHint
+    oracleProfile: OracleProfile?
+
+    /// Static Service IP connectivity (empty object selects static IPs).
+    @gcp.FieldHint
+    staticServiceIpConnectivity: StaticServiceIpConnectivity?
+
+    hidden res: ConnectionProfileResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

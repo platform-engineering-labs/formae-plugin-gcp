@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/monitoring/notificationChannel.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new notificationChannel.NotificationChannel {
+    label = "plugin-sdk-test-notification-channel"
+    channelType = "email"
+    displayName = "formae-test-channel-\(v.testRunID)"
+    description = "Test notification channel for plugin SDK conformance tests"
+    enabled = true
+    labels = new Mapping {
+      ["email_address"] = "formae-test@example.com"
+    }
+  }
+}
