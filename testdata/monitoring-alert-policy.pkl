@@ -1,0 +1,38 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/monitoring/alertPolicy.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new alertPolicy.AlertPolicy {
+    label = "plugin-sdk-test-alert-policy"
+    displayName = "formae-test-alert-\(v.testRunID)"
+    combiner = "OR"
+    conditions = new Listing {
+      new alertPolicy.Condition {
+        displayName = "cpu high"
+        conditionThreshold = new alertPolicy.ConditionThreshold {
+          filter = "resource.type = \"gce_instance\" AND metric.type = \"compute.googleapis.com/instance/cpu/utilization\""
+          comparison = "COMPARISON_GT"
+          thresholdValue = 0.8
+          duration = "60s"
+          aggregations = new Listing {
+            new alertPolicy.Aggregation {
+              alignmentPeriod = "60s"
+              perSeriesAligner = "ALIGN_MEAN"
+            }
+          }
+        }
+      }
+    }
+  }
+}

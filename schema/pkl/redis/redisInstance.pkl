@@ -1,0 +1,94 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Memorystore for Redis Instance
+///
+/// A managed Redis instance. Location-scoped; create, patch and delete are
+/// long-running operations.
+module gcp.redis.redisInstance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Redis::Instance"
+
+typealias RedisTier = "BASIC"|"STANDARD_HA"
+typealias RedisConnectMode = "DIRECT_PEERING"|"PRIVATE_SERVICE_ACCESS"
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Short instance id (e.g. "my-cache"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Service tier of the instance.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    tier: RedisTier
+
+    /// Redis memory size in GiB.
+    @gcp.FieldHint
+    memorySizeGb: Int
+
+    /// Arbitrary, optional user-provided display name for the instance.
+    @gcp.FieldHint
+    displayName: String?
+
+    /// Redis software version. GCP selects the default version when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    redisVersion: String?
+
+    /// Full name of the Compute Engine network the instance connects to. GCP
+    /// selects the default network when unset. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    authorizedNetwork: String?
+
+    /// Network connect mode. GCP defaults to "DIRECT_PEERING" when unset.
+    /// Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    connectMode: RedisConnectMode?
+
+    /// For DIRECT_PEERING mode, the reserved CIDR range of internal addresses.
+    /// GCP allocates a range when unset. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    reservedIpRange: String?
+
+    /// Resource labels representing user-provided metadata.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
