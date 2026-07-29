@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Essential Contacts Contact
+///
+/// A contact that receives notifications from Google Cloud for a project.
+module gcp.essentialcontacts.contact
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::EssentialContacts::Contact"
+
+open class ContactResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ContactResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Contact extends formae.Resource {
+    hidden parent = this
+
+    /// Server-assigned identifier for the contact. The API returns the full path
+    /// "projects/{project}/contacts/{contactId}", stored as the short id. Users
+    /// do not set this - it is populated by the provider on create.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    name: String?
+
+    /// The email address to send notifications to. Does not need to be a Google
+    /// Account.
+    @gcp.FieldHint
+    email: String
+
+    /// The categories of notifications the contact receives, e.g. ["ALL"].
+    @gcp.FieldHint
+    notificationCategorySubscriptions: Listing<String>
+
+    /// Preferred language for notifications, as an ISO 639-1 code (e.g. "en-US").
+    @gcp.FieldHint
+    languageTag: String
+
+    hidden res: ContactResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
