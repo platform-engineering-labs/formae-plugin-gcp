@@ -1,0 +1,29 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/gkebackup/backupPlan.pkl"
+import "./config/vars.pkl" as v
+
+// NOTE: A BackupPlan references an EXISTING GKE cluster. The `cluster` field
+// below is a placeholder path and must point at a real cluster in the same
+// project/location for this fixture to actually create — this fixture depends
+// on a pre-existing GKE cluster dependency.
+forma {
+  v.stack
+  v.target
+
+  new backupPlan.BackupPlan {
+    label = "plugin-sdk-test-gkebackup-backupplan"
+    name = "formae-test-plan-\(v.testRunID)"
+    cluster = "projects/\(v.gcpProject)/locations/\(v.gcpLocation)/clusters/formae-test-cluster"
+    backupConfig = new backupPlan.BackupConfig {
+      allNamespaces = true
+    }
+    description = "Test GKE BackupPlan for plugin SDK conformance tests"
+  }
+}

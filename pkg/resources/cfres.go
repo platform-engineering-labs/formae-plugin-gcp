@@ -21,6 +21,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/essentialcontacts"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/eventarc"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/filestore"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/gkebackup"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/gkehub"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/iam"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/kms"

@@ -1,0 +1,119 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Backup for GKE BackupPlan
+///
+/// A BackupPlan defines the configuration and schedule for creating Backups of a
+/// GKE cluster's Kubernetes resources and (optionally) persistent volume data.
+/// Location-scoped; create and delete are long-running operations. A BackupPlan
+/// references an existing GKE cluster via its full resource path.
+module gcp.gkebackup.backupPlan
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::GKEBackup::BackupPlan"
+
+/// Defines the configuration of Backups created via this BackupPlan.
+@gcp.SubResourceHint
+open class BackupConfig extends formae.SubResource {
+    /// If true, include all namespaced resources in the Backup.
+    @gcp.FieldHint
+    allNamespaces: Boolean?
+
+    /// Whether volume data should be backed up when PVCs are included in scope.
+    /// GCP populates a default when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    includeVolumeData: Boolean?
+
+    /// Whether Kubernetes Secret resources should be included in the Backup.
+    /// GCP populates a default when unset.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    includeSecrets: Boolean?
+}
+
+/// RetentionPolicy governs the lifecycle of Backups created under this plan.
+@gcp.SubResourceHint
+open class RetentionPolicy extends formae.SubResource {
+    /// Minimum age (in days) for Backups created via this BackupPlan.
+    @gcp.FieldHint
+    backupDeleteLockDays: Int?
+
+    /// Default maximum age (in days) of a Backup created via this BackupPlan.
+    @gcp.FieldHint
+    backupRetainDays: Int?
+}
+
+/// Defines a schedule for automatic Backup creation via this BackupPlan.
+@gcp.SubResourceHint
+open class Schedule extends formae.SubResource {
+    /// Standard cron string defining a repeating schedule for creating Backups.
+    @gcp.FieldHint
+    cronSchedule: String?
+}
+
+open class BackupPlanResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BackupPlanResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class BackupPlan extends formae.Resource {
+    hidden parent = this
+
+    /// Short BackupPlan id (e.g. "my-plan"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Full resource path of the source GKE cluster from which Backups will be
+    /// created. Format: projects/{project}/locations/{location}/clusters/{cluster}.
+    /// Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    cluster: String
+
+    /// Configuration of Backups created via this BackupPlan.
+    @gcp.FieldHint
+    backupConfig: BackupConfig?
+
+    /// Lifecycle policy for Backups created under this plan.
+    @gcp.FieldHint
+    retentionPolicy: RetentionPolicy?
+
+    /// Schedule for automatic Backup creation.
+    @gcp.FieldHint
+    backupSchedule: Schedule?
+
+    /// Whether this BackupPlan has been deactivated. GCP defaults to false.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    deactivated: Boolean?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: BackupPlanResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
