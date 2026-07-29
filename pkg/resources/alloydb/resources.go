@@ -35,7 +35,7 @@ func init() {
 				resource.OperationList,
 				resource.OperationCheckStatus,
 			},
-			ResponseTransformer: base.ShortNameResponseTransformer,
+			ResponseTransformer: clusterResponseTransformer,
 		},
 	})
 	if err != nil {
