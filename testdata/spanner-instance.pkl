@@ -1,0 +1,23 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/spanner/spannerInstance.pkl" as instance
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new instance.Instance {
+    label = "plugin-sdk-test-spanner-instance"
+    name = "formae-test-\(v.testRunID)"
+    config = "projects/development-477117/instanceConfigs/regional-us-central1"
+    displayName = "Formae SDK Test Spanner"
+    processingUnits = 100
+  }
+}
