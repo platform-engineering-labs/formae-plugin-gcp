@@ -15,6 +15,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/cloudtasks"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/compute"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/container"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/dataproc"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/dns"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/essentialcontacts"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/filestore"
