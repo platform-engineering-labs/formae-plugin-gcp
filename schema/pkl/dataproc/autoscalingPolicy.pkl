@@ -96,7 +96,12 @@ open class AutoscalingPolicy extends formae.Resource {
     @gcp.FieldHint
     workerConfig: InstanceGroupAutoscalingPolicyConfig
 
-    @gcp.FieldHint
+    /// Secondary (preemptible) worker autoscaling config. GCP populates this
+    /// with defaults even when the user doesn't declare it, so it comes back on
+    /// read — mark it a provider default or Verify rejects it as unexpected.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     secondaryWorkerConfig: InstanceGroupAutoscalingPolicyConfig?
 
     hidden res: AutoscalingPolicyResolvable = new {

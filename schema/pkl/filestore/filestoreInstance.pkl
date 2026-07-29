@@ -64,6 +64,15 @@ open class NetworkConfig extends formae.SubResource {
         hasProviderDefault = true
     }
     reservedIpRange: String?
+
+    /// IP addresses assigned to the instance on this network. Output only —
+    /// GCP allocates them at create, so they appear on read-back even though
+    /// the user never sets them. Mark as a provider default or Verify rejects
+    /// them as unexpected.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    ipAddresses: Listing<String>?
 }
 
 open class InstanceResolvable extends formae.Resolvable {
