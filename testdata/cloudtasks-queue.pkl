@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudtasks/queue.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new queue.Queue {
+    label = "plugin-sdk-test-tasks-queue"
+    name = "formae-test-queue-\(v.testRunID)"
+    rateLimits = new queue.RateLimits {
+      maxDispatchesPerSecond = 10.0
+      maxConcurrentDispatches = 5
+    }
+    retryConfig = new queue.RetryConfig {
+      maxAttempts = 5
+    }
+  }
+}

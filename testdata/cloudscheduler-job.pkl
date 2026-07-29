@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudscheduler/schedulerJob.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new schedulerJob.Job {
+    label = "plugin-sdk-test-scheduler-job"
+    name = "formae-test-job-\(v.testRunID)"
+    schedule = "0 2 * * *"
+    timeZone = "Etc/UTC"
+    description = "Test Cloud Scheduler job for plugin SDK conformance tests"
+    httpTarget = new schedulerJob.HttpTarget {
+      uri = "https://example.com/ping"
+      httpMethod = "GET"
+    }
+  }
+}

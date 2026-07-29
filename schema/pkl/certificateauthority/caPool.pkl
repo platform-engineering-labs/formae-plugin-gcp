@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Authority Service CA Pool
+///
+/// A CaPool represents a group of CertificateAuthorities that form a trust
+/// anchor for issuing certificates. Location-scoped; create and delete are
+/// long-running operations.
+module gcp.certificateauthority.caPool
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateAuthority::CaPool"
+
+typealias Tier = "ENTERPRISE"|"DEVOPS"
+
+/// Options for publishing each CertificateAuthority's CA certificate and CRLs.
+@gcp.SubResourceHint
+open class PublishingOptions extends formae.SubResource {
+  /// When true, publishes each CertificateAuthority's CA certificate.
+  @gcp.FieldHint
+  publishCaCert: Boolean?
+
+  /// When true, publishes each CertificateAuthority's CRL.
+  @gcp.FieldHint
+  publishCrl: Boolean?
+
+  /// Encoding format of the CA certificate and CRLs ("PEM" | "DER").
+  @gcp.FieldHint
+  encodingFormat: String?
+}
+
+open class CaPoolResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CaPoolResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class CaPool extends formae.Resource {
+    hidden parent = this
+
+    /// Short CA pool id (e.g. "my-pool"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Tier of this CaPool. Required and immutable after creation.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    tier: Tier
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Publishing options followed when issuing Certificates from any
+    /// CertificateAuthority in this CaPool.
+    @gcp.FieldHint
+    publishingOptions: PublishingOptions?
+
+    hidden res: CaPoolResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
