@@ -19,6 +19,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/datastream"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/dns"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/essentialcontacts"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/eventarc"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/filestore"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/gkehub"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/iam"
