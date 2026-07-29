@@ -1,0 +1,21 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/apigateway/api.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new api.Api {
+    label = "plugin-sdk-test-apigateway-api"
+    name = "formae-test-api-\(v.testRunID)"
+    displayName = "Formae test API for plugin SDK conformance tests"
+  }
+}

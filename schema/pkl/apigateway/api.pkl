@@ -1,0 +1,59 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP API Gateway Api
+///
+/// An API that can be served by one or more Gateways. Lives under
+/// locations/global; create and delete are long-running operations.
+module gcp.apigateway.api
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Apigateway::Api"
+
+open class ApiResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ApiResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Api extends formae.Resource {
+    hidden parent = this
+
+    /// Short API id (e.g. "my-api"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Optional display name.
+    @gcp.FieldHint
+    displayName: String?
+
+    /// Resource labels (user-provided metadata).
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Name of a Google Managed Service backing this API. Immutable. When
+    /// unset, GCP automatically creates a new managed service for the API.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    managedService: String?
+
+    hidden res: ApiResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
