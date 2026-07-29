@@ -21,6 +21,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/pubsub"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/redis"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/secretmanager"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/servicedirectory"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/servicenetworking"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/spanner"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/sql"

@@ -1,0 +1,23 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/servicedirectory/namespace.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new namespace.Namespace {
+    label = "plugin-sdk-test-servicedirectory-namespace"
+    name = "formae-test-ns-\(v.testRunID)"
+    labels {
+      ["managed-by"] = "formae"
+    }
+  }
+}
