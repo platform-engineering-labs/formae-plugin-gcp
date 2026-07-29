@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Artifact Registry Repository
+///
+/// A repository for container images or language packages. Location-scoped;
+/// create and delete are long-running operations.
+module gcp.artifactregistry.repository
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ArtifactRegistry::Repository"
+
+typealias RepositoryFormat = "DOCKER"|"MAVEN"|"NPM"|"PYTHON"|"APT"|"YUM"|"GO"|"KFP"|"GENERIC"
+
+open class RepositoryResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RepositoryResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Repository extends formae.Resource {
+    hidden parent = this
+
+    /// Short repository id (e.g. "my-images"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Package format. Immutable after creation.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    format: RepositoryFormat
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Repository mode. GCP defaults to "STANDARD_REPOSITORY" when unset.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    mode: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Customer-managed encryption key (KMS key name). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    kmsKeyName: String?
+
+    hidden res: RepositoryResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

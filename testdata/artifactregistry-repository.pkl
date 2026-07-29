@@ -1,0 +1,22 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/artifactregistry/repository.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new repository.Repository {
+    label = "plugin-sdk-test-artifact-repository"
+    name = "formae-test-repo-\(v.testRunID)"
+    format = "DOCKER"
+    description = "Test Artifact Registry repository for plugin SDK conformance tests"
+  }
+}

@@ -61,6 +61,13 @@ type ResourceConfig struct {
 	// response. Defaults to trying "items" then the resource type. Set when the
 	// API uses a different key (e.g. IAM serviceAccounts.list -> "accounts").
 	ListItemsKey string
+
+	// CreateIDParam, when set, sends the resource id as a create-time query
+	// parameter (e.g. "repositoryId", "instanceId") instead of in the request
+	// body. The id is taken from the "name" property, which is then removed from
+	// the body. Common for location-scoped GCP APIs (Artifact Registry, Redis,
+	// Filestore, ...).
+	CreateIDParam string
 }
 
 // ScopeConfig defines how a resource is scoped
