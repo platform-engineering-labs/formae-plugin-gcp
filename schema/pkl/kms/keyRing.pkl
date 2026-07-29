@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud KMS KeyRing
+///
+/// A logical grouping of CryptoKeys, scoped to a project + location. KeyRings
+/// are created synchronously and are permanent: the Cloud KMS API has no
+/// method to delete or update a KeyRing.
+module gcp.kms.keyRing
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::KMS::KeyRing"
+
+open class KeyRingResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: KeyRingResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class KeyRing extends formae.Resource {
+    hidden parent = this
+
+    /// Short KeyRing id (e.g. "my-keyring"). Immutable; sent as ?keyRingId=.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    hidden res: KeyRingResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

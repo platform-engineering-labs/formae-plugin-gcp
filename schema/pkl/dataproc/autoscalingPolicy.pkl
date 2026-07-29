@@ -1,0 +1,98 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Dataproc Autoscaling Policy
+///
+/// An autoscaling policy for Dataproc clusters. Region-scoped; create and
+/// delete are synchronous. The user-declared `name` is the short policy id
+/// (the plugin maps it onto the API's body field `id`).
+module gcp.dataproc.autoscalingPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Dataproc::AutoscalingPolicy"
+
+/// YARN autoscaling configuration for a basic algorithm.
+@gcp.SubResourceHint
+open class BasicYarnAutoscalingConfig extends formae.SubResource {
+    /// Fraction of average YARN pending memory used to add workers. Required.
+    scaleUpFactor: Float
+
+    /// Fraction of average YARN pending memory used to remove workers. Required.
+    scaleDownFactor: Float
+
+    /// Timeout for YARN graceful decommissioning (e.g. "1h", "0s"). Required.
+    gracefulDecommissionTimeout: String
+}
+
+/// Basic autoscaling algorithm (YARN-based).
+@gcp.SubResourceHint
+open class BasicAutoscalingAlgorithm extends formae.SubResource {
+    yarnConfig: BasicYarnAutoscalingConfig
+
+    /// Duration between scaling events (Bounds: 2m, 1d). GCP defaults to 2m.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    cooldownPeriod: String?
+}
+
+/// Autoscaling configuration for an instance group (primary/secondary workers).
+@gcp.SubResourceHint
+open class InstanceGroupAutoscalingPolicyConfig extends formae.SubResource {
+    /// Maximum number of instances for this group. Required for primary workers.
+    maxInstances: Int
+
+    /// Minimum number of instances. GCP defaults to 2 for primary workers.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    minInstances: Int?
+
+    /// Weight used to determine the fraction of total workers. GCP defaults to 1.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    weight: Int?
+}
+
+open class AutoscalingPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AutoscalingPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class AutoscalingPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short policy id (3-50 chars: letters, numbers, "_", "-"; cannot begin or
+    /// end with "_" or "-"). Immutable. Sent to the API as the body field `id`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    basicAlgorithm: BasicAutoscalingAlgorithm
+
+    @gcp.FieldHint
+    workerConfig: InstanceGroupAutoscalingPolicyConfig
+
+    @gcp.FieldHint
+    secondaryWorkerConfig: InstanceGroupAutoscalingPolicyConfig?
+
+    hidden res: AutoscalingPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

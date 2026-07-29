@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/monitoring/uptimeCheckConfig.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new uptimeCheckConfig.UptimeCheckConfig {
+    label = "plugin-sdk-test-uptime-check"
+    displayName = "formae-test-uptime-\(v.testRunID)"
+    timeout = "10s"
+    period = "60s"
+    monitoredResource = new uptimeCheckConfig.MonitoredResource {
+      type = "uptime_url"
+      labels = new Mapping { ["host"] = "example.com" }
+    }
+    httpCheck = new uptimeCheckConfig.HttpCheck {
+      path = "/"
+      port = 80
+      requestMethod = "GET"
+    }
+  }
+}
