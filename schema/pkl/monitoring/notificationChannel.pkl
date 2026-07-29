@@ -1,0 +1,68 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Monitoring NotificationChannel
+///
+/// A destination (email, Slack, PagerDuty, ...) that alerting policies notify.
+/// Project-scoped; the resource name is assigned by the API on create.
+module gcp.monitoring.notificationChannel
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::NotificationChannel"
+
+open class NotificationChannelResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: NotificationChannelResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NotificationChannel extends formae.Resource {
+    hidden parent = this
+
+    /// Server-assigned resource name ("projects/{p}/notificationChannels/{id}").
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    name: String?
+
+    /// Channel type, e.g. "email", "slack", "pagerduty". Immutable after create.
+    /// Exposed as `channelType`; maps to the API's `type` field (which collides
+    /// with formae's reserved resource `type`).
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    channelType: String
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    enabled: Boolean?
+
+    /// Type-specific configuration, e.g. { ["email_address"] = "team@example.com" }.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Free-form user labels.
+    @gcp.FieldHint
+    userLabels: Mapping<String, String>?
+
+    hidden res: NotificationChannelResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
