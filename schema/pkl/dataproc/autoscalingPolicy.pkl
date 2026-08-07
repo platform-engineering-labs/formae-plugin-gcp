@@ -44,8 +44,16 @@ open class BasicAutoscalingAlgorithm extends formae.SubResource {
 /// Autoscaling configuration for an instance group (primary/secondary workers).
 @gcp.SubResourceHint
 open class InstanceGroupAutoscalingPolicyConfig extends formae.SubResource {
-    /// Maximum number of instances for this group. Required for primary workers.
-    maxInstances: Int
+    /// Maximum number of instances for this group. Required by the API for
+    /// primary workers, but GCP omits it on read-back for secondary workers
+    /// (proto3 drops the zero value), so treat it as optional with a provider
+    /// default — otherwise read-back validation fails with
+    /// "missing required fields: [secondaryWorkerConfig.maxInstances]" and the
+    /// resource never lands in inventory.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    maxInstances: Int?
 
     /// Minimum number of instances. GCP defaults to 2 for primary workers.
     @gcp.FieldHint {
@@ -88,7 +96,12 @@ open class AutoscalingPolicy extends formae.Resource {
     @gcp.FieldHint
     workerConfig: InstanceGroupAutoscalingPolicyConfig
 
-    @gcp.FieldHint
+    /// Secondary (preemptible) worker autoscaling config. GCP populates this
+    /// with defaults even when the user doesn't declare it, so it comes back on
+    /// read — mark it a provider default or Verify rejects it as unexpected.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     secondaryWorkerConfig: InstanceGroupAutoscalingPolicyConfig?
 
     hidden res: AutoscalingPolicyResolvable = new {

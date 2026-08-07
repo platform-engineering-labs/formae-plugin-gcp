@@ -227,6 +227,8 @@ jobs:
           case "${{ matrix.test-case }}" in
             cloudsql-instance) TIMEOUT_ARG="TIMEOUT=30" ;;
             instance-group) TIMEOUT_ARG="TIMEOUT=15" ;;
+            # Filestore BASIC is zonal: override the region GCP_LOCATION with the zone.
+            filestore-instance) export GCP_LOCATION="$GCP_ZONE" ;;
           esac
           make conformance-test-crud-run TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
 

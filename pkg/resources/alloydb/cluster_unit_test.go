@@ -86,3 +86,32 @@ func TestClusterRegistered(t *testing.T) {
 		}
 	}
 }
+
+func TestNetworkCanonicalizeTransformer(t *testing.T) {
+	ctx := base.TransformContext{Project: "development-477117"}
+	// GCP canonicalizes the project ID to the project number on read-back;
+	// the transformer must rewrite it back to the declared ID.
+	got := clusterResponseTransformer.Transform(map[string]interface{}{
+		"name": "projects/development-477117/locations/us-central1/clusters/c1",
+		"networkConfig": map[string]interface{}{
+			"network": "projects/123456789/global/networks/default",
+		},
+	}, ctx)
+	nc := got["networkConfig"].(map[string]interface{})
+	if nc["network"] != "projects/development-477117/global/networks/default" {
+		t.Errorf("network = %q", nc["network"])
+	}
+	// ShortNameResponseTransformer still shortens the name.
+	if got["name"] != "c1" {
+		t.Errorf("name = %q", got["name"])
+	}
+}
+
+func TestNetworkCanonicalizeNoop(t *testing.T) {
+	ctx := base.TransformContext{Project: "p"}
+	// No networkConfig: unchanged, no panic.
+	got := clusterResponseTransformer.Transform(map[string]interface{}{"name": "c1"}, ctx)
+	if got["name"] != "c1" {
+		t.Errorf("name = %q", got["name"])
+	}
+}

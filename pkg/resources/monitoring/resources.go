@@ -76,6 +76,9 @@ func init() {
 				Scope:          &base.ScopeConfig{Type: base.ScopeProjectLevel},
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut, // groups.update is a full PUT
+				// groups.list returns {"group":[...]}, not "items"/"groups";
+				// without this discovery lists 0 and the resource never appears.
+				ListItemsKey: "group",
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
 		},

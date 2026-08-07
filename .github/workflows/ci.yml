@@ -257,6 +257,12 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=15
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
               ;;
+            filestore-instance)
+              # Filestore BASIC/BASIC_HDD is zonal: its location must be a zone,
+              # not a region. The shared GCP_LOCATION secret is a region, so
+              # override it with the zone for this test only.
+              export GCP_LOCATION="$GCP_ZONE"
+              ;;
           esac
           make conformance-test-crud-run conformance-test-discovery-run \
             TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
