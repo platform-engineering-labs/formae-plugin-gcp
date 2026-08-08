@@ -12,7 +12,7 @@ require (
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.6
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/api v0.291.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 )
 
 require (
