@@ -27,6 +27,16 @@ on:
         required: false
         default: ""
         type: string
+      test_cases:
+        description: |
+          Comma-separated test cases to run instead of the whole matrix, e.g.
+          "bucket,disk". Diagnosing one suite otherwise costs a full run of
+          every case against the live project, and some of them take upwards of
+          half an hour. Leave empty to run everything, which is what the
+          nightly schedule does.
+        required: false
+        default: ""
+        type: string
 
 # Prevent concurrent conformance tests (CI and nightly share test resources)
 concurrency:
@@ -45,6 +55,10 @@ jobs:
 
       - name: Discover test cases
         id: discover
+        env:
+          # Comma-separated allow-list from the dispatch input. Empty means the
+          # whole matrix, which is what the schedule always runs.
+          TEST_CASE_FILTER: ${{ inputs.test_cases }}
         run: |
           # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
           # and extract the base test case name
@@ -54,6 +68,15 @@ jobs:
             | grep -v '\-replace\.pkl$' \
             | sed 's/\.pkl$//' \
             | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          if [ -n "${TEST_CASE_FILTER}" ]; then
+            TEST_CASES=$(jq -c --arg f "${TEST_CASE_FILTER}" \
+              '[.[] | select(. as $c | ($f | split(",") | map(gsub("^\\s+|\\s+$";"")) | index($c)))]' \
+              <<< "${TEST_CASES}")
+            if [ "${TEST_CASES}" = "[]" ]; then
+              echo "test_cases=${TEST_CASE_FILTER} matched none of the discovered cases" >&2
+              exit 1
+            fi
+          fi
           echo "Discovered test cases: ${TEST_CASES}"
           echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
 
