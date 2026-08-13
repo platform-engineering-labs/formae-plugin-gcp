@@ -137,10 +137,12 @@ open class Bucket extends formae.Resource {
     @gcp.FieldHint
     logging: Logging?
 
-    @gcp.FieldHint {
-        hasProviderDefault = true
-    }
-    metageneration: Int?
+    // metageneration is deliberately not declared. It is the optimistic-locking
+    // counter the server increments on every metadata change, and the update
+    // path reads it live from the API rather than from the forma, so declaring
+    // it only puts an ever-changing value into desired state: extract writes
+    // the counter it saw, the apply bumps it, and re-applying the extracted
+    // forma then plans a spurious update back to the stale value.
 
     @gcp.FieldHint {
         createOnly = true
