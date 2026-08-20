@@ -10,14 +10,15 @@ import (
 )
 
 const rulePath = "projects/dev-1/global/firewallPolicies/pol-a/rules/1000"
+const secRulePath = "projects/dev-1/global/securityPolicies/pol-a/rules/1000"
 
 // A rule has no identity of its own in the API — it is addressed by
 // (policy, priority) — so both must survive the native ID round-trip.
 func TestRuleNativeIDRoundTrip(t *testing.T) {
-	if got := buildRuleNativeID("dev-1", "pol-a", 1000); got != rulePath {
+	if got := firewallPolicyRuleKind.nativeID("dev-1", "pol-a", 1000); got != rulePath {
 		t.Fatalf("build: %q", got)
 	}
-	project, policy, priority, err := parseRuleNativeID(rulePath)
+	project, policy, priority, err := firewallPolicyRuleKind.parseNativeID(rulePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,9 +35,56 @@ func TestParseRuleNativeIDRejectsOtherShapes(t *testing.T) {
 		"projects/dev-1/global/networks/n/rules/1000",             // wrong collection
 		"",
 	} {
-		if _, _, _, err := parseRuleNativeID(bad); err == nil {
+		if _, _, _, err := firewallPolicyRuleKind.parseNativeID(bad); err == nil {
 			t.Errorf("expected error for %q", bad)
 		}
+	}
+}
+
+// The two kinds share one implementation, so each must reject the other's ids —
+// otherwise a Cloud Armor rule could be read against a firewall policy URL.
+func TestPolicyRuleKindsRejectEachOthersIDs(t *testing.T) {
+	if _, _, _, err := firewallPolicyRuleKind.parseNativeID(secRulePath); err == nil {
+		t.Error("firewall kind accepted a security policy rule ID")
+	}
+	if _, _, _, err := securityPolicyRuleKind.parseNativeID(rulePath); err == nil {
+		t.Error("security kind accepted a firewall policy rule ID")
+	}
+	if got := securityPolicyRuleKind.nativeID("dev-1", "pol-a", 1000); got != secRulePath {
+		t.Errorf("security nativeID: %q", got)
+	}
+	project, policy, priority, err := securityPolicyRuleKind.parseNativeID(secRulePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project != "dev-1" || policy != "pol-a" || priority != 1000 {
+		t.Errorf("parse: %q %q %d", project, policy, priority)
+	}
+}
+
+// Cloud Armor creates exactly one rule of its own, the catch-all allow at
+// 2147483647, and List must not offer it as manageable. A user rule sits below.
+func TestSecurityPolicyDefaultRuleIsAboveFloor(t *testing.T) {
+	if defaultSecurityRulePriority < securityPolicyRuleKind.priorityFloor {
+		t.Error("the default allow rule would be reported as manageable")
+	}
+	if 1000 >= securityPolicyRuleKind.priorityFloor {
+		t.Error("a user rule at 1000 must be below the floor")
+	}
+}
+
+// Each kind strips only its own policy property.
+func TestSecurityPolicyRuleBodyStripsPolicy(t *testing.T) {
+	out := securityPolicyRuleKind.body(map[string]interface{}{
+		"securityPolicy": "pol-a",
+		"priority":       float64(1000),
+		"action":         "deny(403)",
+	}, true)
+	if _, ok := out["securityPolicy"]; ok {
+		t.Errorf("policy must not reach the body: %#v", out)
+	}
+	if out["action"] != "deny(403)" || out["priority"] != float64(1000) {
+		t.Errorf("rule fields must survive: %#v", out)
 	}
 }
 
@@ -49,7 +97,7 @@ func TestRuleBodyStripsPolicy(t *testing.T) {
 		"action":         "allow",
 		"ruleName":       "allow-https",
 	}
-	out := ruleBody(props, true)
+	out := firewallPolicyRuleKind.body(props, true)
 	if _, ok := out["firewallPolicy"]; ok {
 		t.Errorf("policy must not reach the body: %#v", out)
 	}
@@ -60,7 +108,7 @@ func TestRuleBodyStripsPolicy(t *testing.T) {
 		t.Errorf("rule fields must survive: %#v", out)
 	}
 	// The caller can also drop priority, for verbs that take it as a query param.
-	if _, ok := ruleBody(props, false)["priority"]; ok {
+	if _, ok := firewallPolicyRuleKind.body(props, false)["priority"]; ok {
 		t.Errorf("priority should be dropped when not requested")
 	}
 	// The input map must not be mutated - the caller reuses it.
@@ -106,11 +154,11 @@ func TestPriorityOfRejectsMissingOrJunk(t *testing.T) {
 // them, since they cannot be managed.
 func TestImpliedRulePriorityFloorExcludesGCPRules(t *testing.T) {
 	for _, implied := range []int{2147483644, 2147483645, 2147483646, 2147483647} {
-		if implied < impliedRulePriorityFloor {
+		if implied < firewallPolicyRuleKind.priorityFloor {
 			t.Errorf("implied rule %d would be reported as manageable", implied)
 		}
 	}
-	if 1000 >= impliedRulePriorityFloor {
+	if 1000 >= firewallPolicyRuleKind.priorityFloor {
 		t.Errorf("a user rule at 1000 must be below the floor")
 	}
 }

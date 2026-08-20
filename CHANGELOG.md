@@ -263,6 +263,31 @@ Together these close the managed-instance-group gap: the plugin previously had
   the group's `networkEndpointType`. Everything is create-only, so any change
   detaches and reattaches.
 
+- `GCP::Compute::SecurityPolicyRule` — one rule inside a global Cloud Armor
+  policy. A new policy carries only a catch-all allow at priority 2147483647, so
+  a policy alone permits everything; the rules are what enforce anything. Like
+  the firewall policy rule it is a set of verbs on the policy rather than a REST
+  sub-collection, so `FirewallPolicyRuleProvisioner` was generalised into
+  `PolicyRuleProvisioner`, parameterised by a `policyRuleKind` (collection
+  segment, owning-policy property, and where GCP's own rules start). Both rule
+  types now share one implementation. Only global `securityPolicies` is wired up;
+  a `RegionSecurityPolicy` rule would need a regional kind.
+
+  **Conformance is red on Verify, Extract and Update**, and not because of this
+  resource: `match.config`, an object nested inside `match`, is absent from
+  stored state immediately after create and update. Create, Sync, Destroy and
+  out-of-band delete pass, and Sync reports *all* expected properties matched —
+  `match.config` included — so the read path is complete and the loss sits in
+  how post-create and post-update state is materialised. That narrows the
+  standing nested-property-loss bug: it is not the plugin's read, and it is not
+  a typing choice, since both an untyped `Mapping<String, Any>` (what
+  `NetworkFirewallPolicyRule.match` uses) and the typed classes lose the field.
+  Every verb was verified directly against the API before shipping.
+
+  Do not declare `rules` inline on the policy and manage rules with this
+  resource at the same time — both own the same list and each will remove what
+  the other added.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

@@ -33,6 +33,8 @@ const (
 	RouteResourceType                = "GCP::Compute::Route"
 	SecurityPolicyResourceType       = "GCP::Compute::SecurityPolicy"
 	RegionSecurityPolicyResourceType = "GCP::Compute::RegionSecurityPolicy"
+	// Registered in policy_rule.go: add/get/patch/removeRule verbs.
+	SecurityPolicyRuleResourceType = "GCP::Compute::SecurityPolicyRule"
 
 	// Managed instance groups
 	InstanceTemplateResourceType           = "GCP::Compute::InstanceTemplate"

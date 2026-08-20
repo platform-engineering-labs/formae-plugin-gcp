@@ -74,6 +74,21 @@ else
     echo "  No regional security policies found"
 fi
 
+# Global Cloud Armor policies. The security-policy-rule fixture creates one as a
+# prerequisite, and conformance Destroy only removes the resource under test, so
+# a killed run leaves the policy behind. Rules die with their policy.
+echo "Cleaning GCP global security policies..."
+GLOBAL_SEC_POLICIES=$(gcloud compute security-policies list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$GLOBAL_SEC_POLICIES" ]; then
+    echo "$GLOBAL_SEC_POLICIES" | while read -r pol region; do
+        [ -n "$region" ] && continue
+        echo "  Deleting global security policy: $pol"
+        gcloud compute security-policies delete "$pol" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No global security policies found"
+fi
+
 echo "Cleaning GCP network firewall policies..."
 NET_FW_POLICIES=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$NET_FW_POLICIES" ]; then

@@ -19,32 +19,69 @@ import (
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
-// FirewallPolicyRuleProvisioner manages one rule inside a network firewall
-// policy. Nothing here can go through the generic engine: a rule is not a REST
-// sub-collection but a set of verbs on the policy — addRule, getRule?priority=N,
-// patchRule?priority=N, removeRule?priority=N — so all of CRUD is hand-written.
-// Status delegates to the base, since every verb returns an ordinary global
-// Compute operation.
+// PolicyRuleProvisioner manages one rule inside a policy. Nothing here can go
+// through the generic engine: a rule is not a REST sub-collection but a set of
+// verbs on the policy — addRule, getRule?priority=N, patchRule?priority=N,
+// removeRule?priority=N — so all of CRUD is hand-written. Status delegates to
+// the base, since every verb returns an ordinary global Compute operation.
 //
-// Shaped like InstanceGroupProvisioner: embed the base for config/transport and
-// override what the verbs demand.
-type FirewallPolicyRuleProvisioner struct {
+// Network firewall policies and Cloud Armor security policies expose the same
+// four verbs over the same shape, differing only in the collection segment, the
+// property naming the owning policy, and where GCP's own rules start — so both
+// are one provisioner parameterised by policyRuleKind.
+type PolicyRuleProvisioner struct {
 	*base.BaseResource
+	kind policyRuleKind
 }
 
-var _ prov.Provisioner = (*FirewallPolicyRuleProvisioner)(nil)
+var _ prov.Provisioner = (*PolicyRuleProvisioner)(nil)
 
-// impliedRulePriorityFloor is where GCP's own implied rules start. A policy is
-// created with several of them (goto_next / deny); they are not manageable, so
-// List must not report them as discoverable resources.
+// policyRuleKind is everything that differs between the two rule flavours.
+type policyRuleKind struct {
+	// collection is the policy's URL segment, which is also its method group.
+	collection string
+	// policyProperty is the schema field naming the owning policy. It is a path
+	// component, never part of a rule body.
+	policyProperty string
+	// priorityFloor is where GCP's own rules start. Rules at or above it are not
+	// manageable, so List must not report them as discoverable resources.
+	priorityFloor int
+	// label appears in status messages and errors.
+	label string
+}
+
+// impliedRulePriorityFloor is where a network firewall policy's implied rules
+// start. A policy is created with several of them (goto_next / deny).
 const impliedRulePriorityFloor = 2147483644
 
-// policyPropertyName is the schema field naming the owning policy. It is a path
-// component, never part of a rule body.
-const policyPropertyName = "firewallPolicy"
+// defaultSecurityRulePriority is the one rule Cloud Armor creates for a new
+// policy — a catch-all allow that cannot be removed on its own.
+const defaultSecurityRulePriority = 2147483647
+
+var (
+	firewallPolicyRuleKind = policyRuleKind{
+		collection:     "firewallPolicies",
+		policyProperty: "firewallPolicy",
+		priorityFloor:  impliedRulePriorityFloor,
+		label:          "firewall policy rule",
+	}
+	// ponytail: global securityPolicies only. RegionSecurityPolicy rules would
+	// need a regional scope here; add that kind when something needs it.
+	securityPolicyRuleKind = policyRuleKind{
+		collection:     "securityPolicies",
+		policyProperty: "securityPolicy",
+		priorityFloor:  defaultSecurityRulePriority,
+		label:          "security policy rule",
+	}
+)
 
 func init() {
-	registry.Register(NetworkFirewallPolicyRuleResourceType,
+	registerPolicyRuleKind(NetworkFirewallPolicyRuleResourceType, firewallPolicyRuleKind)
+	registerPolicyRuleKind(SecurityPolicyRuleResourceType, securityPolicyRuleKind)
+}
+
+func registerPolicyRuleKind(resourceType string, kind policyRuleKind) {
+	registry.Register(resourceType,
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
@@ -54,36 +91,36 @@ func init() {
 			resource.OperationCheckStatus,
 		},
 		func(cfg *config.Config) prov.Provisioner {
-			return &FirewallPolicyRuleProvisioner{
+			return &PolicyRuleProvisioner{
 				BaseResource: &base.BaseResource{
 					Config:          cfg,
 					APIConfig:       ComputeAPI,
 					OperationConfig: ComputeOperations,
 					ResourceConfig: base.ResourceConfig{
-						ResourceType: "firewallPolicies",
+						ResourceType: kind.collection,
 						Scope:        &base.ScopeConfig{Type: base.ScopeGlobal},
 					},
 					NativeIDConfig: ComputeNativeID,
 				},
+				kind: kind,
 			}
 		})
 }
 
-// buildRuleNativeID composes
-// "projects/{p}/global/firewallPolicies/{policy}/rules/{priority}".
-func buildRuleNativeID(project, policy string, priority int) string {
-	return fmt.Sprintf("projects/%s/global/firewallPolicies/%s/rules/%d",
-		project, policy, priority)
+// nativeID composes "projects/{p}/global/{collection}/{policy}/rules/{priority}".
+func (k policyRuleKind) nativeID(project, policy string, priority int) string {
+	return fmt.Sprintf("projects/%s/global/%s/%s/rules/%d",
+		project, k.collection, policy, priority)
 }
 
-// parseRuleNativeID splits the composite id back into its parts. A rule has no
+// parseNativeID splits the composite id back into its parts. A rule has no
 // identity of its own in the API — it is addressed by (policy, priority) — so
 // both have to survive in the native ID.
-func parseRuleNativeID(nativeID string) (project, policy string, priority int, err error) {
+func (k policyRuleKind) parseNativeID(nativeID string) (project, policy string, priority int, err error) {
 	parts := strings.Split(nativeID, "/")
 	if len(parts) != 7 || parts[0] != "projects" || parts[2] != "global" ||
-		parts[3] != "firewallPolicies" || parts[5] != "rules" {
-		return "", "", 0, fmt.Errorf("invalid firewall policy rule native ID: %s", nativeID)
+		parts[3] != k.collection || parts[5] != "rules" {
+		return "", "", 0, fmt.Errorf("invalid %s native ID: %s", k.label, nativeID)
 	}
 	priority, err = strconv.Atoi(parts[6])
 	if err != nil {
@@ -92,32 +129,31 @@ func parseRuleNativeID(nativeID string) (project, policy string, priority int, e
 	return parts[1], parts[4], priority, nil
 }
 
-// ruleBody strips the properties that address the rule rather than describe it.
-// "firewallPolicy" is a path component and "priority" travels as a query
-// parameter on patch, but the API also accepts it in the body on add, so it is
-// kept there.
-func ruleBody(props map[string]interface{}, keepPriority bool) map[string]interface{} {
+// body strips the properties that address the rule rather than describe it. The
+// owning policy is a path component, and "priority" travels as a query parameter
+// on patch, but the API also accepts it in the body on add, so it is kept there.
+func (k policyRuleKind) body(props map[string]interface{}, keepPriority bool) map[string]interface{} {
 	out := make(map[string]interface{}, len(props))
-	for k, v := range props {
-		if k == policyPropertyName {
+	for key, v := range props {
+		if key == k.policyProperty {
 			continue
 		}
-		if k == "priority" && !keepPriority {
+		if key == "priority" && !keepPriority {
 			continue
 		}
-		out[k] = v
+		out[key] = v
 	}
 	return out
 }
 
-func (p *FirewallPolicyRuleProvisioner) policyURL(project, policy string) string {
-	return fmt.Sprintf("%s/projects/%s/global/firewallPolicies/%s",
-		p.APIConfig.BaseURL, project, policy)
+func (p *PolicyRuleProvisioner) policyURL(project, policy string) string {
+	return fmt.Sprintf("%s/projects/%s/global/%s/%s",
+		p.APIConfig.BaseURL, project, p.kind.collection, policy)
 }
 
 // projectFor prefers the project the target is configured with, falling back to
 // whatever the native ID carried.
-func (p *FirewallPolicyRuleProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
+func (p *PolicyRuleProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
 	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
 		return cfg.Project
 	}
@@ -125,7 +161,7 @@ func (p *FirewallPolicyRuleProvisioner) projectFor(targetConfig json.RawMessage,
 }
 
 // issueVerb POSTs one of the rule verbs and returns the operation path to poll.
-func (p *FirewallPolicyRuleProvisioner) issueVerb(
+func (p *PolicyRuleProvisioner) issueVerb(
 	ctx context.Context, url string, body map[string]interface{}, project string,
 ) (string, *transport.Error) {
 	client, err := transport.NewClient(ctx, p.Config)
@@ -138,13 +174,13 @@ func (p *FirewallPolicyRuleProvisioner) issueVerb(
 		Body:   body,
 	})
 	if err != nil {
-		return "", transport.WrapError(err, "firewall policy rule verb failed")
+		return "", transport.WrapError(err, p.kind.label+" verb failed")
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
 	return p.OperationConfig.OperationURLBuilder(base.PathContext{Project: project}, opID), nil
 }
 
-func (p *FirewallPolicyRuleProvisioner) Create(
+func (p *PolicyRuleProvisioner) Create(
 	ctx context.Context, request *resource.CreateRequest,
 ) (*resource.CreateResult, error) {
 	var props map[string]interface{}
@@ -152,10 +188,10 @@ func (p *FirewallPolicyRuleProvisioner) Create(
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("invalid properties: %v", err)), nil
 	}
-	policy, ok := props[policyPropertyName].(string)
+	policy, ok := props[p.kind.policyProperty].(string)
 	if !ok || policy == "" {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
-			fmt.Sprintf("%s is required", policyPropertyName)), nil
+			fmt.Sprintf("%s is required", p.kind.policyProperty)), nil
 	}
 	priority, err := priorityOf(props)
 	if err != nil {
@@ -168,7 +204,7 @@ func (p *FirewallPolicyRuleProvisioner) Create(
 	}
 
 	requestID, verbErr := p.issueVerb(ctx,
-		p.policyURL(project, policy)+"/addRule", ruleBody(props, true), project)
+		p.policyURL(project, policy)+"/addRule", p.kind.body(props, true), project)
 	if verbErr != nil {
 		return createFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -177,17 +213,17 @@ func (p *FirewallPolicyRuleProvisioner) Create(
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        buildRuleNativeID(project, policy, priority),
+			NativeID:        p.kind.nativeID(project, policy, priority),
 			RequestID:       requestID,
-			StatusMessage:   "firewall policy rule creation in progress",
+			StatusMessage:   p.kind.label + " creation in progress",
 		},
 	}, nil
 }
 
-func (p *FirewallPolicyRuleProvisioner) Read(
+func (p *PolicyRuleProvisioner) Read(
 	ctx context.Context, request *resource.ReadRequest,
 ) (*resource.ReadResult, error) {
-	project, policy, priority, err := parseRuleNativeID(request.NativeID)
+	project, policy, priority, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
@@ -204,7 +240,7 @@ func (p *FirewallPolicyRuleProvisioner) Read(
 		URL:    fmt.Sprintf("%s/getRule?priority=%d", p.policyURL(project, policy), priority),
 	})
 	if rErr != nil {
-		wrapped := transport.WrapError(rErr, "failed to read firewall policy rule")
+		wrapped := transport.WrapError(rErr, "failed to read "+p.kind.label)
 		code := transport.ToResourceErrorCode(wrapped.Code)
 		// A removed rule answers 400 ("no rule with priority"), not 404, so the
 		// generic mapping would report a hard failure and formae would never
@@ -222,7 +258,7 @@ func (p *FirewallPolicyRuleProvisioner) Read(
 	for k, v := range resp.Body {
 		props[k] = v
 	}
-	props[policyPropertyName] = policy
+	props[p.kind.policyProperty] = policy
 
 	encoded, mErr := json.Marshal(props)
 	if mErr != nil {
@@ -231,7 +267,7 @@ func (p *FirewallPolicyRuleProvisioner) Read(
 	return &resource.ReadResult{Properties: string(encoded)}, nil
 }
 
-func (p *FirewallPolicyRuleProvisioner) Update(
+func (p *PolicyRuleProvisioner) Update(
 	ctx context.Context, request *resource.UpdateRequest,
 ) (*resource.UpdateResult, error) {
 	var props map[string]interface{}
@@ -239,14 +275,14 @@ func (p *FirewallPolicyRuleProvisioner) Update(
 		return updateFailure(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("invalid properties: %v", err)), nil
 	}
-	project, policy, priority, err := parseRuleNativeID(request.NativeID)
+	project, policy, priority, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return updateFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
 	url := fmt.Sprintf("%s/patchRule?priority=%d", p.policyURL(project, policy), priority)
-	requestID, verbErr := p.issueVerb(ctx, url, ruleBody(props, true), project)
+	requestID, verbErr := p.issueVerb(ctx, url, p.kind.body(props, true), project)
 	if verbErr != nil {
 		return updateFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -256,15 +292,15 @@ func (p *FirewallPolicyRuleProvisioner) Update(
 			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
 			RequestID:       requestID,
-			StatusMessage:   "firewall policy rule update in progress",
+			StatusMessage:   p.kind.label + " update in progress",
 		},
 	}, nil
 }
 
-func (p *FirewallPolicyRuleProvisioner) Delete(
+func (p *PolicyRuleProvisioner) Delete(
 	ctx context.Context, request *resource.DeleteRequest,
 ) (*resource.DeleteResult, error) {
-	project, policy, priority, err := parseRuleNativeID(request.NativeID)
+	project, policy, priority, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
@@ -281,7 +317,7 @@ func (p *FirewallPolicyRuleProvisioner) Delete(
 			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
 			RequestID:       requestID,
-			StatusMessage:   "firewall policy rule deletion in progress",
+			StatusMessage:   p.kind.label + " deletion in progress",
 		},
 	}, nil
 }
@@ -289,12 +325,12 @@ func (p *FirewallPolicyRuleProvisioner) Delete(
 // List enumerates the manageable rules of one policy. Rules live inside their
 // policy, so discovery needs to be told which policy to look in; without that
 // hint there is nothing to enumerate and an empty result is the honest answer.
-func (p *FirewallPolicyRuleProvisioner) List(
+func (p *PolicyRuleProvisioner) List(
 	ctx context.Context, request *resource.ListRequest,
 ) (*resource.ListResult, error) {
 	policy := ""
 	if request.AdditionalProperties != nil {
-		policy = request.AdditionalProperties[policyPropertyName]
+		policy = request.AdditionalProperties[p.kind.policyProperty]
 	}
 	if policy == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
@@ -313,7 +349,7 @@ func (p *FirewallPolicyRuleProvisioner) List(
 		URL:    p.policyURL(project, policy),
 	})
 	if err != nil {
-		wrapped := transport.WrapError(err, "failed to list firewall policy rules")
+		wrapped := transport.WrapError(err, "failed to list "+p.kind.label+"s")
 		return nil, fmt.Errorf("%s", wrapped.Message)
 	}
 
@@ -325,10 +361,10 @@ func (p *FirewallPolicyRuleProvisioner) List(
 			continue
 		}
 		priority, err := priorityOf(ruleMap)
-		if err != nil || priority >= impliedRulePriorityFloor {
+		if err != nil || priority >= p.kind.priorityFloor {
 			continue
 		}
-		nativeIDs = append(nativeIDs, buildRuleNativeID(project, policy, priority))
+		nativeIDs = append(nativeIDs, p.kind.nativeID(project, policy, priority))
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
