@@ -58,27 +58,45 @@ open class Connector extends formae.Resource {
     }
     machineType: String?
 
-    /// Minimum throughput in Mbps. GCP populates a default when unset.
+    // Connector sizing. A create MUST specify exactly one of the two pairs
+    // below — the API rejects a connector that sizes neither ("Operation
+    // failed: A Connector must specify either max_throughput or
+    // max_instances."). Whichever pair is left unset is computed by GCP and
+    // reported back, hence hasProviderDefault on all four.
+    //
+    //   * minInstances/maxInstances — preferred; GCP discourages the
+    //     throughput fields.
+    //   * minThroughput/maxThroughput — legacy sizing in Mbps.
+    //
+    // The pairs are mutually exclusive: minInstances conflicts with
+    // minThroughput, maxInstances with maxThroughput.
+
+    /// Minimum throughput in Mbps (multiple of 100, 200-900). Conflicts with
+    /// minInstances. Computed by GCP when instance-based sizing is used.
     @gcp.FieldHint {
         hasProviderDefault = true
     }
     minThroughput: Int?
 
-    /// Maximum throughput in Mbps. GCP populates a default when unset.
+    /// Maximum throughput in Mbps (multiple of 100, 300-1000), greater than
+    /// minThroughput. Conflicts with maxInstances. Computed by GCP when
+    /// instance-based sizing is used.
     @gcp.FieldHint {
         hasProviderDefault = true
     }
     maxThroughput: Int?
 
-    /// Minimum number of instances in the autoscaling group. GCP populates a
-    /// default when unset.
+    /// Minimum instances in the autoscaling group (2-9), lower than
+    /// maxInstances. Required alongside maxInstances when not using the
+    /// throughput pair. Conflicts with minThroughput.
     @gcp.FieldHint {
         hasProviderDefault = true
     }
     minInstances: Int?
 
-    /// Maximum number of instances in the autoscaling group. GCP populates a
-    /// default when unset.
+    /// Maximum instances in the autoscaling group (3-10), higher than
+    /// minInstances. Required alongside minInstances when not using the
+    /// throughput pair. Conflicts with maxThroughput.
     @gcp.FieldHint {
         hasProviderDefault = true
     }

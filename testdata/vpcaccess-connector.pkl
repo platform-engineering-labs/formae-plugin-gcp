@@ -18,5 +18,10 @@ forma {
     name = "formae-test-conn-\(v.testRunID)"
     network = "default"
     ipCidrRange = "10.8.0.0/28"
+    // The API rejects a create that sizes the connector with neither the
+    // instance pair nor the throughput pair. Instance-based is the sizing
+    // GCP recommends.
+    minInstances = 2
+    maxInstances = 3
   }
 }
