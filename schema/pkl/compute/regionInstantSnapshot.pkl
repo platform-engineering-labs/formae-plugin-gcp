@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionInstantSnapshot (regional)
+///
+/// A near-instant point-in-time copy of a *regional* disk. Like the zonal
+/// `instantSnapshot` it is a fast rollback point rather than a backup, but it
+/// inherits the source disk's regional replication, so it survives losing a
+/// single zone. Requires an SSD-class source disk.
+///
+/// ponytail: update is off — only `setLabels` mutates an instant snapshot, and
+/// that needs a labelFingerprint round-trip, so a change replaces.
+module gcp.compute.regionInstantSnapshot
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionInstantSnapshot"
+
+open class RegionInstantSnapshotResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionInstantSnapshotResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionInstantSnapshotResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionInstantSnapshotResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionInstantSnapshot extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Regional disk to copy. Pass `regionDisk.res.selfLink` — the API stores a
+    /// full URL and compares against it.
+    @gcp.FieldHint { createOnly = true }
+    sourceDisk: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Size of the source disk in GB, server-populated. The API reports it as a
+    /// string.
+    @gcp.FieldHint { hasProviderDefault = true }
+    diskSizeGb: String?
+
+    hidden res: RegionInstantSnapshotResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

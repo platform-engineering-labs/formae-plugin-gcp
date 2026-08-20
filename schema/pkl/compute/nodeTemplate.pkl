@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NodeTemplate (regional)
+///
+/// The specification a sole-tenant `nodeGroup` stamps its physical nodes from:
+/// which node type, how much CPU overcommit is allowed, and the affinity labels
+/// VMs use to select the group.
+///
+/// Creating a template provisions nothing and costs nothing — a `nodeGroup`
+/// built from it is what reserves physical hardware. The group is not modelled
+/// here, so a template on its own is inert.
+///
+/// ponytail: the API has no patch for node templates, so a change replaces.
+module gcp.compute.nodeTemplate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NodeTemplate"
+
+/// NONE keeps nodes at their nominal CPU count; ENABLED allows overcommit for
+/// workloads that tolerate it.
+typealias CpuOvercommitType = "NONE"|"ENABLED"
+
+open class NodeTemplateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NodeTemplateResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: NodeTemplateResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: NodeTemplateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NodeTemplate extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Sole-tenant node type, e.g. "n1-node-96-624". Availability varies by
+    /// zone — list `nodeTypes` in the target zone before choosing.
+    @gcp.FieldHint { createOnly = true }
+    nodeType: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    cpuOvercommitType: CpuOvercommitType?
+
+    /// Labels a VM sets `scheduling.nodeAffinities` against to land on nodes
+    /// from this template.
+    @gcp.FieldHint { createOnly = true }
+    nodeAffinityLabels: Mapping<String, String>?
+
+    hidden res: NodeTemplateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

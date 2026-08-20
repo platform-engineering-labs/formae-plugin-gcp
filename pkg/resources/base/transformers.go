@@ -196,6 +196,57 @@ func (t *ProjectResponseTransformer) Transform(apiResponse map[string]interface{
 // AddProjectResponseTransformer is a convenience instance of ProjectResponseTransformer
 var AddProjectResponseTransformer = &ProjectResponseTransformer{}
 
+// DropFields returns a transformer that removes the named fields from every
+// request body. Use it for properties that identify the resource's place in the
+// URL rather than its payload — a nested resource's parent id and location —
+// which several GCP APIs reject outright as unknown body fields. base builds
+// the path context from the raw properties before any transformer runs, so
+// removing them here does not affect routing.
+func DropFields(fields ...string) RequestTransformer {
+	drop := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		drop[f] = true
+	}
+	return RequestTransformerFunc(
+		func(props map[string]interface{}, _ TransformContext) (map[string]interface{}, error) {
+			out := make(map[string]interface{}, len(props))
+			for k, v := range props {
+				if drop[k] {
+					continue
+				}
+				out[k] = v
+			}
+			return out, nil
+		})
+}
+
+// DropFieldsOnUpdate returns a transformer that removes the named fields from
+// update bodies only. Several GCP APIs build their PATCH updateMask from the
+// body's top-level fields, so an immutable or read-only field left in the body
+// lands in the mask and the call is rejected outright (Cloud Logging answers
+// "name cannot be changed"). Create bodies usually still need those fields —
+// "name" typically carries the client-chosen id — hence the operation check.
+func DropFieldsOnUpdate(fields ...string) RequestTransformer {
+	drop := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		drop[f] = true
+	}
+	return RequestTransformerFunc(
+		func(props map[string]interface{}, ctx TransformContext) (map[string]interface{}, error) {
+			if ctx.Operation != resource.OperationUpdate {
+				return props, nil
+			}
+			out := make(map[string]interface{}, len(props))
+			for k, v := range props {
+				if drop[k] {
+					continue
+				}
+				out[k] = v
+			}
+			return out, nil
+		})
+}
+
 // ShortNameResponseTransformer rewrites a full-path "name" field
 // (e.g. "projects/p/topics/my-topic") to its last segment ("my-topic"). Many
 // GCP APIs (Pub/Sub, Secret Manager, DNS, IAM) echo the full resource path in

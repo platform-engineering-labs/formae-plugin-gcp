@@ -1,0 +1,93 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Monitoring MetricDescriptor
+///
+/// The schema of a custom metric: its kind, value type, unit and labels. Declare
+/// one so an `alertPolicy` or `dashboard` can reference the metric before any
+/// application has written a point to it.
+///
+/// `name` carries the metric type, e.g. "custom.googleapis.com/orders/latency".
+/// The API calls this field `type`, which formae's base Resource class reserves,
+/// so the provisioner renames it on the wire.
+///
+/// ponytail: no patch endpoint exists for metric descriptors, so a change
+/// replaces.
+module gcp.monitoring.metricDescriptor
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::MetricDescriptor"
+
+/// GAUGE measures a value at a point in time, DELTA a change over an interval,
+/// CUMULATIVE a running total since a start time.
+typealias MetricKind = "GAUGE"|"DELTA"|"CUMULATIVE"
+
+typealias ValueType = "BOOL"|"INT64"|"DOUBLE"|"STRING"|"DISTRIBUTION"|"MONEY"
+
+typealias LabelValueType = "STRING"|"BOOL"|"INT64"
+
+/// A dimension the metric can be sliced by.
+@gcp.SubResourceHint
+open class LabelDescriptor extends formae.SubResource {
+    @gcp.FieldHint
+    key: String
+
+    /// GCP omits STRING from the response because it is the default.
+    @gcp.FieldHint { hasProviderDefault = true }
+    valueType: LabelValueType?
+
+    @gcp.FieldHint
+    description: String?
+}
+
+open class MetricDescriptorResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MetricDescriptorResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class MetricDescriptor extends formae.Resource {
+    hidden parent = this
+
+    /// Metric type, e.g. "custom.googleapis.com/orders/latency". Custom metrics
+    /// must sit under "custom.googleapis.com/" or
+    /// "external.googleapis.com/user/".
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    metricKind: MetricKind
+
+    @gcp.FieldHint { createOnly = true }
+    valueType: ValueType
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Unit of measure, in the Unified Code for Units of Measure, e.g. "1",
+    /// "By", "ms".
+    @gcp.FieldHint
+    unit: String?
+
+    @gcp.FieldHint
+    labels: Listing<LabelDescriptor>?
+
+    hidden res: MetricDescriptorResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

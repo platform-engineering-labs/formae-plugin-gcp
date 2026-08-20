@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionNetworkFirewallPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency regional policy. As with the global one, rules and network
+// associations are separate verb-based API operations and are not modelled yet.
+forma {
+  v.stack
+  v.target
+
+  new regionNetworkFirewallPolicy.RegionNetworkFirewallPolicy {
+    label = "plugin-sdk-test-region-network-firewall-policy"
+    name = "formae-plugin-sdk-test-rnfp-\(v.testRunID)"
+    region = v.gcpRegion
+    description = "Test regional network firewall policy for plugin SDK conformance tests"
+  }
+}

@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute Snapshot (global)
+///
+/// A point-in-time incremental backup of a persistent disk. Restore by pointing
+/// a new `disk.sourceSnapshot` at it. For recurring backups declare a
+/// `resourcePolicy` snapshot schedule instead of managing snapshots by hand.
+///
+/// ponytail: update is off — `snapshots.setLabels` needs a labelFingerprint
+/// round-trip, and nothing else on a snapshot is mutable, so a change replaces.
+module gcp.compute.snapshot
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Snapshot"
+
+typealias SnapshotType = "STANDARD"|"ARCHIVE"
+
+open class SnapshotResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: SnapshotResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: SnapshotResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: SnapshotResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Snapshot extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// Self-link of the disk to snapshot. Pass `disk.res.selfLink` so formae
+    /// creates the disk first.
+    @gcp.FieldHint { createOnly = true }
+    sourceDisk: (String|formae.Resolvable)?
+
+    @gcp.FieldHint { createOnly = true }
+    labels: Mapping<String, String>?
+
+    /// Regions or multi-regions holding the snapshot, e.g. "eu". GCP picks a
+    /// location from the source disk when omitted.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    storageLocations: Listing<String>?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    snapshotType: SnapshotType?
+
+    /// Size of the source disk in GB, server-populated.
+    @gcp.FieldHint { hasProviderDefault = true }
+    diskSizeGb: String?
+
+    hidden res: SnapshotResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

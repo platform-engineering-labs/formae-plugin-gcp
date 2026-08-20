@@ -1,0 +1,126 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Monitoring Dashboard
+///
+/// A custom Cloud Monitoring dashboard. Unlike its Monitoring siblings, the
+/// dashboard ID is caller-chosen: declare `name` and the provisioner expands it
+/// to "projects/{project}/dashboards/{name}" on the wire, so the identifier
+/// stays stable across reconciles.
+///
+/// Dashboards live on the Monitoring **v1** API, not v3.
+///
+/// ponytail: only the `gridLayout` container and the `text` / `xyChart` widgets
+/// are modelled. Monitoring's widget union is large (scorecard, alert chart,
+/// log panel, pie, table, ...) — add them as they are needed rather than
+/// mirroring the whole API surface up front.
+module gcp.monitoring.dashboard
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::Dashboard"
+
+typealias TextFormat = "MARKDOWN"|"RAW"
+
+typealias PlotType = "LINE"|"STACKED_AREA"|"STACKED_BAR"|"HEATMAP"
+
+typealias TargetAxis = "Y1"|"Y2"
+
+/// A block of static text or markdown.
+@gcp.SubResourceHint
+open class TextWidget extends formae.SubResource {
+    @gcp.FieldHint
+    content: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    format: TextFormat?
+
+    /// Font/colour overrides. GCP echoes an empty object when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    style: Mapping<String, Any>?
+}
+
+/// One series on an xyChart. `timeSeriesQuery` is passed through untyped — the
+/// query union (filter, ratio, MQL, PromQL) is large and GCP echoes it back as
+/// sent.
+@gcp.SubResourceHint
+open class DataSet extends formae.SubResource {
+    @gcp.FieldHint
+    timeSeriesQuery: Mapping<String, Any>?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    plotType: PlotType?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    targetAxis: TargetAxis?
+
+    @gcp.FieldHint
+    legendTemplate: String?
+}
+
+@gcp.SubResourceHint
+open class XyChart extends formae.SubResource {
+    @gcp.FieldHint
+    dataSets: Listing<DataSet>?
+
+    @gcp.FieldHint
+    timeshiftDuration: String?
+}
+
+@gcp.SubResourceHint
+open class Widget extends formae.SubResource {
+    @gcp.FieldHint
+    title: String?
+
+    @gcp.FieldHint
+    text: TextWidget?
+
+    @gcp.FieldHint
+    xyChart: XyChart?
+}
+
+/// Widgets flow left-to-right, wrapping after `columns`.
+@gcp.SubResourceHint
+open class GridLayout extends formae.SubResource {
+    /// Number of columns. The API types this as a string.
+    @gcp.FieldHint
+    columns: String?
+
+    @gcp.FieldHint
+    widgets: Listing<Widget>?
+}
+
+open class DashboardResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DashboardResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Dashboard extends formae.Resource {
+    hidden parent = this
+
+    /// Dashboard ID, e.g. "service-health". Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint
+    gridLayout: GridLayout?
+
+    hidden res: DashboardResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

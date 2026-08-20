@@ -1,0 +1,95 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/instanceTemplate.pkl"
+import "@gcp/compute/regionInstanceGroupManager.pkl"
+import "@gcp/compute/regionAutoscaler.pkl"
+import "./config/vars.pkl" as v
+
+// Full regional autoscaling chain: net + subnet + template + regional MIG +
+// regional autoscaler.
+// targetSize = 0 so no VM boots — the test project has no Cloud NAT and the org
+// policy forbids external IPs, so a VM could never pull its image. The MIG
+// object is what is under test.
+//
+// distributionPolicy is left unset: GCP picks the region's zones with an EVEN
+// shape and echoes them back as full URLs, so declaring short zone names here
+// would read back as drift.
+local net = new network.Network {
+  label = "plugin-sdk-test-rautoscale-net"
+  name = "formae-plugin-sdk-test-rautoscale-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-rautoscale-subnet"
+  name = "formae-plugin-sdk-test-rautoscale-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.96.0.0/24"
+}
+local rmig = new regionInstanceGroupManager.RegionInstanceGroupManager {
+  label = "plugin-sdk-test-rautoscale-mig"
+  name = "formae-plugin-sdk-test-rautoscale-mig-\(v.testRunID)"
+  description = "Regional MIG the autoscaler scales"
+  region = v.gcpRegion
+  baseInstanceName = "formae-rauto-vm"
+  instanceTemplate = tmpl.res.selfLink
+  targetSize = 0
+}
+local tmpl = new instanceTemplate.InstanceTemplate {
+  label = "plugin-sdk-test-rautoscale-template"
+  name = "formae-plugin-sdk-test-rautoscale-tmpl-\(v.testRunID)"
+  description = "Blueprint for the regional MIG conformance test"
+  properties = new instanceTemplate.InstanceProperties {
+    machineType = "e2-micro"
+    disks = new Listing {
+      new instanceTemplate.TemplateAttachedDisk {
+        boot = true
+        autoDelete = true
+        initializeParams = new instanceTemplate.TemplateDiskInitializeParams {
+          sourceImage = "projects/debian-cloud/global/images/family/debian-12"
+        }
+      }
+    }
+    networkInterfaces = new Listing {
+      new instanceTemplate.TemplateNetworkInterface {
+        network = net.res.selfLink
+        subnetwork = subnet.res.selfLink
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+  tmpl
+
+  rmig
+
+  new regionAutoscaler.RegionAutoscaler {
+    label = "plugin-sdk-test-region-autoscaler"
+    name = "formae-plugin-sdk-test-rautoscale-\(v.testRunID)"
+    description = "Test regional autoscaler for plugin SDK conformance tests"
+    region = v.gcpRegion
+    // Resolvable -> establishes MIG-before-autoscaler create ordering.
+    instanceGroupManager = rmig.res.selfLink
+    autoscalingPolicy = new regionAutoscaler.AutoscalingPolicy {
+      maxNumReplicas = 2
+      minNumReplicas = 0
+      cpuUtilization = new regionAutoscaler.CpuUtilization {
+        utilizationTarget = 0.6
+      }
+    }
+  }
+}

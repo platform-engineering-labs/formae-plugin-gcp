@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute BackendBucket (global)
+///
+/// A load balancer backend that serves objects straight out of a Cloud Storage
+/// bucket, so a URL map can route static paths to GCS and dynamic paths to a
+/// BackendService.
+///
+/// ponytail: `cdnPolicy` is not exposed — `enableCdn` covers the common case
+/// and GCP fills the policy with defaults. Add the sub-resource when someone
+/// needs to tune TTLs or cache keys.
+module gcp.compute.backendBucket
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::BackendBucket"
+
+typealias CompressionMode = "AUTOMATIC"|"DISABLED"
+
+open class BackendBucketResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: BackendBucketResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: BackendBucketResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: BackendBucketResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class BackendBucket extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Name of the Cloud Storage bucket to serve. Pass `bucket.res.name` so
+    /// formae creates the bucket first.
+    @gcp.FieldHint
+    bucketName: (String|formae.Resolvable)
+
+    /// Serve through Cloud CDN.
+    @gcp.FieldHint { hasProviderDefault = true }
+    enableCdn: Boolean?
+
+    /// Whether the LB compresses responses. GCP fills DISABLED.
+    @gcp.FieldHint { hasProviderDefault = true }
+    compressionMode: CompressionMode?
+
+    /// Headers the LB adds to every response, as "Name: value" strings.
+    @gcp.FieldHint
+    customResponseHeaders: Listing<String>?
+
+    hidden res: BackendBucketResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

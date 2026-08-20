@@ -1,0 +1,64 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionNetworkFirewallPolicy (regional)
+///
+/// A region-scoped network firewall policy. Use this where the rules only apply
+/// to one region — regional policies can also be attached by regional load
+/// balancers, which global policies cannot.
+///
+/// A policy on its own is inert: it ships with GCP's implied rules only. Rules
+/// and network attachments are separate operations on the API (`addRule`,
+/// `addAssociation`) rather than fields of this resource — the API rejects them
+/// inline with "Rules must be added using the addRule method" — so they are not
+/// modelled here yet.
+///
+/// Note the path segment is `firewallPolicies` even though the API method group
+/// is `regionNetworkFirewallPolicies`.
+module gcp.compute.regionNetworkFirewallPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionNetworkFirewallPolicy"
+
+open class RegionNetworkFirewallPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionNetworkFirewallPolicyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionNetworkFirewallPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionNetworkFirewallPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionNetworkFirewallPolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    hidden res: RegionNetworkFirewallPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

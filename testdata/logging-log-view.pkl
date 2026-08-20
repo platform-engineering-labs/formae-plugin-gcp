@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/logView.pkl"
+import "./config/vars.pkl" as v
+
+// A view onto the project's own _Default bucket, which always exists — so the
+// test needs no bucket resource. (Log buckets are deliberately not modelled:
+// their DELETE only marks them DELETE_REQUESTED for 7 days, so a destroyed
+// bucket still reads back as present.)
+forma {
+  v.stack
+  v.target
+
+  new logView.LogView {
+    label = "plugin-sdk-test-logging-log-view"
+    name = "formae-plugin-sdk-test-view-\(v.testRunID)"
+    bucket = "_Default"
+    location = "global"
+    description = "Test log view for plugin SDK conformance tests"
+    filter = "resource.type=\"gce_instance\""
+  }
+}

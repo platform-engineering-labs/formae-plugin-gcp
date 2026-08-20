@@ -1,0 +1,75 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionSslPolicy (regional)
+///
+/// The TLS floor a *regional* target HTTPS proxy enforces: minimum protocol
+/// version plus a cipher profile. Attach it from
+/// `regionTargetHttpsProxy.sslPolicy` — a regional proxy cannot reference the
+/// global `sslPolicy`, which is why this twin exists.
+///
+/// Updates are in-place: `sslPolicies.patch` requires the current
+/// `fingerprint`, which the generic engine supplies through optimistic locking.
+module gcp.compute.regionSslPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionSslPolicy"
+
+/// COMPATIBLE and MODERN and RESTRICTED are Google-curated cipher sets, in
+/// decreasing permissiveness. CUSTOM takes an explicit `customFeatures` list.
+typealias SslPolicyProfile = "COMPATIBLE"|"MODERN"|"RESTRICTED"|"CUSTOM"
+
+typealias MinTlsVersion = "TLS_1_0"|"TLS_1_1"|"TLS_1_2"
+
+open class RegionSslPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionSslPolicyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionSslPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionSslPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionSslPolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    profile: SslPolicyProfile?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    minTlsVersion: MinTlsVersion?
+
+    /// Cipher suites to allow. Only valid when `profile` is "CUSTOM".
+    @gcp.FieldHint
+    customFeatures: Listing<String>?
+
+    hidden res: RegionSslPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

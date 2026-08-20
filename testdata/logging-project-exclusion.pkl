@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/projectExclusion.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency exclusion: drops low-severity GCE instance chatter before it
+// is stored or billed.
+forma {
+  v.stack
+  v.target
+
+  new projectExclusion.ProjectExclusion {
+    label = "plugin-sdk-test-logging-project-exclusion"
+    name = "formae-plugin-sdk-test-excl-\(v.testRunID)"
+    description = "Test log exclusion for plugin SDK conformance tests"
+    filter = "resource.type=\"gce_instance\" AND severity<\"WARNING\""
+  }
+}

@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute GlobalNetworkEndpointGroup (global)
+///
+/// A group of endpoints *outside* Google Cloud, so an external HTTP(S) load
+/// balancer or Cloud CDN can serve from an origin you host elsewhere. The
+/// regional `networkEndpointGroup` covers serverless and in-VPC backends; this
+/// one covers the public internet.
+///
+/// The endpoints themselves are attached with the
+/// `attachNetworkEndpoints` / `detachNetworkEndpoints` verbs rather than being
+/// fields of this resource, so they are not modelled here — an empty group is
+/// valid but serves nothing until endpoints are added.
+///
+/// ponytail: the API has no patch for network endpoint groups, so a change
+/// replaces.
+module gcp.compute.globalNetworkEndpointGroup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::GlobalNetworkEndpointGroup"
+
+/// INTERNET_FQDN_PORT resolves a hostname; INTERNET_IP_PORT targets a literal
+/// address.
+typealias GlobalEndpointType = "INTERNET_FQDN_PORT"|"INTERNET_IP_PORT"
+
+open class GlobalNetworkEndpointGroupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: GlobalNetworkEndpointGroupResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: GlobalNetworkEndpointGroupResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: GlobalNetworkEndpointGroupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class GlobalNetworkEndpointGroup extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    networkEndpointType: GlobalEndpointType
+
+    /// Port the endpoints are reached on when an endpoint does not name its own.
+    @gcp.FieldHint { createOnly = true }
+    defaultPort: Int?
+
+    hidden res: GlobalNetworkEndpointGroupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

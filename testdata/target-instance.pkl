@@ -1,0 +1,86 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/instance.pkl"
+import "@gcp/compute/targetInstance.pkl"
+import "./config/vars.pkl" as v
+
+// The VM the target instance forwards to, with its own net/subnet/boot-disk —
+// the same shape instance.pkl uses (the Instance schema does not expose disk
+// initializeParams, so the boot disk is a separate resource attached by
+// source).
+local net = new network.Network {
+  label = "plugin-sdk-test-ti-net"
+  name = "formae-plugin-sdk-test-ti-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-ti-subnet"
+  name = "formae-plugin-sdk-test-ti-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.97.0.0/24"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  local bootDisk = new disk.Disk {
+    label = "plugin-sdk-test-ti-bootdisk"
+    project = v.gcpProject
+    zone = v.gcpZone
+    name = "formae-plugin-sdk-test-ti-disk-\(v.testRunID)"
+    description = "Boot disk for the target-instance test VM"
+    sizeGb = 10
+    type = "pd-standard"
+    sourceImage = formae.value("projects/debian-cloud/global/images/family/debian-12")
+  }
+
+  local vm = new instance.Instance {
+    label = "plugin-sdk-test-ti-vm"
+    project = v.gcpProject
+    zone = v.gcpZone
+    name = "formae-plugin-sdk-test-ti-vm-\(v.testRunID)"
+    machineType = "e2-micro"
+    description = "VM behind the target instance"
+    disks = new Listing {
+      new instance.AttachedDisk {
+        boot = true
+        autoDelete = false
+        source = bootDisk.res.selfLink
+      }
+    }
+    // Internal IP only, to comply with the external-IP org policy.
+    networkInterfaces = new Listing {
+      new instance.NetworkInterface {
+        network = net.res.selfLink
+        subnetwork = subnet.res.selfLink
+      }
+    }
+  }
+
+  bootDisk
+  vm
+
+  new targetInstance.TargetInstance {
+    label = "plugin-sdk-test-target-instance"
+    name = "formae-plugin-sdk-test-ti-\(v.testRunID)"
+    description = "Test protocol-forwarding target for plugin SDK conformance tests"
+    zone = v.gcpZone
+    // Resolvable -> establishes VM-before-target create ordering.
+    instance = vm.res.selfLink
+  }
+}

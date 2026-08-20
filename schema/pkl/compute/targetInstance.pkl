@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute TargetInstance (zonal)
+///
+/// Points a protocol-forwarding `forwardingRule` at a single VM, so traffic for
+/// protocols a load balancer will not terminate (ESP, AH, SCTP, or raw
+/// TCP/UDP without balancing) lands on that instance. For balanced traffic use
+/// `targetPool` or a backend service instead.
+///
+/// ponytail: the API has no targetInstances.patch, so a change replaces.
+module gcp.compute.targetInstance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::TargetInstance"
+
+/// NO_NAT is the only value the v1 API accepts today.
+typealias NatPolicy = "NO_NAT"
+
+open class TargetInstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: TargetInstanceResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: TargetInstanceResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: TargetInstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class TargetInstance extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    zone: String
+
+    /// The VM that receives the forwarded traffic. Pass `vm.res.selfLink` — the
+    /// API stores a full URL and compares against it.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// GCP fills NO_NAT when unset.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    natPolicy: NatPolicy?
+
+    hidden res: TargetInstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

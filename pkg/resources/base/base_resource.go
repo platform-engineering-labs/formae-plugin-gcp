@@ -9,19 +9,19 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // BaseResource provides unified CRUD operations for all GCP APIs
 type BaseResource struct {
-	Config             *config.Config
-	APIConfig          APIConfig
-	OperationConfig    OperationConfig
-	ResourceConfig     ResourceConfig
-	NativeIDConfig     NativeIDConfig
-	RequestTransformer RequestTransformer
+	Config              *config.Config
+	APIConfig           APIConfig
+	OperationConfig     OperationConfig
+	ResourceConfig      ResourceConfig
+	NativeIDConfig      NativeIDConfig
+	RequestTransformer  RequestTransformer
 	ResponseTransformer ResponseTransformer
 }
 

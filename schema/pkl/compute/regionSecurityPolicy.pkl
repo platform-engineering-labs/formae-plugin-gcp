@@ -1,0 +1,112 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute SecurityPolicy (Cloud Armor)
+///
+/// A set of rules matching incoming requests to a backend service.
+module gcp.compute.regionSecurityPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionSecurityPolicy"
+
+typealias SecurityPolicyType = "CLOUD_ARMOR"|"CLOUD_ARMOR_EDGE"|"CLOUD_ARMOR_NETWORK"
+
+@gcp.SubResourceHint
+open class MatchConfig extends formae.SubResource {
+    @gcp.FieldHint
+    srcIpRanges: Listing<String>
+}
+
+@gcp.SubResourceHint
+open class Match extends formae.SubResource {
+    /// Predefined expression, e.g. "SRC_IPS_V1".
+    @gcp.FieldHint
+    versionedExpr: String?
+
+    @gcp.FieldHint
+    config: MatchConfig?
+}
+
+@gcp.SubResourceHint
+open class Rule extends formae.SubResource {
+    /// e.g. "allow" or "deny(403)".
+    @gcp.FieldHint
+    action: String
+
+    @gcp.FieldHint
+    priority: Int
+
+    @gcp.FieldHint
+    match: Match
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Whether the rule is in preview (server-defaulted to false).
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    preview: Boolean?
+
+    /// Server-set type tag (e.g. "compute#securityPolicyRule").
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    kind: String?
+}
+
+open class RegionSecurityPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden selfLink: RegionSecurityPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionSecurityPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionSecurityPolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    region: gcp.Region
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Declare "CLOUD_ARMOR". The API also accepts "CLOUD_ARMOR_REGIONAL" on
+    /// create but reports it back as "CLOUD_ARMOR", which would read as drift.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    type: SecurityPolicyType?
+
+    /// Rules evaluated in priority order. A default rule (priority
+    /// 2147483647) must be present.
+    @gcp.FieldHint
+    rules: Listing<Rule>?
+
+    hidden res: RegionSecurityPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

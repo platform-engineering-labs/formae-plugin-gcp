@@ -1,0 +1,208 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute InstanceTemplate (global)
+///
+/// The immutable VM blueprint a managed instance group instantiates. Every
+/// field is createOnly — GCP has no update method for instanceTemplates; a
+/// change means a new template.
+module gcp.compute.instanceTemplate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::InstanceTemplate"
+
+typealias DiskType = "pd-standard"|"pd-ssd"|"pd-balanced"|"hyperdisk-balanced"
+
+typealias ProvisioningModel = "STANDARD"|"SPOT"
+
+/// Parameters for the disk the template creates per instance.
+@gcp.SubResourceHint
+open class TemplateDiskInitializeParams extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    sourceImage: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    diskSizeGb: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    diskType: DiskType?
+
+    @gcp.FieldHint { createOnly = true }
+    labels: Mapping<String, String>?
+}
+
+@gcp.SubResourceHint
+open class TemplateAttachedDisk extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    boot: Boolean?
+
+    @gcp.FieldHint { createOnly = true }
+    autoDelete: Boolean?
+
+    /// PERSISTENT or SCRATCH — GCP fills PERSISTENT when omitted.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    type: String?
+
+    /// READ_WRITE or READ_ONLY — GCP fills READ_WRITE when omitted.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    mode: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    deviceName: String?
+
+    /// Position in the guest's disk order — server-assigned.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    index: Int?
+
+    @gcp.FieldHint { createOnly = true }
+    initializeParams: TemplateDiskInitializeParams?
+
+    /// Existing disk to attach instead of creating one.
+    @gcp.FieldHint { createOnly = true }
+    source: (String|formae.Resolvable)?
+
+    /// Server-echoed type discriminator (e.g. "compute#attachedDisk").
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    kind: String?
+}
+
+@gcp.SubResourceHint
+open class TemplateAccessConfig extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    type: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    name: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    networkTier: String?
+
+    /// Server-echoed type discriminator (e.g. "compute#attachedDisk").
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    kind: String?
+}
+
+@gcp.SubResourceHint
+open class TemplateNetworkInterface extends formae.SubResource {
+    /// Canonicalized by GCP to a full self-link URL.
+    @gcp.FieldHint { createOnly = true }
+    network: (String|formae.Resolvable)?
+
+    @gcp.FieldHint { createOnly = true }
+    subnetwork: (String|formae.Resolvable)?
+
+    /// nic0, nic1, ... — server-assigned.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    name: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    stackType: String?
+
+    @gcp.FieldHint { createOnly = true }
+    accessConfigs: Listing<TemplateAccessConfig>?
+
+    /// Server-echoed type discriminator (e.g. "compute#attachedDisk").
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    kind: String?
+}
+
+@gcp.SubResourceHint
+open class TemplateTags extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    items: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class TemplateServiceAccount extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    email: String?
+
+    @gcp.FieldHint { createOnly = true }
+    scopes: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class TemplateScheduling extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    automaticRestart: Boolean?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    onHostMaintenance: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    preemptible: Boolean?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    provisioningModel: ProvisioningModel?
+}
+
+/// The VM shape the template stamps out.
+@gcp.SubResourceHint
+open class InstanceProperties extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    machineType: String
+
+    @gcp.FieldHint { createOnly = true }
+    disks: Listing<TemplateAttachedDisk>?
+
+    @gcp.FieldHint { createOnly = true }
+    networkInterfaces: Listing<TemplateNetworkInterface>?
+
+    @gcp.FieldHint { createOnly = true }
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint { createOnly = true }
+    tags: TemplateTags?
+
+    @gcp.FieldHint { createOnly = true }
+    serviceAccounts: Listing<TemplateServiceAccount>?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    scheduling: TemplateScheduling?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    canIpForward: Boolean?
+}
+
+open class InstanceTemplateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: InstanceTemplateResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: InstanceTemplateResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: InstanceTemplateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class InstanceTemplate extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    properties: InstanceProperties
+
+    hidden res: InstanceTemplateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

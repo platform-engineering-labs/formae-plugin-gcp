@@ -1,0 +1,80 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionHealthAggregationPolicy (regional)
+///
+/// Decides when a whole backend service counts as healthy, rather than each
+/// backend individually: a cross-region load balancer uses this to stop sending
+/// traffic to a region whose backends have mostly failed, instead of trickling
+/// requests into a half-dead one.
+///
+/// Note the URL segment is `healthAggregationPolicies` even though the API
+/// method group is `regionHealthAggregationPolicies`.
+///
+/// ponytail: update is off — patch exists but carries the usual Compute
+/// fingerprint requirement, which needs its own verification pass; a change
+/// replaces.
+module gcp.compute.regionHealthAggregationPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionHealthAggregationPolicy"
+
+/// BACKEND_SERVICE_POLICY aggregates backend health; DNS_PUBLIC_IP_POLICY is
+/// for public-IP DNS routing.
+typealias HealthAggregationPolicyType = "BACKEND_SERVICE_POLICY"|"DNS_PUBLIC_IP_POLICY"
+
+open class RegionHealthAggregationPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionHealthAggregationPolicyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionHealthAggregationPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionHealthAggregationPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionHealthAggregationPolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    policyType: HealthAggregationPolicyType?
+
+    /// Percentage of backends that must be healthy for the service to count as
+    /// healthy. Only valid when `policyType` is BACKEND_SERVICE_POLICY.
+    @gcp.FieldHint
+    healthyPercentThreshold: Int?
+
+    /// Absolute floor on healthy backends, applied alongside the percentage.
+    /// GCP fills 1.
+    @gcp.FieldHint { hasProviderDefault = true }
+    minHealthyThreshold: Int?
+
+    hidden res: RegionHealthAggregationPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

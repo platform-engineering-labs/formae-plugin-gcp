@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/alloydb/alloydbCluster.pkl"
+import "@gcp/alloydb/alloydbInstance.pkl"
+import "./config/vars.pkl" as v
+
+// Cluster + its PRIMARY instance. The cluster reuses the same default-network
+// setup as alloydb-cluster.pkl (the project's default VPC already has a private
+// service access range, which AlloyDB requires).
+//
+// ZONAL and the smallest supported machine (2 vCPU) keep the create as short
+// and cheap as this resource allows — an AlloyDB instance still takes several
+// minutes, so this case needs a raised TIMEOUT.
+local dbCluster = new alloydbCluster.Cluster {
+  label = "plugin-sdk-test-alloydb-instance-cluster"
+  name = "formae-test-inst-cluster-\(v.testRunID)"
+  networkConfig = new {
+    network = "projects/\(v.gcpProject)/global/networks/default"
+  }
+  displayName = "Formae AlloyDB instance-test cluster"
+}
+
+forma {
+  v.stack
+  v.target
+
+  dbCluster
+
+  new alloydbInstance.Instance {
+    label = "plugin-sdk-test-alloydb-instance"
+    name = "formae-test-instance-\(v.testRunID)"
+    // Resolvable -> establishes cluster-before-instance create ordering.
+    cluster = dbCluster.res.name
+    instanceType = "PRIMARY"
+    displayName = "Formae AlloyDB conformance test instance"
+    availabilityType = "ZONAL"
+    machineConfig = new alloydbInstance.MachineConfig {
+      cpuCount = 2
+    }
+  }
+}

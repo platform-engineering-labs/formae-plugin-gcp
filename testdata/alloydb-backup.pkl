@@ -1,0 +1,62 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/alloydb/alloydbCluster.pkl"
+import "@gcp/alloydb/alloydbInstance.pkl"
+import "@gcp/alloydb/alloydbBackup.pkl"
+import "./config/vars.pkl" as v
+
+// Cluster + PRIMARY instance + an on-demand backup. A backup needs a serving
+// instance, so the whole chain is built — which makes this one of the slowest
+// cases in the suite. The cluster reuses the same default-network
+// setup as alloydb-cluster.pkl (the project's default VPC already has a private
+// service access range, which AlloyDB requires).
+//
+// ZONAL and the smallest supported machine (2 vCPU) keep the create as short
+// and cheap as this resource allows — an AlloyDB instance still takes several
+// minutes, so this case needs a raised TIMEOUT.
+local dbCluster = new alloydbCluster.Cluster {
+  label = "plugin-sdk-test-alloydb-backup-cluster"
+  name = "formae-test-bkp-cluster-\(v.testRunID)"
+  networkConfig = new {
+    network = "projects/\(v.gcpProject)/global/networks/default"
+  }
+  displayName = "Formae AlloyDB backup-test cluster"
+}
+
+forma {
+  v.stack
+  v.target
+
+  dbCluster
+
+  local primary = new alloydbInstance.Instance {
+    label = "plugin-sdk-test-alloydb-backup-instance"
+    name = "formae-test-bkp-instance-\(v.testRunID)"
+    // Resolvable -> establishes cluster-before-instance create ordering.
+    cluster = dbCluster.res.name
+    instanceType = "PRIMARY"
+    displayName = "Formae AlloyDB conformance test instance"
+    availabilityType = "ZONAL"
+    machineConfig = new alloydbInstance.MachineConfig {
+      cpuCount = 2
+    }
+  }
+
+  primary
+
+  new alloydbBackup.Backup {
+    label = "plugin-sdk-test-alloydb-backup"
+    name = "formae-test-backup-\(v.testRunID)"
+    // Referenced through the instance: a backup needs a serving primary, and
+    // this yields the cluster id while ordering the backup after the instance.
+    cluster = primary.res.cluster
+    type = "ON_DEMAND"
+    description = "Test AlloyDB backup for plugin SDK conformance tests"
+  }
+}

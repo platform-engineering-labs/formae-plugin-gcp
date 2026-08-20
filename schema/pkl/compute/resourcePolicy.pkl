@@ -1,0 +1,137 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute ResourcePolicy (regional)
+///
+/// A schedule attached to disks or instances. The common case is a snapshot
+/// schedule: take a snapshot every N days, keep it for M days, drop it when the
+/// source disk goes away.
+///
+/// ponytail: only the snapshot-schedule flavour is modelled. Instance-schedule
+/// and group-placement policies are separate top-level fields on the same API
+/// resource — add them when someone needs them.
+///
+/// ponytail: update is off — resourcePolicies.patch is beta-only, so a change
+/// replaces the policy.
+module gcp.compute.resourcePolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::ResourcePolicy"
+
+typealias OnSourceDiskDelete = "KEEP_AUTO_SNAPSHOTS"|"APPLY_RETENTION_POLICY"|"UNSPECIFIED_ON_SOURCE_DISK_DELETE"
+
+/// Take a snapshot every `daysInCycle` days, starting at `startTime` (UTC,
+/// "HH:MM").
+@gcp.SubResourceHint
+open class DailyCycle extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    daysInCycle: Int?
+
+    @gcp.FieldHint { createOnly = true }
+    startTime: String?
+
+    /// Server-echoed cycle length, e.g. "24h".
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    duration: String?
+}
+
+/// Take a snapshot every `hoursInCycle` hours, starting at `startTime`.
+@gcp.SubResourceHint
+open class HourlyCycle extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    hoursInCycle: Int?
+
+    @gcp.FieldHint { createOnly = true }
+    startTime: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    duration: String?
+}
+
+@gcp.SubResourceHint
+open class SnapshotSchedule extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    dailySchedule: DailyCycle?
+
+    @gcp.FieldHint { createOnly = true }
+    hourlySchedule: HourlyCycle?
+}
+
+@gcp.SubResourceHint
+open class SnapshotRetentionPolicy extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    maxRetentionDays: Int?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    onSourceDiskDelete: OnSourceDiskDelete?
+}
+
+@gcp.SubResourceHint
+open class SnapshotProperties extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint { createOnly = true }
+    storageLocations: Listing<String>?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    guestFlush: Boolean?
+}
+
+@gcp.SubResourceHint
+open class SnapshotSchedulePolicy extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    schedule: SnapshotSchedule
+
+    @gcp.FieldHint { createOnly = true }
+    retentionPolicy: SnapshotRetentionPolicy?
+
+    @gcp.FieldHint { createOnly = true }
+    snapshotProperties: SnapshotProperties?
+}
+
+open class ResourcePolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ResourcePolicyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: ResourcePolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ResourcePolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ResourcePolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: String
+
+    @gcp.FieldHint { createOnly = true }
+    snapshotSchedulePolicy: SnapshotSchedulePolicy?
+
+    hidden res: ResourcePolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

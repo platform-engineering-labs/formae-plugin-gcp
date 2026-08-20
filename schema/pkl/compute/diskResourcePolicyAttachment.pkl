@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute DiskResourcePolicyAttachment
+///
+/// Attaches a `resourcePolicy` to a disk. This is what makes a snapshot schedule
+/// do anything: a policy on its own defines *when* to snapshot but has nothing
+/// to snapshot until it is attached to a disk.
+///
+/// The attachment is not a REST resource — it is an entry in the disk's
+/// `resourcePolicies` array, added and removed with the
+/// `addResourcePolicies` / `removeResourcePolicies` verbs, so this resource is a
+/// hand-written provisioner.
+///
+/// ponytail: there is nothing to update — the attachment is just a
+/// (disk, policy) pair, so a change detaches and reattaches.
+module gcp.compute.diskResourcePolicyAttachment
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::DiskResourcePolicyAttachment"
+
+open class DiskResourcePolicyAttachmentResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DiskResourcePolicyAttachmentResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class DiskResourcePolicyAttachment extends formae.Resource {
+    hidden parent = this
+
+    /// Name of the resource policy to attach. A bare name is expanded to the
+    /// disk's region; a full path is used as given.
+    @gcp.FieldHint { createOnly = true }
+    name: (String|formae.Resolvable)
+
+    /// Name of the disk to attach it to. Pass `disk.res.name` so formae creates
+    /// the disk first.
+    @gcp.FieldHint { createOnly = true }
+    disk: (String|formae.Resolvable)
+
+    /// Zone the disk lives in.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    zone: String?
+
+    hidden res: DiskResourcePolicyAttachmentResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

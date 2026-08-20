@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/snapshot.pkl"
+import "./config/vars.pkl" as v
+
+// The disk the snapshot captures. Referenced through its resolvable so formae
+// creates and settles the disk before the snapshot is taken.
+local src = new disk.Disk {
+  label = "plugin-sdk-test-snapshot-disk"
+  project = v.gcpProject
+  zone = v.gcpZone
+  name = "formae-plugin-sdk-test-snap-disk-\(v.testRunID)"
+  description = "Source disk for the snapshot conformance test"
+  sizeGb = 10
+  type = "pd-standard"
+  sourceImage = formae.value("projects/debian-cloud/global/images/family/debian-12")
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+
+  new snapshot.Snapshot {
+    label = "plugin-sdk-test-snapshot"
+    name = "formae-plugin-sdk-test-snap-\(v.testRunID)"
+    description = "Test snapshot for plugin SDK conformance tests"
+    sourceDisk = src.res.selfLink
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

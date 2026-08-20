@@ -1,0 +1,32 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/externalVpnGateway.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency peer-gateway description. No tunnel is built against it here,
+// so nothing dials the address. 8.8.8.8 mirrors the upstream provider examples;
+// RFC 5735 reserved ranges (203.0.113.0/24 and friends) are rejected outright
+// once a tunnel references them.
+forma {
+  v.stack
+  v.target
+
+  new externalVpnGateway.ExternalVpnGateway {
+    label = "plugin-sdk-test-external-vpn-gateway"
+    name = "formae-plugin-sdk-test-egw-\(v.testRunID)"
+    description = "Test peer VPN gateway for plugin SDK conformance tests"
+    redundancyType = "SINGLE_IP_INTERNALLY_REDUNDANT"
+    interfaces = new Listing {
+      new externalVpnGateway.ExternalVpnGatewayInterface {
+        id = 0
+        ipAddress = "8.8.8.8"
+      }
+    }
+  }
+}

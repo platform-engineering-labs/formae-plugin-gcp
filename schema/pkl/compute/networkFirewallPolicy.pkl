@@ -1,0 +1,62 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NetworkFirewallPolicy (global)
+///
+/// A project-scoped network firewall policy — the modern replacement for VPC
+/// `firewall` rules. A policy holds ordered rules and is attached to one or more
+/// networks, which lets the same rule set be shared and evaluated before the
+/// legacy per-network rules.
+///
+/// A policy on its own is inert: it ships with GCP's implied rules only. Rules
+/// and network attachments are separate operations on the API (`addRule`,
+/// `addAssociation`) rather than fields of this resource — the API rejects them
+/// inline with "Rules must be added using the addRule method" — so they are not
+/// modelled here yet.
+///
+/// Note the path segment is `firewallPolicies` even though the API method group
+/// is `networkFirewallPolicies`.
+module gcp.compute.networkFirewallPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NetworkFirewallPolicy"
+
+open class NetworkFirewallPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NetworkFirewallPolicyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: NetworkFirewallPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: NetworkFirewallPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NetworkFirewallPolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    hidden res: NetworkFirewallPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

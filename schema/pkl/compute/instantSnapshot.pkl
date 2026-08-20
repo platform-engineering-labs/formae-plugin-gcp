@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute InstantSnapshot (zonal)
+///
+/// A near-instant, same-zone point-in-time copy of a disk. Unlike `snapshot` it
+/// is not replicated anywhere else, so it is a fast rollback point rather than a
+/// backup — losing the zone loses the instant snapshot with it. Requires an
+/// SSD-class source disk.
+///
+/// ponytail: update is off — only `setLabels` mutates an instant snapshot, and
+/// that needs a labelFingerprint round-trip, so a change replaces.
+module gcp.compute.instantSnapshot
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::InstantSnapshot"
+
+open class InstantSnapshotResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: InstantSnapshotResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: InstantSnapshotResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: InstantSnapshotResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class InstantSnapshot extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    zone: String
+
+    /// Disk to copy. Pass `disk.res.selfLink` — the API stores a full URL and
+    /// compares against it.
+    @gcp.FieldHint { createOnly = true }
+    sourceDisk: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Size of the source disk in GB, server-populated. The API reports it as a
+    /// string.
+    @gcp.FieldHint { hasProviderDefault = true }
+    diskSizeGb: String?
+
+    hidden res: InstantSnapshotResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

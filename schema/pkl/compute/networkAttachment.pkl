@@ -1,0 +1,86 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NetworkAttachment (regional)
+///
+/// The consumer end of Private Service Connect *interfaces*: it hands a
+/// producer permission to place an interface inside one of your subnets, so
+/// their service reaches your VPC over private IPs instead of the internet.
+///
+/// `connectionPreference` decides who may attach — ACCEPT_AUTOMATIC takes any
+/// producer project, ACCEPT_MANUAL takes only the ones in
+/// `producerAcceptLists`.
+///
+/// Updates are in-place: `networkAttachments.patch` requires the current
+/// `fingerprint`, which the generic engine supplies through optimistic locking.
+module gcp.compute.networkAttachment
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NetworkAttachment"
+
+typealias ConnectionPreference = "ACCEPT_AUTOMATIC"|"ACCEPT_MANUAL"
+
+open class NetworkAttachmentResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NetworkAttachmentResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: NetworkAttachmentResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: NetworkAttachmentResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NetworkAttachment extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Subnets a producer interface may be placed in. Pass
+    /// `subnet.res.selfLink` — the API stores full URLs and compares against
+    /// them.
+    @gcp.FieldHint
+    subnetworks: Listing<String|formae.Resolvable>
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    connectionPreference: ConnectionPreference?
+
+    /// VPC the attachment lives in. Server-derived from `subnetworks`.
+    @gcp.FieldHint { hasProviderDefault = true }
+    network: String?
+
+    /// Producer projects allowed to attach, when `connectionPreference` is
+    /// ACCEPT_MANUAL.
+    @gcp.FieldHint
+    producerAcceptLists: Listing<String>?
+
+    /// Producer projects explicitly refused.
+    @gcp.FieldHint
+    producerRejectLists: Listing<String>?
+
+    hidden res: NetworkAttachmentResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

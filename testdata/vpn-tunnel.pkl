@@ -1,0 +1,83 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/router.pkl"
+import "@gcp/compute/haVpnGateway.pkl"
+import "@gcp/compute/externalVpnGateway.pkl"
+import "@gcp/compute/vpnTunnel.pkl"
+import "./config/vars.pkl" as v
+
+// Full HA VPN chain: network + Cloud Router + Google-side gateway + peer-side
+// gateway + one tunnel between interface 0 of each. Every cross-reference goes
+// through a resolvable self-link, both to order the creates and because the
+// Compute API stores these as full URLs and compares against them.
+//
+// The tunnel never establishes (nothing answers at the peer address), which is
+// fine — the resource under test is the tunnel object.
+//
+// This is the only fixture that creates an HaVpnGateway: VPN_GATEWAYS_PER_REGION
+// is capped at 2, so a second gateway fixture would collide with this one (and
+// with any leftover from a previous run) and fail with QUOTA_EXCEEDED. The
+// gateway's own round-trip is verified here as part of the chain.
+local net = new network.Network {
+  label = "plugin-sdk-test-vpn-net"
+  name = "formae-plugin-sdk-test-vpn-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local cloudRouter = new router.Router {
+  label = "plugin-sdk-test-vpn-router"
+  name = "formae-plugin-sdk-test-vpn-router-\(v.testRunID)"
+  region = v.gcpRegion
+  network = net.res.selfLink
+  bgp = new router.Bgp {
+    asn = 64514
+  }
+}
+local googleGw = new haVpnGateway.HaVpnGateway {
+  label = "plugin-sdk-test-ha-vpn-gateway"
+  name = "formae-plugin-sdk-test-hagw-\(v.testRunID)"
+  region = v.gcpRegion
+  network = net.res.selfLink
+}
+local peerGw = new externalVpnGateway.ExternalVpnGateway {
+  label = "plugin-sdk-test-vpn-peer-gateway"
+  name = "formae-plugin-sdk-test-vpn-egw-\(v.testRunID)"
+  redundancyType = "SINGLE_IP_INTERNALLY_REDUNDANT"
+  interfaces = new Listing {
+    new externalVpnGateway.ExternalVpnGatewayInterface {
+      id = 0
+      ipAddress = "8.8.8.8"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  cloudRouter
+  googleGw
+  peerGw
+
+  new vpnTunnel.VpnTunnel {
+    label = "plugin-sdk-test-vpn-tunnel"
+    name = "formae-plugin-sdk-test-tunnel-\(v.testRunID)"
+    description = "Test VPN tunnel for plugin SDK conformance tests"
+    region = v.gcpRegion
+    vpnGateway = googleGw.res.selfLink
+    vpnGatewayInterface = 0
+    peerExternalGateway = peerGw.res.selfLink
+    peerExternalGatewayInterface = 0
+    router = cloudRouter.res.selfLink
+    sharedSecret = formae.value("formae-conformance-test-psk").opaque
+    ikeVersion = 2
+  }
+}

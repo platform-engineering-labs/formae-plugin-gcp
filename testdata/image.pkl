@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/image.pkl"
+import "./config/vars.pkl" as v
+
+// The disk the image captures. Referenced through its resolvable so formae
+// creates and settles the disk before the image is taken.
+local src = new disk.Disk {
+  label = "plugin-sdk-test-image-disk"
+  project = v.gcpProject
+  zone = v.gcpZone
+  name = "formae-plugin-sdk-test-img-disk-\(v.testRunID)"
+  description = "Source disk for the image conformance test"
+  sizeGb = 10
+  type = "pd-standard"
+  sourceImage = formae.value("projects/debian-cloud/global/images/family/debian-12")
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+
+  new image.Image {
+    label = "plugin-sdk-test-image"
+    name = "formae-plugin-sdk-test-img-\(v.testRunID)"
+    description = "Test image for plugin SDK conformance tests"
+    family = "formae-plugin-sdk-test"
+    sourceDisk = src.res.selfLink
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

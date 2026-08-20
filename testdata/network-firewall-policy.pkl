@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/networkFirewallPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency policy. Rules and network associations are separate API
+// operations (addRule / addAssociation) and are not modelled yet, so the policy
+// here carries only GCP's implied rules.
+forma {
+  v.stack
+  v.target
+
+  new networkFirewallPolicy.NetworkFirewallPolicy {
+    label = "plugin-sdk-test-network-firewall-policy"
+    name = "formae-plugin-sdk-test-nfp-\(v.testRunID)"
+    description = "Test network firewall policy for plugin SDK conformance tests"
+  }
+}

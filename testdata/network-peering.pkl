@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/networkPeering.pkl"
+import "./config/vars.pkl" as v
+
+// Two networks and a peering from the first to the second. Only one side is
+// declared, so the peering settles at INACTIVE ("Waiting for peer network to
+// connect") — that is the correct state for a one-sided peering and is what the
+// resource under test is: the peering object itself.
+local netA = new network.Network {
+  label = "plugin-sdk-test-peer-net-a"
+  name = "formae-plugin-sdk-test-peer-a-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local netB = new network.Network {
+  label = "plugin-sdk-test-peer-net-b"
+  name = "formae-plugin-sdk-test-peer-b-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+forma {
+  v.stack
+  v.target
+
+  netA
+  netB
+
+  new networkPeering.NetworkPeering {
+    label = "plugin-sdk-test-network-peering"
+    name = "formae-peering-\(v.testRunID)"
+    // Owning network: a path component, so the short name.
+    network = netA.res.name
+    // Far side: stored as a full URL by the API, so pass the self-link.
+    peerNetwork = netB.res.selfLink
+    exchangeSubnetRoutes = true
+  }
+}

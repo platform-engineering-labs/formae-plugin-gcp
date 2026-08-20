@@ -1,0 +1,118 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP AlloyDB Instance
+///
+/// The compute that actually serves an AlloyDB cluster. A cluster on its own
+/// stores nothing reachable — it needs a PRIMARY instance, and optionally
+/// READ_POOL instances for read scale-out.
+///
+/// Nested under its cluster:
+/// /projects/{p}/locations/{location}/clusters/{cluster}/instances/{name}.
+///
+/// ponytail: update is deferred, matching the Cluster resource — create and
+/// delete are the async paths this proves out. A change replaces.
+module gcp.alloydb.alloydbInstance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AlloyDB::Instance"
+
+typealias InstanceType = "PRIMARY"|"READ_POOL"|"SECONDARY"
+
+/// ZONAL keeps a single node; REGIONAL adds a standby in another zone and is
+/// what production primaries normally use.
+typealias AvailabilityType = "ZONAL"|"REGIONAL"
+
+@gcp.SubResourceHint
+open class MachineConfig extends formae.SubResource {
+    /// vCPUs per node. AlloyDB's smallest supported size is 2.
+    @gcp.FieldHint
+    cpuCount: Int?
+
+    /// Server-selected machine shape backing `cpuCount`.
+    @gcp.FieldHint { hasProviderDefault = true }
+    machineType: String?
+}
+
+@gcp.SubResourceHint
+open class ReadPoolConfig extends formae.SubResource {
+    /// Nodes in the read pool. Only meaningful for READ_POOL instances.
+    @gcp.FieldHint
+    nodeCount: Int?
+}
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+
+    /// Private IP clients connect to.
+    hidden ipAddress: InstanceResolvable = (this) {
+        property = "ipAddress"
+    }
+
+    /// Id of the owning cluster. Referencing the cluster *through* the instance
+    /// is how a resource that needs a serving database (an `alloydbUser`) orders
+    /// itself after the instance: the value is the cluster id either way, but
+    /// the reference makes the dependency explicit.
+    hidden cluster: InstanceResolvable = (this) {
+        property = "cluster"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Instance id, unique within the cluster. Sent as the `instanceId` query
+    /// parameter on create.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the owning cluster. A path component, not a body field — pass
+    /// `cluster.res.name` so formae creates the cluster first.
+    @gcp.FieldHint { createOnly = true }
+    cluster: (String|formae.Resolvable)
+
+    /// Region the cluster lives in.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint { createOnly = true }
+    instanceType: InstanceType
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    machineConfig: MachineConfig?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    availabilityType: AvailabilityType?
+
+    @gcp.FieldHint
+    readPoolConfig: ReadPoolConfig?
+
+    /// Postgres flags applied to the instance, e.g. ["max_connections" = "100"].
+    @gcp.FieldHint
+    databaseFlags: Mapping<String, String>?
+
+    /// Private IP the instance serves on — server-assigned.
+    @gcp.FieldHint { hasProviderDefault = true }
+    ipAddress: String?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

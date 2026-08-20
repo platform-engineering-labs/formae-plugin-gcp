@@ -1,0 +1,114 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute Autoscaler (zonal)
+///
+/// Scales a zonal managed instance group between `minNumReplicas` and
+/// `maxNumReplicas` against a utilization signal. `instanceGroupManager` is the
+/// MIG's self-link; an autoscaler and a MIG `targetSize` are mutually exclusive
+/// controls, so let the autoscaler own the size once attached.
+///
+/// ponytail: update is off — the Compute API patches autoscalers via
+/// `?autoscaler=NAME` (query param, not a path segment), which the generic
+/// engine's resource-URL builder does not emit. A change replaces instead.
+module gcp.compute.autoscaler
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Autoscaler"
+
+typealias AutoscalerMode = "ON"|"OFF"|"ONLY_SCALE_OUT"|"ONLY_UP"
+
+/// Target average CPU utilization across the group, 0.0-1.0.
+@gcp.SubResourceHint
+open class CpuUtilization extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    utilizationTarget: Number?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    predictiveMethod: String?
+}
+
+/// Target fraction of the backend service's capacity.
+@gcp.SubResourceHint
+open class LoadBalancingUtilization extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    utilizationTarget: Number?
+}
+
+@gcp.SubResourceHint
+open class AutoscalingPolicy extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    maxNumReplicas: Int
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    minNumReplicas: Int?
+
+    /// Seconds a new VM is given to warm up before its metrics count.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    coolDownPeriodSec: Int?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    mode: AutoscalerMode?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    cpuUtilization: CpuUtilization?
+
+    @gcp.FieldHint { createOnly = true }
+    loadBalancingUtilization: LoadBalancingUtilization?
+}
+
+open class AutoscalerResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: AutoscalerResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: AutoscalerResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: AutoscalerResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Autoscaler extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    zone: String
+
+    /// Self-link of the InstanceGroupManager to scale. Pass
+    /// `mig.res.selfLink` so formae creates the MIG first.
+    ///
+    /// The API field is `target`, but `target` is reserved by the base Resource
+    /// class (it names the deployment target), so the provisioner renames this
+    /// on the way out and back on read — the same trick sslCertificate uses for
+    /// `managed`.
+    @gcp.FieldHint { createOnly = true }
+    instanceGroupManager: (String|formae.Resolvable)
+
+    @gcp.FieldHint { createOnly = true }
+    autoscalingPolicy: AutoscalingPolicy
+
+    hidden res: AutoscalerResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

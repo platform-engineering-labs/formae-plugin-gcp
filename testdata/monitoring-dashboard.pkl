@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/monitoring/dashboard.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency dashboard: one text widget plus one CPU-utilization chart.
+forma {
+  v.stack
+  v.target
+
+  new dashboard.Dashboard {
+    label = "plugin-sdk-test-monitoring-dashboard"
+    name = "formae-plugin-sdk-test-dash-\(v.testRunID)"
+    displayName = "Formae conformance dashboard"
+    gridLayout = new dashboard.GridLayout {
+      columns = "2"
+      widgets = new Listing {
+        new dashboard.Widget {
+          title = "Notes"
+          text = new dashboard.TextWidget {
+            content = "Created by the formae GCP plugin conformance suite."
+            format = "MARKDOWN"
+          }
+        }
+        new dashboard.Widget {
+          title = "Instance CPU"
+          xyChart = new dashboard.XyChart {
+            dataSets = new Listing {
+              new dashboard.DataSet {
+                timeSeriesQuery = new Mapping {
+                  ["timeSeriesFilter"] = new Mapping {
+                    ["filter"] = "metric.type=\"compute.googleapis.com/instance/cpu/utilization\""
+                    ["aggregation"] = new Mapping {
+                      ["alignmentPeriod"] = "60s"
+                      ["perSeriesAligner"] = "ALIGN_MEAN"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

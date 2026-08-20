@@ -1,0 +1,35 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionDisk.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency regional disk, replicated across two zones of the target
+// region. Blank (no sourceImage) so the create does not wait on an image copy.
+forma {
+  v.stack
+  v.target
+
+  new regionDisk.RegionDisk {
+    label = "plugin-sdk-test-region-disk"
+    project = v.gcpProject
+    region = v.gcpRegion
+    name = "formae-plugin-sdk-test-regdisk-\(v.testRunID)"
+    description = "Test regional disk for plugin SDK conformance tests"
+    sizeGb = 10
+    type = "pd-balanced"
+    replicaZones = new Listing {
+      "\(v.gcpRegion)-a"
+      "\(v.gcpRegion)-b"
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

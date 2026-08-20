@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/savedQuery.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency saved Logs Explorer query.
+forma {
+  v.stack
+  v.target
+
+  new savedQuery.SavedQuery {
+    label = "plugin-sdk-test-logging-saved-query"
+    name = "formae-plugin-sdk-test-sq-\(v.testRunID)"
+    location = "global"
+    displayName = "Formae conformance error query"
+    description = "Test saved query for plugin SDK conformance tests"
+    visibility = "SHARED"
+    loggingQuery = new savedQuery.LoggingQuery {
+      filter = "severity>=\"ERROR\""
+    }
+  }
+}

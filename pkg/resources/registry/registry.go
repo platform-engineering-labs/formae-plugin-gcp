@@ -33,6 +33,14 @@ func Get(name string, operation resource.Operation, cfg *config.Config) prov.Pro
 	return provisioner
 }
 
+// RegisteredTypes returns every resource type that has a provisioner. Exported
+// so tests can compare the registry against the published PKL schema: a schema
+// module with no provisioner is declarable but fails at apply, and a provisioner
+// with no schema module cannot be declared at all.
+func RegisteredTypes() []string {
+	return getRegistryKeys()
+}
+
 func getRegistryKeys() []string {
 	var keys []string
 	for k := range registry {

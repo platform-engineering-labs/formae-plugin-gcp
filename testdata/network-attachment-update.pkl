@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/networkAttachment.pkl"
+import "./config/vars.pkl" as v
+
+// Network + subnet the attachment exposes to producers. Both referenced by
+// self-link so formae orders the creates and the stored URLs round-trip.
+local net = new network.Network {
+  label = "plugin-sdk-test-natt-net"
+  name = "formae-plugin-sdk-test-natt-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-natt-subnet"
+  name = "formae-plugin-sdk-test-natt-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.94.0.0/24"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  new networkAttachment.NetworkAttachment {
+    label = "plugin-sdk-test-network-attachment"
+    name = "formae-plugin-sdk-test-natt-\(v.testRunID)"
+    description = "Updated PSC network attachment description"
+    region = v.gcpRegion
+    connectionPreference = "ACCEPT_AUTOMATIC"
+    subnetworks = new Listing {
+      subnet.res.selfLink
+    }
+  }
+}

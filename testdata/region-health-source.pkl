@@ -1,0 +1,69 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionHealthCheck.pkl"
+import "@gcp/compute/regionBackendService.pkl"
+import "@gcp/compute/regionHealthAggregationPolicy.pkl"
+import "@gcp/compute/regionHealthSource.pkl"
+import "./config/vars.pkl" as v
+
+// The health source binds a backend service to an aggregation policy, so the
+// chain is: RegionHealthCheck -> RegionBackendService + policy -> health source.
+// Every reference is a resolvable self-link so formae orders the creates and the
+// stored full URLs round-trip.
+//
+// The backend service has no backends: the health source only needs the service
+// to exist, and adding instance groups would mean booting VMs that cannot reach
+// the internet in this project.
+local hc = new regionHealthCheck.RegionHealthCheck {
+  label = "plugin-sdk-test-hs-hc"
+  name = "formae-plugin-sdk-test-hs-hc-\(v.testRunID)"
+  region = v.gcpRegion
+  type = "TCP"
+  tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
+    port = 80
+  }
+}
+local bes = new regionBackendService.RegionBackendService {
+  label = "plugin-sdk-test-hs-bes"
+  name = "formae-plugin-sdk-test-hs-bes-\(v.testRunID)"
+  region = v.gcpRegion
+  loadBalancingScheme = "INTERNAL"
+  protocol = "TCP"
+  healthChecks = new Listing {
+    hc.res.selfLink
+  }
+}
+local policy = new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
+  label = "plugin-sdk-test-hs-policy"
+  name = "formae-plugin-sdk-test-hs-hap-\(v.testRunID)"
+  region = v.gcpRegion
+  policyType = "BACKEND_SERVICE_POLICY"
+  healthyPercentThreshold = 60
+}
+
+forma {
+  v.stack
+  v.target
+
+  hc
+  bes
+  policy
+
+  new regionHealthSource.RegionHealthSource {
+    label = "plugin-sdk-test-region-health-source"
+    name = "formae-plugin-sdk-test-hs-\(v.testRunID)"
+    description = "Test health source for plugin SDK conformance tests"
+    region = v.gcpRegion
+    sourceType = "BACKEND_SERVICE"
+    healthAggregationPolicy = policy.res.selfLink
+    sources = new Listing {
+      bes.res.selfLink
+    }
+  }
+}

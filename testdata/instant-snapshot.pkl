@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/instantSnapshot.pkl"
+import "./config/vars.pkl" as v
+
+// Instant snapshots require an SSD-class source disk, so this uses pd-ssd
+// rather than the pd-standard the other disk fixtures use. Blank disk (no
+// sourceImage) keeps the create quick.
+local src = new disk.Disk {
+  label = "plugin-sdk-test-instant-snapshot-disk"
+  project = v.gcpProject
+  zone = v.gcpZone
+  name = "formae-plugin-sdk-test-is-disk-\(v.testRunID)"
+  description = "Source disk for the instant snapshot conformance test"
+  sizeGb = 10
+  type = "pd-ssd"
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+
+  new instantSnapshot.InstantSnapshot {
+    label = "plugin-sdk-test-instant-snapshot"
+    name = "formae-plugin-sdk-test-is-\(v.testRunID)"
+    description = "Test instant snapshot for plugin SDK conformance tests"
+    zone = v.gcpZone
+    // Resolvable -> establishes disk-before-snapshot create ordering.
+    sourceDisk = src.res.selfLink
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

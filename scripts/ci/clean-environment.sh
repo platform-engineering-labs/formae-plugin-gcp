@@ -16,6 +16,13 @@
 #
 # Deletion order matters due to dependencies:
 #   1. Firewalls (depend on networks)
+#   1b-1d. Autoscalers -> managed instance groups -> instance templates
+#      (each depends on the next; templates hold a network reference)
+#   1e. Images, snapshots, resource policies (leaf)
+#   1f. Log views, logging sinks, logging exclusions, Monitoring services + dashboards
+#   1f2. VPN tunnels -> HA/external VPN gateways -> routers (gateway quota is 2/region)
+#   1g. SSL policies (after the target proxies that reference them)
+#   1h. Network attachments (hold a subnet reference)
 #   2. Subnetworks (depend on networks)
 #   3. Disks, Cloud Run services, BigQuery tables (leaf resources)
 #   4. BigQuery datasets (tables must be deleted first)
@@ -53,6 +60,43 @@ cleanup_resources() {
 }
 
 # --- 1. Firewalls (must delete before networks) ---
+# Network firewall policies are global; a policy with associations must have
+# them removed first, but the fixtures create none.
+echo "Cleaning GCP regional security policies..."
+REGION_SEC_POLICIES=$(gcloud compute security-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_SEC_POLICIES" ]; then
+    echo "$REGION_SEC_POLICIES" | while read -r pol region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional security policy: $pol (region: $region)"
+        gcloud compute security-policies delete "$pol" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional security policies found"
+fi
+
+echo "Cleaning GCP network firewall policies..."
+NET_FW_POLICIES=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$NET_FW_POLICIES" ]; then
+    echo "$NET_FW_POLICIES" | while read -r pol; do
+        echo "  Deleting network firewall policy: $pol"
+        gcloud compute network-firewall-policies delete "$pol" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No network firewall policies found"
+fi
+
+echo "Cleaning GCP regional network firewall policies..."
+REGION_FW_POLICIES=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_FW_POLICIES" ]; then
+    echo "$REGION_FW_POLICIES" | while read -r pol region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional network firewall policy: $pol (region: $region)"
+        gcloud compute network-firewall-policies delete "$pol" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional network firewall policies found"
+fi
+
 echo "Cleaning GCP firewalls..."
 FIREWALLS=$(gcloud compute firewall-rules list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$FIREWALLS" ]; then
@@ -62,6 +106,370 @@ if [ -n "$FIREWALLS" ]; then
     done
 else
     echo "  No firewalls found"
+fi
+
+# --- 1b. Autoscalers (must delete before the MIGs they target) ---
+echo "Cleaning GCP autoscalers..."
+AUTOSCALERS=$(gcloud compute instance-groups managed list --filter="name~^formae-plugin-sdk" --format="value(autoscaler.name,zone)" 2>/dev/null | grep -v '^\s*$' || true)
+if [ -n "$AUTOSCALERS" ]; then
+    echo "$AUTOSCALERS" | while read -r autoscaler zone; do
+        [ -z "$autoscaler" ] && continue
+        echo "  Deleting autoscaler: $autoscaler (zone: $zone)"
+        gcloud compute instance-groups managed stop-autoscaling "${autoscaler}" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No autoscalers found"
+fi
+
+# Regional autoscalers are attached to regional MIGs, which report no zone.
+echo "Cleaning GCP regional autoscalers..."
+REGION_AUTOSCALERS=$(gcloud compute instance-groups managed list --filter="name~^formae-plugin-sdk AND -zone:*" --format="value(autoscaler.name,region)" 2>/dev/null | grep -v '^\s*$' || true)
+if [ -n "$REGION_AUTOSCALERS" ]; then
+    echo "$REGION_AUTOSCALERS" | while read -r autoscaler region; do
+        [ -z "$autoscaler" ] && continue
+        echo "  Stopping regional autoscaling on: $autoscaler (region: $region)"
+        gcloud compute instance-groups managed stop-autoscaling "$autoscaler" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional autoscalers found"
+fi
+
+# --- 1c. Managed instance groups (must delete before their instance templates) ---
+echo "Cleaning GCP managed instance groups..."
+MIGS=$(gcloud compute instance-groups managed list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$MIGS" ]; then
+    echo "$MIGS" | while read -r mig zone; do
+        echo "  Deleting managed instance group: $mig (zone: $zone)"
+        gcloud compute instance-groups managed delete "$mig" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No managed instance groups found"
+fi
+
+# Regional MIGs report no zone, so the zonal loop above skips them.
+echo "Cleaning GCP regional managed instance groups..."
+REGION_MIGS=$(gcloud compute instance-groups managed list --filter="name~^formae-plugin-sdk AND -zone:*" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_MIGS" ]; then
+    echo "$REGION_MIGS" | while read -r mig region; do
+        echo "  Deleting regional managed instance group: $mig (region: $region)"
+        gcloud compute instance-groups managed delete "$mig" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional managed instance groups found"
+fi
+
+# --- 1d. Instance templates (hold a network reference, so delete before networks) ---
+# Regional instance templates are a separate collection from the global ones.
+echo "Cleaning GCP regional instance templates..."
+REGION_TEMPLATES=$(gcloud compute instance-templates list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_TEMPLATES" ]; then
+    echo "$REGION_TEMPLATES" | while read -r tmpl region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional instance template: $tmpl (region: $region)"
+        gcloud compute instance-templates delete "$tmpl" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional instance templates found"
+fi
+
+echo "Cleaning GCP instance templates..."
+TEMPLATES=$(gcloud compute instance-templates list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$TEMPLATES" ]; then
+    echo "$TEMPLATES" | while read -r tmpl; do
+        echo "  Deleting instance template: $tmpl"
+        gcloud compute instance-templates delete "$tmpl" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No instance templates found"
+fi
+
+# --- 1e. Images and resource policies (leaf resources, no dependents) ---
+# Machine images pin their source instance, so they go before the instances loop.
+echo "Cleaning GCP machine images..."
+MACHINE_IMAGES=$(gcloud compute machine-images list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$MACHINE_IMAGES" ]; then
+    echo "$MACHINE_IMAGES" | while read -r mi; do
+        echo "  Deleting machine image: $mi"
+        gcloud compute machine-images delete "$mi" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No machine images found"
+fi
+
+echo "Cleaning GCP images..."
+IMAGES=$(gcloud compute images list --no-standard-images --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$IMAGES" ]; then
+    echo "$IMAGES" | while read -r img; do
+        echo "  Deleting image: $img"
+        gcloud compute images delete "$img" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No images found"
+fi
+
+# Instant snapshots are zonal and pin their source disk, so they go before disks.
+# Regional instant snapshots are a separate collection from the zonal ones.
+echo "Cleaning GCP regional instant snapshots..."
+REGION_ISNAPS=$(gcloud compute instant-snapshots list --filter="name~^formae-plugin-sdk AND -zone:*" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_ISNAPS" ]; then
+    echo "$REGION_ISNAPS" | while read -r isnap region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional instant snapshot: $isnap (region: $region)"
+        gcloud compute instant-snapshots delete "$isnap" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional instant snapshots found"
+fi
+
+echo "Cleaning GCP instant snapshots..."
+INSTANT_SNAPSHOTS=$(gcloud compute instant-snapshots list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$INSTANT_SNAPSHOTS" ]; then
+    echo "$INSTANT_SNAPSHOTS" | while read -r isnap zone; do
+        echo "  Deleting instant snapshot: $isnap (zone: $zone)"
+        gcloud compute instant-snapshots delete "$isnap" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No instant snapshots found"
+fi
+
+echo "Cleaning GCP snapshots..."
+SNAPSHOTS=$(gcloud compute snapshots list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SNAPSHOTS" ]; then
+    echo "$SNAPSHOTS" | while read -r snap; do
+        echo "  Deleting snapshot: $snap"
+        gcloud compute snapshots delete "$snap" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No snapshots found"
+fi
+
+# A policy still attached to a disk cannot be deleted, so detach first.
+echo "Detaching resource policies from test disks..."
+POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,resourcePolicies[])" 2>/dev/null || true)
+if [ -n "$POLICY_DISKS" ]; then
+    echo "$POLICY_DISKS" | while read -r dk zone policies; do
+        [ -z "$policies" ] && continue
+        for pol in $(echo "$policies" | tr ';,' ' '); do
+            [ -z "$pol" ] && continue
+            echo "  Detaching $(basename "$pol") from $dk"
+            gcloud compute disks remove-resource-policies "$dk" --zone="$zone" --resource-policies="$pol" --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No disks with attached policies found"
+fi
+
+echo "Cleaning GCP resource policies..."
+POLICIES=$(gcloud compute resource-policies list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$POLICIES" ]; then
+    echo "$POLICIES" | while read -r policy region; do
+        echo "  Deleting resource policy: $policy (region: $region)"
+        gcloud compute resource-policies delete "$policy" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No resource policies found"
+fi
+
+# --- 1f. Logging sinks and Monitoring dashboards (leaf resources) ---
+echo "Cleaning GCP logging sinks..."
+SINKS=$(gcloud logging sinks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SINKS" ]; then
+    echo "$SINKS" | while read -r sink; do
+        echo "  Deleting log sink: $sink"
+        gcloud logging sinks delete "$sink" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No logging sinks found"
+fi
+
+echo "Cleaning GCP log scopes..."
+LOG_SCOPES=$(gcloud logging scopes list --location=global --filter="name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$LOG_SCOPES" ]; then
+    echo "$LOG_SCOPES" | while read -r ls_; do
+        echo "  Deleting log scope: $ls_"
+        gcloud logging scopes delete "$(basename "$ls_")" --location=global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No log scopes found"
+fi
+
+echo "Cleaning GCP saved queries..."
+SAVED_QUERIES=$(gcloud logging saved-queries list --location=global --filter="name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SAVED_QUERIES" ]; then
+    echo "$SAVED_QUERIES" | while read -r sq; do
+        echo "  Deleting saved query: $sq"
+        gcloud logging saved-queries delete "$sq" --location=global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No saved queries found"
+fi
+
+echo "Cleaning GCP log views..."
+VIEWS=$(gcloud logging views list --bucket=_Default --location=global --filter="name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$VIEWS" ]; then
+    echo "$VIEWS" | while read -r view; do
+        echo "  Deleting log view: $view"
+        gcloud logging views delete "$view" --bucket=_Default --location=global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No log views found"
+fi
+
+echo "Cleaning GCP logging exclusions..."
+EXCLUSIONS=$(gcloud logging exclusions list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$EXCLUSIONS" ]; then
+    echo "$EXCLUSIONS" | while read -r excl; do
+        echo "  Deleting log exclusion: $excl"
+        gcloud logging exclusions delete "$excl" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No logging exclusions found"
+fi
+
+echo "Cleaning GCP custom metric descriptors..."
+METRIC_DESCRIPTORS=$(gcloud logging metrics list --format="value(name)" 2>/dev/null >/dev/null; gcloud monitoring metrics-descriptors list --filter="type~custom.googleapis.com/formae" --format="value(type)" 2>/dev/null || true)
+if [ -n "$METRIC_DESCRIPTORS" ]; then
+    echo "$METRIC_DESCRIPTORS" | while read -r md; do
+        echo "  Deleting metric descriptor: $md"
+        gcloud monitoring metrics-descriptors delete "$md" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No custom metric descriptors found"
+fi
+
+echo "Cleaning GCP monitoring custom services (deletes their SLOs too)..."
+SERVICES=$(gcloud monitoring services list --filter="name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SERVICES" ]; then
+    echo "$SERVICES" | while read -r svc; do
+        echo "  Deleting monitoring service: $svc"
+        gcloud monitoring services delete "$svc" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No monitoring services found"
+fi
+
+echo "Cleaning GCP monitoring dashboards..."
+DASHBOARDS=$(gcloud monitoring dashboards list --filter="displayName~Formae" --format="value(name)" 2>/dev/null || true)
+if [ -n "$DASHBOARDS" ]; then
+    echo "$DASHBOARDS" | while read -r dash; do
+        echo "  Deleting dashboard: $dash"
+        gcloud monitoring dashboards delete "$dash" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No monitoring dashboards found"
+fi
+
+# --- 1f2. HA VPN: tunnels -> gateways (VPN_GATEWAYS_PER_REGION is only 2, so a
+# leftover gateway blocks the next run with QUOTA_EXCEEDED). Routers are cleaned
+# with the other regional resources below.
+echo "Cleaning GCP VPN tunnels..."
+VPN_TUNNELS=$(gcloud compute vpn-tunnels list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$VPN_TUNNELS" ]; then
+    echo "$VPN_TUNNELS" | while read -r tun region; do
+        echo "  Deleting VPN tunnel: $tun (region: $region)"
+        gcloud compute vpn-tunnels delete "$tun" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No VPN tunnels found"
+fi
+
+echo "Cleaning GCP HA VPN gateways..."
+VPN_GATEWAYS=$(gcloud compute vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$VPN_GATEWAYS" ]; then
+    echo "$VPN_GATEWAYS" | while read -r gw region; do
+        echo "  Deleting HA VPN gateway: $gw (region: $region)"
+        gcloud compute vpn-gateways delete "$gw" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No HA VPN gateways found"
+fi
+
+echo "Cleaning GCP external VPN gateways..."
+EXT_GATEWAYS=$(gcloud compute external-vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$EXT_GATEWAYS" ]; then
+    echo "$EXT_GATEWAYS" | while read -r egw; do
+        echo "  Deleting external VPN gateway: $egw"
+        gcloud compute external-vpn-gateways delete "$egw" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No external VPN gateways found"
+fi
+
+echo "Cleaning GCP cloud routers..."
+ROUTERS=$(gcloud compute routers list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$ROUTERS" ]; then
+    echo "$ROUTERS" | while read -r rtr region; do
+        echo "  Deleting cloud router: $rtr (region: $region)"
+        gcloud compute routers delete "$rtr" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No cloud routers found"
+fi
+
+# --- 1g. SSL policies (must delete after the proxies that reference them) ---
+# Regional SSL policies are a separate collection from the global ones.
+echo "Cleaning GCP regional SSL policies..."
+REGION_SSL=$(gcloud compute ssl-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_SSL" ]; then
+    echo "$REGION_SSL" | while read -r pol region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional SSL policy: $pol (region: $region)"
+        gcloud compute ssl-policies delete "$pol" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional SSL policies found"
+fi
+
+echo "Cleaning GCP SSL policies..."
+SSL_POLICIES=$(gcloud compute ssl-policies list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SSL_POLICIES" ]; then
+    echo "$SSL_POLICIES" | while read -r pol; do
+        echo "  Deleting SSL policy: $pol"
+        gcloud compute ssl-policies delete "$pol" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No SSL policies found"
+fi
+
+# --- 1h. Network attachments (hold a subnet reference, so delete before subnets) ---
+# Service attachments hold forwarding-rule and PSC-subnet references, so they
+# must go before the forwarding rules and subnets below.
+echo "Cleaning GCP service attachments..."
+SERVICE_ATTACHMENTS=$(gcloud compute service-attachments list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$SERVICE_ATTACHMENTS" ]; then
+    echo "$SERVICE_ATTACHMENTS" | while read -r sa region; do
+        echo "  Deleting service attachment: $sa (region: $region)"
+        gcloud compute service-attachments delete "$sa" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No service attachments found"
+fi
+
+echo "Cleaning GCP network attachments..."
+NET_ATTACHMENTS=$(gcloud compute network-attachments list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$NET_ATTACHMENTS" ]; then
+    echo "$NET_ATTACHMENTS" | while read -r att region; do
+        echo "  Deleting network attachment: $att (region: $region)"
+        gcloud compute network-attachments delete "$att" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No network attachments found"
+fi
+
+# Peerings must be removed before their networks can be deleted.
+echo "Cleaning GCP network peerings..."
+PEER_NETS=$(gcloud compute networks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$PEER_NETS" ]; then
+    echo "$PEER_NETS" | while read -r net; do
+        PEERINGS=$(gcloud compute networks peerings list --network="$net" --format="value(peerings[].name)" 2>/dev/null || true)
+        for peering in $PEERINGS; do
+            [ -z "$peering" ] && continue
+            echo "  Deleting peering $peering on $net"
+            gcloud compute networks peerings delete "$peering" --network="$net" --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No networks to check for peerings"
 fi
 
 # --- 2. Subnetworks (must delete before networks) ---
@@ -100,7 +508,43 @@ else
     echo "  No disks found"
 fi
 
+# Regional disks report no zone, so the zonal loop above skips them.
+echo "Cleaning GCP sole-tenant node templates..."
+NODE_TEMPLATES=$(gcloud compute sole-tenancy node-templates list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$NODE_TEMPLATES" ]; then
+    echo "$NODE_TEMPLATES" | while read -r nt region; do
+        echo "  Deleting node template: $nt (region: $region)"
+        gcloud compute sole-tenancy node-templates delete "$nt" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No node templates found"
+fi
+
+echo "Cleaning GCP regional disks..."
+REGION_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk AND -zone:*" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$REGION_DISKS" ]; then
+    echo "$REGION_DISKS" | while read -r disk region; do
+        echo "  Deleting regional disk: $disk (region: $region)"
+        gcloud compute disks delete "$disk" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional disks found"
+fi
+
 # --- Target TCP proxies (global, must be deleted before their backend services) ---
+# Target instances hold a VM reference, so they go before the instances loop
+# above can succeed on a re-run; they are zonal.
+echo "Cleaning GCP target instances..."
+TARGET_INSTANCES=$(gcloud compute target-instances list --filter="name~^formae-plugin-sdk" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$TARGET_INSTANCES" ]; then
+    echo "$TARGET_INSTANCES" | while read -r ti zone; do
+        echo "  Deleting target instance: $ti (zone: $zone)"
+        gcloud compute target-instances delete "$ti" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target instances found"
+fi
+
 echo "Cleaning GCP target TCP proxies..."
 TARGET_TCP_PROXIES=$(gcloud compute target-tcp-proxies list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
 if [ -n "$TARGET_TCP_PROXIES" ]; then
@@ -209,6 +653,42 @@ else
 fi
 
 # --- Health checks (global) ---
+echo "Cleaning GCP legacy HTTPS health checks..."
+HTTPS_HCS=$(gcloud compute https-health-checks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$HTTPS_HCS" ]; then
+    echo "$HTTPS_HCS" | while read -r hc; do
+        echo "  Deleting legacy HTTPS health check: $hc"
+        gcloud compute https-health-checks delete "$hc" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No legacy HTTPS health checks found"
+fi
+
+echo "Cleaning GCP legacy HTTP health checks..."
+HTTP_HCS=$(gcloud compute http-health-checks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$HTTP_HCS" ]; then
+    echo "$HTTP_HCS" | while read -r hc; do
+        echo "  Deleting legacy HTTP health check: $hc"
+        gcloud compute http-health-checks delete "$hc" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No legacy HTTP health checks found"
+fi
+
+# Global (internet) NEGs are separate from the zonal/regional ones. Deleting one
+# takes its attached endpoints with it (verified against the API), so no detach
+# pass is needed here.
+echo "Cleaning GCP global network endpoint groups..."
+GLOBAL_NEGS=$(gcloud compute network-endpoint-groups list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$GLOBAL_NEGS" ]; then
+    echo "$GLOBAL_NEGS" | while read -r neg; do
+        echo "  Deleting global network endpoint group: $neg"
+        gcloud compute network-endpoint-groups delete "$neg" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No global network endpoint groups found"
+fi
+
 echo "Cleaning GCP health checks..."
 HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==1{print $1}' || true)
 if [ -n "$HEALTH_CHECKS" ]; then
@@ -221,6 +701,29 @@ else
 fi
 
 # --- Regional health checks (region-http-lb test) ---
+# Health sources reference an aggregation policy, so they go first.
+echo "Cleaning GCP health sources..."
+HEALTH_SOURCES=$(gcloud compute health-sources list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$HEALTH_SOURCES" ]; then
+    echo "$HEALTH_SOURCES" | while read -r hs region; do
+        echo "  Deleting health source: $hs (region: $region)"
+        gcloud compute health-sources delete "$hs" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No health sources found"
+fi
+
+echo "Cleaning GCP health aggregation policies..."
+HAPS=$(gcloud compute health-aggregation-policies list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$HAPS" ]; then
+    echo "$HAPS" | while read -r hap region; do
+        echo "  Deleting health aggregation policy: $hap (region: $region)"
+        gcloud compute health-aggregation-policies delete "$hap" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No health aggregation policies found"
+fi
+
 echo "Cleaning GCP regional health checks..."
 REGIONAL_HEALTH_CHECKS=$(gcloud compute health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region.basename())" 2>/dev/null | awk 'NF==2' || true)
 if [ -n "$REGIONAL_HEALTH_CHECKS" ]; then
@@ -388,6 +891,46 @@ fi
 # and gcloud's credential token type is not always accepted by sqladmin. The REST
 # DELETE defaults to no final backup and works with a plain bearer token. Instances
 # still in PENDING_CREATE are accepted (the delete queues behind the create).
+# AlloyDB bills per instance-minute, so a leaked cluster is expensive, not just
+# untidy. Instances must go before their cluster.
+# Backups outlive their cluster, so they are cleaned independently.
+echo "Cleaning GCP AlloyDB backups..."
+ALLOYDB_BACKUPS=$(gcloud alloydb backups list --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$ALLOYDB_BACKUPS" ]; then
+    echo "$ALLOYDB_BACKUPS" | while read -r bkp region; do
+        echo "  Deleting AlloyDB backup: $(basename "$bkp") (region: $region)"
+        gcloud alloydb backups delete "$(basename "$bkp")" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No AlloyDB backups found"
+fi
+
+echo "Cleaning GCP AlloyDB instances and clusters..."
+ALLOYDB_CLUSTERS=$(gcloud alloydb clusters list --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$ALLOYDB_CLUSTERS" ]; then
+    echo "$ALLOYDB_CLUSTERS" | while read -r cluster region; do
+        cname=$(basename "$cluster")
+        INSTS=$(gcloud alloydb instances list --cluster="$cname" --region="$region" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$INSTS" ]; then
+            echo "$INSTS" | while read -r inst; do
+                echo "  Deleting AlloyDB instance: $(basename "$inst") (cluster: $cname)"
+                gcloud alloydb instances delete "$(basename "$inst")" --cluster="$cname" --region="$region" --quiet 2>/dev/null || true
+            done
+        fi
+        USERS=$(gcloud alloydb users list --cluster="$cname" --region="$region" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$USERS" ]; then
+            echo "$USERS" | while read -r usr; do
+                echo "  Deleting AlloyDB user: $(basename "$usr") (cluster: $cname)"
+                gcloud alloydb users delete "$(basename "$usr")" --cluster="$cname" --region="$region" --quiet 2>/dev/null || true
+            done
+        fi
+        echo "  Deleting AlloyDB cluster: $cname (region: $region)"
+        gcloud alloydb clusters delete "$cname" --region="$region" --force --quiet 2>/dev/null || true
+    done
+else
+    echo "  No AlloyDB clusters found"
+fi
+
 echo "Cleaning GCP Cloud SQL instances..."
 SQL_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
 SQL_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"

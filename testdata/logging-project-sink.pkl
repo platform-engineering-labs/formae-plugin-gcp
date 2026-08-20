@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/projectSink.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency sink: routes error entries into the project's own _Default
+// log bucket. A log-bucket destination needs no extra IAM binding, unlike a
+// GCS/BigQuery/Pub-Sub destination where the sink's writerIdentity has to be
+// granted write access.
+forma {
+  v.stack
+  v.target
+
+  new projectSink.ProjectSink {
+    label = "plugin-sdk-test-logging-project-sink"
+    name = "formae-plugin-sdk-test-sink-\(v.testRunID)"
+    description = "Test log sink for plugin SDK conformance tests"
+    destination = "logging.googleapis.com/projects/\(v.gcpProject)/locations/global/buckets/_Default"
+    filter = "severity>=\"ERROR\""
+  }
+}

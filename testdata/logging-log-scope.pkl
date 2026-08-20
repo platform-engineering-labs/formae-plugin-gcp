@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/logScope.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency scope over the project's own _Default view, which always
+// exists.
+forma {
+  v.stack
+  v.target
+
+  new logScope.LogScope {
+    label = "plugin-sdk-test-logging-log-scope"
+    name = "formae-plugin-sdk-test-scope-\(v.testRunID)"
+    location = "global"
+    description = "Test log scope for plugin SDK conformance tests"
+    resourceNames = new Listing {
+      "projects/\(v.gcpProject)/locations/global/buckets/_Default/views/_Default"
+    }
+  }
+}

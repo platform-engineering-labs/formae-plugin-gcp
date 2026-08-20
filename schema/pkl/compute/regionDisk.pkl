@@ -1,0 +1,91 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionDisk (regional)
+///
+/// A persistent disk synchronously replicated across two zones in a region, so
+/// a workload survives losing one of them. The zonal `disk` is cheaper and
+/// faster; reach for this one when the disk itself must be highly available.
+///
+/// ponytail: update is off. Resize and label edits are separate endpoints
+/// (`resize`, `setLabels`), the same split the zonal Disk has; wire them when
+/// someone needs them.
+module gcp.compute.regionDisk
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionDisk"
+
+/// Regional disks support the replicated PD types only — no local SSD.
+typealias RegionDiskType = "pd-standard"|"pd-ssd"|"pd-balanced"
+
+open class RegionDiskResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionDiskResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionDiskResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionDiskResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionDisk extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    project: String
+
+    @gcp.FieldHint { createOnly = true }
+    region: String
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// Size in GB. The API reports it as a string.
+    @gcp.FieldHint { outputTransformation = formae.transform.toString }
+    sizeGb: Int?
+
+    /// Disk type. Declare the short name; the provisioner expands it to the
+    /// regional diskTypes URL the API requires.
+    @gcp.FieldHint { createOnly = true }
+    type: RegionDiskType?
+
+    /// Exactly two zones in `region` to replicate across, e.g.
+    /// ["europe-central2-a", "europe-central2-b"]. Declare the short zone
+    /// names; the provisioner expands them to full URLs.
+    @gcp.FieldHint { createOnly = true }
+    replicaZones: Listing<String>
+
+    /// Image to initialize the disk from, as "projects/<p>/global/images/...".
+    @gcp.FieldHint { createOnly = true }
+    sourceImage: (String|formae.Value)?
+
+    /// Snapshot to restore the disk from.
+    @gcp.FieldHint { createOnly = true }
+    sourceSnapshot: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: RegionDiskResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
