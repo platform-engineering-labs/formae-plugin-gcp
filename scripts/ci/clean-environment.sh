@@ -330,6 +330,21 @@ else
     echo "  No global addresses found"
 fi
 
+# --- 6c. Serverless VPC Access connectors (attached to a network, so delete
+#         before networks). Connector names are capped at 25 chars, so the
+#         testdata name is "formae-test-conn-<runID>", not the long
+#         formae-plugin-sdk prefix the other filters use. ---
+echo "Cleaning GCP VPC Access connectors..."
+VPC_CONNECTORS=$(gcloud compute networks vpc-access connectors list --region="${GCP_REGION:-europe-central2}" --filter="name~formae-test-conn" --format="value(name.basename())" 2>/dev/null || true)
+if [ -n "$VPC_CONNECTORS" ]; then
+    echo "$VPC_CONNECTORS" | while read -r conn; do
+        echo "  Deleting VPC Access connector: $conn"
+        gcloud compute networks vpc-access connectors delete "$conn" --region="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No VPC Access connectors found"
+fi
+
 # --- 7. Networks (after firewalls and subnetworks are deleted) ---
 echo "Cleaning GCP networks..."
 NETWORKS=$(gcloud compute networks list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
