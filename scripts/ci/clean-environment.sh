@@ -429,6 +429,20 @@ else
     echo "  No VPN tunnels found"
 fi
 
+# Classic VPN gateways are a separate collection from the HA ones and hold their
+# network, so they go before the network passes.
+echo "Cleaning GCP target VPN gateways..."
+TARGET_VPN_GWS=$(gcloud compute target-vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$TARGET_VPN_GWS" ]; then
+    echo "$TARGET_VPN_GWS" | while read -r gw region; do
+        [ -z "$gw" ] && continue
+        echo "  Deleting target VPN gateway: $gw ($region)"
+        gcloud compute target-vpn-gateways delete "$gw" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target VPN gateways found"
+fi
+
 echo "Cleaning GCP HA VPN gateways..."
 VPN_GATEWAYS=$(gcloud compute vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
 if [ -n "$VPN_GATEWAYS" ]; then

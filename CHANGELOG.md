@@ -519,6 +519,19 @@ Together these close the managed-instance-group gap: the plugin previously had
   `TIMEOUT=30`. The API also refuses a PATCH while creation is still running.
   Conformance green on all eight steps, Update included.
 
+- `GCP::Compute::TargetVpnGateway` — the classic, route-based VPN gateway.
+  `HaVpnGateway` is the modern alternative with an SLA and BGP; this one
+  terminates policy- and route-based tunnels and still backs plenty of existing
+  setups.
+
+  It is a different collection (`targetVpnGateways`, not `vpnGateways`) drawing
+  on a **separate quota**, which is why this case passes in a project whose
+  `VPN_GATEWAYS_PER_REGION` is exhausted — the condition that still keeps
+  `vpn-tunnel` red. Immutable: PATCH is not a method on it at all (an attempt
+  answers with an HTML 404), so any change replaces. Conformance green on all
+  eight steps; the cleanup script gained a target-VPN-gateway pass, ordered before
+  the network passes since a gateway holds its network.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

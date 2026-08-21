@@ -79,6 +79,7 @@ const (
 	// HA VPN
 	ExternalVpnGatewayResourceType = "GCP::Compute::ExternalVpnGateway"
 	HaVpnGatewayResourceType       = "GCP::Compute::HaVpnGateway"
+	TargetVpnGatewayResourceType   = "GCP::Compute::TargetVpnGateway"
 	VpnTunnelResourceType          = "GCP::Compute::VpnTunnel"
 	SslCertificateResourceType     = "GCP::Compute::SslCertificate"
 	SslPolicyResourceType          = "GCP::Compute::SslPolicy"
@@ -592,6 +593,23 @@ func init() {
 		},
 		// VPN Tunnel - one IPsec tunnel between a gateway interface pair.
 		// ponytail: no vpnTunnels.patch exists, so a change replaces.
+		// Target VPN Gateway - the classic (route-based) VPN gateway, a separate
+		// collection from the HA gateway above and drawing on a separate quota.
+		// Immutable: PATCH is not a method on it at all.
+		{
+			ResourceType: TargetVpnGatewayResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "targetVpnGateways",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    false,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
 		{
 			ResourceType: VpnTunnelResourceType,
 			ResourceConfig: base.ResourceConfig{
