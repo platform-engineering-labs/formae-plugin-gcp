@@ -480,6 +480,21 @@ Together these close the managed-instance-group gap: the plugin previously had
   DOWNLOAD rule per repository**. Conformance green on all eight steps, Update
   included.
 
+- `GCP::Eventarc::MessageBus` — the hub of an Eventarc Advanced setup, where
+  publishers send events and enrollments and pipelines route them onward. A
+  `Trigger` wires one source to one destination; a bus is the fan-out point
+  between many, and it supports PATCH where Trigger does not.
+
+  **Eventarc Advanced is not available in every region.** `europe-central2` —
+  this project's `GCP_LOCATION` — is rejected outright with "region ... is not
+  supported in Eventarc Advanced", so the resource declares its own `location`
+  and the fixture pins `europe-west1`. A request transformer keeps `location` out
+  of the body (it addresses the URL) while keeping `name` for `?messageBusId=`,
+  and a response transformer recovers `location` from the returned path so a
+  declared location is not reported missing. Because the fixture's region differs
+  from `GCP_LOCATION`, the cleanup script names the Advanced regions explicitly.
+  Conformance green on all eight steps, Update included.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

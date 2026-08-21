@@ -37,6 +37,41 @@ var EventarcNativeID = base.NativeIDConfig{
 	Format: base.FullPathFormat,
 }
 
+// messageBusRequestTransformer drops "location", which addresses the resource in
+// the URL and is not a body field. "name" stays: the engine reads the create id
+// (?messageBusId=) from the transformed body.
+func messageBusRequestTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "location" {
+			continue
+		}
+		body[k] = v
+	}
+	return body, nil
+}
+
+// messageBusResponseTransformer shortens the resource name and puts back the
+// location, which lives only in the returned path. Eventarc Advanced runs in a
+// subset of regions, so a message bus usually declares a location of its own
+// rather than inheriting the target's - and a declared field the read never
+// reports would look like it went missing.
+func messageBusResponseTransformer(props map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	out := make(map[string]interface{}, len(props)+1)
+	for k, v := range props {
+		out[k] = v
+	}
+	if name, ok := props["name"].(string); ok {
+		parts := strings.Split(name, "/")
+		// projects/{p}/locations/{l}/messageBuses/{name}
+		if len(parts) == 6 && parts[2] == "locations" && parts[4] == "messageBuses" {
+			out["location"] = parts[3]
+			out["name"] = parts[5]
+		}
+	}
+	return out
+}
+
 // eventarcPathBuilder builds
 // /projects/{project}/locations/{location}/{resourceType}[/{name}].
 func eventarcPathBuilder(ctx base.PathContext) string {

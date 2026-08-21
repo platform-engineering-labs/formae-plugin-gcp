@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Eventarc MessageBus
+///
+/// The hub of an Eventarc Advanced setup: publishers send events to a bus, and
+/// enrollments and pipelines route them onward. A `Trigger` wires one source to
+/// one destination; a bus is the fan-out point between many.
+///
+/// **Eventarc Advanced runs in a subset of regions.** `europe-central2`, for
+/// example, is rejected outright ("region ... is not supported in Eventarc
+/// Advanced"), so a bus normally declares its own `location` rather than
+/// inheriting the target's.
+module gcp.eventarc.messageBus
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Eventarc::MessageBus"
+
+/// How much the bus logs about the events passing through it.
+@gcp.SubResourceHint
+open class LoggingConfig extends formae.SubResource {
+    /// NONE (the GCP default), DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL,
+    /// ALERT or EMERGENCY.
+    @gcp.FieldHint
+    logSeverity: String?
+}
+
+open class MessageBusResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MessageBusResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class MessageBus extends formae.Resource {
+    hidden parent = this
+
+    /// Short bus id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the bus. A path component, not a body field. Set it to a
+    /// region Eventarc Advanced supports.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Customer-managed encryption key for events at rest.
+    @gcp.FieldHint
+    cryptoKeyName: (String|formae.Resolvable)?
+
+    /// GCP fills this in with logSeverity NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    loggingConfig: LoggingConfig?
+
+    /// Server-assigned unique id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    uid: String?
+
+    hidden res: MessageBusResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

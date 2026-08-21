@@ -791,6 +791,20 @@ fi
 # repository). Both the repository and rule fixtures leave one behind when a run
 # is killed, and neither the repository nor its rules are named by the compute
 # passes above.
+# Eventarc Advanced message buses. These live in a region Eventarc Advanced
+# supports rather than GCP_LOCATION, so the fixture's region is listed explicitly
+# instead of being inherited.
+echo "Cleaning GCP eventarc message buses..."
+for mb_loc in europe-west1 us-central1; do
+    MBS=$(gcloud eventarc message-buses list --location="$mb_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+    [ -z "$MBS" ] && continue
+    echo "$MBS" | while read -r mb; do
+        [ -z "$mb" ] && continue
+        echo "  Deleting message bus: $mb ($mb_loc)"
+        gcloud eventarc message-buses delete "$mb" --location="$mb_loc" --quiet 2>/dev/null || true
+    done
+done
+
 echo "Cleaning GCP artifact registry repositories..."
 AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)
 if [ -n "$AR_REPOS" ]; then
