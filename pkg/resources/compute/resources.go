@@ -80,16 +80,18 @@ const (
 	ServiceAttachmentResourceType  = "GCP::Compute::ServiceAttachment"
 
 	// Load Balancer - Global resources
-	GlobalAddressResourceType        = "GCP::Compute::GlobalAddress"
-	HealthCheckResourceType          = "GCP::Compute::HealthCheck"
-	BackendServiceResourceType       = "GCP::Compute::BackendService"
-	UrlMapResourceType               = "GCP::Compute::UrlMap"
-	TargetHttpProxyResourceType      = "GCP::Compute::TargetHttpProxy"
-	TargetHttpsProxyResourceType     = "GCP::Compute::TargetHttpsProxy"
-	TargetTcpProxyResourceType       = "GCP::Compute::TargetTcpProxy"
-	TargetSslProxyResourceType       = "GCP::Compute::TargetSslProxy"
-	TargetGrpcProxyResourceType      = "GCP::Compute::TargetGrpcProxy"
-	GlobalForwardingRuleResourceType = "GCP::Compute::GlobalForwardingRule"
+	GlobalAddressResourceType  = "GCP::Compute::GlobalAddress"
+	HealthCheckResourceType    = "GCP::Compute::HealthCheck"
+	BackendServiceResourceType = "GCP::Compute::BackendService"
+	// Registered in backend_service_signed_url_key.go: add/deleteSignedUrlKey verbs.
+	BackendServiceSignedUrlKeyResourceType = "GCP::Compute::BackendServiceSignedUrlKey"
+	UrlMapResourceType                     = "GCP::Compute::UrlMap"
+	TargetHttpProxyResourceType            = "GCP::Compute::TargetHttpProxy"
+	TargetHttpsProxyResourceType           = "GCP::Compute::TargetHttpsProxy"
+	TargetTcpProxyResourceType             = "GCP::Compute::TargetTcpProxy"
+	TargetSslProxyResourceType             = "GCP::Compute::TargetSslProxy"
+	TargetGrpcProxyResourceType            = "GCP::Compute::TargetGrpcProxy"
+	GlobalForwardingRuleResourceType       = "GCP::Compute::GlobalForwardingRule"
 
 	// Load Balancer - Regional resources
 	RegionHealthCheckResourceType             = "GCP::Compute::RegionHealthCheck"
