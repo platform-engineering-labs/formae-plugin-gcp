@@ -1,0 +1,109 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Serverless VPC Access Connector
+///
+/// A connector that lets serverless environments reach resources in a VPC
+/// network via internal IP. Location-scoped; create and delete are
+/// long-running operations.
+module gcp.vpcaccess.connector
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Vpcaccess::Connector"
+
+open class ConnectorResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ConnectorResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Connector extends formae.Resource {
+    hidden parent = this
+
+    /// Short connector id (e.g. "my-connector"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Name of the VPC network to connect to (e.g. "default"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String
+
+    /// Internal address range in RFC 4632 notation (e.g. "10.8.0.0/28").
+    /// Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    ipCidrRange: String
+
+    /// Machine type of the underlying VM instances. GCP defaults to "e2-micro"
+    /// when unset.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    machineType: String?
+
+    // Connector sizing. A create MUST specify exactly one of the two pairs
+    // below — the API rejects a connector that sizes neither ("Operation
+    // failed: A Connector must specify either max_throughput or
+    // max_instances."). Whichever pair is left unset is computed by GCP and
+    // reported back, hence hasProviderDefault on all four.
+    //
+    //   * minInstances/maxInstances — preferred; GCP discourages the
+    //     throughput fields.
+    //   * minThroughput/maxThroughput — legacy sizing in Mbps.
+    //
+    // The pairs are mutually exclusive: minInstances conflicts with
+    // minThroughput, maxInstances with maxThroughput.
+
+    /// Minimum throughput in Mbps (multiple of 100, 200-900). Conflicts with
+    /// minInstances. Computed by GCP when instance-based sizing is used.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    minThroughput: Int?
+
+    /// Maximum throughput in Mbps (multiple of 100, 300-1000), greater than
+    /// minThroughput. Conflicts with maxInstances. Computed by GCP when
+    /// instance-based sizing is used.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    maxThroughput: Int?
+
+    /// Minimum instances in the autoscaling group (2-9), lower than
+    /// maxInstances. Required alongside maxInstances when not using the
+    /// throughput pair. Conflicts with minThroughput.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    minInstances: Int?
+
+    /// Maximum instances in the autoscaling group (3-10), higher than
+    /// minInstances. Required alongside minInstances when not using the
+    /// throughput pair. Conflicts with maxThroughput.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    maxInstances: Int?
+
+    hidden res: ConnectorResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
