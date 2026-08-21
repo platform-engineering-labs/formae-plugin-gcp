@@ -1,0 +1,98 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Dataproc SessionTemplate
+///
+/// A reusable configuration for a serverless Spark session — the runtime version,
+/// the session kind, and the environment a session gets when someone starts one.
+/// The template itself runs nothing and costs nothing; only sessions started
+/// from it are billed.
+///
+/// Note the API shape: session templates live under `locations/{location}` while
+/// `autoscalingPolicy` lives under `regions/{region}`, and there is no
+/// `?sessionTemplateId=` parameter — the id is bound from the body's `name`,
+/// which the provisioner expands from the short name declared here.
+module gcp.dataproc.sessionTemplate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Dataproc::SessionTemplate"
+
+/// Which notebook kernel a Jupyter session starts.
+typealias JupyterKernel = "KERNEL_UNSPECIFIED"|"PYTHON"|"SCALA"
+
+/// A Jupyter notebook session.
+@gcp.SubResourceHint
+open class JupyterSession extends formae.SubResource {
+    @gcp.FieldHint
+    kernel: JupyterKernel?
+
+    @gcp.FieldHint
+    displayName: String?
+}
+
+/// A Spark Connect session. Set this or `jupyterSession`, not both.
+@gcp.SubResourceHint
+open class SparkConnectSession extends formae.SubResource {
+}
+
+/// Runtime the session runs on.
+@gcp.SubResourceHint
+open class SessionRuntimeConfig extends formae.SubResource {
+    /// Serverless runtime version, e.g. "2.2".
+    @gcp.FieldHint
+    version: String?
+
+    @gcp.FieldHint
+    properties: Mapping<String, String>?
+}
+
+open class SessionTemplateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SessionTemplateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class SessionTemplate extends formae.Resource {
+    hidden parent = this
+
+    /// Short template id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// A Jupyter session. Mutually exclusive with `sparkConnectSession`.
+    @gcp.FieldHint
+    jupyterSession: JupyterSession?
+
+    /// A Spark Connect session. Mutually exclusive with `jupyterSession`.
+    @gcp.FieldHint
+    sparkConnectSession: SparkConnectSession?
+
+    @gcp.FieldHint
+    runtimeConfig: SessionRuntimeConfig?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Whoever created the template - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    creator: String?
+
+    hidden res: SessionTemplateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

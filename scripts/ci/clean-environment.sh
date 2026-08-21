@@ -811,6 +811,20 @@ fi
 # Pipelines hold their destination bus, so they go first. Only one bus is allowed
 # per project per region, so a leftover bus fails the next run's create outright.
 # Workflows definitions. Free to keep, but they are test debris.
+# Dataproc session templates. Free to keep, but they are test debris. Note these
+# are location-scoped, unlike autoscaling policies.
+echo "Cleaning GCP dataproc session templates..."
+STS=$(gcloud dataproc session-templates list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep 'formae-plugin-sdk' || true)
+if [ -n "$STS" ]; then
+    echo "$STS" | while read -r st; do
+        [ -z "$st" ] && continue
+        echo "  Deleting session template: $(basename "$st")"
+        gcloud dataproc session-templates delete "$(basename "$st")" --location="${GCP_LOCATION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No dataproc session templates found"
+fi
+
 echo "Cleaning GCP workflows..."
 WFS=$(gcloud workflows list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
 if [ -n "$WFS" ]; then
