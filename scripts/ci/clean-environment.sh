@@ -89,6 +89,23 @@ else
     echo "  No global security policies found"
 fi
 
+# An association pins both its policy and the network it attaches to, so it has
+# to be detached before either can be deleted.
+echo "Detaching network firewall policy associations..."
+NFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$NFP_FOR_ASSOC" ]; then
+    echo "$NFP_FOR_ASSOC" | while read -r pol; do
+        ASSOCS=$(gcloud compute network-firewall-policies describe "$pol" --global --format="value(associations[].name)" 2>/dev/null || true)
+        for assoc in $(echo "$ASSOCS" | tr ';,' ' '); do
+            [ -z "$assoc" ] && continue
+            echo "  Detaching association $assoc from $pol"
+            gcloud compute network-firewall-policies associations delete --firewall-policy="$pol" --name="$assoc" --global-firewall-policy --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No network firewall policies to check for associations"
+fi
+
 echo "Cleaning GCP network firewall policies..."
 NET_FW_POLICIES=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$NET_FW_POLICIES" ]; then

@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/networkFirewallPolicy.pkl"
+import "@gcp/compute/networkFirewallPolicyAssociation.pkl"
+import "./config/vars.pkl" as v
+
+// Policy + network + the association that binds them. Without the association
+// the policy is inert, which is the gap this resource closes.
+local net = new network.Network {
+  label = "plugin-sdk-test-nfpa-network"
+  name = "formae-plugin-sdk-test-nfpa-net-\(v.testRunID)"
+  description = "Network the firewall policy is attached to"
+  autoCreateSubnetworks = false
+}
+
+local policy = new networkFirewallPolicy.NetworkFirewallPolicy {
+  label = "plugin-sdk-test-nfpa-policy"
+  name = "formae-plugin-sdk-test-nfpa-pol-\(v.testRunID)"
+  description = "Policy attached to the network under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  policy
+
+  new networkFirewallPolicyAssociation.NetworkFirewallPolicyAssociation {
+    label = "plugin-sdk-test-network-firewall-policy-association"
+    name = "formae-plugin-sdk-test-nfpa-assoc-\(v.testRunID)"
+    // Resolvables -> both the policy and the network exist before the attach verb.
+    firewallPolicy = policy.res.name
+    attachmentTarget = net.res.selfLink
+  }
+}

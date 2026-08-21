@@ -330,6 +330,20 @@ Together these close the managed-instance-group gap: the plugin previously had
   attachment would have pinned its policy forever; the detach pass now uses
   whichever of zone/region the disk actually reports.
 
+- `GCP::Compute::NetworkFirewallPolicyAssociation` — attaches a network firewall
+  policy to a VPC network, which is what puts the policy in the data path: a
+  policy with rules but no association is inert. Like the rules it is a set of
+  verbs on the policy (`addAssociation`, `getAssociation?name=N`,
+  `removeAssociation?name=N`), so it is a hand-written provisioner, and a removed
+  association answers `getAssociation` with **400, not 404**, so not-found is
+  mapped explicitly. Nothing is updatable — an association is a
+  (policy, network) pair — so a change replaces it. Conformance green on all
+  eight steps.
+
+  `clean-environment.sh` now detaches associations before deleting policies: an
+  association pins both its policy and its network, so a killed run used to
+  leave all three behind.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

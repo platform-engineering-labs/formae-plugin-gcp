@@ -21,10 +21,12 @@ const (
 	FirewallResourceType              = "GCP::Compute::Firewall"
 	NetworkFirewallPolicyResourceType = "GCP::Compute::NetworkFirewallPolicy"
 	// Registered in firewall_policy_rule.go: every operation is a verb on the policy.
-	NetworkFirewallPolicyRuleResourceType   = "GCP::Compute::NetworkFirewallPolicyRule"
-	RegionNetworkFirewallPolicyResourceType = "GCP::Compute::RegionNetworkFirewallPolicy"
-	InstanceResourceType                    = "GCP::Compute::Instance"
-	NetworkResourceType                     = "GCP::Compute::Network"
+	NetworkFirewallPolicyRuleResourceType = "GCP::Compute::NetworkFirewallPolicyRule"
+	// Registered in firewall_policy_association.go: add/get/removeAssociation verbs.
+	NetworkFirewallPolicyAssociationResourceType = "GCP::Compute::NetworkFirewallPolicyAssociation"
+	RegionNetworkFirewallPolicyResourceType      = "GCP::Compute::RegionNetworkFirewallPolicy"
+	InstanceResourceType                         = "GCP::Compute::Instance"
+	NetworkResourceType                          = "GCP::Compute::Network"
 	// Registered in network_peering.go: addPeering/removePeering verbs.
 	NetworkPeeringResourceType       = "GCP::Compute::NetworkPeering"
 	RouterResourceType               = "GCP::Compute::Router"
