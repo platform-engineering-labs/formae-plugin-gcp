@@ -576,6 +576,19 @@ else
     echo "  No node templates found"
 fi
 
+# A disk in active async replication cannot be deleted, so stop replication on
+# any test primary before the disk passes below run.
+echo "Stopping async replication on test disks..."
+REPL_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk AND -zone:''" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$REPL_DISKS" ]; then
+    echo "$REPL_DISKS" | while read -r dsk zone; do
+        [ -z "$zone" ] && continue
+        gcloud compute disks stop-async-replication "$dsk" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No zonal test disks to check"
+fi
+
 echo "Cleaning GCP regional disks..."
 REGION_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk AND -zone:*" --format="value(name,region)" 2>/dev/null || true)
 if [ -n "$REGION_DISKS" ]; then

@@ -436,6 +436,28 @@ Together these close the managed-instance-group gap: the plugin previously had
   no VMs. Conformance green on all eight steps, with Replace exercising the
   delete-then-create path.
 
+- `GCP::Compute::DiskAsyncReplication` — the replication link between a primary
+  disk and a secondary in another region, which is what cross-region disk
+  disaster recovery is. The disks are ordinary `Disk` resources; this models the
+  relationship, started and stopped with the startAsyncReplication /
+  stopAsyncReplication verbs on the primary.
+
+  The subtlety that shapes the whole implementation: **stopping replication does
+  not clear `asyncPrimaryDisk` from the secondary.** Only
+  `resourceStatus.asyncPrimaryDisk.state` changes, ACTIVE to STOPPED, so a read
+  that keyed on the field being present would report a dead pair as live
+  forever. `Read` judges by state, and also refuses a secondary that has been
+  re-paired with a different primary. `stopAsyncReplication` is idempotent, so
+  deleting twice is not an error. Nothing is updatable — the link is a pair.
+
+  `Disk.asyncPrimaryDisk.disk` was typed `String`, which made it impossible to
+  reference the primary through a resolvable; it now accepts one, so formae
+  orders the creates. That matters more than convenience here: a secondary
+  cannot be paired after creation, so the reference has to be right the first
+  time. A disk in active replication also cannot be deleted, so the cleanup
+  script stops replication before its disk passes run. Conformance green on all
+  eight steps.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
