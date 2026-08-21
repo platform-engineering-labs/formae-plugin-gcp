@@ -794,6 +794,19 @@ fi
 # Eventarc Advanced message buses. These live in a region Eventarc Advanced
 # supports rather than GCP_LOCATION, so the fixture's region is listed explicitly
 # instead of being inherited.
+# Pipelines hold their destination bus, so they go first. Only one bus is allowed
+# per project per region, so a leftover bus fails the next run's create outright.
+echo "Cleaning GCP eventarc pipelines..."
+for pl_loc in europe-west1 us-central1; do
+    PLS=$(gcloud eventarc pipelines list --location="$pl_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+    [ -z "$PLS" ] && continue
+    echo "$PLS" | while read -r pl; do
+        [ -z "$pl" ] && continue
+        echo "  Deleting pipeline: $pl ($pl_loc)"
+        gcloud eventarc pipelines delete "$pl" --location="$pl_loc" --quiet 2>/dev/null || true
+    done
+done
+
 echo "Cleaning GCP eventarc message buses..."
 for mb_loc in europe-west1 us-central1; do
     MBS=$(gcloud eventarc message-buses list --location="$mb_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)

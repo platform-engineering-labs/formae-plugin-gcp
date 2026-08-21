@@ -1,0 +1,49 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/eventarc/messageBus.pkl"
+import "@gcp/eventarc/pipeline.pkl"
+import "./config/vars.pkl" as v
+
+// A bus plus the pipeline that drains it. The destination is another message bus
+// rather than an HTTP endpoint: an http destination needs a real
+// networkAttachment, while a bus destination needs nothing but the bus.
+//
+// Both pin us-central1. Eventarc Advanced rejects GCP_LOCATION's
+// europe-central2 outright, and only ONE message bus is allowed per project per
+// region — so this case uses a different Advanced region from the
+// eventarc-message-bus case, which would otherwise hold the only europe-west1
+// slot and fail this one's bus.
+local bus = new messageBus.MessageBus {
+  label = "plugin-sdk-test-pl-bus"
+  name = "formae-plugin-sdk-test-pl-bus-\(v.testRunID)"
+  location = "us-central1"
+}
+
+forma {
+  v.stack
+  v.target
+
+  bus
+
+  new pipeline.Pipeline {
+    label = "plugin-sdk-test-eventarc-pipeline"
+    name = "formae-plugin-sdk-test-pl-\(v.testRunID)"
+    location = "us-central1"
+    labels = new Mapping {
+      ["phase"] = "updated"
+    }
+    destinations = new Listing {
+      new pipeline.PipelineDestination {
+        // Resolvable -> the bus exists before the pipeline is created. The
+        // plugin expands this short name into the full path Eventarc wants.
+        messageBus = bus.res.name
+      }
+    }
+  }
+}

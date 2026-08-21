@@ -14,6 +14,10 @@
 /// example, is rejected outright ("region ... is not supported in Eventarc
 /// Advanced"), so a bus normally declares its own `location` rather than
 /// inheriting the target's.
+///
+/// **Only one bus is allowed per project per region** (quota
+/// `MessageBusesPerProjectPerRegion`, limit 1). A second bus in the same region
+/// fails at create, so two stacks in one project need two regions.
 module gcp.eventarc.messageBus
 
 import "../gcp.pkl"

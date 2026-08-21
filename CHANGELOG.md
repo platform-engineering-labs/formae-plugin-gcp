@@ -495,6 +495,30 @@ Together these close the managed-instance-group gap: the plugin previously had
   from `GCP_LOCATION`, the cleanup script names the Advanced regions explicitly.
   Conformance green on all eight steps, Update included.
 
+- `GCP::Eventarc::Pipeline` — where a message bus sends the events it accepts. An
+  enrollment decides which events reach a pipeline; the pipeline says where they
+  go and how hard to retry.
+
+  Two API facts govern the fixture. First, **only one message bus is allowed per
+  project per region** (`MessageBusesPerProjectPerRegion`, limit 1), so the
+  pipeline case pins `us-central1` while `eventarc-message-bus` keeps
+  `europe-west1` — otherwise whichever ran first would hold the region's only
+  slot and fail the other. Second, an `httpEndpoint` destination needs a real
+  `networkAttachment`, and a bogus one fails the create *asynchronously*; a
+  `messageBus` destination needs nothing but the bus, so that is what the fixture
+  uses.
+
+  A forma passes `bus.res.name`, so formae orders the creates; the request
+  transformer expands that short name into the full path Eventarc wants and the
+  response transformer shortens it back. That symmetry is the point — expanding
+  on write without shortening on read made all four comparison steps report drift
+  on a pipeline that was in fact correct.
+
+  This resource is slow: roughly four minutes to create and two and a half to
+  delete, so the conformance case takes about 25 minutes and needs
+  `TIMEOUT=30`. The API also refuses a PATCH while creation is still running.
+  Conformance green on all eight steps, Update included.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
