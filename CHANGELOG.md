@@ -213,17 +213,9 @@ Together these close the managed-instance-group gap: the plugin previously had
   learn the rule is gone; and `List` skips priorities at or above 2147483644,
   where GCP's own implied rules live.
 
-  **No conformance fixture yet.** Create, Sync, Destroy and OOB-delete all pass
-  — so the verbs, native ID, List filtering and status wiring are right — but
-  Verify/Extract/Update fail with "Property match should exist in actual
-  resource". The `match` object never reaches stored state. This provisioner's
-  `Read` is hand-written and demonstrably returns the API body verbatim
-  (`getRule` includes `match`, verified directly), and the failure is identical
-  whether `match` is a typed sub-object or an untyped `Mapping`. That places the
-  loss downstream of the plugin's Read result rather than in the request path or
-  the schema, and makes this the fourth instance of the same class of problem
-  (see `Logging::SavedQuery.summaryFields`, `Monitoring::Dashboard` etag,
-  `Logging::LogScope` update).
+  Conformance green on all eight steps, with a fixture. (It had none for a while:
+  `match` went missing from state after create, which looked like a formae bug.
+  It was the missing `Status` read-back described under *Fixed* below.)
 - `GCP::Compute::InstantSnapshot` — a near-instant, same-zone copy of a disk: a
   fast rollback point rather than a backup, since it is not replicated outside
   the zone. Requires an SSD-class source disk, so its fixture uses `pd-ssd`
@@ -273,16 +265,10 @@ Together these close the managed-instance-group gap: the plugin previously had
   types now share one implementation. Only global `securityPolicies` is wired up;
   a `RegionSecurityPolicy` rule would need a regional kind.
 
-  **Conformance is red on Verify, Extract and Update**, and not because of this
-  resource: `match.config`, an object nested inside `match`, is absent from
-  stored state immediately after create and update. Create, Sync, Destroy and
-  out-of-band delete pass, and Sync reports *all* expected properties matched —
-  `match.config` included — so the read path is complete and the loss sits in
-  how post-create and post-update state is materialised. That narrows the
-  standing nested-property-loss bug: it is not the plugin's read, and it is not
-  a typing choice, since both an untyped `Mapping<String, Any>` (what
-  `NetworkFirewallPolicyRule.match` uses) and the typed classes lose the field.
-  Every verb was verified directly against the API before shipping.
+  Conformance green on all eight steps. (It was initially red on Verify, Extract
+  and Update over a missing `match.config`; that turned out to be the missing
+  `Status` read-back described under *Fixed* below, not anything about this
+  resource.)
 
   Do not declare `rules` inline on the policy and manage rules with this
   resource at the same time — both own the same list and each will remove what
@@ -303,10 +289,8 @@ Together these close the managed-instance-group gap: the plugin previously had
   body, and passes the region to the operation poll so it hits
   `regions/{r}/operations`. Three kinds now share the one provisioner.
 
-  Red on Verify, Extract and Update for exactly the same reason as the global
-  rule — `match.config` missing from state right after create and update — with
-  Create, Sync, Destroy and out-of-band delete green. The regional path itself is
-  verified: all four verbs were probed directly, and a direct `Create` against a
+  Conformance green on all eight steps, once the `Status` read-back below was in
+  place. All four verbs were probed directly, and a direct `Create` against a
   live regional policy returns the right composite native ID.
 
 - `GCP::Compute::NetworkEndpointGroup` gains `pscTargetService` and the
@@ -379,6 +363,19 @@ Together these close the managed-instance-group gap: the plugin previously had
   `formae.Value` so it stays out of plans and state. Nothing is updatable:
   rotating a key removes it and adds the new value. Conformance green on all
   eight steps.
+
+- `GCP::Compute::RouterRoutePolicy` — a BGP route policy on a Cloud Router,
+  filtering or rewriting the routes it imports from, or advertises to, its peers.
+  Without one a router takes and gives every route as-is. Verb-based
+  (`updateRoutePolicy`, which both creates and updates, plus `getRoutePolicy`,
+  `deleteRoutePolicy`, `listRoutePolicies`), so it is a hand-written provisioner.
+  Three API quirks: `getRoutePolicy` wraps the policy in a `resource` envelope,
+  `listRoutePolicies` returns `result` rather than the usual `items`, and an
+  update must carry the current fingerprint while a create must not carry one at
+  all — so `Update` re-reads the policy for a fresh fingerprint instead of
+  trusting the declared forma, where it would go stale after the first change.
+  A removed policy answers 400 ("The policy does not exist"), not 404.
+  Conformance green on all eight steps, Update included.
 
 ### Changed
 
@@ -576,6 +573,24 @@ Together these close the managed-instance-group gap: the plugin previously had
   path). `DiskResourcePolicyAttachment.List` walks `aggregated/disks` and reports
   each attached policy, filtered to zonal scopes so a native ID it emits is one
   its own `Read` can resolve.
+
+- **Hand-written provisioners lost structured properties from post-create state.**
+  `base.UnifiedProvisioner.Status` re-reads a resource after a successful
+  operation and returns the result in `ProgressResult.ResourceProperties`; a
+  provisioner that overrode CRUD and delegated `Status` straight to
+  `BaseResource` skipped that read-back. Scalars survived from the declared
+  forma, nested objects and arrays did not, and only the next sync filled them
+  in — so `SecurityPolicyRule`, `RegionSecurityPolicyRule`,
+  `NetworkFirewallPolicyRule` and `RouterRoutePolicy` all failed Verify, Extract
+  and Update while passing Sync. That pattern looked like a formae bug and was
+  recorded as one; it was ours.
+
+  New `base.StatusWithRead` does the read-back, and all seven hand-written
+  provisioners route `Status` through it. Re-running the affected fixtures
+  unchanged apart from the fix took each from three failing steps to 8/8.
+  **Any new provisioner that overrides CRUD must override `Status` too and route
+  it through `StatusWithRead`.**
+
 
 
 - `GCP::SecretManager::SecretVersion` `data` (the secret payload) was typed

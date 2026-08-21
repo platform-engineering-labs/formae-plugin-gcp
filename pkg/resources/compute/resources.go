@@ -29,9 +29,11 @@ const (
 	InstanceResourceType                               = "GCP::Compute::Instance"
 	NetworkResourceType                                = "GCP::Compute::Network"
 	// Registered in network_peering.go: addPeering/removePeering verbs.
-	NetworkPeeringResourceType       = "GCP::Compute::NetworkPeering"
-	RouterResourceType               = "GCP::Compute::Router"
-	RouterNatResourceType            = "GCP::Compute::RouterNat"
+	NetworkPeeringResourceType = "GCP::Compute::NetworkPeering"
+	RouterResourceType         = "GCP::Compute::Router"
+	RouterNatResourceType      = "GCP::Compute::RouterNat"
+	// Registered in router_route_policy.go: update/get/delete/listRoutePolicies verbs.
+	RouterRoutePolicyResourceType    = "GCP::Compute::RouterRoutePolicy"
 	SubnetworkResourceType           = "GCP::Compute::Subnetwork"
 	RouteResourceType                = "GCP::Compute::Route"
 	SecurityPolicyResourceType       = "GCP::Compute::SecurityPolicy"

@@ -310,3 +310,11 @@ func (p *NetworkPeeringProvisioner) List(
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
+
+// Status routes through the shared read-back so post-create and post-update
+// state carries the resource's real properties, not just what was declared.
+func (p *NetworkPeeringProvisioner) Status(
+	ctx context.Context, request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
+}
