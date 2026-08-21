@@ -787,6 +787,25 @@ fi
 # A composite health check references health sources, so it goes before them.
 # Project metadata is shared, project-wide state, so this removes only keys the
 # test fixtures own and never touches anything else (enable-oslogin, ssh-keys).
+# Artifact Registry repositories (and the rules inside them, which go with the
+# repository). Both the repository and rule fixtures leave one behind when a run
+# is killed, and neither the repository nor its rules are named by the compute
+# passes above.
+echo "Cleaning GCP artifact registry repositories..."
+AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)
+if [ -n "$AR_REPOS" ]; then
+    echo "$AR_REPOS" | while read -r repo; do
+        [ -z "$repo" ] && continue
+        short=$(basename "$repo")
+        loc=$(echo "$repo" | awk -F/ '{for(i=1;i<=NF;i++) if($i=="locations") print $(i+1)}')
+        [ -z "$loc" ] && loc="${GCP_LOCATION:-europe-central2}"
+        echo "  Deleting artifact repository: $short ($loc)"
+        gcloud artifacts repositories delete "$short" --location="$loc" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No artifact registry repositories found"
+fi
+
 echo "Cleaning GCP project metadata test keys..."
 PMI_KEYS=$(gcloud compute project-info describe --format="value(commonInstanceMetadata.items[].key)" 2>/dev/null | tr ';,' '\n' | grep '^formae-plugin-sdk' || true)
 if [ -n "$PMI_KEYS" ]; then

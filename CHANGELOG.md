@@ -458,6 +458,28 @@ Together these close the managed-instance-group gap: the plugin previously had
   script stops replication before its disk passes run. Conformance green on all
   eight steps.
 
+- `GCP::ArtifactRegistry::Rule` — a rule gates an operation on its repository
+  (denying downloads, for instance). A repository without rules allows whatever
+  the caller's IAM permits, so this is how one enforces policy of its own. It is
+  the first parented resource in this package, and config-driven rather than
+  hand-written, which took three fixes to the generic Artifact Registry plumbing:
+
+  - the path builder now inserts `repositories/{repo}` when a resource is
+    nested, so a rule lands on `.../repositories/{repo}/rules/{rule}`;
+  - the native-ID extractor keeps that parent segment, since a read URL is
+    rebuilt from the id and would otherwise address the location-level
+    collection; and
+  - `ArtifactRegistryNativeID` gained a `Parser` that restores
+    ParentType/ParentResource from a nested id.
+
+  A request transformer drops `repository` and `location` (path components the
+  API rejects as body fields) while keeping `name`, which the engine reads to
+  fill `?ruleId=`; a response transformer recovers `repository` and `location`
+  from the returned path. Rules are synchronous, unlike repositories, so the
+  definition carries its own `OperationConfig`. Note the API allows only **one
+  DOWNLOAD rule per repository**. Conformance green on all eight steps, Update
+  included.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
