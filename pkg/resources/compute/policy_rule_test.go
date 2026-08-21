@@ -11,14 +11,15 @@ import (
 
 const rulePath = "projects/dev-1/global/firewallPolicies/pol-a/rules/1000"
 const secRulePath = "projects/dev-1/global/securityPolicies/pol-a/rules/1000"
+const regionRulePath = "projects/dev-1/regions/europe-west1/securityPolicies/pol-a/rules/1000"
 
 // A rule has no identity of its own in the API — it is addressed by
 // (policy, priority) — so both must survive the native ID round-trip.
 func TestRuleNativeIDRoundTrip(t *testing.T) {
-	if got := firewallPolicyRuleKind.nativeID("dev-1", "pol-a", 1000); got != rulePath {
+	if got := firewallPolicyRuleKind.nativeID("dev-1", "", "pol-a", 1000); got != rulePath {
 		t.Fatalf("build: %q", got)
 	}
-	project, policy, priority, err := firewallPolicyRuleKind.parseNativeID(rulePath)
+	project, _, policy, priority, err := firewallPolicyRuleKind.parseNativeID(rulePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +36,7 @@ func TestParseRuleNativeIDRejectsOtherShapes(t *testing.T) {
 		"projects/dev-1/global/networks/n/rules/1000",             // wrong collection
 		"",
 	} {
-		if _, _, _, err := firewallPolicyRuleKind.parseNativeID(bad); err == nil {
+		if _, _, _, _, err := firewallPolicyRuleKind.parseNativeID(bad); err == nil {
 			t.Errorf("expected error for %q", bad)
 		}
 	}
@@ -44,16 +45,16 @@ func TestParseRuleNativeIDRejectsOtherShapes(t *testing.T) {
 // The two kinds share one implementation, so each must reject the other's ids —
 // otherwise a Cloud Armor rule could be read against a firewall policy URL.
 func TestPolicyRuleKindsRejectEachOthersIDs(t *testing.T) {
-	if _, _, _, err := firewallPolicyRuleKind.parseNativeID(secRulePath); err == nil {
+	if _, _, _, _, err := firewallPolicyRuleKind.parseNativeID(secRulePath); err == nil {
 		t.Error("firewall kind accepted a security policy rule ID")
 	}
-	if _, _, _, err := securityPolicyRuleKind.parseNativeID(rulePath); err == nil {
+	if _, _, _, _, err := securityPolicyRuleKind.parseNativeID(rulePath); err == nil {
 		t.Error("security kind accepted a firewall policy rule ID")
 	}
-	if got := securityPolicyRuleKind.nativeID("dev-1", "pol-a", 1000); got != secRulePath {
+	if got := securityPolicyRuleKind.nativeID("dev-1", "", "pol-a", 1000); got != secRulePath {
 		t.Errorf("security nativeID: %q", got)
 	}
-	project, policy, priority, err := securityPolicyRuleKind.parseNativeID(secRulePath)
+	project, _, policy, priority, err := securityPolicyRuleKind.parseNativeID(secRulePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,5 +161,57 @@ func TestImpliedRulePriorityFloorExcludesGCPRules(t *testing.T) {
 	}
 	if 1000 >= firewallPolicyRuleKind.priorityFloor {
 		t.Errorf("a user rule at 1000 must be below the floor")
+	}
+}
+
+// The regional kind carries "regions/{region}" where the global one carries a
+// single "global" segment, so the two id shapes must not cross over — a regional
+// rule read against a global URL would 404, or worse, hit a same-named global
+// policy.
+func TestRegionalPolicyRuleNativeID(t *testing.T) {
+	if got := regionSecurityPolicyRuleKind.nativeID("dev-1", "europe-west1", "pol-a", 1000); got != regionRulePath {
+		t.Fatalf("build: %q", got)
+	}
+	project, region, policy, priority, err := regionSecurityPolicyRuleKind.parseNativeID(regionRulePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if project != "dev-1" || region != "europe-west1" || policy != "pol-a" || priority != 1000 {
+		t.Errorf("parse: %q %q %q %d", project, region, policy, priority)
+	}
+	if _, _, _, _, err := regionSecurityPolicyRuleKind.parseNativeID(secRulePath); err == nil {
+		t.Error("regional kind accepted a global ID")
+	}
+	if _, _, _, _, err := securityPolicyRuleKind.parseNativeID(regionRulePath); err == nil {
+		t.Error("global kind accepted a regional ID")
+	}
+	for _, bad := range []string{
+		"projects/dev-1/regions//securityPolicies/pol-a/rules/1000",             // empty region
+		"projects/dev-1/zones/europe-west1-b/securityPolicies/pol-a/rules/1000", // zonal
+		"projects/dev-1/regions/europe-west1/securityPolicies/pol-a/rules/abc",  // non-numeric
+		"projects/dev-1/regions/europe-west1/backendServices/pol-a/rules/1000",  // wrong collection
+	} {
+		if _, _, _, _, err := regionSecurityPolicyRuleKind.parseNativeID(bad); err == nil {
+			t.Errorf("expected error for %q", bad)
+		}
+	}
+}
+
+// "region" addresses the policy in the URL; the API rejects it as a body field.
+func TestRegionalPolicyRuleBodyStripsRegion(t *testing.T) {
+	props := map[string]interface{}{
+		"securityPolicy": "pol-a",
+		"region":         "europe-west1",
+		"priority":       float64(1000),
+		"action":         "deny(403)",
+	}
+	out := regionSecurityPolicyRuleKind.body(props, true)
+	if _, ok := out["region"]; ok {
+		t.Errorf("region must not reach the body: %#v", out)
+	}
+	// The global kind has no region to strip, so it must leave the key alone
+	// rather than silently swallowing a field it does not own.
+	if _, ok := securityPolicyRuleKind.body(props, true)["region"]; !ok {
+		t.Error("global kind should not strip region")
 	}
 }

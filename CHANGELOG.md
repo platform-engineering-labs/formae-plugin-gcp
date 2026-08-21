@@ -296,6 +296,19 @@ Together these close the managed-instance-group gap: the plugin previously had
   the other target proxies this one registers optimistic locking. Conformance is
   green on all eight steps, Update included.
 
+- `GCP::Compute::RegionSecurityPolicyRule` — the regional twin of the Cloud Armor
+  rule above. The four verbs are identical, only the policy sits under
+  `regions/{region}`, so `policyRuleKind` gained a `regional` flag: it picks the
+  scope segment, makes `region` a path component that never travels in the rule
+  body, and passes the region to the operation poll so it hits
+  `regions/{r}/operations`. Three kinds now share the one provisioner.
+
+  Red on Verify, Extract and Update for exactly the same reason as the global
+  rule — `match.config` missing from state right after create and update — with
+  Create, Sync, Destroy and out-of-band delete green. The regional path itself is
+  verified: all four verbs were probed directly, and a direct `Create` against a
+  live regional policy returns the right composite native ID.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

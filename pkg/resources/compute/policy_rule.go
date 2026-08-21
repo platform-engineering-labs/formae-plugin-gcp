@@ -46,6 +46,9 @@ type policyRuleKind struct {
 	// priorityFloor is where GCP's own rules start. Rules at or above it are not
 	// manageable, so List must not report them as discoverable resources.
 	priorityFloor int
+	// regional puts the policy under regions/{region} instead of global, and
+	// makes "region" a path component of the rule rather than a body field.
+	regional bool
 	// label appears in status messages and errors.
 	label string
 }
@@ -65,19 +68,26 @@ var (
 		priorityFloor:  impliedRulePriorityFloor,
 		label:          "firewall policy rule",
 	}
-	// ponytail: global securityPolicies only. RegionSecurityPolicy rules would
-	// need a regional scope here; add that kind when something needs it.
 	securityPolicyRuleKind = policyRuleKind{
 		collection:     "securityPolicies",
 		policyProperty: "securityPolicy",
 		priorityFloor:  defaultSecurityRulePriority,
 		label:          "security policy rule",
 	}
+	// The regional verbs are identical, only the policy sits under a region.
+	regionSecurityPolicyRuleKind = policyRuleKind{
+		collection:     "securityPolicies",
+		policyProperty: "securityPolicy",
+		priorityFloor:  defaultSecurityRulePriority,
+		label:          "regional security policy rule",
+		regional:       true,
+	}
 )
 
 func init() {
 	registerPolicyRuleKind(NetworkFirewallPolicyRuleResourceType, firewallPolicyRuleKind)
 	registerPolicyRuleKind(SecurityPolicyRuleResourceType, securityPolicyRuleKind)
+	registerPolicyRuleKind(RegionSecurityPolicyRuleResourceType, regionSecurityPolicyRuleKind)
 }
 
 func registerPolicyRuleKind(resourceType string, kind policyRuleKind) {
@@ -98,7 +108,7 @@ func registerPolicyRuleKind(resourceType string, kind policyRuleKind) {
 					OperationConfig: ComputeOperations,
 					ResourceConfig: base.ResourceConfig{
 						ResourceType: kind.collection,
-						Scope:        &base.ScopeConfig{Type: base.ScopeGlobal},
+						Scope:        &base.ScopeConfig{Type: kind.scopeType()},
 					},
 					NativeIDConfig: ComputeNativeID,
 				},
@@ -107,26 +117,62 @@ func registerPolicyRuleKind(resourceType string, kind policyRuleKind) {
 		})
 }
 
-// nativeID composes "projects/{p}/global/{collection}/{policy}/rules/{priority}".
-func (k policyRuleKind) nativeID(project, policy string, priority int) string {
-	return fmt.Sprintf("projects/%s/global/%s/%s/rules/%d",
-		project, k.collection, policy, priority)
+func (k policyRuleKind) scopeType() base.ScopeType {
+	if k.regional {
+		return base.ScopeRegional
+	}
+	return base.ScopeGlobal
+}
+
+// scopePath is the segment(s) between the project and the collection.
+func (k policyRuleKind) scopePath(region string) string {
+	if k.regional {
+		return "regions/" + region
+	}
+	return "global"
+}
+
+// nativeID composes "projects/{p}/{scope}/{collection}/{policy}/rules/{priority}",
+// where scope is "global" or "regions/{region}".
+func (k policyRuleKind) nativeID(project, region, policy string, priority int) string {
+	return fmt.Sprintf("projects/%s/%s/%s/%s/rules/%d",
+		project, k.scopePath(region), k.collection, policy, priority)
 }
 
 // parseNativeID splits the composite id back into its parts. A rule has no
 // identity of its own in the API — it is addressed by (policy, priority) — so
 // both have to survive in the native ID.
-func (k policyRuleKind) parseNativeID(nativeID string) (project, policy string, priority int, err error) {
+func (k policyRuleKind) parseNativeID(nativeID string) (project, region, policy string, priority int, err error) {
+	invalid := func() (string, string, string, int, error) {
+		return "", "", "", 0, fmt.Errorf("invalid %s native ID: %s", k.label, nativeID)
+	}
 	parts := strings.Split(nativeID, "/")
-	if len(parts) != 7 || parts[0] != "projects" || parts[2] != "global" ||
-		parts[3] != k.collection || parts[5] != "rules" {
-		return "", "", 0, fmt.Errorf("invalid %s native ID: %s", k.label, nativeID)
+	// A regional id spells the scope as "regions/{region}" where a global one
+	// uses the single segment "global", so everything after the scope sits one
+	// index further along.
+	off := 0
+	if k.regional {
+		off = 1
 	}
-	priority, err = strconv.Atoi(parts[6])
+	if len(parts) != 7+off || parts[0] != "projects" {
+		return invalid()
+	}
+	if k.regional {
+		if parts[2] != "regions" || parts[3] == "" {
+			return invalid()
+		}
+		region = parts[3]
+	} else if parts[2] != "global" {
+		return invalid()
+	}
+	if parts[3+off] != k.collection || parts[5+off] != "rules" {
+		return invalid()
+	}
+	priority, err = strconv.Atoi(parts[6+off])
 	if err != nil {
-		return "", "", 0, fmt.Errorf("invalid priority in native ID %s: %w", nativeID, err)
+		return "", "", "", 0, fmt.Errorf("invalid priority in native ID %s: %w", nativeID, err)
 	}
-	return parts[1], parts[4], priority, nil
+	return parts[1], region, parts[4+off], priority, nil
 }
 
 // body strips the properties that address the rule rather than describe it. The
@@ -138,6 +184,9 @@ func (k policyRuleKind) body(props map[string]interface{}, keepPriority bool) ma
 		if key == k.policyProperty {
 			continue
 		}
+		if key == "region" && k.regional {
+			continue
+		}
 		if key == "priority" && !keepPriority {
 			continue
 		}
@@ -146,9 +195,9 @@ func (k policyRuleKind) body(props map[string]interface{}, keepPriority bool) ma
 	return out
 }
 
-func (p *PolicyRuleProvisioner) policyURL(project, policy string) string {
-	return fmt.Sprintf("%s/projects/%s/global/%s/%s",
-		p.APIConfig.BaseURL, project, p.kind.collection, policy)
+func (p *PolicyRuleProvisioner) policyURL(project, region, policy string) string {
+	return fmt.Sprintf("%s/projects/%s/%s/%s/%s",
+		p.APIConfig.BaseURL, project, p.kind.scopePath(region), p.kind.collection, policy)
 }
 
 // projectFor prefers the project the target is configured with, falling back to
@@ -160,9 +209,25 @@ func (p *PolicyRuleProvisioner) projectFor(targetConfig json.RawMessage, fallbac
 	return fallback
 }
 
+// regionFor is only meaningful for a regional kind: the region is a path
+// component, so it comes from the declared properties, falling back to the
+// target's configured region.
+func (p *PolicyRuleProvisioner) regionFor(props map[string]interface{}, targetConfig json.RawMessage) string {
+	if !p.kind.regional {
+		return ""
+	}
+	if region, ok := props["region"].(string); ok && region != "" {
+		return region
+	}
+	if cfg := config.FromTargetConfig(targetConfig); cfg != nil {
+		return cfg.Region
+	}
+	return ""
+}
+
 // issueVerb POSTs one of the rule verbs and returns the operation path to poll.
 func (p *PolicyRuleProvisioner) issueVerb(
-	ctx context.Context, url string, body map[string]interface{}, project string,
+	ctx context.Context, url string, body map[string]interface{}, project, region string,
 ) (string, *transport.Error) {
 	client, err := transport.NewClient(ctx, p.Config)
 	if err != nil {
@@ -177,7 +242,8 @@ func (p *PolicyRuleProvisioner) issueVerb(
 		return "", transport.WrapError(err, p.kind.label+" verb failed")
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
-	return p.OperationConfig.OperationURLBuilder(base.PathContext{Project: project}, opID), nil
+	return p.OperationConfig.OperationURLBuilder(
+		base.PathContext{Project: project, Region: region}, opID), nil
 }
 
 func (p *PolicyRuleProvisioner) Create(
@@ -203,8 +269,14 @@ func (p *PolicyRuleProvisioner) Create(
 			"target project is required"), nil
 	}
 
+	region := p.regionFor(props, request.TargetConfig)
+	if p.kind.regional && region == "" {
+		return createFailure(resource.OperationErrorCodeInvalidRequest,
+			"region is required"), nil
+	}
+
 	requestID, verbErr := p.issueVerb(ctx,
-		p.policyURL(project, policy)+"/addRule", p.kind.body(props, true), project)
+		p.policyURL(project, region, policy)+"/addRule", p.kind.body(props, true), project, region)
 	if verbErr != nil {
 		return createFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -213,7 +285,7 @@ func (p *PolicyRuleProvisioner) Create(
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        p.kind.nativeID(project, policy, priority),
+			NativeID:        p.kind.nativeID(project, region, policy, priority),
 			RequestID:       requestID,
 			StatusMessage:   p.kind.label + " creation in progress",
 		},
@@ -223,7 +295,7 @@ func (p *PolicyRuleProvisioner) Create(
 func (p *PolicyRuleProvisioner) Read(
 	ctx context.Context, request *resource.ReadRequest,
 ) (*resource.ReadResult, error) {
-	project, policy, priority, err := p.kind.parseNativeID(request.NativeID)
+	project, region, policy, priority, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{
 			ErrorCode: resource.OperationErrorCodeInvalidRequest,
@@ -237,7 +309,7 @@ func (p *PolicyRuleProvisioner) Read(
 	}
 	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL:    fmt.Sprintf("%s/getRule?priority=%d", p.policyURL(project, policy), priority),
+		URL:    fmt.Sprintf("%s/getRule?priority=%d", p.policyURL(project, region, policy), priority),
 	})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to read "+p.kind.label)
@@ -259,6 +331,9 @@ func (p *PolicyRuleProvisioner) Read(
 		props[k] = v
 	}
 	props[p.kind.policyProperty] = policy
+	if p.kind.regional {
+		props["region"] = region
+	}
 
 	encoded, mErr := json.Marshal(props)
 	if mErr != nil {
@@ -275,14 +350,14 @@ func (p *PolicyRuleProvisioner) Update(
 		return updateFailure(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("invalid properties: %v", err)), nil
 	}
-	project, policy, priority, err := p.kind.parseNativeID(request.NativeID)
+	project, region, policy, priority, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return updateFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
-	url := fmt.Sprintf("%s/patchRule?priority=%d", p.policyURL(project, policy), priority)
-	requestID, verbErr := p.issueVerb(ctx, url, p.kind.body(props, true), project)
+	url := fmt.Sprintf("%s/patchRule?priority=%d", p.policyURL(project, region, policy), priority)
+	requestID, verbErr := p.issueVerb(ctx, url, p.kind.body(props, true), project, region)
 	if verbErr != nil {
 		return updateFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -300,14 +375,14 @@ func (p *PolicyRuleProvisioner) Update(
 func (p *PolicyRuleProvisioner) Delete(
 	ctx context.Context, request *resource.DeleteRequest,
 ) (*resource.DeleteResult, error) {
-	project, policy, priority, err := p.kind.parseNativeID(request.NativeID)
+	project, region, policy, priority, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
-	url := fmt.Sprintf("%s/removeRule?priority=%d", p.policyURL(project, policy), priority)
-	requestID, verbErr := p.issueVerb(ctx, url, nil, project)
+	url := fmt.Sprintf("%s/removeRule?priority=%d", p.policyURL(project, region, policy), priority)
+	requestID, verbErr := p.issueVerb(ctx, url, nil, project, region)
 	if verbErr != nil {
 		return deleteFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -339,6 +414,18 @@ func (p *PolicyRuleProvisioner) List(
 	if project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
+	region := ""
+	if p.kind.regional {
+		props := map[string]interface{}{}
+		if request.AdditionalProperties != nil {
+			if r := request.AdditionalProperties["region"]; r != "" {
+				props["region"] = r
+			}
+		}
+		if region = p.regionFor(props, request.TargetConfig); region == "" {
+			return &resource.ListResult{NativeIDs: []string{}}, nil
+		}
+	}
 
 	client, err := transport.NewClient(ctx, p.Config)
 	if err != nil {
@@ -346,7 +433,7 @@ func (p *PolicyRuleProvisioner) List(
 	}
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL:    p.policyURL(project, policy),
+		URL:    p.policyURL(project, region, policy),
 	})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list "+p.kind.label+"s")
@@ -364,7 +451,7 @@ func (p *PolicyRuleProvisioner) List(
 		if err != nil || priority >= p.kind.priorityFloor {
 			continue
 		}
-		nativeIDs = append(nativeIDs, p.kind.nativeID(project, policy, priority))
+		nativeIDs = append(nativeIDs, p.kind.nativeID(project, region, policy, priority))
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
