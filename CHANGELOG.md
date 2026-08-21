@@ -377,6 +377,24 @@ Together these close the managed-instance-group gap: the plugin previously had
   A removed policy answers 400 ("The policy does not exist"), not 404.
   Conformance green on all eight steps, Update included.
 
+- `GCP::Compute::RouterNamedSet` — a reusable list of prefixes on a Cloud
+  Router. A route policy term can match against a named set instead of spelling
+  out every prefix, so one edit here changes every policy referencing it.
+
+  Same shape as the route policy down to the quirks — the update verb also
+  creates, the get verb wraps its payload in a `resource` envelope, the list verb
+  returns `result` rather than `items`, and an update needs the current
+  fingerprint while a create must not carry one — so
+  `RouterRoutePolicyProvisioner` became `RouterSubResourceProvisioner`,
+  parameterised by a `routerSubKind` holding the four verb names, the query
+  parameter and the native-ID segment. The verbs cannot be derived from one
+  noun (`listRoutePolicies` pluralises, `listNamedSets` does not), so a unit
+  test pins all six strings per kind. `NAMED_SET_TYPE_PREFIX` must be spelled in
+  full — `PREFIX` is rejected — and a prefix element carries its own quotes
+  (`'10.0.0.0/8'`). A missing set answers 404 `NAMED_SET_NOT_FOUND` where a
+  missing policy answers 400 `does not exist`, so both spellings count as gone.
+  Conformance green on all eight steps for both kinds, Update included.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

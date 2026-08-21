@@ -34,6 +34,7 @@ const (
 	RouterNatResourceType      = "GCP::Compute::RouterNat"
 	// Registered in router_route_policy.go: update/get/delete/listRoutePolicies verbs.
 	RouterRoutePolicyResourceType    = "GCP::Compute::RouterRoutePolicy"
+	RouterNamedSetResourceType       = "GCP::Compute::RouterNamedSet"
 	SubnetworkResourceType           = "GCP::Compute::Subnetwork"
 	RouteResourceType                = "GCP::Compute::Route"
 	SecurityPolicyResourceType       = "GCP::Compute::SecurityPolicy"

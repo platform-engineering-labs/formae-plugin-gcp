@@ -18,27 +18,70 @@ import (
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
-// RouterRoutePolicyProvisioner manages one BGP route policy on a Cloud Router.
-// A policy filters or transforms the routes a router imports or advertises, so
-// it is how a router does anything selective with BGP.
+// RouterSubResourceProvisioner manages one BGP object owned by a Cloud Router:
+// a route policy (which filters or rewrites the routes the router imports and
+// advertises) or a named set (a reusable list of prefixes those policies match
+// against). Neither is a REST resource; both are sets of verbs on the router.
 //
-// The policy is not a REST resource but a set of verbs on the router:
-// updateRoutePolicy (which both creates and updates), getRoutePolicy?policy=N,
-// deleteRoutePolicy?policy=N and listRoutePolicies. Two quirks shape this code:
-// getRoutePolicy wraps the policy in a "resource" envelope, and an update must
-// carry the current fingerprint while a create must not have one at all.
-type RouterRoutePolicyProvisioner struct {
+// The two are the same shape down to their quirks — the update verb also
+// creates, the get verb wraps its payload in a "resource" envelope, the list
+// verb returns "result" instead of "items", and an update must carry the
+// current fingerprint while a create must not carry one at all — so they are one
+// provisioner parameterised by routerSubKind.
+type RouterSubResourceProvisioner struct {
 	*base.BaseResource
+	kind routerSubKind
 }
 
-var _ prov.Provisioner = (*RouterRoutePolicyProvisioner)(nil)
+var _ prov.Provisioner = (*RouterSubResourceProvisioner)(nil)
 
-// routePolicyRouterProperty names the owning router; it and "region" are path
+// routerSubKind is everything that differs between the two.
+type routerSubKind struct {
+	// segment is the sub-collection in the native ID.
+	segment string
+	// The four verbs, which do not follow one naming rule: the list verb
+	// pluralises the noun ("listRoutePolicies", "listNamedSets").
+	updateVerb string
+	getVerb    string
+	deleteVerb string
+	listVerb   string
+	// queryParam names the object in get/delete URLs.
+	queryParam string
+	label      string
+}
+
+var (
+	routePolicyKind = routerSubKind{
+		segment:    "routePolicies",
+		updateVerb: "updateRoutePolicy",
+		getVerb:    "getRoutePolicy",
+		deleteVerb: "deleteRoutePolicy",
+		listVerb:   "listRoutePolicies",
+		queryParam: "policy",
+		label:      "router route policy",
+	}
+	namedSetKind = routerSubKind{
+		segment:    "namedSets",
+		updateVerb: "updateNamedSet",
+		getVerb:    "getNamedSet",
+		deleteVerb: "deleteNamedSet",
+		listVerb:   "listNamedSets",
+		queryParam: "namedSet",
+		label:      "router named set",
+	}
+)
+
+// routerSubRouterProperty names the owning router; it and "region" are path
 // components, never part of the verb body.
-const routePolicyRouterProperty = "router"
+const routerSubRouterProperty = "router"
 
 func init() {
-	registry.Register(RouterRoutePolicyResourceType,
+	registerRouterSubResource(RouterRoutePolicyResourceType, routePolicyKind)
+	registerRouterSubResource(RouterNamedSetResourceType, namedSetKind)
+}
+
+func registerRouterSubResource(resourceType string, kind routerSubKind) {
+	registry.Register(resourceType,
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
@@ -48,7 +91,7 @@ func init() {
 			resource.OperationCheckStatus,
 		},
 		func(cfg *config.Config) prov.Provisioner {
-			return &RouterRoutePolicyProvisioner{
+			return &RouterSubResourceProvisioner{
 				BaseResource: &base.BaseResource{
 					Config:          cfg,
 					APIConfig:       ComputeAPI,
@@ -59,36 +102,39 @@ func init() {
 					},
 					NativeIDConfig: ComputeNativeID,
 				},
+				kind: kind,
 			}
 		})
 }
 
-// buildRoutePolicyNativeID composes
-// "projects/{p}/regions/{r}/routers/{router}/routePolicies/{name}".
-func buildRoutePolicyNativeID(project, region, router, name string) string {
-	return fmt.Sprintf("projects/%s/regions/%s/routers/%s/routePolicies/%s",
-		project, region, router, name)
+// nativeID composes
+// "projects/{p}/regions/{r}/routers/{router}/{segment}/{name}".
+func (k routerSubKind) nativeID(project, region, router, name string) string {
+	return fmt.Sprintf("projects/%s/regions/%s/routers/%s/%s/%s",
+		project, region, router, k.segment, name)
 }
 
-// parseRoutePolicyNativeID splits the composite id. A policy is addressed by
-// (router, name) within a region, so all of it has to survive.
-func parseRoutePolicyNativeID(nativeID string) (project, region, router, name string, err error) {
+// parseNativeID splits the composite id. The object is addressed by
+// (router, name) within a region, so all of it has to survive, and the segment
+// must match this kind — a named set read through the route-policy verbs would
+// simply not be found.
+func (k routerSubKind) parseNativeID(nativeID string) (project, region, router, name string, err error) {
 	parts := strings.Split(nativeID, "/")
 	if len(parts) != 8 || parts[0] != "projects" || parts[2] != "regions" ||
-		parts[3] == "" || parts[4] != "routers" || parts[6] != "routePolicies" || parts[7] == "" {
-		return "", "", "", "", fmt.Errorf("invalid router route policy native ID: %s", nativeID)
+		parts[3] == "" || parts[4] != "routers" || parts[6] != k.segment || parts[7] == "" {
+		return "", "", "", "", fmt.Errorf("invalid %s native ID: %s", k.label, nativeID)
 	}
 	return parts[1], parts[3], parts[5], parts[7], nil
 }
 
-// routePolicyBody keeps only what the verb accepts. The router and region
-// address the URL, and the fingerprint is supplied by Update from a fresh read —
-// never from the declared forma, which would go stale.
-func routePolicyBody(props map[string]interface{}) map[string]interface{} {
+// routerSubBody keeps only what the verb accepts. The router and region address
+// the URL, and the fingerprint is supplied by Update from a fresh read — never
+// from the declared forma, which would go stale.
+func routerSubBody(props map[string]interface{}) map[string]interface{} {
 	body := make(map[string]interface{}, len(props))
 	for k, v := range props {
 		switch k {
-		case routePolicyRouterProperty, "region", "fingerprint":
+		case routerSubRouterProperty, "region", "fingerprint":
 			continue
 		}
 		body[k] = v
@@ -96,19 +142,19 @@ func routePolicyBody(props map[string]interface{}) map[string]interface{} {
 	return body
 }
 
-func (p *RouterRoutePolicyProvisioner) routerURL(project, region, router string) string {
+func (p *RouterSubResourceProvisioner) routerURL(project, region, router string) string {
 	return fmt.Sprintf("%s/projects/%s/regions/%s/routers/%s",
 		p.APIConfig.BaseURL, project, region, router)
 }
 
-func (p *RouterRoutePolicyProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
+func (p *RouterSubResourceProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
 	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback
 }
 
-func (p *RouterRoutePolicyProvisioner) regionFor(props map[string]interface{}, targetConfig json.RawMessage, fallback string) string {
+func (p *RouterSubResourceProvisioner) regionFor(props map[string]interface{}, targetConfig json.RawMessage, fallback string) string {
 	if region, ok := props["region"].(string); ok && region != "" {
 		return region
 	}
@@ -118,7 +164,7 @@ func (p *RouterRoutePolicyProvisioner) regionFor(props map[string]interface{}, t
 	return fallback
 }
 
-func (p *RouterRoutePolicyProvisioner) issueVerb(
+func (p *RouterSubResourceProvisioner) issueVerb(
 	ctx context.Context, url string, body map[string]interface{}, project, region string,
 ) (string, *transport.Error) {
 	client, err := transport.NewClient(ctx, p.Config)
@@ -131,17 +177,17 @@ func (p *RouterRoutePolicyProvisioner) issueVerb(
 		Body:   body,
 	})
 	if err != nil {
-		return "", transport.WrapError(err, "router route policy verb failed")
+		return "", transport.WrapError(err, p.kind.label+" verb failed")
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
 	return p.OperationConfig.OperationURLBuilder(
 		base.PathContext{Project: project, Region: region}, opID), nil
 }
 
-// fetchRoutePolicy reads one policy, unwrapping the "resource" envelope the API
-// puts it in. A missing policy answers 400 ("The policy does not exist"), not
-// 404, so the caller is told plainly whether it is gone.
-func (p *RouterRoutePolicyProvisioner) fetchRoutePolicy(
+// fetch reads one object, unwrapping the "resource" envelope the API puts it in.
+// A missing one may answer 400 ("The policy does not exist") or 404
+// ("NAMED_SET_NOT_FOUND"), so both spellings are treated as gone.
+func (p *RouterSubResourceProvisioner) fetch(
 	ctx context.Context, project, region, router, name string,
 ) (policy map[string]interface{}, gone bool, err *transport.Error) {
 	client, cErr := transport.NewClient(ctx, p.Config)
@@ -150,15 +196,15 @@ func (p *RouterRoutePolicyProvisioner) fetchRoutePolicy(
 	}
 	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL: fmt.Sprintf("%s/getRoutePolicy?policy=%s",
-			p.routerURL(project, region, router), name),
+		URL: fmt.Sprintf("%s/%s?%s=%s", p.routerURL(project, region, router),
+			p.kind.getVerb, p.kind.queryParam, name),
 	})
 	if rErr != nil {
-		wrapped := transport.WrapError(rErr, "failed to read router route policy")
+		wrapped := transport.WrapError(rErr, "failed to read "+p.kind.label)
 		code := transport.ToResourceErrorCode(wrapped.Code)
+		msg := strings.ToLower(wrapped.Message)
 		if code == resource.OperationErrorCodeNotFound ||
-			(code == resource.OperationErrorCodeInvalidRequest &&
-				strings.Contains(strings.ToLower(wrapped.Message), "does not exist")) {
+			strings.Contains(msg, "does not exist") || strings.Contains(msg, "not found") {
 			return nil, true, nil
 		}
 		return nil, false, wrapped
@@ -171,7 +217,7 @@ func (p *RouterRoutePolicyProvisioner) fetchRoutePolicy(
 	return inner, false, nil
 }
 
-func (p *RouterRoutePolicyProvisioner) Create(
+func (p *RouterSubResourceProvisioner) Create(
 	ctx context.Context, request *resource.CreateRequest,
 ) (*resource.CreateResult, error) {
 	var props map[string]interface{}
@@ -179,7 +225,7 @@ func (p *RouterRoutePolicyProvisioner) Create(
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("invalid properties: %v", err)), nil
 	}
-	router, _ := props[routePolicyRouterProperty].(string)
+	router, _ := props[routerSubRouterProperty].(string)
 	name, _ := props["name"].(string)
 	if router == "" || name == "" {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
@@ -195,8 +241,8 @@ func (p *RouterRoutePolicyProvisioner) Create(
 	// A create must not carry a fingerprint; the API rejects one for a policy
 	// that does not exist yet.
 	requestID, verbErr := p.issueVerb(ctx,
-		p.routerURL(project, region, router)+"/updateRoutePolicy",
-		routePolicyBody(props), project, region)
+		p.routerURL(project, region, router)+"/"+p.kind.updateVerb,
+		routerSubBody(props), project, region)
 	if verbErr != nil {
 		return createFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -204,23 +250,23 @@ func (p *RouterRoutePolicyProvisioner) Create(
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        buildRoutePolicyNativeID(project, region, router, name),
+			NativeID:        p.kind.nativeID(project, region, router, name),
 			RequestID:       requestID,
-			StatusMessage:   "router route policy creation in progress",
+			StatusMessage:   p.kind.label + " creation in progress",
 		},
 	}, nil
 }
 
-func (p *RouterRoutePolicyProvisioner) Read(
+func (p *RouterSubResourceProvisioner) Read(
 	ctx context.Context, request *resource.ReadRequest,
 ) (*resource.ReadResult, error) {
-	project, region, router, name, err := parseRoutePolicyNativeID(request.NativeID)
+	project, region, router, name, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
-	policy, gone, vErr := p.fetchRoutePolicy(ctx, project, region, router, name)
+	policy, gone, vErr := p.fetch(ctx, project, region, router, name)
 	if vErr != nil {
 		return &resource.ReadResult{ErrorCode: transport.ToResourceErrorCode(vErr.Code)}, nil
 	}
@@ -234,7 +280,7 @@ func (p *RouterRoutePolicyProvisioner) Read(
 	for k, v := range policy {
 		props[k] = v
 	}
-	props[routePolicyRouterProperty] = router
+	props[routerSubRouterProperty] = router
 	props["region"] = region
 
 	encoded, mErr := json.Marshal(props)
@@ -246,7 +292,7 @@ func (p *RouterRoutePolicyProvisioner) Read(
 
 // Update re-reads the policy for its current fingerprint: the verb requires one
 // and rejects a stale value, so it cannot come from the declared forma.
-func (p *RouterRoutePolicyProvisioner) Update(
+func (p *RouterSubResourceProvisioner) Update(
 	ctx context.Context, request *resource.UpdateRequest,
 ) (*resource.UpdateResult, error) {
 	var props map[string]interface{}
@@ -254,28 +300,28 @@ func (p *RouterRoutePolicyProvisioner) Update(
 		return updateFailure(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("invalid properties: %v", err)), nil
 	}
-	project, region, router, name, err := parseRoutePolicyNativeID(request.NativeID)
+	project, region, router, name, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return updateFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
-	current, gone, vErr := p.fetchRoutePolicy(ctx, project, region, router, name)
+	current, gone, vErr := p.fetch(ctx, project, region, router, name)
 	if vErr != nil {
 		return updateFailure(transport.ToResourceErrorCode(vErr.Code), vErr.Message), nil
 	}
 	if gone {
 		return updateFailure(resource.OperationErrorCodeNotFound,
-			"route policy no longer exists"), nil
+			p.kind.label+" no longer exists"), nil
 	}
 
-	body := routePolicyBody(props)
+	body := routerSubBody(props)
 	if fingerprint, ok := current["fingerprint"].(string); ok && fingerprint != "" {
 		body["fingerprint"] = fingerprint
 	}
 
 	requestID, verbErr := p.issueVerb(ctx,
-		p.routerURL(project, region, router)+"/updateRoutePolicy", body, project, region)
+		p.routerURL(project, region, router)+"/"+p.kind.updateVerb, body, project, region)
 	if verbErr != nil {
 		return updateFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -285,22 +331,22 @@ func (p *RouterRoutePolicyProvisioner) Update(
 			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
 			RequestID:       requestID,
-			StatusMessage:   "router route policy update in progress",
+			StatusMessage:   p.kind.label + " update in progress",
 		},
 	}, nil
 }
 
-func (p *RouterRoutePolicyProvisioner) Delete(
+func (p *RouterSubResourceProvisioner) Delete(
 	ctx context.Context, request *resource.DeleteRequest,
 ) (*resource.DeleteResult, error) {
-	project, region, router, name, err := parseRoutePolicyNativeID(request.NativeID)
+	project, region, router, name, err := p.kind.parseNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
-	url := fmt.Sprintf("%s/deleteRoutePolicy?policy=%s",
-		p.routerURL(project, region, router), name)
+	url := fmt.Sprintf("%s/%s?%s=%s", p.routerURL(project, region, router),
+		p.kind.deleteVerb, p.kind.queryParam, name)
 	requestID, verbErr := p.issueVerb(ctx, url, nil, project, region)
 	if verbErr != nil {
 		return deleteFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
@@ -311,7 +357,7 @@ func (p *RouterRoutePolicyProvisioner) Delete(
 			OperationStatus: resource.OperationStatusInProgress,
 			NativeID:        request.NativeID,
 			RequestID:       requestID,
-			StatusMessage:   "router route policy deletion in progress",
+			StatusMessage:   p.kind.label + " deletion in progress",
 		},
 	}, nil
 }
@@ -319,13 +365,13 @@ func (p *RouterRoutePolicyProvisioner) Delete(
 // List enumerates one router's policies, which arrive under "result" rather than
 // the usual "items". Policies live inside their router, so discovery has to be
 // told which router to look in.
-func (p *RouterRoutePolicyProvisioner) List(
+func (p *RouterSubResourceProvisioner) List(
 	ctx context.Context, request *resource.ListRequest,
 ) (*resource.ListResult, error) {
 	router := ""
 	region := ""
 	if request.AdditionalProperties != nil {
-		router = request.AdditionalProperties[routePolicyRouterProperty]
+		router = request.AdditionalProperties[routerSubRouterProperty]
 		region = request.AdditionalProperties["region"]
 	}
 	project := p.projectFor(request.TargetConfig, "")
@@ -340,22 +386,22 @@ func (p *RouterRoutePolicyProvisioner) List(
 	}
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL:    p.routerURL(project, region, router) + "/listRoutePolicies",
+		URL:    p.routerURL(project, region, router) + "/" + p.kind.listVerb,
 	})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list router route policies")
 		return nil, fmt.Errorf("%s", wrapped.Message)
 	}
 
-	policies, _ := resp.Body["result"].([]interface{})
-	nativeIDs := make([]string, 0, len(policies))
-	for _, entry := range policies {
-		policy, ok := entry.(map[string]interface{})
+	objects, _ := resp.Body["result"].([]interface{})
+	nativeIDs := make([]string, 0, len(objects))
+	for _, entry := range objects {
+		object, ok := entry.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		if name, ok := policy["name"].(string); ok && name != "" {
-			nativeIDs = append(nativeIDs, buildRoutePolicyNativeID(project, region, router, name))
+		if name, ok := object["name"].(string); ok && name != "" {
+			nativeIDs = append(nativeIDs, p.kind.nativeID(project, region, router, name))
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
@@ -363,7 +409,7 @@ func (p *RouterRoutePolicyProvisioner) List(
 
 // Status routes through the shared read-back so post-create and post-update
 // state carries the resource's real properties, not just what was declared.
-func (p *RouterRoutePolicyProvisioner) Status(
+func (p *RouterSubResourceProvisioner) Status(
 	ctx context.Context, request *resource.StatusRequest,
 ) (*resource.StatusResult, error) {
 	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
