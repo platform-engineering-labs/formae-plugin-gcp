@@ -344,6 +344,13 @@ Together these close the managed-instance-group gap: the plugin previously had
   association pins both its policy and its network, so a killed run used to
   leave all three behind.
 
+- `GCP::Compute::RegionNetworkFirewallPolicyAssociation` — the regional twin of
+  the association above, for a `RegionNetworkFirewallPolicy`. The three verbs are
+  identical, only the policy sits under `regions/{region}` (the network itself
+  stays global), so `FirewallPolicyAssociationProvisioner` gained a `regional`
+  flag rather than a second copy. Conformance green on all eight steps, and the
+  cleanup script detaches regional associations too.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

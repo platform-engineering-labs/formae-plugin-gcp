@@ -26,8 +26,13 @@ import (
 // verbs on the policy: addAssociation, getAssociation?name=N,
 // removeAssociation?name=N. There is nothing to update — an association is a
 // (policy, network) pair — so a change replaces it.
+//
+// Global and regional network firewall policies expose the same three verbs,
+// differing only in whether the policy sits under global or regions/{region},
+// so both are one provisioner carrying a `regional` flag.
 type FirewallPolicyAssociationProvisioner struct {
 	*base.BaseResource
+	regional bool
 }
 
 var _ prov.Provisioner = (*FirewallPolicyAssociationProvisioner)(nil)
@@ -37,7 +42,16 @@ var _ prov.Provisioner = (*FirewallPolicyAssociationProvisioner)(nil)
 const associationPolicyProperty = "firewallPolicy"
 
 func init() {
-	registry.Register(NetworkFirewallPolicyAssociationResourceType,
+	registerPolicyAssociation(NetworkFirewallPolicyAssociationResourceType, false)
+	registerPolicyAssociation(RegionNetworkFirewallPolicyAssociationResourceType, true)
+}
+
+func registerPolicyAssociation(resourceType string, regional bool) {
+	scope := base.ScopeGlobal
+	if regional {
+		scope = base.ScopeRegional
+	}
+	registry.Register(resourceType,
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
@@ -53,34 +67,67 @@ func init() {
 					OperationConfig: ComputeOperations,
 					ResourceConfig: base.ResourceConfig{
 						ResourceType: "firewallPolicies",
-						Scope:        &base.ScopeConfig{Type: base.ScopeGlobal},
+						Scope:        &base.ScopeConfig{Type: scope},
 					},
 					NativeIDConfig: ComputeNativeID,
 				},
+				regional: regional,
 			}
 		})
 }
 
+// scopePath is the segment(s) between the project and the collection.
+func (p *FirewallPolicyAssociationProvisioner) scopePath(region string) string {
+	if p.regional {
+		return "regions/" + region
+	}
+	return "global"
+}
+
 // buildAssociationNativeID composes
-// "projects/{p}/global/firewallPolicies/{policy}/associations/{name}".
-func buildAssociationNativeID(project, policy, name string) string {
-	return fmt.Sprintf("projects/%s/global/firewallPolicies/%s/associations/%s",
-		project, policy, name)
+// "projects/{p}/{scope}/firewallPolicies/{policy}/associations/{name}", where
+// scope is "global" or "regions/{region}".
+func (p *FirewallPolicyAssociationProvisioner) buildAssociationNativeID(project, region, policy, name string) string {
+	return fmt.Sprintf("projects/%s/%s/firewallPolicies/%s/associations/%s",
+		project, p.scopePath(region), policy, name)
 }
 
 // parseAssociationNativeID splits the composite id. An association is addressed
-// by (policy, name), so both have to survive.
-func parseAssociationNativeID(nativeID string) (project, policy, name string, err error) {
-	parts := strings.Split(nativeID, "/")
-	if len(parts) != 7 || parts[0] != "projects" || parts[2] != "global" ||
-		parts[3] != "firewallPolicies" || parts[5] != "associations" || parts[6] == "" {
-		return "", "", "", fmt.Errorf("invalid firewall policy association native ID: %s", nativeID)
+// by (policy, name), so both have to survive, and the scope segment must match
+// this provisioner's kind — a regional association read against a global URL
+// would find nothing, or worse, a same-named global policy.
+func (p *FirewallPolicyAssociationProvisioner) parseAssociationNativeID(nativeID string) (project, region, policy, name string, err error) {
+	invalid := func() (string, string, string, string, error) {
+		return "", "", "", "", fmt.Errorf("invalid firewall policy association native ID: %s", nativeID)
 	}
-	return parts[1], parts[4], parts[6], nil
+	parts := strings.Split(nativeID, "/")
+	// A regional id spells the scope as "regions/{region}"; a global one uses
+	// the single segment "global", so it is one shorter.
+	off := 0
+	if p.regional {
+		off = 1
+	}
+	if len(parts) != 7+off || parts[0] != "projects" {
+		return invalid()
+	}
+	if p.regional {
+		if parts[2] != "regions" || parts[3] == "" {
+			return invalid()
+		}
+		region = parts[3]
+	} else if parts[2] != "global" {
+		return invalid()
+	}
+	if parts[3+off] != "firewallPolicies" || parts[5+off] != "associations" || parts[6+off] == "" {
+		return invalid()
+	}
+	return parts[1], region, parts[4+off], parts[6+off], nil
 }
 
 // associationBody keeps only what the attach verb accepts: the association's own
 // name and the network it attaches to.
+// associationBody also drops "region": it addresses the policy in the URL and
+// the attach verb rejects it as a body field.
 func associationBody(props map[string]interface{}) map[string]interface{} {
 	body := map[string]interface{}{}
 	if name, ok := props["name"].(string); ok && name != "" {
@@ -92,9 +139,25 @@ func associationBody(props map[string]interface{}) map[string]interface{} {
 	return body
 }
 
-func (p *FirewallPolicyAssociationProvisioner) policyURL(project, policy string) string {
-	return fmt.Sprintf("%s/projects/%s/global/firewallPolicies/%s",
-		p.APIConfig.BaseURL, project, policy)
+func (p *FirewallPolicyAssociationProvisioner) policyURL(project, region, policy string) string {
+	return fmt.Sprintf("%s/projects/%s/%s/firewallPolicies/%s",
+		p.APIConfig.BaseURL, project, p.scopePath(region), policy)
+}
+
+// regionFor is only meaningful for a regional kind: the region is a path
+// component, so it comes from the declared properties, falling back to the
+// target's configured region.
+func (p *FirewallPolicyAssociationProvisioner) regionFor(props map[string]interface{}, targetConfig json.RawMessage) string {
+	if !p.regional {
+		return ""
+	}
+	if region, ok := props["region"].(string); ok && region != "" {
+		return region
+	}
+	if cfg := config.FromTargetConfig(targetConfig); cfg != nil {
+		return cfg.Region
+	}
+	return ""
 }
 
 func (p *FirewallPolicyAssociationProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
@@ -105,7 +168,7 @@ func (p *FirewallPolicyAssociationProvisioner) projectFor(targetConfig json.RawM
 }
 
 func (p *FirewallPolicyAssociationProvisioner) issueVerb(
-	ctx context.Context, url string, body map[string]interface{}, project string,
+	ctx context.Context, url string, body map[string]interface{}, project, region string,
 ) (string, *transport.Error) {
 	client, err := transport.NewClient(ctx, p.Config)
 	if err != nil {
@@ -120,7 +183,8 @@ func (p *FirewallPolicyAssociationProvisioner) issueVerb(
 		return "", transport.WrapError(err, "firewall policy association verb failed")
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
-	return p.OperationConfig.OperationURLBuilder(base.PathContext{Project: project}, opID), nil
+	return p.OperationConfig.OperationURLBuilder(
+		base.PathContext{Project: project, Region: region}, opID), nil
 }
 
 func (p *FirewallPolicyAssociationProvisioner) Create(
@@ -144,8 +208,14 @@ func (p *FirewallPolicyAssociationProvisioner) Create(
 			"target project is required"), nil
 	}
 
+	region := p.regionFor(props, request.TargetConfig)
+	if p.regional && region == "" {
+		return createFailure(resource.OperationErrorCodeInvalidRequest,
+			"region is required"), nil
+	}
+
 	requestID, verbErr := p.issueVerb(ctx,
-		p.policyURL(project, policy)+"/addAssociation", associationBody(props), project)
+		p.policyURL(project, region, policy)+"/addAssociation", associationBody(props), project, region)
 	if verbErr != nil {
 		return createFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -153,7 +223,7 @@ func (p *FirewallPolicyAssociationProvisioner) Create(
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        buildAssociationNativeID(project, policy, name),
+			NativeID:        p.buildAssociationNativeID(project, region, policy, name),
 			RequestID:       requestID,
 			StatusMessage:   "firewall policy association in progress",
 		},
@@ -163,7 +233,7 @@ func (p *FirewallPolicyAssociationProvisioner) Create(
 func (p *FirewallPolicyAssociationProvisioner) Read(
 	ctx context.Context, request *resource.ReadRequest,
 ) (*resource.ReadResult, error) {
-	project, policy, name, err := parseAssociationNativeID(request.NativeID)
+	project, region, policy, name, err := p.parseAssociationNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
@@ -175,7 +245,7 @@ func (p *FirewallPolicyAssociationProvisioner) Read(
 	}
 	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL:    fmt.Sprintf("%s/getAssociation?name=%s", p.policyURL(project, policy), name),
+		URL:    fmt.Sprintf("%s/getAssociation?name=%s", p.policyURL(project, region, policy), name),
 	})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to read firewall policy association")
@@ -197,6 +267,9 @@ func (p *FirewallPolicyAssociationProvisioner) Read(
 	// The owning policy is a path component, so put it back for comparison
 	// against the declared forma.
 	props[associationPolicyProperty] = policy
+	if p.regional {
+		props["region"] = region
+	}
 
 	encoded, mErr := json.Marshal(props)
 	if mErr != nil {
@@ -215,14 +288,14 @@ func (p *FirewallPolicyAssociationProvisioner) Update(
 func (p *FirewallPolicyAssociationProvisioner) Delete(
 	ctx context.Context, request *resource.DeleteRequest,
 ) (*resource.DeleteResult, error) {
-	project, policy, name, err := parseAssociationNativeID(request.NativeID)
+	project, region, policy, name, err := p.parseAssociationNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
-	url := fmt.Sprintf("%s/removeAssociation?name=%s", p.policyURL(project, policy), name)
-	requestID, verbErr := p.issueVerb(ctx, url, nil, project)
+	url := fmt.Sprintf("%s/removeAssociation?name=%s", p.policyURL(project, region, policy), name)
+	requestID, verbErr := p.issueVerb(ctx, url, nil, project, region)
 	if verbErr != nil {
 		return deleteFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -251,6 +324,16 @@ func (p *FirewallPolicyAssociationProvisioner) List(
 	if policy == "" || project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
+	region := ""
+	if p.regional {
+		props := map[string]interface{}{}
+		if r := request.AdditionalProperties["region"]; r != "" {
+			props["region"] = r
+		}
+		if region = p.regionFor(props, request.TargetConfig); region == "" {
+			return &resource.ListResult{NativeIDs: []string{}}, nil
+		}
+	}
 
 	client, err := transport.NewClient(ctx, p.Config)
 	if err != nil {
@@ -258,7 +341,7 @@ func (p *FirewallPolicyAssociationProvisioner) List(
 	}
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL:    p.policyURL(project, policy),
+		URL:    p.policyURL(project, region, policy),
 	})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list firewall policy associations")
@@ -273,7 +356,7 @@ func (p *FirewallPolicyAssociationProvisioner) List(
 			continue
 		}
 		if name, ok := assoc["name"].(string); ok && name != "" {
-			nativeIDs = append(nativeIDs, buildAssociationNativeID(project, policy, name))
+			nativeIDs = append(nativeIDs, p.buildAssociationNativeID(project, region, policy, name))
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil

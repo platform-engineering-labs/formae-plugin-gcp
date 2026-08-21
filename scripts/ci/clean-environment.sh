@@ -106,6 +106,23 @@ else
     echo "  No network firewall policies to check for associations"
 fi
 
+# Regional policies keep their associations in a separate collection.
+echo "Detaching regional network firewall policy associations..."
+RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$RNFP_FOR_ASSOC" ]; then
+    echo "$RNFP_FOR_ASSOC" | while read -r pol region; do
+        [ -z "$region" ] && continue
+        ASSOCS=$(gcloud compute network-firewall-policies describe "$pol" --region="$region" --format="value(associations[].name)" 2>/dev/null || true)
+        for assoc in $(echo "$ASSOCS" | tr ';,' ' '); do
+            [ -z "$assoc" ] && continue
+            echo "  Detaching association $assoc from $pol (region: $region)"
+            gcloud compute network-firewall-policies associations delete --firewall-policy="$pol" --name="$assoc" --firewall-policy-region="$region" --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No regional network firewall policies to check for associations"
+fi
+
 echo "Cleaning GCP network firewall policies..."
 NET_FW_POLICIES=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$NET_FW_POLICIES" ]; then
