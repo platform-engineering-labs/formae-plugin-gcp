@@ -288,6 +288,14 @@ Together these close the managed-instance-group gap: the plugin previously had
   resource at the same time — both own the same list and each will remove what
   the other added.
 
+- `GCP::Compute::TargetGrpcProxy` — the proxy a proxyless gRPC service mesh
+  points its clients at. The other target proxies terminate connections for a
+  load balancer; this one hands an xDS-aware gRPC client the routing rules from
+  its `urlMap`, with no proxy in the data path. `urlMap` is required, unlike on
+  the HTTP proxies, and `patch` is rejected without a `fingerprint`, so unlike
+  the other target proxies this one registers optimistic locking. Conformance is
+  green on all eight steps, Update included.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

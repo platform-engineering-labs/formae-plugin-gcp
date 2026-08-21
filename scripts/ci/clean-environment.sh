@@ -560,6 +560,20 @@ else
     echo "  No target instances found"
 fi
 
+# Target gRPC proxies hold a url map reference, so they go before the url maps
+# loop; the fixture's map and backend service are prerequisites that Destroy
+# leaves behind.
+echo "Cleaning GCP target gRPC proxies..."
+TARGET_GRPC_PROXIES=$(gcloud compute target-grpc-proxies list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$TARGET_GRPC_PROXIES" ]; then
+    echo "$TARGET_GRPC_PROXIES" | while read -r tgp; do
+        echo "  Deleting target gRPC proxy: $tgp"
+        gcloud compute target-grpc-proxies delete "$tgp" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target gRPC proxies found"
+fi
+
 echo "Cleaning GCP target TCP proxies..."
 TARGET_TCP_PROXIES=$(gcloud compute target-tcp-proxies list --filter="name~^formae-plugin-sdk" --global --format="value(name)" 2>/dev/null || true)
 if [ -n "$TARGET_TCP_PROXIES" ]; then
