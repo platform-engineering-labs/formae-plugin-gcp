@@ -26,14 +26,28 @@ import (
 //
 // There is nothing to update: the attachment is just a pair, so a change means
 // detach and attach.
+//
+// Zonal and regional disks expose the same two verbs, differing only in whether
+// the disk sits under zones/{zone} or regions/{region}, so both are one
+// provisioner carrying a `regional` flag.
 type DiskResourcePolicyAttachmentProvisioner struct {
 	*base.BaseResource
+	regional bool
 }
 
 var _ prov.Provisioner = (*DiskResourcePolicyAttachmentProvisioner)(nil)
 
 func init() {
-	registry.Register(DiskResourcePolicyAttachmentResourceType,
+	registerDiskAttachment(DiskResourcePolicyAttachmentResourceType, false)
+	registerDiskAttachment(RegionDiskResourcePolicyAttachmentResourceType, true)
+}
+
+func registerDiskAttachment(resourceType string, regional bool) {
+	scope := base.ScopeZonal
+	if regional {
+		scope = base.ScopeRegional
+	}
+	registry.Register(resourceType,
 		[]resource.Operation{
 			resource.OperationCreate,
 			resource.OperationRead,
@@ -49,35 +63,60 @@ func init() {
 					OperationConfig: ComputeOperations,
 					ResourceConfig: base.ResourceConfig{
 						ResourceType: "disks",
-						Scope:        &base.ScopeConfig{Type: base.ScopeZonal},
+						Scope:        &base.ScopeConfig{Type: scope},
 					},
 					NativeIDConfig: ComputeNativeID,
 				},
+				regional: regional,
 			}
 		})
 }
 
+// locationSegment is "zones/{zone}" or "regions/{region}" — a regional disk
+// lives in a region, and the verbs sit under the disk either way.
+func (p *DiskResourcePolicyAttachmentProvisioner) locationSegment(location string) string {
+	if p.regional {
+		return "regions/" + location
+	}
+	return "zones/" + location
+}
+
+// locationKey is the property (and native ID segment) naming the disk's home:
+// a zone for a zonal disk, a region for a regional one.
+func (p *DiskResourcePolicyAttachmentProvisioner) locationKey() string {
+	if p.regional {
+		return "region"
+	}
+	return "zone"
+}
+
 // buildAttachmentNativeID composes
-// "projects/{p}/zones/{zone}/disks/{disk}/resourcePolicies/{policy}".
-func buildAttachmentNativeID(project, zone, disk, policy string) string {
-	return fmt.Sprintf("projects/%s/zones/%s/disks/%s/resourcePolicies/%s",
-		project, zone, disk, policy)
+// "projects/{p}/{zones|regions}/{location}/disks/{disk}/resourcePolicies/{policy}".
+func (p *DiskResourcePolicyAttachmentProvisioner) buildAttachmentNativeID(project, location, disk, policy string) string {
+	return fmt.Sprintf("projects/%s/%s/disks/%s/resourcePolicies/%s",
+		project, p.locationSegment(location), disk, policy)
 }
 
 // parseAttachmentNativeID splits the composite id. An attachment has no identity
-// beyond the (disk, policy) pair, so all four parts must survive.
-func parseAttachmentNativeID(nativeID string) (project, zone, disk, policy string, err error) {
+// beyond the (disk, policy) pair, so all four parts must survive. The scope
+// segment must match this provisioner's kind, or a regional attachment could be
+// read against a zonal URL.
+func (p *DiskResourcePolicyAttachmentProvisioner) parseAttachmentNativeID(nativeID string) (project, location, disk, policy string, err error) {
+	wantScope := "zones"
+	if p.regional {
+		wantScope = "regions"
+	}
 	parts := strings.Split(nativeID, "/")
-	if len(parts) != 8 || parts[0] != "projects" || parts[2] != "zones" ||
-		parts[4] != "disks" || parts[6] != "resourcePolicies" {
+	if len(parts) != 8 || parts[0] != "projects" || parts[2] != wantScope ||
+		parts[3] == "" || parts[4] != "disks" || parts[6] != "resourcePolicies" {
 		return "", "", "", "", fmt.Errorf("invalid disk resource policy attachment native ID: %s", nativeID)
 	}
 	return parts[1], parts[3], parts[5], parts[7], nil
 }
 
-func (p *DiskResourcePolicyAttachmentProvisioner) diskURL(project, zone, disk string) string {
-	return fmt.Sprintf("%s/projects/%s/zones/%s/disks/%s",
-		p.APIConfig.BaseURL, project, zone, disk)
+func (p *DiskResourcePolicyAttachmentProvisioner) diskURL(project, location, disk string) string {
+	return fmt.Sprintf("%s/projects/%s/%s/disks/%s",
+		p.APIConfig.BaseURL, project, p.locationSegment(location), disk)
 }
 
 // policyURL expands a bare policy name into the regional resource path the verbs
@@ -87,11 +126,18 @@ func policyURLFor(project, zone, policy string) string {
 	if strings.Contains(policy, "/") {
 		return policy
 	}
-	region := zone
-	if i := strings.LastIndex(zone, "-"); i > 0 {
-		region = zone[:i]
+	return fmt.Sprintf("projects/%s/regions/%s/resourcePolicies/%s",
+		project, regionOfZone(zone), policy)
+}
+
+// regionOfZone drops a zone's trailing letter. A region is returned unchanged,
+// so a regional disk's location passes straight through.
+func regionOfZone(zone string) string {
+	parts := strings.Split(zone, "-")
+	if len(parts) == 3 {
+		return strings.Join(parts[:2], "-")
 	}
-	return fmt.Sprintf("projects/%s/regions/%s/resourcePolicies/%s", project, region, policy)
+	return zone
 }
 
 func (p *DiskResourcePolicyAttachmentProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
@@ -101,15 +147,22 @@ func (p *DiskResourcePolicyAttachmentProvisioner) projectFor(targetConfig json.R
 	return fallback
 }
 
-func (p *DiskResourcePolicyAttachmentProvisioner) zoneFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Zone != "" {
-		return cfg.Zone
+// locationFor prefers the target's configured zone or region, depending on kind.
+func (p *DiskResourcePolicyAttachmentProvisioner) locationFor(targetConfig json.RawMessage, fallback string) string {
+	cfg := config.FromTargetConfig(targetConfig)
+	if cfg != nil {
+		if p.regional && cfg.Region != "" {
+			return cfg.Region
+		}
+		if !p.regional && cfg.Zone != "" {
+			return cfg.Zone
+		}
 	}
 	return fallback
 }
 
 func (p *DiskResourcePolicyAttachmentProvisioner) issueVerb(
-	ctx context.Context, url, policy, project, zone string,
+	ctx context.Context, url, policy, project, location string,
 ) (string, *transport.Error) {
 	client, err := transport.NewClient(ctx, p.Config)
 	if err != nil {
@@ -124,8 +177,11 @@ func (p *DiskResourcePolicyAttachmentProvisioner) issueVerb(
 		return "", transport.WrapError(err, "disk resource policy verb failed")
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
-	return p.OperationConfig.OperationURLBuilder(
-		base.PathContext{Project: project, Zone: zone}, opID), nil
+	pathCtx := base.PathContext{Project: project, Zone: location}
+	if p.regional {
+		pathCtx = base.PathContext{Project: project, Region: location}
+	}
+	return p.OperationConfig.OperationURLBuilder(pathCtx, opID), nil
 }
 
 func (p *DiskResourcePolicyAttachmentProvisioner) Create(
@@ -143,18 +199,18 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Create(
 			"name (the policy) and disk are required"), nil
 	}
 	project := p.projectFor(request.TargetConfig, "")
-	zone := p.zoneFor(request.TargetConfig, "")
-	if z, ok := props["zone"].(string); ok && z != "" {
-		zone = z
+	location := p.locationFor(request.TargetConfig, "")
+	if l, ok := props[p.locationKey()].(string); ok && l != "" {
+		location = l
 	}
-	if project == "" || zone == "" {
+	if project == "" || location == "" {
 		return createFailure(resource.OperationErrorCodeInvalidRequest,
-			"target project and zone are required"), nil
+			fmt.Sprintf("target project and %s are required", p.locationKey())), nil
 	}
 
 	requestID, verbErr := p.issueVerb(ctx,
-		p.diskURL(project, zone, disk)+"/addResourcePolicies",
-		policyURLFor(project, zone, name), project, zone)
+		p.diskURL(project, location, disk)+"/addResourcePolicies",
+		policyURLFor(project, location, name), project, location)
 	if verbErr != nil {
 		return createFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}
@@ -162,7 +218,7 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Create(
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusInProgress,
-			NativeID:        buildAttachmentNativeID(project, zone, disk, name),
+			NativeID:        p.buildAttachmentNativeID(project, location, disk, name),
 			RequestID:       requestID,
 			StatusMessage:   "disk resource policy attachment in progress",
 		},
@@ -172,7 +228,7 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Create(
 func (p *DiskResourcePolicyAttachmentProvisioner) Read(
 	ctx context.Context, request *resource.ReadRequest,
 ) (*resource.ReadResult, error) {
-	project, zone, disk, policy, err := parseAttachmentNativeID(request.NativeID)
+	project, location, disk, policy, err := p.parseAttachmentNativeID(request.NativeID)
 	if err != nil {
 		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeInvalidRequest}, nil
 	}
@@ -183,7 +239,7 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Read(
 		return nil, fmt.Errorf("failed to create transport client: %w", cErr)
 	}
 	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
-		Method: "GET", URL: p.diskURL(project, zone, disk),
+		Method: "GET", URL: p.diskURL(project, location, disk),
 	})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to read disk")
@@ -209,9 +265,9 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Read(
 	}
 
 	encoded, mErr := json.Marshal(map[string]interface{}{
-		"name": policy,
-		"disk": disk,
-		"zone": zone,
+		"name":          policy,
+		"disk":          disk,
+		p.locationKey(): location,
 	})
 	if mErr != nil {
 		return nil, fmt.Errorf("failed to marshal attachment properties: %w", mErr)
@@ -229,15 +285,15 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Update(
 func (p *DiskResourcePolicyAttachmentProvisioner) Delete(
 	ctx context.Context, request *resource.DeleteRequest,
 ) (*resource.DeleteResult, error) {
-	project, zone, disk, policy, err := parseAttachmentNativeID(request.NativeID)
+	project, location, disk, policy, err := p.parseAttachmentNativeID(request.NativeID)
 	if err != nil {
 		return deleteFailure(resource.OperationErrorCodeInvalidRequest, err.Error()), nil
 	}
 	project = p.projectFor(request.TargetConfig, project)
 
 	requestID, verbErr := p.issueVerb(ctx,
-		p.diskURL(project, zone, disk)+"/removeResourcePolicies",
-		policyURLFor(project, zone, policy), project, zone)
+		p.diskURL(project, location, disk)+"/removeResourcePolicies",
+		policyURLFor(project, location, policy), project, location)
 	if verbErr != nil {
 		return deleteFailure(transport.ToResourceErrorCode(verbErr.Code), verbErr.Message), nil
 	}

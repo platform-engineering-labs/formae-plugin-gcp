@@ -258,16 +258,23 @@ else
     echo "  No snapshots found"
 fi
 
-# A policy still attached to a disk cannot be deleted, so detach first.
+# A policy still attached to a disk cannot be deleted, so detach first. A
+# regional disk reports a region and no zone, and remove-resource-policies needs
+# whichever one it actually has.
 echo "Detaching resource policies from test disks..."
-POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,resourcePolicies[])" 2>/dev/null || true)
+POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,region,resourcePolicies[])" 2>/dev/null || true)
 if [ -n "$POLICY_DISKS" ]; then
-    echo "$POLICY_DISKS" | while read -r dk zone policies; do
+    echo "$POLICY_DISKS" | while read -r dk zone region policies; do
         [ -z "$policies" ] && continue
+        if [ -n "$zone" ]; then
+            SCOPE_FLAG="--zone=$zone"
+        else
+            SCOPE_FLAG="--region=$region"
+        fi
         for pol in $(echo "$policies" | tr ';,' ' '); do
             [ -z "$pol" ] && continue
             echo "  Detaching $(basename "$pol") from $dk"
-            gcloud compute disks remove-resource-policies "$dk" --zone="$zone" --resource-policies="$pol" --quiet 2>/dev/null || true
+            gcloud compute disks remove-resource-policies "$dk" "$SCOPE_FLAG" --resource-policies="$pol" --quiet 2>/dev/null || true
         done
     done
 else

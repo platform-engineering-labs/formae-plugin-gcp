@@ -54,14 +54,15 @@ const (
 	BackendBucketResourceType         = "GCP::Compute::BackendBucket"
 	ResourcePolicyResourceType        = "GCP::Compute::ResourcePolicy"
 	// Registered in disk_resource_policy_attachment.go: add/removeResourcePolicies verbs.
-	DiskResourcePolicyAttachmentResourceType = "GCP::Compute::DiskResourcePolicyAttachment"
-	ImageResourceType                        = "GCP::Compute::Image"
-	MachineImageResourceType                 = "GCP::Compute::MachineImage"
-	SnapshotResourceType                     = "GCP::Compute::Snapshot"
-	InstantSnapshotResourceType              = "GCP::Compute::InstantSnapshot"
-	RegionInstantSnapshotResourceType        = "GCP::Compute::RegionInstantSnapshot"
-	NodeTemplateResourceType                 = "GCP::Compute::NodeTemplate"
-	RegionDiskResourceType                   = "GCP::Compute::RegionDisk"
+	DiskResourcePolicyAttachmentResourceType       = "GCP::Compute::DiskResourcePolicyAttachment"
+	RegionDiskResourcePolicyAttachmentResourceType = "GCP::Compute::RegionDiskResourcePolicyAttachment"
+	ImageResourceType                              = "GCP::Compute::Image"
+	MachineImageResourceType                       = "GCP::Compute::MachineImage"
+	SnapshotResourceType                           = "GCP::Compute::Snapshot"
+	InstantSnapshotResourceType                    = "GCP::Compute::InstantSnapshot"
+	RegionInstantSnapshotResourceType              = "GCP::Compute::RegionInstantSnapshot"
+	NodeTemplateResourceType                       = "GCP::Compute::NodeTemplate"
+	RegionDiskResourceType                         = "GCP::Compute::RegionDisk"
 
 	// HA VPN
 	ExternalVpnGatewayResourceType = "GCP::Compute::ExternalVpnGateway"

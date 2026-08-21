@@ -318,6 +318,18 @@ Together these close the managed-instance-group gap: the plugin previously had
   VPC: `testdata/network-endpoint-group-psc.pkl` is the only conformance case in
   the suite with no prerequisites at all, and runs in under 90 seconds.
 
+- `GCP::Compute::RegionDiskResourcePolicyAttachment` — binds a snapshot schedule
+  to a regional disk, the regional twin of the zonal attachment. Same two verbs
+  (`addResourcePolicies` / `removeResourcePolicies`), so
+  `DiskResourcePolicyAttachmentProvisioner` gained a `regional` flag rather than
+  a second copy: it picks the scope segment, swaps the `zone` property for
+  `region`, and puts the region into the operation poll. Conformance green on
+  all eight steps.
+
+  `clean-environment.sh` detached policies with `--zone` only, so a regional
+  attachment would have pinned its policy forever; the detach pass now uses
+  whichever of zone/region the disk actually reports.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
