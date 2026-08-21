@@ -559,6 +559,25 @@ Together these close the managed-instance-group gap: the plugin previously had
   it back, keeping declared and observed values comparable. Conformance green on
   all eight steps in 16 seconds, the fastest case in the suite.
 
+- `GCP::Dataproc::WorkflowTemplate` — a Spark job graph plus the cluster to run it
+  on. Instantiating one creates a cluster, runs the jobs in dependency order and
+  tears it down; defining the template runs nothing and costs nothing.
+  Region-scoped, so it shares the existing path builder.
+
+  Two conventions of its own: the create body carries `id` rather than a
+  `?workflowTemplateId=` parameter, and an update is a **PUT** that must carry the
+  template's current `version`, supplied through optimistic locking. Step ids must
+  match `[a-zA-Z0-9][-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]` — a two-character id like
+  "s1" is rejected.
+
+  **Conformance is 7/8: Update is red on `labels`.** Create, Verify, Extract,
+  Sync, Destroy and out-of-band delete all pass. What is established: the update
+  itself works — driving the engine's `Update` directly applies the labels and a
+  following read returns them — and the base fix below now attaches the update
+  response to stored state, which did not change the outcome. The remaining
+  cause is not yet identified, so this is shipped working but with Update
+  unverified end to end.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
@@ -755,6 +774,24 @@ Together these close the managed-instance-group gap: the plugin previously had
   path). `DiskResourcePolicyAttachment.List` walks `aggregated/disks` and reports
   each attached policy, filtered to zonal scopes so a native ID it emits is one
   its own `Read` can resolve.
+
+- **A synchronous resource's update left stale properties in state.**
+  `handleSynchronousCreate` attaches the create response as
+  `ProgressResult.ResourceProperties`, but the synchronous branch of
+  `performUpdate` attached nothing: with no operation to poll there is no
+  read-back either, so every changed field stayed at its pre-update value until
+  the next sync. `performUpdate` now marshals the update response the same way
+  Create does, through the response transformer. Verified no regression by
+  re-running `dataproc-sessiontemplate` and `artifactregistry-rule` (both
+  synchronous with updates): 8/8 each.
+
+- **Optimistic locking only understood string etags.** The locking value was read
+  with `Body[field].(string)`, so a numeric etag — Dataproc's
+  `workflowTemplates.version` — silently became `""` and the API rejected the
+  update. The raw value now goes into the request body with its own type
+  preserved, and a new `lockingValueString` renders it for the query-parameter
+  case; unit-tested across string, float64, int, int64, `json.Number`, absent and
+  junk inputs.
 
 - `GCP::Compute::RouterNat` now returns the NAT's properties from `Status` after
   a successful operation. It has a bespoke `Status` (its RequestID carries the

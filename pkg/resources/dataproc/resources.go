@@ -11,6 +11,7 @@ import (
 
 const AutoscalingPolicyResourceType = "GCP::Dataproc::AutoscalingPolicy"
 const SessionTemplateResourceType = "GCP::Dataproc::SessionTemplate"
+const WorkflowTemplateResourceType = "GCP::Dataproc::WorkflowTemplate"
 
 var dataprocRegistry *base.ResourceRegistry
 
@@ -65,6 +66,34 @@ func init() {
 			},
 			RequestTransformer:  base.RequestTransformerFunc(sessionTemplateRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(sessionTemplateResponseTransformer),
+		},
+		{
+			// A Spark job graph plus the cluster to run it on. Region-scoped like
+			// the autoscaling policy, so it shares the default API config.
+			// Update is a PUT carrying the current version, which the engine
+			// supplies through optimistic locking - the version is a number, not
+			// a string etag.
+			ResourceType: WorkflowTemplateResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "workflowTemplates",
+				Scope:          &base.ScopeConfig{Type: base.ScopeRegional},
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPut,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "version",
+					LocationInURL: false,
+				},
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			ResponseTransformer: base.ResponseTransformerFunc(workflowTemplateResponseTransformer),
 		},
 	})
 	if err != nil {

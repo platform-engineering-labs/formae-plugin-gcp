@@ -1,0 +1,187 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Dataproc WorkflowTemplate
+///
+/// A Spark job graph plus the cluster to run it on. Instantiating the template
+/// creates the cluster, runs the jobs in dependency order and tears the cluster
+/// down again — but defining the template runs nothing and costs nothing.
+///
+/// Region-scoped (`regions/{region}`, like `autoscalingPolicy` and unlike
+/// `sessionTemplate`). Two API details worth knowing: the create body carries
+/// `id` rather than a `?workflowTemplateId=` parameter, and an update is a **PUT**
+/// that must carry the template's current `version` — the provisioner supplies
+/// that automatically.
+module gcp.dataproc.workflowTemplate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Dataproc::WorkflowTemplate"
+
+/// A group of VMs in the managed cluster.
+@gcp.SubResourceHint
+open class InstanceGroupConfig extends formae.SubResource {
+    @gcp.FieldHint
+    numInstances: Int?
+
+    /// Machine type, either a bare name ("n2-standard-2") or a full URI.
+    @gcp.FieldHint
+    machineTypeUri: String?
+}
+
+/// Image and properties for the managed cluster.
+@gcp.SubResourceHint
+open class ClusterSoftwareConfig extends formae.SubResource {
+    /// Dataproc image version, e.g. "2.2-debian12".
+    @gcp.FieldHint
+    imageVersion: String?
+
+    @gcp.FieldHint
+    properties: Mapping<String, String>?
+}
+
+/// The cluster the workflow runs on.
+@gcp.SubResourceHint
+open class WorkflowClusterConfig extends formae.SubResource {
+    @gcp.FieldHint
+    masterConfig: InstanceGroupConfig?
+
+    @gcp.FieldHint
+    workerConfig: InstanceGroupConfig?
+
+    @gcp.FieldHint
+    softwareConfig: ClusterSoftwareConfig?
+}
+
+/// A cluster created for the workflow and deleted afterwards.
+@gcp.SubResourceHint
+open class ManagedCluster extends formae.SubResource {
+    @gcp.FieldHint
+    clusterName: String
+
+    @gcp.FieldHint
+    config: WorkflowClusterConfig?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+}
+
+/// Run on an existing cluster selected by label instead of a managed one.
+@gcp.SubResourceHint
+open class ClusterSelector extends formae.SubResource {
+    @gcp.FieldHint
+    zone: String?
+
+    @gcp.FieldHint
+    clusterLabels: Mapping<String, String>
+}
+
+/// Where the workflow runs. Set exactly one of the two.
+@gcp.SubResourceHint
+open class WorkflowPlacement extends formae.SubResource {
+    @gcp.FieldHint
+    managedCluster: ManagedCluster?
+
+    @gcp.FieldHint
+    clusterSelector: ClusterSelector?
+}
+
+/// A Spark job.
+@gcp.SubResourceHint
+open class SparkJob extends formae.SubResource {
+    @gcp.FieldHint
+    mainClass: String?
+
+    @gcp.FieldHint
+    mainJarFileUri: String?
+
+    @gcp.FieldHint
+    jarFileUris: Listing<String>?
+
+    @gcp.FieldHint
+    args: Listing<String>?
+}
+
+/// A PySpark job.
+@gcp.SubResourceHint
+open class PySparkJob extends formae.SubResource {
+    @gcp.FieldHint
+    mainPythonFileUri: String
+
+    @gcp.FieldHint
+    pythonFileUris: Listing<String>?
+
+    @gcp.FieldHint
+    args: Listing<String>?
+}
+
+/// One step of the graph. `prerequisiteStepIds` is what makes it a graph rather
+/// than a list.
+@gcp.SubResourceHint
+open class OrderedJob extends formae.SubResource {
+    @gcp.FieldHint
+    stepId: String
+
+    @gcp.FieldHint
+    sparkJob: SparkJob?
+
+    @gcp.FieldHint
+    pysparkJob: PySparkJob?
+
+    @gcp.FieldHint
+    prerequisiteStepIds: Listing<String>?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+}
+
+open class WorkflowTemplateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: WorkflowTemplateResolvable = (this) {
+        property = "id"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "id"
+}
+open class WorkflowTemplate extends formae.Resource {
+    hidden parent = this
+
+    /// Short template id, carried in the create body rather than a query
+    /// parameter. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    id: String
+
+    /// Where the jobs run.
+    @gcp.FieldHint
+    placement: WorkflowPlacement
+
+    /// The jobs, in dependency order.
+    @gcp.FieldHint
+    jobs: Listing<OrderedJob>
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// How long the whole workflow may run, e.g. "600s".
+    @gcp.FieldHint
+    dagTimeout: String?
+
+    /// Bumped by the server on every update, and required by the next one. The
+    /// provisioner reads the current value itself, so a declared value is not
+    /// needed.
+    @gcp.FieldHint { hasProviderDefault = true }
+    version: Int?
+
+    hidden res: WorkflowTemplateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
