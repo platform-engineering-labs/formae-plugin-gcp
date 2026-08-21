@@ -810,6 +810,19 @@ fi
 # instead of being inherited.
 # Pipelines hold their destination bus, so they go first. Only one bus is allowed
 # per project per region, so a leftover bus fails the next run's create outright.
+# Workflows definitions. Free to keep, but they are test debris.
+echo "Cleaning GCP workflows..."
+WFS=$(gcloud workflows list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+if [ -n "$WFS" ]; then
+    echo "$WFS" | while read -r wf; do
+        [ -z "$wf" ] && continue
+        echo "  Deleting workflow: $wf"
+        gcloud workflows delete "$wf" --location="${GCP_LOCATION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No workflows found"
+fi
+
 echo "Cleaning GCP eventarc pipelines..."
 for pl_loc in europe-west1 us-central1; do
     PLS=$(gcloud eventarc pipelines list --location="$pl_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)

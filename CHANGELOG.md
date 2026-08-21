@@ -532,6 +532,18 @@ Together these close the managed-instance-group gap: the plugin previously had
   eight steps; the cleanup script gained a target-VPN-gateway pass, ordered before
   the network passes since a gateway holds its network.
 
+- `GCP::Workflows::Workflow` — a workflow definition: the YAML program Workflows
+  runs to orchestrate calls to other services. **New service namespace** — the
+  plugin had no Workflows coverage at all — so this adds
+  `pkg/resources/workflows` (API config, LRO operations, native-ID parser) and
+  `schema/pkl/workflows`.
+
+  Defining a workflow costs nothing; only executions are billed, and nothing
+  executes this one. Editing `sourceContents` produces a new revision rather than
+  mutating the old one, which `revisionId` reports, and `serviceAccount` is
+  filled in with the project's default compute service account when unset.
+  Conformance green on all eight steps, Update included, in under two minutes.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

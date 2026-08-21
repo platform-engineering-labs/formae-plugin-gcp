@@ -1,0 +1,84 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Workflows Workflow
+///
+/// A workflow definition: the YAML (or JSON) program Workflows runs to
+/// orchestrate calls to other services. Defining one costs nothing — only
+/// executions are billed — so a workflow is a cheap way to wire services
+/// together without running a server.
+///
+/// Editing `sourceContents` creates a new revision rather than mutating the old
+/// one; `revisionId` reports which is current.
+module gcp.workflows.workflow
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Workflows::Workflow"
+
+/// How much each step logs.
+typealias CallLogLevel = "CALL_LOG_LEVEL_UNSPECIFIED"|"LOG_ALL_CALLS"|"LOG_ERRORS_ONLY"|"LOG_NONE"
+
+open class WorkflowResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: WorkflowResolvable = (this) {
+        property = "name"
+    }
+
+    hidden revisionId: WorkflowResolvable = (this) {
+        property = "revisionId"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Workflow extends formae.Resource {
+    hidden parent = this
+
+    /// Short workflow id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// The program source, YAML or JSON. A change here produces a new revision.
+    @gcp.FieldHint
+    sourceContents: String?
+
+    /// Identity the workflow runs as. GCP fills in the project's default compute
+    /// service account when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    serviceAccount: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    callLogLevel: CallLogLevel?
+
+    /// Customer-managed encryption key.
+    @gcp.FieldHint
+    cryptoKeyName: (String|formae.Resolvable)?
+
+    /// ACTIVE or UNAVAILABLE - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// Which revision is current, e.g. "000001-c3a". Changes whenever
+    /// `sourceContents` does.
+    @gcp.FieldHint { hasProviderDefault = true }
+    revisionId: String?
+
+    hidden res: WorkflowResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
