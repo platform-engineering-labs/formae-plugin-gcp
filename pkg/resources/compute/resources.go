@@ -32,6 +32,8 @@ const (
 	NetworkPeeringResourceType = "GCP::Compute::NetworkPeering"
 	RouterResourceType         = "GCP::Compute::Router"
 	RouterNatResourceType      = "GCP::Compute::RouterNat"
+	// Registered in router_interface.go: merge into Router.interfaces[].
+	RouterInterfaceResourceType = "GCP::Compute::RouterInterface"
 	// Registered in router_route_policy.go: update/get/delete/listRoutePolicies verbs.
 	RouterRoutePolicyResourceType = "GCP::Compute::RouterRoutePolicy"
 	RouterNamedSetResourceType    = "GCP::Compute::RouterNamedSet"

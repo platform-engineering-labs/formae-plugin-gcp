@@ -417,6 +417,25 @@ Together these close the managed-instance-group gap: the plugin previously had
   `enable-oslogin` was verified intact afterwards. The cleanup script removes
   only `formae-plugin-sdk`-prefixed keys.
 
+- `GCP::Compute::RouterInterface` — one entry of `Router.interfaces[]`, where a
+  Cloud Router attaches to whatever it peers over. A BGP peer is configured
+  against an interface, so this is the first half of making a router speak BGP,
+  and `Router` did not model interfaces at all.
+
+  Like Cloud NAT it lives inside the router and is managed by read-modify-write
+  through routers.patch, so sibling interfaces — and the router's NATs and BGP
+  peers — survive every operation. The merge is unit-tested against sibling
+  preservation, in-place overwrite, absent-key removal, an empty router and junk
+  entries.
+
+  Every field is createOnly: the API rejects an in-place change ("the following
+  field(s) specified in the router interface cannot be updated"), so `Update`
+  reports not-updatable and formae replaces instead. Attaching by `subnetwork` +
+  `privateIpAddress` — a router appliance interface — needs no VPN tunnel, so the
+  fixture sidesteps the exhausted per-region VPN gateway quota entirely and boots
+  no VMs. Conformance green on all eight steps, with Replace exercising the
+  delete-then-create path.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
@@ -613,6 +632,14 @@ Together these close the managed-instance-group gap: the plugin previously had
   path). `DiskResourcePolicyAttachment.List` walks `aggregated/disks` and reports
   each attached policy, filtered to zonal scopes so a native ID it emits is one
   its own `Read` can resolve.
+
+- `GCP::Compute::RouterNat` now returns the NAT's properties from `Status` after
+  a successful operation. It has a bespoke `Status` (its RequestID carries the
+  synthetic native ID), so it missed the read-back that `base.StatusWithRead`
+  adds elsewhere, meaning a NAT's nested `logConfig` and `subnetworks` would be
+  absent from state until the next sync. Unit-tested only: `RouterNat` has no
+  conformance fixture, so this is unverified end to end.
+
 
 - **Hand-written provisioners lost structured properties from post-create state.**
   `base.UnifiedProvisioner.Status` re-reads a resource after a successful
