@@ -772,6 +772,20 @@ fi
 
 # --- Regional health checks (region-http-lb test) ---
 # A composite health check references health sources, so it goes before them.
+# Project metadata is shared, project-wide state, so this removes only keys the
+# test fixtures own and never touches anything else (enable-oslogin, ssh-keys).
+echo "Cleaning GCP project metadata test keys..."
+PMI_KEYS=$(gcloud compute project-info describe --format="value(commonInstanceMetadata.items[].key)" 2>/dev/null | tr ';,' '\n' | grep '^formae-plugin-sdk' || true)
+if [ -n "$PMI_KEYS" ]; then
+    echo "$PMI_KEYS" | while read -r mkey; do
+        [ -z "$mkey" ] && continue
+        echo "  Removing project metadata key: $mkey"
+        gcloud compute project-info remove-metadata --keys="$mkey" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No project metadata test keys found"
+fi
+
 echo "Cleaning GCP composite health checks..."
 CHCS=$(gcloud compute composite-health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
 if [ -n "$CHCS" ]; then

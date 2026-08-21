@@ -395,6 +395,28 @@ Together these close the managed-instance-group gap: the plugin previously had
   missing policy answers 400 `does not exist`, so both spellings count as gone.
   Conformance green on all eight steps for both kinds, Update included.
 
+- `GCP::Compute::ProjectMetadataItem` — one key of the project's common instance
+  metadata: the project-wide defaults every VM inherits, such as
+  `enable-oslogin`, `ssh-keys` or a default `startup-script`. There was no way to
+  manage any of that before.
+
+  This is **shared, project-wide state**, and the API has no per-key operation:
+  `setCommonInstanceMetadata` replaces the whole list. So every write is
+  read-modify-write that touches one key and copies every other key verbatim,
+  and the merge carries the resource's whole safety story — it is unit-tested
+  against foreign keys, in-place overwrite, absent-key removal, a project with no
+  metadata, and junk entries (keyless items, non-maps, keys with no value). A
+  stale fingerprint is rejected by the API rather than silently overwriting, so a
+  concurrent editor causes one retry, never a lost key; `writeMetadataItem`
+  retries once on that error.
+
+  Declare one resource per key — modelling the whole map would have two
+  declarations fighting over one list. `List` reports every key, so undeclared
+  ones surface as unmanaged, which is honest: they are real project settings.
+  Conformance green on all eight steps, and the project's pre-existing
+  `enable-oslogin` was verified intact afterwards. The cleanup script removes
+  only `formae-plugin-sdk`-prefixed keys.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

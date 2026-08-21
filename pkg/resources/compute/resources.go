@@ -33,10 +33,12 @@ const (
 	RouterResourceType         = "GCP::Compute::Router"
 	RouterNatResourceType      = "GCP::Compute::RouterNat"
 	// Registered in router_route_policy.go: update/get/delete/listRoutePolicies verbs.
-	RouterRoutePolicyResourceType    = "GCP::Compute::RouterRoutePolicy"
-	RouterNamedSetResourceType       = "GCP::Compute::RouterNamedSet"
-	SubnetworkResourceType           = "GCP::Compute::Subnetwork"
-	RouteResourceType                = "GCP::Compute::Route"
+	RouterRoutePolicyResourceType = "GCP::Compute::RouterRoutePolicy"
+	RouterNamedSetResourceType    = "GCP::Compute::RouterNamedSet"
+	SubnetworkResourceType        = "GCP::Compute::Subnetwork"
+	RouteResourceType             = "GCP::Compute::Route"
+	// Registered in project_metadata_item.go: setCommonInstanceMetadata merge.
+	ProjectMetadataItemResourceType  = "GCP::Compute::ProjectMetadataItem"
 	SecurityPolicyResourceType       = "GCP::Compute::SecurityPolicy"
 	RegionSecurityPolicyResourceType = "GCP::Compute::RegionSecurityPolicy"
 	// Registered in policy_rule.go: add/get/patch/removeRule verbs.
