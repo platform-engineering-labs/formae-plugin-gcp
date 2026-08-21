@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionCompositeHealthCheck
+///
+/// Aggregates one or more `regionHealthSource`s and reports the verdict at a
+/// forwarding rule. It is the third piece of the health-aggregation trio: an
+/// aggregation policy decides what "healthy" means, a health source applies that
+/// to a backend service, and this reports the result where a load balancer can
+/// act on it. Without it the other two are inert.
+module gcp.compute.regionCompositeHealthCheck
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionCompositeHealthCheck"
+
+open class RegionCompositeHealthCheckResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionCompositeHealthCheckResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionCompositeHealthCheckResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionCompositeHealthCheckResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionCompositeHealthCheck extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Health sources to aggregate. Pass `healthSource.res.selfLink` so formae
+    /// creates them first.
+    @gcp.FieldHint
+    healthSources: Listing<(String|formae.Resolvable)>?
+
+    /// Where the aggregated verdict is reported. Must be a **forwarding rule** —
+    /// the API rejects a backend service here. Pass
+    /// `forwardingRule.res.selfLink`.
+    @gcp.FieldHint
+    healthDestination: (String|formae.Resolvable)
+
+    /// Server-managed, and patch requires it. The API hides that: a patch
+    /// without a fingerprint returns 200 with an operation, and the *operation*
+    /// then fails with 412 CONDITION_NOT_MET.
+    @gcp.FieldHint { hasProviderDefault = true }
+    fingerprint: String?
+
+    hidden res: RegionCompositeHealthCheckResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -95,6 +95,7 @@ const (
 	RegionHealthCheckResourceType             = "GCP::Compute::RegionHealthCheck"
 	RegionHealthAggregationPolicyResourceType = "GCP::Compute::RegionHealthAggregationPolicy"
 	RegionHealthSourceResourceType            = "GCP::Compute::RegionHealthSource"
+	RegionCompositeHealthCheckResourceType    = "GCP::Compute::RegionCompositeHealthCheck"
 	RegionBackendServiceResourceType          = "GCP::Compute::RegionBackendService"
 	RegionUrlMapResourceType                  = "GCP::Compute::RegionUrlMap"
 	RegionTargetHttpProxyResourceType         = "GCP::Compute::RegionTargetHttpProxy"
@@ -403,6 +404,32 @@ func init() {
 		// policy. NOTE the URL segment is "healthSources" while the method group
 		// is "regionHealthSources". ponytail: patch needs the fingerprint dance;
 		// deferred, so a change replaces.
+		// Region Composite Health Check - aggregates health sources and reports the
+		// verdict at a forwarding rule, which is what makes a health source and
+		// its aggregation policy do anything.
+		//
+		// Patch needs the fingerprint, and the API hides that: a patch without
+		// one is accepted with a 200 and an operation, then the *operation*
+		// fails with 412 CONDITION_NOT_MET ("missing fingerprint"). Only the
+		// operation outcome tells the truth.
+		{
+			ResourceType: RegionCompositeHealthCheckResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "compositeHealthChecks",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate: true,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "fingerprint",
+					LocationInURL: false,
+				},
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
 		{
 			ResourceType: RegionHealthSourceResourceType,
 			ResourceConfig: base.ResourceConfig{
