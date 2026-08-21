@@ -309,6 +309,15 @@ Together these close the managed-instance-group gap: the plugin previously had
   verified: all four verbs were probed directly, and a direct `Create` against a
   live regional policy returns the right composite native ID.
 
+- `GCP::Compute::NetworkEndpointGroup` gains `pscTargetService` and the
+  `PRIVATE_SERVICE_CONNECT` endpoint type, so the group can front a Google API
+  or a published service attachment rather than only a Cloud Run service. This
+  is what Terraform calls `google_compute_region_network_endpoint_group` — not a
+  separate resource here, since this one is already regional. The API rejects
+  `network` and `subnetwork` for a PSC group in regional scope, so it needs no
+  VPC: `testdata/network-endpoint-group-psc.pkl` is the only conformance case in
+  the suite with no prerequisites at all, and runs in under 90 seconds.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
