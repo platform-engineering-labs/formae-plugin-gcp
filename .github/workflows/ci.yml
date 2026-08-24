@@ -247,12 +247,22 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=30
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
               ;;
-            url-map|target-http-proxy|region-http-lb|global-forwarding-rule)
+            url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule)
               # Load-balancer chains create 3-5 dependent resources serially
               # (health-check -> backend-service -> url-map -> proxy -> rule).
               # The CRUD lifecycle already runs ~4m13s on a good day - 84% of
               # the 5m default - so any per-op or operator-startup jitter tips
               # it over. Give the chain headroom.
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
+            machine-image)
+              # A machine image snapshots every disk of an instance, and the case
+              # builds the VM chain (network -> subnet -> disk -> instance) first.
+              # It runs ~7m30s end to end locally, so the 5m default leaves no
+              # room for the image capture itself under CI load.
               TIMEOUT_ARG="TIMEOUT=15"
               export FORMAE_TEST_DISCOVERY_TIMEOUT=15
               export FORMAE_TEST_OOB_TIMEOUT=15
