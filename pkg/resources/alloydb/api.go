@@ -43,8 +43,16 @@ var AlloyDBNativeID = base.NativeIDConfig{
 // for resources nested under another (instances under a cluster).
 func alloyDBPathBuilder(ctx base.PathContext) string {
 	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
-	if ctx.ParentType != "" && ctx.ParentResource != "" {
-		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	parent := ctx.ParentResource
+	// Discovery lists with no properties, so it can name no cluster to look in.
+	// instances.list accepts the "-" wildcard for the cluster, which reports
+	// every instance in the location; users.list does not, so that one walks the
+	// clusters itself (see user_list.go).
+	if parent == "" && ctx.IsList && ctx.ResourceType == "instances" {
+		parent = "-"
+	}
+	if ctx.ParentType != "" && parent != "" {
+		path += fmt.Sprintf("/%s/%s", ctx.ParentType, parent)
 	}
 	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {

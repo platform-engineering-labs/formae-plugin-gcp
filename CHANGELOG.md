@@ -12,6 +12,13 @@ formae agent.
 
 ### Fixed
 
+- `GCP::AlloyDB::Instance` and `GCP::AlloyDB::User` are now discoverable. Both
+  live under a cluster and discovery names none, so each listed a path with an
+  empty cluster segment and got a 404. Instances now use the API's `clusters/-`
+  wildcard; users.list rejects that wildcard, so that one walks the clusters.
+
+### Fixed
+
 - An update of a resource that uses optimistic locking now reports the updated
   properties. That path returned no `ResourceProperties` at all, so whatever the
   update changed was missing from state until some later sync happened to pick it

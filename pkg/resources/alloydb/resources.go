@@ -124,4 +124,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Users need a List that walks the clusters; see user_list.go.
+	registerUserListOverride()
 }
