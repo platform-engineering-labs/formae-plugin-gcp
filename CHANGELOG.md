@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- An update of a resource that uses optimistic locking now reports the updated
+  properties. That path returned no `ResourceProperties` at all, so whatever the
+  update changed was missing from state until some later sync happened to pick it
+  up - a `labels` change on a Dataproc workflow template read as never applied.
+- `Update` now unwraps `formae.Value` wrappers the way `Create` already did.
+
+### Fixed
+
 - Sub-resources that live inside a parent object are now discoverable. A policy
   rule, a firewall policy association, a router interface, named set or route
   policy and a log view have no collection URL of their own, and discovery lists

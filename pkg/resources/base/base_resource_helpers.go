@@ -387,6 +387,10 @@ func (b *BaseResource) updateWithOptimisticLocking(
 				OperationStatus: resource.OperationStatusSuccess,
 				NativeID:        request.NativeID,
 				StatusMessage:   "Resource updated successfully",
+				// As in performUpdate: without the read-back the update reports no
+				// properties at all, so anything the update changed is missing from
+				// state until some later sync happens to pick it up.
+				ResourceProperties: b.readBackAfterUpdate(ctx, request),
 			},
 		}, nil
 	}

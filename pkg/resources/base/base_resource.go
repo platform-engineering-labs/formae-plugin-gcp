@@ -213,6 +213,9 @@ func (b *BaseResource) Update(
 			resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
+	// As on create: a declared formae.Value arrives wrapped, and the wrapper is
+	// not what the API expects to receive.
+	props = UnwrapValues(props)
 
 	// Parse native ID
 	pathCtx, err := ParseNativeID(b.NativeIDConfig, request.NativeID)
