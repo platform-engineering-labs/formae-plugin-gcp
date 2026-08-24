@@ -263,6 +263,61 @@ Together these close the managed-instance-group gap: the plugin previously had
   the group's `networkEndpointType`. Everything is create-only, so any change
   detaches and reattaches.
 
+- `GCP::Compute::SecurityPolicyRule` — one rule inside a global Cloud Armor
+  policy. A new policy carries only a catch-all allow at priority 2147483647, so
+  a policy alone permits everything; the rules are what enforce anything. Like
+  the firewall policy rule it is a set of verbs on the policy rather than a REST
+  sub-collection, so `FirewallPolicyRuleProvisioner` was generalised into
+  `PolicyRuleProvisioner`, parameterised by a `policyRuleKind` (collection
+  segment, owning-policy property, and where GCP's own rules start). Both rule
+  types now share one implementation. Only global `securityPolicies` is wired up;
+  a `RegionSecurityPolicy` rule would need a regional kind.
+
+  **Conformance is red on Verify, Extract and Update**, and not because of this
+  resource: `match.config`, an object nested inside `match`, is absent from
+  stored state immediately after create and update. Create, Sync, Destroy and
+  out-of-band delete pass, and Sync reports *all* expected properties matched —
+  `match.config` included — so the read path is complete and the loss sits in
+  how post-create and post-update state is materialised. That narrows the
+  standing nested-property-loss bug: it is not the plugin's read, and it is not
+  a typing choice, since both an untyped `Mapping<String, Any>` (what
+  `NetworkFirewallPolicyRule.match` uses) and the typed classes lose the field.
+  Every verb was verified directly against the API before shipping.
+
+  Do not declare `rules` inline on the policy and manage rules with this
+  resource at the same time — both own the same list and each will remove what
+  the other added.
+
+- `GCP::Compute::TargetGrpcProxy` — the proxy a proxyless gRPC service mesh
+  points its clients at. The other target proxies terminate connections for a
+  load balancer; this one hands an xDS-aware gRPC client the routing rules from
+  its `urlMap`, with no proxy in the data path. `urlMap` is required, unlike on
+  the HTTP proxies, and `patch` is rejected without a `fingerprint`, so unlike
+  the other target proxies this one registers optimistic locking. Conformance is
+  green on all eight steps, Update included.
+
+- `GCP::Compute::RegionSecurityPolicyRule` — the regional twin of the Cloud Armor
+  rule above. The four verbs are identical, only the policy sits under
+  `regions/{region}`, so `policyRuleKind` gained a `regional` flag: it picks the
+  scope segment, makes `region` a path component that never travels in the rule
+  body, and passes the region to the operation poll so it hits
+  `regions/{r}/operations`. Three kinds now share the one provisioner.
+
+  Red on Verify, Extract and Update for exactly the same reason as the global
+  rule — `match.config` missing from state right after create and update — with
+  Create, Sync, Destroy and out-of-band delete green. The regional path itself is
+  verified: all four verbs were probed directly, and a direct `Create` against a
+  live regional policy returns the right composite native ID.
+
+- `GCP::Compute::NetworkEndpointGroup` gains `pscTargetService` and the
+  `PRIVATE_SERVICE_CONNECT` endpoint type, so the group can front a Google API
+  or a published service attachment rather than only a Cloud Run service. This
+  is what Terraform calls `google_compute_region_network_endpoint_group` — not a
+  separate resource here, since this one is already regional. The API rejects
+  `network` and `subnetwork` for a PSC group in regional scope, so it needs no
+  VPC: `testdata/network-endpoint-group-psc.pkl` is the only conformance case in
+  the suite with no prerequisites at all, and runs in under 90 seconds.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

@@ -33,6 +33,9 @@ const (
 	RouteResourceType                = "GCP::Compute::Route"
 	SecurityPolicyResourceType       = "GCP::Compute::SecurityPolicy"
 	RegionSecurityPolicyResourceType = "GCP::Compute::RegionSecurityPolicy"
+	// Registered in policy_rule.go: add/get/patch/removeRule verbs.
+	SecurityPolicyRuleResourceType       = "GCP::Compute::SecurityPolicyRule"
+	RegionSecurityPolicyRuleResourceType = "GCP::Compute::RegionSecurityPolicyRule"
 
 	// Managed instance groups
 	InstanceTemplateResourceType           = "GCP::Compute::InstanceTemplate"
@@ -81,6 +84,7 @@ const (
 	TargetHttpsProxyResourceType     = "GCP::Compute::TargetHttpsProxy"
 	TargetTcpProxyResourceType       = "GCP::Compute::TargetTcpProxy"
 	TargetSslProxyResourceType       = "GCP::Compute::TargetSslProxy"
+	TargetGrpcProxyResourceType      = "GCP::Compute::TargetGrpcProxy"
 	GlobalForwardingRuleResourceType = "GCP::Compute::GlobalForwardingRule"
 
 	// Load Balancer - Regional resources
@@ -929,6 +933,27 @@ func init() {
 					Type: base.ScopeGlobal,
 				},
 				SupportsUpdate: true,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "fingerprint",
+					LocationInURL: false,
+				},
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: nil,
+		},
+
+		// Target gRPC Proxy - Global proxy for proxyless gRPC service mesh
+		{
+			ResourceType: TargetGrpcProxyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "targetGrpcProxies",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeGlobal,
+				},
+				SupportsUpdate: true,
+				// Unlike the other target proxies, patch rejects a request
+				// without a fingerprint.
 				OptimisticLocking: &base.OptimisticLockingConfig{
 					Enabled:       true,
 					FieldName:     "fingerprint",
