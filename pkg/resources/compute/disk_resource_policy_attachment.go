@@ -252,12 +252,66 @@ func (p *DiskResourcePolicyAttachmentProvisioner) Delete(
 	}, nil
 }
 
-// List needs a disk to look inside, so without one there is nothing to
-// enumerate; an empty result is the honest answer.
+// List walks the project's disks and reports every policy attached to them.
+// Discovery calls this with no hints, so returning nothing would mean an
+// attachment can be managed but never discovered. The aggregated endpoint covers
+// every zone in one call.
 func (p *DiskResourcePolicyAttachmentProvisioner) List(
 	ctx context.Context, request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	return &resource.ListResult{NativeIDs: []string{}}, nil
+	project := p.projectFor(request.TargetConfig, "")
+	if project == "" {
+		return &resource.ListResult{NativeIDs: []string{}}, nil
+	}
+	client, err := transport.NewClient(ctx, p.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
+		Method: "GET",
+		URL:    fmt.Sprintf("%s/projects/%s/aggregated/disks", p.APIConfig.BaseURL, project),
+	})
+	if rErr != nil {
+		wrapped := transport.WrapError(rErr, "failed to list disks")
+		return nil, fmt.Errorf("%s", wrapped.Message)
+	}
+
+	nativeIDs := []string{}
+	scopes, _ := resp.Body["items"].(map[string]interface{})
+	for scope, payload := range scopes {
+		// Keys are "zones/{zone}" or "regions/{region}". Only zonal disks carry
+		// attachments this provisioner can address; a regional key would produce
+		// a native ID whose read 404s.
+		if !strings.HasPrefix(scope, "zones/") {
+			continue
+		}
+		zone := strings.TrimPrefix(scope, "zones/")
+		entry, ok := payload.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		disks, _ := entry["disks"].([]interface{})
+		for _, raw := range disks {
+			disk, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			diskName, _ := disk["name"].(string)
+			if diskName == "" {
+				continue
+			}
+			policies, _ := disk["resourcePolicies"].([]interface{})
+			for _, rawPolicy := range policies {
+				policyURL, ok := rawPolicy.(string)
+				if !ok || policyURL == "" {
+					continue
+				}
+				nativeIDs = append(nativeIDs,
+					buildAttachmentNativeID(project, zone, diskName, policyNameOf(policyURL)))
+			}
+		}
+	}
+	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
 // policyNameOf reduces a resource policy URL to its bare name.

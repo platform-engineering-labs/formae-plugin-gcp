@@ -309,37 +309,84 @@ func (p *GlobalNetworkEndpointProvisioner) Delete(
 	}, nil
 }
 
-// List needs a group to look inside, so without one there is nothing to
-// enumerate.
+// List enumerates endpoints. Discovery calls this with no hints, so when no
+// group is named it walks every global network endpoint group and reports the
+// endpoints inside them — without that an endpoint can be managed but never
+// discovered. A named group is still honoured as a fast path.
 func (p *GlobalNetworkEndpointProvisioner) List(
 	ctx context.Context, request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	group := ""
-	if request.AdditionalProperties != nil {
-		group = request.AdditionalProperties["networkEndpointGroup"]
-	}
 	project := p.projectFor(request.TargetConfig, "")
-	if group == "" || project == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
-	endpoints, verbErr := p.listEndpoints(ctx, project, group)
-	if verbErr != nil {
-		return nil, fmt.Errorf("%s", verbErr.Message)
+
+	var groups []string
+	if request.AdditionalProperties != nil {
+		if group := request.AdditionalProperties["networkEndpointGroup"]; group != "" {
+			groups = []string{group}
+		}
 	}
-	nativeIDs := make([]string, 0, len(endpoints))
-	for _, endpoint := range endpoints {
-		port, err := portOf(endpoint)
-		if err != nil {
+	if groups == nil {
+		discovered, gErr := p.listGroups(ctx, project)
+		if gErr != nil {
+			return nil, fmt.Errorf("%s", gErr.Message)
+		}
+		groups = discovered
+	}
+
+	nativeIDs := []string{}
+	for _, group := range groups {
+		endpoints, verbErr := p.listEndpoints(ctx, project, group)
+		if verbErr != nil {
+			// One unreadable group must not hide the others.
 			continue
 		}
-		host, _ := endpoint["fqdn"].(string)
-		if host == "" {
-			host, _ = endpoint["ipAddress"].(string)
+		for _, endpoint := range endpoints {
+			port, err := portOf(endpoint)
+			if err != nil {
+				continue
+			}
+			host, _ := endpoint["fqdn"].(string)
+			if host == "" {
+				host, _ = endpoint["ipAddress"].(string)
+			}
+			if host == "" {
+				continue
+			}
+			nativeIDs = append(nativeIDs, buildEndpointNativeID(project, group, host, port))
 		}
-		if host == "" {
-			continue
-		}
-		nativeIDs = append(nativeIDs, buildEndpointNativeID(project, group, host, port))
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
+
+// listGroups names every global network endpoint group in the project, so
+// discovery has somewhere to look.
+func (p *GlobalNetworkEndpointProvisioner) listGroups(
+	ctx context.Context, project string,
+) ([]string, *transport.Error) {
+	client, err := transport.NewClient(ctx, p.Config)
+	if err != nil {
+		return nil, transport.WrapError(err, "failed to create transport client")
+	}
+	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
+		Method: "GET",
+		URL: fmt.Sprintf("%s/projects/%s/global/networkEndpointGroups",
+			p.APIConfig.BaseURL, project),
+	})
+	if rErr != nil {
+		return nil, transport.WrapError(rErr, "failed to list global network endpoint groups")
+	}
+	items, _ := resp.Body["items"].([]interface{})
+	groups := make([]string, 0, len(items))
+	for _, raw := range items {
+		group, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if name, _ := group["name"].(string); name != "" {
+			groups = append(groups, name)
+		}
+	}
+	return groups, nil
 }

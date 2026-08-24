@@ -414,6 +414,20 @@ Together these close the managed-instance-group gap: the plugin previously had
 
 ### Fixed
 
+- **Two resources could be managed but never discovered.** `TestPluginDiscovery`
+  calls `List` with no hints, and both
+  `GCP::Compute::GlobalNetworkEndpoint` and
+  `GCP::Compute::DiskResourcePolicyAttachment` returned an empty list unless
+  they were told which parent to look inside — so their CRUD lifecycle passed
+  8/8 while discovery timed out waiting for them to appear in inventory.
+
+  `GlobalNetworkEndpoint.List` now walks every global network endpoint group and
+  reports the endpoints inside them (a named group is still honoured as a fast
+  path). `DiskResourcePolicyAttachment.List` walks `aggregated/disks` and reports
+  each attached policy, filtered to zonal scopes so a native ID it emits is one
+  its own `Read` can resolve.
+
+
 - `GCP::SecretManager::SecretVersion` `data` (the secret payload) was typed
   plain `String`, so it could not be marked opaque and was stored in cleartext
   in desired state. It now accepts `formae.Value`/`formae.SecretValue`
