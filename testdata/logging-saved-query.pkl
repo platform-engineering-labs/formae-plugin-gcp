@@ -1,0 +1,33 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/savedQuery.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency saved Logs Explorer query.
+//
+// The location follows the target rather than being pinned to "global": saved
+// queries are supported in either, and discovery lists with no properties to
+// declare a location with, so it looks in the target's location. A query pinned
+// to global is created and managed correctly but can never be discovered.
+forma {
+  v.stack
+  v.target
+
+  new savedQuery.SavedQuery {
+    label = "plugin-sdk-test-logging-saved-query"
+    name = "formae-plugin-sdk-test-sq-\(v.testRunID)"
+    location = v.gcpLocation
+    displayName = "Formae conformance error query"
+    description = "Test saved query for plugin SDK conformance tests"
+    visibility = "SHARED"
+    loggingQuery = new savedQuery.LoggingQuery {
+      filter = "severity>=\"ERROR\""
+    }
+  }
+}

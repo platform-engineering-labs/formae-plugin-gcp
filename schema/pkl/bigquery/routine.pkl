@@ -1,0 +1,118 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP BigQuery Routine
+///
+/// A user-defined function, table function, or stored procedure inside a
+/// dataset — the thing that lets SQL logic live in version control next to the
+/// tables it queries.
+///
+/// The provisioner for this resource already existed; this schema module is what
+/// makes it declarable from a forma. Field names follow what the provisioner
+/// reads and returns (see `pkg/resources/bigquery/routine.go`).
+///
+/// ponytail: create/read/delete only, matching the provisioner's registered
+/// operations — a change replaces.
+module gcp.bigquery.routine
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BigQuery::Routine"
+
+/// SCALAR_FUNCTION returns a single value, TABLE_VALUED_FUNCTION a table, and
+/// PROCEDURE runs statements.
+typealias RoutineType = "SCALAR_FUNCTION"|"PROCEDURE"|"TABLE_VALUED_FUNCTION"
+
+typealias RoutineLanguage = "SQL"|"JAVASCRIPT"|"PYTHON"|"JAVA"|"SCALA"
+
+/// DETERMINISTIC lets BigQuery cache results; NOT_DETERMINISTIC forbids it.
+typealias DeterminismLevel = "DETERMINISTIC"|"NOT_DETERMINISTIC"
+
+/// A BigQuery type reference, e.g. { typeKind = "STRING" }.
+@gcp.SubResourceHint
+open class DataType extends formae.SubResource {
+    @gcp.FieldHint
+    typeKind: String?
+}
+
+/// One declared argument. `kind` is ARGUMENT_KIND_UNSPECIFIED, FIXED_TYPE or
+/// ANY_TYPE.
+@gcp.SubResourceHint
+open class Argument extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    kind: String?
+
+    @gcp.FieldHint
+    dataType: DataType?
+}
+
+open class RoutineResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden routineId: RoutineResolvable = (this) {
+        property = "routineId"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "routineId"
+}
+open class Routine extends formae.Resource {
+    hidden parent = this
+
+    /// Routine id, unique within the dataset.
+    @gcp.FieldHint { createOnly = true }
+    routineId: String
+
+    /// Id of the owning dataset. Pass `dataset.res.datasetId` so formae creates
+    /// the dataset first.
+    @gcp.FieldHint { createOnly = true }
+    datasetId: (String|formae.Resolvable)
+
+    /// GCP project holding the dataset.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    project: String?
+
+    @gcp.FieldHint
+    type: RoutineType?
+
+    @gcp.FieldHint
+    language: RoutineLanguage?
+
+    /// The routine's body — the SQL or script text.
+    @gcp.FieldHint
+    body: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    arguments: Listing<Argument>?
+
+    /// Return type for a scalar function, e.g. { typeKind = "STRING" }.
+    @gcp.FieldHint
+    returnType: DataType?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    determinismLevel: DeterminismLevel?
+
+    /// Server-populated timestamps, as Unix seconds.
+    @gcp.FieldHint { hasProviderDefault = true }
+    createdTime: Int?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    lastModified: Int?
+
+    hidden res: RoutineResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

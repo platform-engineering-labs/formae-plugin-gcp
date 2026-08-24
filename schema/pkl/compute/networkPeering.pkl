@@ -1,0 +1,99 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NetworkPeering
+///
+/// A VPC peering from one network to another, so workloads reach each other over
+/// private IPs without a VPN or external routing.
+///
+/// A peering is not a REST resource: it lives inside the owning network and is
+/// manipulated with `addPeering` / `removePeering`, so this resource is a
+/// hand-written provisioner. Peering is also **one-sided** — declare it on both
+/// networks (two of these resources) for the link to reach ACTIVE; a single side
+/// sits at INACTIVE, "Waiting for peer network to connect".
+///
+/// ponytail: v1 has no `updatePeering` method (the path 404s), so a change
+/// replaces the peering.
+module gcp.compute.networkPeering
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NetworkPeering"
+
+typealias PeeringStackType = "IPV4_ONLY"|"IPV4_IPV6"
+
+open class NetworkPeeringResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: NetworkPeeringResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NetworkPeering extends formae.Resource {
+    hidden parent = this
+
+    /// Peering name, unique within the owning network.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The network this peering belongs to — a path component, not a body field.
+    /// Pass `net.res.name` so formae creates the network first.
+    @gcp.FieldHint { createOnly = true }
+    network: (String|formae.Resolvable)
+
+    /// The network on the far side, as a self-link or
+    /// "projects/<p>/global/networks/<name>". The API calls this field `network`
+    /// too, which would collide with the owning network, so the schema renames
+    /// it and the provisioner maps it back.
+    @gcp.FieldHint { createOnly = true }
+    peerNetwork: (String|formae.Resolvable)
+
+    /// Exchange subnet routes between the two networks. GCP fills true.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    exchangeSubnetRoutes: Boolean?
+
+    /// Also create routes automatically. GCP fills true and mirrors
+    /// `exchangeSubnetRoutes`.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    autoCreateRoutes: Boolean?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    importCustomRoutes: Boolean?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    exportCustomRoutes: Boolean?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    importSubnetRoutesWithPublicIp: Boolean?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    exportSubnetRoutesWithPublicIp: Boolean?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    stackType: PeeringStackType?
+
+    /// ACTIVE once both sides exist; INACTIVE while waiting for the far side.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    stateDetails: String?
+
+    /// How GCP applies peering changes — server-selected.
+    @gcp.FieldHint { hasProviderDefault = true }
+    updateStrategy: String?
+
+    hidden res: NetworkPeeringResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

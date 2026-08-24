@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute MachineImage (global)
+///
+/// A whole-VM capture: every attached disk plus the instance's machine type,
+/// metadata, network config and licences. Unlike `image` (one disk) or
+/// `snapshot` (one disk, incremental), a machine image is what you clone or move
+/// an entire VM from.
+///
+/// ponytail: update is off — only `setLabels` mutates a machine image, so a
+/// change replaces.
+module gcp.compute.machineImage
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::MachineImage"
+
+open class MachineImageResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: MachineImageResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: MachineImageResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: MachineImageResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class MachineImage extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// The VM to capture. Pass `vm.res.selfLink` — the API stores a full URL and
+    /// compares against it.
+    @gcp.FieldHint { createOnly = true }
+    sourceInstance: (String|formae.Resolvable)
+
+    /// Regions or multi-regions holding the image, e.g. "eu". GCP picks one from
+    /// the source instance when omitted.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    storageLocations: Listing<String>?
+
+    /// Ask the guest OS to flush its filesystem buffers before the capture.
+    /// Needs the guest agent; GCP fills false.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    guestFlush: Boolean?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: MachineImageResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

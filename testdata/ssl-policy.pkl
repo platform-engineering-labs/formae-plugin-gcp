@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/sslPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency TLS policy. The paired ssl-policy-update.pkl raises
+// minTlsVersion, which exercises sslPolicies.patch and therefore the
+// fingerprint round-trip (the API rejects a patch without it).
+forma {
+  v.stack
+  v.target
+
+  new sslPolicy.SslPolicy {
+    label = "plugin-sdk-test-ssl-policy"
+    name = "formae-plugin-sdk-test-sslpol-\(v.testRunID)"
+    description = "Test SSL policy for plugin SDK conformance tests"
+    profile = "MODERN"
+    minTlsVersion = "TLS_1_0"
+  }
+}

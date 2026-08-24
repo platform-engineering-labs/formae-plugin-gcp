@@ -1,0 +1,59 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/resourcePolicy.pkl"
+import "@gcp/compute/diskResourcePolicyAttachment.pkl"
+import "./config/vars.pkl" as v
+
+// Disk + snapshot schedule + the attachment that binds them. Without the
+// attachment the policy is inert, which is the gap this resource closes.
+local src = new disk.Disk {
+  label = "plugin-sdk-test-drpa-disk"
+  project = v.gcpProject
+  zone = v.gcpZone
+  name = "formae-plugin-sdk-test-drpa-disk-\(v.testRunID)"
+  description = "Disk the snapshot schedule is attached to"
+  sizeGb = 10
+  type = "pd-standard"
+}
+
+local policy = new resourcePolicy.ResourcePolicy {
+  label = "plugin-sdk-test-drpa-policy"
+  name = "formae-plugin-sdk-test-drpa-pol-\(v.testRunID)"
+  description = "Nightly snapshot schedule for the attachment test"
+  region = v.gcpRegion
+  snapshotSchedulePolicy = new resourcePolicy.SnapshotSchedulePolicy {
+    schedule = new resourcePolicy.SnapshotSchedule {
+      dailySchedule = new resourcePolicy.DailyCycle {
+        daysInCycle = 1
+        startTime = "04:00"
+      }
+    }
+    retentionPolicy = new resourcePolicy.SnapshotRetentionPolicy {
+      maxRetentionDays = 7
+      onSourceDiskDelete = "APPLY_RETENTION_POLICY"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+  policy
+
+  new diskResourcePolicyAttachment.DiskResourcePolicyAttachment {
+    label = "plugin-sdk-test-disk-resource-policy-attachment"
+    // Resolvables -> both the disk and the policy exist before the attach verb.
+    name = policy.res.name
+    disk = src.res.name
+    zone = v.gcpZone
+  }
+}

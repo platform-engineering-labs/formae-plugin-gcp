@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/httpHealthCheck.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency legacy health check, the kind a targetPool references.
+forma {
+  v.stack
+  v.target
+
+  new httpHealthCheck.HttpHealthCheck {
+    label = "plugin-sdk-test-http-health-check"
+    name = "formae-plugin-sdk-test-hhc-\(v.testRunID)"
+    description = "Updated legacy HTTP health check description"
+    port = 80
+    requestPath = "/ready"
+    checkIntervalSec = 15
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+  }
+}

@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionHealthSource (regional)
+///
+/// Binds a backend service to a `regionHealthAggregationPolicy`: the policy says
+/// *how* to decide a service is healthy, the health source says *which* service
+/// that judgement applies to. Cross-region load balancing consumes the pair.
+///
+/// Note the URL segment is `healthSources` even though the API method group is
+/// `regionHealthSources`.
+///
+/// ponytail: update is off — patch carries the usual Compute fingerprint
+/// requirement, which needs its own verification pass; a change replaces.
+module gcp.compute.regionHealthSource
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionHealthSource"
+
+/// BACKEND_SERVICE is the only value the v1 API accepts today.
+typealias HealthSourceType = "BACKEND_SERVICE"
+
+open class RegionHealthSourceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionHealthSourceResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionHealthSourceResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionHealthSourceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionHealthSource extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    sourceType: HealthSourceType?
+
+    /// The policy that defines the health judgement. Must be in the same
+    /// region — pass `policy.res.selfLink`.
+    @gcp.FieldHint
+    healthAggregationPolicy: (String|formae.Resolvable)
+
+    /// Exactly one backend service the judgement applies to. Pass
+    /// `backendService.res.selfLink`.
+    @gcp.FieldHint
+    sources: Listing<String|formae.Resolvable>
+
+    hidden res: RegionHealthSourceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

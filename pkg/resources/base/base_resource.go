@@ -9,19 +9,19 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // BaseResource provides unified CRUD operations for all GCP APIs
 type BaseResource struct {
-	Config             *config.Config
-	APIConfig          APIConfig
-	OperationConfig    OperationConfig
-	ResourceConfig     ResourceConfig
-	NativeIDConfig     NativeIDConfig
-	RequestTransformer RequestTransformer
+	Config              *config.Config
+	APIConfig           APIConfig
+	OperationConfig     OperationConfig
+	ResourceConfig      ResourceConfig
+	NativeIDConfig      NativeIDConfig
+	RequestTransformer  RequestTransformer
 	ResponseTransformer ResponseTransformer
 }
 
@@ -41,6 +41,7 @@ func (b *BaseResource) Create(
 		return b.createFailureResult(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
+	props = UnwrapValues(props)
 
 	// Build path context
 	pathCtx := b.buildPathContext(request.TargetConfig, props)
@@ -380,21 +381,24 @@ func (b *BaseResource) List(
 	}
 
 	// Handle parent resource for nested resources
+	// Discovery lists with no AdditionalProperties, so a nested resource has no
+	// owning parent to name. Erroring here made every parented resource
+	// undiscoverable by construction, so instead the parent is left empty and
+	// the API config decides: a path builder can substitute the API's wildcard
+	// ("services/-" for Monitoring SLOs) where one exists. Where none exists the
+	// request simply fails and the caller sees no resources - no worse than
+	// before, and it no longer masks the ones that can be listed.
 	if b.ResourceConfig.ParentResource != nil && b.ResourceConfig.ParentResource.RequiresParent {
-		if request.AdditionalProperties == nil {
-			return nil, fmt.Errorf("nested resource %s requires parent info in AdditionalProperties", request.ResourceType)
-		}
-		// Extract parent info from additional properties
 		// Use PropertyName if specified, otherwise fall back to ParentType
 		propName := b.ResourceConfig.ParentResource.PropertyName
 		if propName == "" {
 			propName = b.ResourceConfig.ParentResource.ParentType
 		}
-		if parent, ok := request.AdditionalProperties[propName]; ok {
-			pathCtx.ParentResource = parent
-			pathCtx.ParentType = b.ResourceConfig.ParentResource.ParentType
-		} else {
-			return nil, fmt.Errorf("nested resource %s requires '%s' in AdditionalProperties", request.ResourceType, propName)
+		if request.AdditionalProperties != nil {
+			if parent, ok := request.AdditionalProperties[propName]; ok && parent != "" {
+				pathCtx.ParentResource = parent
+				pathCtx.ParentType = b.ResourceConfig.ParentResource.ParentType
+			}
 		}
 	}
 

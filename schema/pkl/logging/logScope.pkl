@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Logging LogScope
+///
+/// Names a set of log views (or buckets) so a Logs Explorer session can query
+/// them together — the usual reason being to search several projects' logs at
+/// once without switching context.
+module gcp.logging.logScope
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::LogScope"
+
+open class LogScopeResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: LogScopeResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class LogScope extends formae.Resource {
+    hidden parent = this
+
+    /// Scope id, unique within the project and location. Sent as the
+    /// `logScopeId` query parameter on create.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Where the scope is stored, e.g. "global". A path component, not a body
+    /// field.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// The views or buckets in scope, as full resource paths, e.g.
+    /// "projects/<p>/locations/global/buckets/_Default/views/_Default". Up to
+    /// 50 entries.
+    @gcp.FieldHint
+    resourceNames: Listing<String|formae.Resolvable>
+}

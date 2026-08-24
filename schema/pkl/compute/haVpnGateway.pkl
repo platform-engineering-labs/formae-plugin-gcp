@@ -1,0 +1,92 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute HaVpnGateway (regional)
+///
+/// The Google side of an HA VPN. Creating one allocates two interfaces with
+/// public IPs (`vpnInterfaces`, server-assigned) in two zones of the region, so
+/// a pair of tunnels can survive losing either. Attach tunnels with
+/// `vpnTunnel`, and a `router` for the BGP sessions.
+module gcp.compute.haVpnGateway
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::HaVpnGateway"
+
+typealias StackType = "IPV4_ONLY"|"IPV4_IPV6"|"IPV6_ONLY"
+
+typealias GatewayIpVersion = "IPV4"|"IPV6"
+
+/// A Google-side endpoint. `id` (0 or 1) is what
+/// `vpnTunnel.vpnGatewayInterface` selects. Both fields are server-assigned.
+@gcp.SubResourceHint
+open class VpnInterface extends formae.SubResource {
+    @gcp.FieldHint { hasProviderDefault = true }
+    id: Int?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    ipAddress: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    interconnectAttachment: String?
+}
+
+open class HaVpnGatewayResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: HaVpnGatewayResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: HaVpnGatewayResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: HaVpnGatewayResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class HaVpnGateway extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// VPC the gateway lives in. Pass `net.res.selfLink` — the API stores a
+    /// full self-link URL and compares against it.
+    @gcp.FieldHint { createOnly = true }
+    network: (String|formae.Resolvable)
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    stackType: StackType?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    gatewayIpVersion: GatewayIpVersion?
+
+    /// Server-assigned interfaces and their public IPs.
+    @gcp.FieldHint { hasProviderDefault = true }
+    vpnInterfaces: Listing<VpnInterface>?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: HaVpnGatewayResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

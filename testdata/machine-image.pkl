@@ -1,0 +1,85 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/instance.pkl"
+import "@gcp/compute/machineImage.pkl"
+import "./config/vars.pkl" as v
+
+// The VM the machine image captures, with its own net/subnet/boot-disk —
+// the same shape instance.pkl uses (the Instance schema does not expose disk
+// initializeParams, so the boot disk is a separate resource attached by
+// source).
+local net = new network.Network {
+  label = "plugin-sdk-test-mi-net"
+  name = "formae-plugin-sdk-test-mi-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-mi-subnet"
+  name = "formae-plugin-sdk-test-mi-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.99.0.0/24"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  local bootDisk = new disk.Disk {
+    label = "plugin-sdk-test-mi-bootdisk"
+    project = v.gcpProject
+    zone = v.gcpZone
+    name = "formae-plugin-sdk-test-mi-disk-\(v.testRunID)"
+    description = "Boot disk for the machine-image test VM"
+    sizeGb = 10
+    type = "pd-standard"
+    sourceImage = formae.value("projects/debian-cloud/global/images/family/debian-12")
+  }
+
+  local vm = new instance.Instance {
+    label = "plugin-sdk-test-mi-vm"
+    project = v.gcpProject
+    zone = v.gcpZone
+    name = "formae-plugin-sdk-test-mi-vm-\(v.testRunID)"
+    machineType = "e2-micro"
+    description = "VM captured by the machine image"
+    disks = new Listing {
+      new instance.AttachedDisk {
+        boot = true
+        autoDelete = false
+        source = bootDisk.res.selfLink
+      }
+    }
+    // Internal IP only, to comply with the external-IP org policy.
+    networkInterfaces = new Listing {
+      new instance.NetworkInterface {
+        network = net.res.selfLink
+        subnetwork = subnet.res.selfLink
+      }
+    }
+  }
+
+  bootDisk
+  vm
+
+  new machineImage.MachineImage {
+    label = "plugin-sdk-test-machine-image"
+    name = "formae-plugin-sdk-test-mi-\(v.testRunID)"
+    description = "Test machine image for plugin SDK conformance tests"
+    // Resolvable -> establishes VM-before-capture create ordering.
+    sourceInstance = vm.res.selfLink
+  }
+}

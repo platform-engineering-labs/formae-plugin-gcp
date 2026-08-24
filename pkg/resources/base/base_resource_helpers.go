@@ -519,3 +519,48 @@ func (b *BaseResource) deleteFailureResult(nativeID string, errorCode resource.O
 		},
 	}
 }
+
+// UnwrapValues replaces formae's wrapped-value objects with the value inside.
+//
+// A forma can wrap a property to control how it is shown or stored - notably
+// `formae.value(secret).opaque`, which keeps a secret out of plans and state.
+// Formae unwraps those before calling a plugin, so the normal apply path never
+// sees them. The conformance harness's out-of-band path calls the plugin
+// directly with the evaluated forma, wrappers intact, and a wrapper sent as a
+// field value reaches the API as an object where it expects a string - GCP
+// reports it as empty ("A shared secret must be..."). Unwrapping here makes the
+// plugin tolerant of both shapes.
+func UnwrapValues(props map[string]interface{}) map[string]interface{} {
+	unwrapped, _ := unwrapValue(props).(map[string]interface{})
+	if unwrapped == nil {
+		return props
+	}
+	return unwrapped
+}
+
+func unwrapValue(v interface{}) interface{} {
+	switch value := v.(type) {
+	case map[string]interface{}:
+		// A wrapper carries "$value" alongside only "$"-prefixed siblings; a
+		// resolvable ("$res") is left alone, since formae resolves those and a
+		// half-resolved reference must not be mistaken for a literal.
+		if inner, ok := value["$value"]; ok {
+			if _, isRef := value["$res"]; !isRef {
+				return unwrapValue(inner)
+			}
+		}
+		out := make(map[string]interface{}, len(value))
+		for k, item := range value {
+			out[k] = unwrapValue(item)
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, 0, len(value))
+		for _, item := range value {
+			out = append(out, unwrapValue(item))
+		}
+		return out
+	default:
+		return v
+	}
+}

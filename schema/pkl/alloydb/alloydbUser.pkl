@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP AlloyDB User
+///
+/// A database user in an AlloyDB cluster. With `alloydbCluster` and
+/// `alloydbInstance` this completes the set needed for something an application
+/// can actually connect to.
+///
+/// Nested under its cluster:
+/// /projects/{p}/locations/{location}/clusters/{cluster}/users/{name}.
+/// Unlike the cluster and instance, this API path is synchronous.
+///
+/// ponytail: update is off. `users.patch` takes an updateMask and the mutable
+/// set is `password` and `databaseRoles`, but that needs its own verification
+/// pass; a change replaces for now.
+module gcp.alloydb.alloydbUser
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AlloyDB::User"
+
+/// ALLOYDB_BUILT_IN is a password user; ALLOYDB_IAM_USER authenticates as a
+/// Google identity and takes no password.
+typealias UserType = "ALLOYDB_BUILT_IN"|"ALLOYDB_IAM_USER"
+
+open class UserResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: UserResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class User extends formae.Resource {
+    hidden parent = this
+
+    /// User name, unique within the cluster. Sent as the `userId` query
+    /// parameter on create.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the owning cluster. A path component, not a body field — pass
+    /// `cluster.res.name` so formae creates the cluster first.
+    @gcp.FieldHint { createOnly = true }
+    cluster: (String|formae.Resolvable)
+
+    /// Region the cluster lives in.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint { createOnly = true }
+    userType: UserType?
+
+    /// Password for an ALLOYDB_BUILT_IN user. Input-only: the API never returns
+    /// it, and the provisioner drops it from reads so it cannot reach stored
+    /// state. Wrap it (`formae.value(...).opaque`) to keep it out of plans.
+    @gcp.FieldHint { createOnly = true; writeOnly = true }
+    password: (String|formae.Value)?
+
+    /// Postgres roles granted to the user, e.g. ["alloydbsuperuser"].
+    @gcp.FieldHint
+    databaseRoles: Listing<String>?
+
+    hidden res: UserResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

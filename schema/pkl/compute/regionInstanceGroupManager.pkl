@@ -1,0 +1,120 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionInstanceGroupManager (regional)
+///
+/// A managed instance group spread across several zones of a region, so the
+/// workload survives losing one. This is the shape production normally wants;
+/// the zonal `instanceGroupManager` is for single-zone workloads.
+///
+/// ponytail: like the zonal MIG, patch (template/targetSize/namedPorts) is
+/// deferred until the update body is verified, so a change replaces.
+module gcp.compute.regionInstanceGroupManager
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionInstanceGroupManager"
+
+/// EVEN spreads instances equally across the zones; ANY lets GCP pick based on
+/// available capacity.
+typealias TargetShape = "EVEN"|"ANY"|"ANY_SINGLE_ZONE"|"BALANCED"
+
+/// A name -> port mapping a backend service references by port name.
+@gcp.SubResourceHint
+open class NamedPort extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    port: Int
+}
+
+/// One zone the group may place instances in. GCP stores these as full URLs.
+@gcp.SubResourceHint
+open class DistributionPolicyZone extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    zone: String?
+}
+
+/// How instances are spread across zones. Omit it and GCP picks the region's
+/// zones with an EVEN shape.
+@gcp.SubResourceHint
+open class DistributionPolicy extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    zones: Listing<DistributionPolicyZone>?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    targetShape: TargetShape?
+}
+
+open class RegionInstanceGroupManagerResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionInstanceGroupManagerResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionInstanceGroupManagerResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionInstanceGroupManagerResolvable = (this) {
+        property = "name"
+    }
+
+    /// Self-link of the unmanaged group the MIG owns — what a backend service
+    /// points at.
+    hidden instanceGroup: RegionInstanceGroupManagerResolvable = (this) {
+        property = "instanceGroup"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionInstanceGroupManager extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Prefix GCP prepends to every generated VM name.
+    @gcp.FieldHint { createOnly = true }
+    baseInstanceName: String
+
+    /// InstanceTemplate self-link. Pass `template.res.selfLink` rather than a
+    /// bare name — GCP canonicalizes this to a full URL.
+    @gcp.FieldHint { createOnly = true }
+    instanceTemplate: (String|formae.Resolvable)
+
+    /// Number of VMs to keep running across the region. 0 creates the group
+    /// without any VMs.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    targetSize: Int?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    distributionPolicy: DistributionPolicy?
+
+    @gcp.FieldHint { createOnly = true }
+    namedPorts: Listing<NamedPort>?
+
+    /// Self-link of the regional instance group GCP creates for this MIG.
+    @gcp.FieldHint { hasProviderDefault = true }
+    instanceGroup: String?
+
+    hidden res: RegionInstanceGroupManagerResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

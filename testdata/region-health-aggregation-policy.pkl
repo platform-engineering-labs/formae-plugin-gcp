@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionHealthAggregationPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency: the policy is a threshold definition, referenced by a
+// backend service rather than referencing one itself.
+forma {
+  v.stack
+  v.target
+
+  new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
+    label = "plugin-sdk-test-region-health-aggregation-policy"
+    name = "formae-plugin-sdk-test-hap-\(v.testRunID)"
+    description = "Test health aggregation policy for plugin SDK conformance tests"
+    region = v.gcpRegion
+    policyType = "BACKEND_SERVICE_POLICY"
+    healthyPercentThreshold = 60
+  }
+}

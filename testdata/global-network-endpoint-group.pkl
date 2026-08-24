@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/globalNetworkEndpointGroup.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency internet NEG. Endpoints are attached by verb
+// (attachNetworkEndpoints) and are not modelled, so the group is created empty —
+// which is a valid state, just one that serves nothing yet.
+forma {
+  v.stack
+  v.target
+
+  new globalNetworkEndpointGroup.GlobalNetworkEndpointGroup {
+    label = "plugin-sdk-test-global-network-endpoint-group"
+    name = "formae-plugin-sdk-test-gneg-\(v.testRunID)"
+    description = "Test internet NEG for plugin SDK conformance tests"
+    networkEndpointType = "INTERNET_FQDN_PORT"
+    defaultPort = 443
+  }
+}

@@ -1,0 +1,89 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute Image (global)
+///
+/// A bootable disk image, normally captured from a persistent disk to serve as
+/// a golden image. Feed it to `instanceTemplate`'s
+/// `disks[].initializeParams.sourceImage`, or to `disk.sourceImage`.
+///
+/// Images are immutable in practice: `images.patch` only moves labels and
+/// description, and label edits need a `labelFingerprint` round-trip, so
+/// ponytail: update is off and a change replaces the image.
+module gcp.compute.image
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::Image"
+
+/// An OS capability the guest advertises (e.g. UEFI_COMPATIBLE, VIRTIO_SCSI_MULTIQUEUE).
+@gcp.SubResourceHint
+open class GuestOsFeature extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    type: String?
+}
+
+open class ImageResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ImageResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: ImageResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ImageResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Image extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// Image family. Pointing a disk or template at
+    /// `projects/<p>/global/images/family/<family>` always resolves to the
+    /// newest non-deprecated image in the family.
+    @gcp.FieldHint { createOnly = true }
+    family: String?
+
+    /// Self-link of the persistent disk to capture. Pass `disk.res.selfLink`
+    /// so formae creates the disk first.
+    @gcp.FieldHint { createOnly = true }
+    sourceDisk: (String|formae.Resolvable)?
+
+    @gcp.FieldHint { createOnly = true }
+    labels: Mapping<String, String>?
+
+    /// Regions or multi-regions holding the image, e.g. "eu". GCP picks the
+    /// source disk's location when omitted.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    storageLocations: Listing<String>?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    guestOsFeatures: Listing<GuestOsFeature>?
+
+    /// Size of the image's disk in GB — inherited from the source disk.
+    @gcp.FieldHint { hasProviderDefault = true }
+    diskSizeGb: String?
+
+    hidden res: ImageResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

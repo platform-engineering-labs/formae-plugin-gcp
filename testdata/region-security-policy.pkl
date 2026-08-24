@@ -1,0 +1,37 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionSecurityPolicy.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new regionSecurityPolicy.RegionSecurityPolicy {
+    label = "plugin-sdk-test-region-security-policy"
+    name = "formae-plugin-sdk-test-rsecpol-\(v.testRunID)"
+    region = v.gcpRegion
+    description = "Test regional Cloud Armor policy for plugin SDK conformance tests"
+    type = "CLOUD_ARMOR"
+    rules = new Listing {
+      // Required default rule.
+      new regionSecurityPolicy.Rule {
+        action = "allow"
+        priority = 2147483647
+        description = "default allow rule"
+        match = new regionSecurityPolicy.Match {
+          versionedExpr = "SRC_IPS_V1"
+          config = new regionSecurityPolicy.MatchConfig {
+            srcIpRanges = new Listing { "*" }
+          }
+        }
+      }
+    }
+  }
+}

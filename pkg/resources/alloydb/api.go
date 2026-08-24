@@ -38,13 +38,110 @@ var AlloyDBNativeID = base.NativeIDConfig{
 }
 
 // alloyDBPathBuilder builds
-// /projects/{project}/locations/{location}/{resourceType}[/{name}].
+// /projects/{project}/locations/{location}/{resourceType}[/{name}], or
+// /projects/{project}/locations/{location}/{parentType}/{parent}/{resourceType}[/{name}]
+// for resources nested under another (instances under a cluster).
 func alloyDBPathBuilder(ctx base.PathContext) string {
-	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, ctx.Location, ctx.ResourceType)
+	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
+	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	}
+	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {
 		path += "/" + ctx.ResourceName
 	}
 	return path
+}
+
+// AlloyDBInstanceNativeID - instances are two levels deep, so the default
+// pairwise parser would lose the owning cluster.
+var AlloyDBInstanceNativeID = ClusterScopedNativeID("instances")
+
+// AlloyDBUserNativeID - users sit at the same depth as instances.
+var AlloyDBUserNativeID = ClusterScopedNativeID("users")
+
+// ClusterScopedNativeID returns a NativeIDConfig for
+// "projects/{p}/locations/{loc}/clusters/{cluster}/{resourceType}/{id}". Each
+// leaf type gets its own check so a native ID belonging to a sibling type is
+// rejected rather than silently mis-parsed.
+func ClusterScopedNativeID(resourceType string) base.NativeIDConfig {
+	return base.NativeIDConfig{
+		Format: base.FullPathFormat,
+		Parser: func(nativeID string) (base.PathContext, error) {
+			parts := strings.Split(nativeID, "/")
+			if len(parts) != 8 || parts[0] != "projects" || parts[2] != "locations" ||
+				parts[4] != "clusters" || parts[6] != resourceType {
+				return base.PathContext{}, fmt.Errorf(
+					"invalid AlloyDB %s native ID: %s", resourceType, nativeID)
+			}
+			return base.PathContext{
+				Project:        parts[1],
+				Location:       parts[3],
+				ParentType:     "clusters",
+				ParentResource: parts[5],
+				ResourceType:   parts[6],
+				ResourceName:   parts[7],
+			}, nil
+		},
+	}
+}
+
+// AlloyDBUserOperations - unlike clusters and instances, users.create returns
+// the User itself rather than an Operation, so this path is synchronous.
+var AlloyDBUserOperations = base.OperationConfig{
+	Synchronous:            true,
+	OperationIDExtractor:   func(map[string]interface{}) string { return "" },
+	OperationURLBuilder:    func(base.PathContext, string) string { return "" },
+	NativeIDExtractor:      extractUserNativeID,
+	OperationStatusChecker: func(map[string]interface{}) (bool, error) { return true, nil },
+}
+
+// extractUserNativeID takes the full resource name the API returns, falling
+// back to composing it from context (delete returns an empty body).
+func extractUserNativeID(response map[string]interface{}, ctx base.PathContext) string {
+	if name, ok := response["name"].(string); ok {
+		if i := strings.Index(name, "projects/"); i >= 0 {
+			return name[i:]
+		}
+	}
+	if ctx.ResourceName == "" || ctx.ParentResource == "" {
+		return ""
+	}
+	return fmt.Sprintf("projects/%s/locations/%s/clusters/%s/users/%s",
+		ctx.Project, ctx.Location, ctx.ParentResource, ctx.ResourceName)
+}
+
+// AlloyDBInstanceOperations - as AlloyDBOperations, but the native ID keeps the
+// owning cluster in the path.
+var AlloyDBInstanceOperations = base.OperationConfig{
+	Synchronous:            false,
+	OperationIDExtractor:   extractOperationName,
+	OperationURLBuilder:    func(_ base.PathContext, opID string) string { return opID },
+	NativeIDExtractor:      extractInstanceNativeID,
+	OperationStatusChecker: checkOperationStatus,
+}
+
+// extractInstanceNativeID builds the nested instance path. On async create the
+// response is an Operation, so compose from context; fall back to the
+// operation's metadata.target, then to a direct resource response.
+func extractInstanceNativeID(response map[string]interface{}, ctx base.PathContext) string {
+	if ctx.ResourceName != "" && ctx.ParentResource != "" {
+		return fmt.Sprintf("projects/%s/locations/%s/clusters/%s/instances/%s",
+			ctx.Project, ctx.Location, ctx.ParentResource, ctx.ResourceName)
+	}
+	if md, ok := response["metadata"].(map[string]interface{}); ok {
+		if target, ok := md["target"].(string); ok {
+			if i := strings.Index(target, "projects/"); i >= 0 {
+				return target[i:]
+			}
+		}
+	}
+	if name, ok := response["name"].(string); ok && !strings.Contains(name, "/operations/") {
+		if i := strings.Index(name, "projects/"); i >= 0 {
+			return name[i:]
+		}
+	}
+	return ""
 }
 
 // extractOperationName returns the LRO operation name from a create/delete

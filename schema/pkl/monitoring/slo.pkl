@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Monitoring Slo (service level objective)
+///
+/// A reliability target on a service: "`goal` of the time, over
+/// `rollingPeriod`, the indicator is good". Nested under a service —
+/// /projects/{p}/services/{service}/serviceLevelObjectives/{name}.
+///
+/// ponytail: `serviceLevelIndicator` is passed through untyped. The indicator
+/// union (request-based vs windows-based, each with ratio / distribution-cut /
+/// threshold variants) is deep, and the API echoes it back exactly as sent, so
+/// a typed mirror would be a lot of schema for no validation gain today.
+module gcp.monitoring.slo
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::Slo"
+
+open class SloResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SloResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Slo extends formae.Resource {
+    hidden parent = this
+
+    /// SLO id, unique within the service. Sent as the
+    /// `serviceLevelObjectiveId` query parameter on create.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the owning service. This is a path component, not a body field —
+    /// pass `svc.res.name` so formae creates the service first.
+    @gcp.FieldHint { createOnly = true }
+    service: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    displayName: String?
+
+    /// Target fraction of good service, 0 < goal <= 1.
+    @gcp.FieldHint
+    goal: Number
+
+    /// Rolling window the goal is measured over, e.g. "604800s" (7 days).
+    /// Mutually exclusive with `calendarPeriod`.
+    @gcp.FieldHint
+    rollingPeriod: String?
+
+    /// "DAY", "WEEK", "FORTNIGHT" or "MONTH". Mutually exclusive with
+    /// `rollingPeriod`.
+    @gcp.FieldHint
+    calendarPeriod: String?
+
+    /// How "good" is measured. See the Monitoring ServiceLevelIndicator docs.
+    @gcp.FieldHint
+    serviceLevelIndicator: Mapping<String, Any>?
+
+    hidden res: SloResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,95 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute InstanceGroupManager (zonal, managed)
+///
+/// A managed instance group keeps `targetSize` VMs alive from an
+/// InstanceTemplate blueprint, recreating them when they fail. Pair it with
+/// `instanceTemplate.pkl`; a backend service targets the group the MIG owns.
+///
+/// ponytail: every field is createOnly for now — the API patches
+/// instanceTemplate/targetSize/namedPorts in place, but that path needs a
+/// verified update body before it is enabled, so a change replaces the MIG.
+module gcp.compute.instanceGroupManager
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::InstanceGroupManager"
+
+/// A name -> port mapping a backend service references by port name.
+@gcp.SubResourceHint
+open class NamedPort extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    port: Int
+}
+
+open class InstanceGroupManagerResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: InstanceGroupManagerResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: InstanceGroupManagerResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: InstanceGroupManagerResolvable = (this) {
+        property = "name"
+    }
+
+    /// Self-link of the unmanaged group the MIG owns — what a backend service
+    /// points at.
+    hidden instanceGroup: InstanceGroupManagerResolvable = (this) {
+        property = "instanceGroup"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class InstanceGroupManager extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    zone: String
+
+    /// Prefix GCP prepends to every generated VM name.
+    @gcp.FieldHint { createOnly = true }
+    baseInstanceName: String
+
+    /// InstanceTemplate self-link. GCP canonicalizes this to a full URL, so
+    /// pass `template.res.selfLink` rather than a bare name.
+    @gcp.FieldHint { createOnly = true }
+    instanceTemplate: (String|formae.Resolvable)
+
+    /// Number of VMs to keep running. 0 creates the group without any VMs.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    targetSize: Int?
+
+    @gcp.FieldHint { createOnly = true }
+    namedPorts: Listing<NamedPort>?
+
+    /// Self-link of the unmanaged instance group GCP creates for this MIG.
+    @gcp.FieldHint { hasProviderDefault = true }
+    instanceGroup: String?
+
+    hidden res: InstanceGroupManagerResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

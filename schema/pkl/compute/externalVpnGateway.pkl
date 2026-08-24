@@ -1,0 +1,80 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute ExternalVpnGateway (global)
+///
+/// Describes the *other* end of a VPN: the on-prem or other-cloud device, by
+/// its public IP(s). It holds no Google-side capacity — it exists so a
+/// `vpnTunnel` can name its peer. Pair with `haVpnGateway` (the Google side).
+///
+/// `redundancyType` must match the interface count: one interface for
+/// SINGLE_IP_INTERNALLY_REDUNDANT, two for TWO_IPS_REDUNDANCY, four for
+/// FOUR_IPS_REDUNDANCY.
+module gcp.compute.externalVpnGateway
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::ExternalVpnGateway"
+
+typealias RedundancyType = "SINGLE_IP_INTERNALLY_REDUNDANT"|"TWO_IPS_REDUNDANCY"|"FOUR_IPS_REDUNDANCY"
+
+/// One peer endpoint. `id` is 0-based and referenced by
+/// `vpnTunnel.peerExternalGatewayInterface`.
+@gcp.SubResourceHint
+open class ExternalVpnGatewayInterface extends formae.SubResource {
+    @gcp.FieldHint { createOnly = true }
+    id: Int?
+
+    /// Public IP of the peer device. Must not be an RFC 5735 reserved address —
+    /// the API rejects those when a tunnel is built against it.
+    @gcp.FieldHint { createOnly = true }
+    ipAddress: String?
+}
+
+open class ExternalVpnGatewayResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ExternalVpnGatewayResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: ExternalVpnGatewayResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ExternalVpnGatewayResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ExternalVpnGateway extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    redundancyType: RedundancyType?
+
+    @gcp.FieldHint { createOnly = true }
+    interfaces: Listing<ExternalVpnGatewayInterface>?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ExternalVpnGatewayResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

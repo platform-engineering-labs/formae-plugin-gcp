@@ -1,0 +1,116 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NetworkFirewallPolicyRule
+///
+/// One rule inside a `networkFirewallPolicy`. Without rules a policy carries
+/// only GCP's implied ones and enforces nothing, so this is the resource that
+/// makes a policy do work.
+///
+/// A rule is not a REST sub-collection: it is addressed by `(policy, priority)`
+/// through verbs on the policy (`addRule`, `getRule`, `patchRule`,
+/// `removeRule`). `priority` is therefore effectively the rule's identity —
+/// changing it removes one rule and adds another.
+module gcp.compute.networkFirewallPolicyRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NetworkFirewallPolicyRule"
+
+typealias RuleAction = "allow"|"deny"|"goto_next"|"apply_security_profile_group"
+
+typealias RuleDirection = "INGRESS"|"EGRESS"
+
+/// A protocol/port pair the rule matches.
+@gcp.SubResourceHint
+open class Layer4Config extends formae.SubResource {
+    /// "tcp", "udp", "icmp", "esp", "ah", "sctp", "ipip", or a protocol number.
+    @gcp.FieldHint
+    ipProtocol: String
+
+    /// Ports or ranges, e.g. ["443", "8080-8090"]. Omit for all ports.
+    @gcp.FieldHint
+    ports: Listing<String>?
+}
+
+/// What traffic the rule matches. At least one of the IP-range lists is
+/// required, alongside `layer4Configs`.
+@gcp.SubResourceHint
+open class RuleMatch extends formae.SubResource {
+    @gcp.FieldHint
+    srcIpRanges: Listing<String>?
+
+    @gcp.FieldHint
+    destIpRanges: Listing<String>?
+
+    @gcp.FieldHint
+    layer4Configs: Listing<Layer4Config>?
+}
+
+open class NetworkFirewallPolicyRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden ruleName: NetworkFirewallPolicyRuleResolvable = (this) {
+        property = "ruleName"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "ruleName"
+}
+open class NetworkFirewallPolicyRule extends formae.Resource {
+    hidden parent = this
+
+    /// A name for the rule. Not how the API addresses it — that is `priority` —
+    /// but it is what identifies the rule in a forma.
+    @gcp.FieldHint
+    ruleName: String
+
+    /// Id of the owning policy. A path component, not part of the rule body —
+    /// pass `policy.res.name` so formae creates the policy first.
+    @gcp.FieldHint { createOnly = true }
+    firewallPolicy: (String|formae.Resolvable)
+
+    /// Evaluation order, lower first. Must be below 2147483644, where GCP's
+    /// implied rules begin.
+    @gcp.FieldHint { createOnly = true }
+    priority: Int
+
+    @gcp.FieldHint
+    action: RuleAction
+
+    @gcp.FieldHint
+    direction: RuleDirection
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Passed through untyped. A typed sub-object with nested listings does not
+    /// survive the round-trip here — the same loss `SavedQuery.summaryFields`
+    /// shows — whereas an untyped mapping does, as `Slo.serviceLevelIndicator`
+    /// demonstrates.
+    @gcp.FieldHint
+    match: Mapping<String, Any>?
+
+    /// Log every connection the rule evaluates. GCP fills false.
+    @gcp.FieldHint { hasProviderDefault = true }
+    enableLogging: Boolean?
+
+    /// A disabled rule is kept but not evaluated.
+    @gcp.FieldHint { hasProviderDefault = true }
+    disabled: Boolean?
+
+    /// What the rule applies to — GCP fills INSTANCES.
+    @gcp.FieldHint { hasProviderDefault = true }
+    targetType: String?
+
+    hidden res: NetworkFirewallPolicyRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

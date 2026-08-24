@@ -1,0 +1,42 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/resourcePolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency snapshot schedule: daily snapshot at 04:00 UTC, kept 7 days,
+// dropped when the source disk goes away.
+forma {
+  v.stack
+  v.target
+
+  new resourcePolicy.ResourcePolicy {
+    label = "plugin-sdk-test-resource-policy"
+    name = "formae-plugin-sdk-test-rp-\(v.testRunID)"
+    description = "Test snapshot schedule for plugin SDK conformance tests"
+    region = v.gcpRegion
+    snapshotSchedulePolicy = new resourcePolicy.SnapshotSchedulePolicy {
+      schedule = new resourcePolicy.SnapshotSchedule {
+        dailySchedule = new resourcePolicy.DailyCycle {
+          daysInCycle = 1
+          startTime = "04:00"
+        }
+      }
+      retentionPolicy = new resourcePolicy.SnapshotRetentionPolicy {
+        maxRetentionDays = 7
+        onSourceDiskDelete = "APPLY_RETENTION_POLICY"
+      }
+      snapshotProperties = new resourcePolicy.SnapshotProperties {
+        labels = new Mapping {
+          ["environment"] = "test"
+          ["managed-by"] = "formae"
+        }
+      }
+    }
+  }
+}

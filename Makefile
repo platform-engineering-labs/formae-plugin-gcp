@@ -60,10 +60,17 @@ lint-reuse:
 add-license:
 	./scripts/add_license.sh
 
-## verify-schema: Validate PKL schema files
-## Checks that schema files are well-formed and follow formae conventions.
+## verify-schema: Validate PKL schema files and schema/provisioner parity
+## Checks that schema files are well-formed and follow formae conventions, then
+## that every declarable type has a provisioner and vice versa. The parity check
+## catches a class verify-schema alone cannot: a schema module whose Go
+## registration never landed still validates, and only fails when a user applies
+## it.
 verify-schema: schema-version
 	$(GO) run github.com/platform-engineering-labs/formae/pkg/plugin/testutil/cmd/verify-schema --namespace $(PLUGIN_NAMESPACE) ./schema/pkl
+	@echo ""
+	@echo "Checking schema/provisioner parity..."
+	@$(GO) test . -run 'TestEverySchemaTypeHasAProvisioner|TestEveryProvisionerHasASchemaType|TestKnownParityGapsAreStillGaps' -count=1
 
 ## schema-docs: Generate documentation for plugin schema in markdown format
 schema-docs:

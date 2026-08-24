@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/regionInstanceTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// Managed network + subnet the template's NIC attaches to, referenced by
+// self-link so they round-trip against the API's returned full URLs and so
+// formae creates them before the template.
+local net = new network.Network {
+  label = "plugin-sdk-test-rtmpl-net"
+  name = "formae-plugin-sdk-test-rtmpl-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-rtmpl-subnet"
+  name = "formae-plugin-sdk-test-rtmpl-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.101.0.0/24"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  new regionInstanceTemplate.RegionInstanceTemplate {
+    label = "plugin-sdk-test-region-instance-template"
+    name = "formae-plugin-sdk-test-rtmpl-\(v.testRunID)"
+    region = v.gcpRegion
+    description = "Test regional instance template for plugin SDK conformance tests"
+    properties = new regionInstanceTemplate.InstanceProperties {
+      machineType = "e2-micro"
+      disks = new Listing {
+        new regionInstanceTemplate.TemplateAttachedDisk {
+          boot = true
+          autoDelete = true
+          initializeParams = new regionInstanceTemplate.TemplateDiskInitializeParams {
+            sourceImage = "projects/debian-cloud/global/images/family/debian-12"
+          }
+        }
+      }
+      // Internal IP only (no accessConfigs) to comply with the
+      // compute.vmExternalIpAccess org policy in the test project.
+      networkInterfaces = new Listing {
+        new regionInstanceTemplate.TemplateNetworkInterface {
+          network = net.res.selfLink
+          subnetwork = subnet.res.selfLink
+        }
+      }
+      labels = new Mapping {
+        ["environment"] = "test"
+        ["managed-by"] = "formae"
+      }
+    }
+  }
+}

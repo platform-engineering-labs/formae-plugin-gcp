@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionDisk.pkl"
+import "@gcp/compute/regionInstantSnapshot.pkl"
+import "./config/vars.pkl" as v
+
+// Instant snapshots need an SSD-class source, so the regional disk is pd-ssd.
+// Blank (no sourceImage) keeps the create quick.
+local src = new regionDisk.RegionDisk {
+  label = "plugin-sdk-test-ris-disk"
+  project = v.gcpProject
+  region = v.gcpRegion
+  name = "formae-plugin-sdk-test-ris-disk-\(v.testRunID)"
+  description = "Source regional disk for the regional instant snapshot test"
+  sizeGb = 10
+  type = "pd-ssd"
+  replicaZones = new Listing {
+    "\(v.gcpRegion)-a"
+    "\(v.gcpRegion)-b"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+
+  new regionInstantSnapshot.RegionInstantSnapshot {
+    label = "plugin-sdk-test-region-instant-snapshot"
+    name = "formae-plugin-sdk-test-ris-\(v.testRunID)"
+    description = "Test regional instant snapshot for plugin SDK conformance tests"
+    region = v.gcpRegion
+    // Resolvable -> establishes disk-before-snapshot create ordering.
+    sourceDisk = src.res.selfLink
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

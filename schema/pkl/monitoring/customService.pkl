@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Monitoring CustomService
+///
+/// A hand-declared service, as opposed to one Cloud Monitoring discovers from
+/// App Engine / Cloud Run / GKE telemetry. It exists to hang
+/// `serviceLevelObjective` resources off — declare one per user-facing service
+/// whose reliability you want to track.
+///
+/// ponytail: update is off. `services.patch` works, but its updateMask would
+/// name `custom`, which is a service-type marker rather than an independently
+/// mutable field; `displayName` is the only thing worth changing.
+module gcp.monitoring.customService
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Monitoring::CustomService"
+
+open class CustomServiceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CustomServiceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class CustomService extends formae.Resource {
+    hidden parent = this
+
+    /// Service id, unique within the project. Sent as the `serviceId` query
+    /// parameter on create, not in the body.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    displayName: String?
+
+    /// Marks this as a custom (hand-declared) service. The provisioner injects
+    /// the empty object the API requires, so this normally stays unset.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    custom: Mapping<String, Any>?
+
+    hidden res: CustomServiceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,88 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute VpnTunnel (regional)
+///
+/// One IPsec tunnel between a Google-side `haVpnGateway` interface and a
+/// peer-side `externalVpnGateway` interface. An HA VPN needs a `router` for the
+/// BGP session that carries routes; add a router interface and BGP peer to
+/// finish the wiring.
+///
+/// ponytail: update is off — the API has no vpnTunnels.patch, so a change
+/// replaces the tunnel.
+module gcp.compute.vpnTunnel
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::VpnTunnel"
+
+open class VpnTunnelResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: VpnTunnelResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: VpnTunnelResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: VpnTunnelResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class VpnTunnel extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Google-side gateway. Pass `gw.res.selfLink`.
+    @gcp.FieldHint { createOnly = true }
+    vpnGateway: (String|formae.Resolvable)
+
+    /// Which gateway interface (0 or 1) this tunnel uses.
+    @gcp.FieldHint { createOnly = true }
+    vpnGatewayInterface: Int?
+
+    /// Peer-side gateway. Pass `egw.res.selfLink`.
+    @gcp.FieldHint { createOnly = true }
+    peerExternalGateway: (String|formae.Resolvable)?
+
+    /// Which peer interface id this tunnel targets.
+    @gcp.FieldHint { createOnly = true }
+    peerExternalGatewayInterface: Int?
+
+    /// Cloud Router carrying the BGP session. Pass `router.res.selfLink`.
+    @gcp.FieldHint { createOnly = true }
+    router: (String|formae.Resolvable)?
+
+    /// IKE pre-shared key. Write-only: the API returns only
+    /// `sharedSecretHash`. Wrap it so it stays out of plans and state, the way
+    /// `sslCertificate.privateKey` does.
+    @gcp.FieldHint { createOnly = true; writeOnly = true }
+    sharedSecret: (String|formae.Value)
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    ikeVersion: Int?
+
+    hidden res: VpnTunnelResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

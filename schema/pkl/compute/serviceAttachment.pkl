@@ -1,0 +1,116 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute ServiceAttachment (regional)
+///
+/// The producer end of Private Service Connect: it publishes an internal load
+/// balancer so consumers in other VPCs can reach it over private IPs. Consumers
+/// connect with a PSC endpoint; `networkAttachment` is the other side of the
+/// PSC story (interfaces rather than published services).
+///
+/// `natSubnets` must point at subnets whose `purpose` is
+/// PRIVATE_SERVICE_CONNECT — GCP draws consumer-side source addresses from
+/// them.
+///
+/// Updates are in-place: `serviceAttachments.patch` requires the current
+/// `fingerprint`, which the generic engine supplies through optimistic locking.
+module gcp.compute.serviceAttachment
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::ServiceAttachment"
+
+/// ACCEPT_AUTOMATIC publishes to any consumer project; ACCEPT_MANUAL restricts
+/// to the projects in `consumerAcceptLists`.
+typealias ConnectionPreference = "ACCEPT_AUTOMATIC"|"ACCEPT_MANUAL"
+
+/// A consumer project allowed to connect, with its endpoint quota.
+@gcp.SubResourceHint
+open class ConsumerProjectLimit extends formae.SubResource {
+    @gcp.FieldHint
+    projectIdOrNum: String?
+
+    @gcp.FieldHint
+    networkUrl: String?
+
+    @gcp.FieldHint
+    connectionLimit: Int?
+}
+
+open class ServiceAttachmentResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ServiceAttachmentResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: ServiceAttachmentResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ServiceAttachmentResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ServiceAttachment extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// The internal load balancer being published — a forwarding rule
+    /// self-link. Pass `rule.res.selfLink`.
+    @gcp.FieldHint { createOnly = true }
+    targetService: (String|formae.Resolvable)
+
+    /// Subnets with purpose PRIVATE_SERVICE_CONNECT that consumer traffic is
+    /// NATed through. Pass `subnet.res.selfLink`.
+    @gcp.FieldHint
+    natSubnets: Listing<String|formae.Resolvable>
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    connectionPreference: ConnectionPreference?
+
+    /// Prepend the PROXY protocol header so the backend can see the consumer's
+    /// original source. GCP fills false.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    enableProxyProtocol: Boolean?
+
+    /// DNS names consumers may use to reach the service.
+    @gcp.FieldHint
+    domainNames: Listing<String>?
+
+    /// Consumer projects allowed to connect, when `connectionPreference` is
+    /// ACCEPT_MANUAL.
+    @gcp.FieldHint
+    consumerAcceptLists: Listing<ConsumerProjectLimit>?
+
+    /// Consumer projects explicitly refused.
+    @gcp.FieldHint
+    consumerRejectLists: Listing<String>?
+
+    /// Re-evaluate existing connections against the accept/reject lists when
+    /// they change. GCP fills false.
+    @gcp.FieldHint { hasProviderDefault = true }
+    reconcileConnections: Boolean?
+
+    hidden res: ServiceAttachmentResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

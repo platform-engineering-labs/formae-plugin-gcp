@@ -1,0 +1,92 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Logging ProjectSink
+///
+/// Routes matching log entries out of a project to a destination: a log bucket,
+/// a Cloud Storage bucket, a BigQuery dataset, or a Pub/Sub topic.
+///
+/// Note on permissions: for non-log-bucket destinations the sink's writer
+/// identity must be granted write access on the destination, which is a
+/// separate IAM binding this resource does not manage.
+module gcp.logging.projectSink
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::ProjectSink"
+
+/// A carve-out from the sink's filter: entries matching `filter` are not routed.
+@gcp.SubResourceHint
+open class Exclusion extends formae.SubResource {
+    @gcp.FieldHint
+    name: String
+
+    @gcp.FieldHint
+    filter: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    disabled: Boolean?
+}
+
+open class ProjectSinkResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ProjectSinkResolvable = (this) {
+        property = "name"
+    }
+
+    /// Service account Logging writes as. Grant it access on the destination.
+    hidden writerIdentity: ProjectSinkResolvable = (this) {
+        property = "writerIdentity"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ProjectSink extends formae.Resource {
+    hidden parent = this
+
+    /// Sink id, unique within the project. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Where to route entries, e.g.
+    /// "logging.googleapis.com/projects/<p>/locations/global/buckets/<bucket>",
+    /// "storage.googleapis.com/<bucket>",
+    /// "bigquery.googleapis.com/projects/<p>/datasets/<ds>",
+    /// "pubsub.googleapis.com/projects/<p>/topics/<topic>".
+    @gcp.FieldHint
+    destination: (String|formae.Resolvable)
+
+    /// Advanced logs filter. Empty routes every entry.
+    @gcp.FieldHint
+    filter: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// A disabled sink routes nothing but keeps its configuration.
+    @gcp.FieldHint { hasProviderDefault = true }
+    disabled: Boolean?
+
+    @gcp.FieldHint
+    exclusions: Listing<Exclusion>?
+
+    /// Service account Logging writes as — server-assigned.
+    @gcp.FieldHint { hasProviderDefault = true }
+    writerIdentity: String?
+
+    hidden res: ProjectSinkResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

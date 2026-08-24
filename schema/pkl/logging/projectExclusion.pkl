@@ -1,0 +1,54 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Logging ProjectExclusion
+///
+/// Drops matching entries before they are stored or billed — the standard lever
+/// for cutting log volume from a noisy source. Exclusions apply to the
+/// project's `_Default` bucket; entries a sink routes elsewhere are unaffected.
+module gcp.logging.projectExclusion
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::ProjectExclusion"
+
+open class ProjectExclusionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ProjectExclusionResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ProjectExclusion extends formae.Resource {
+    hidden parent = this
+
+    /// Exclusion id, unique within the project. Immutable — the API rejects a
+    /// patch that names it ("name cannot be changed").
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Advanced logs filter selecting the entries to drop.
+    @gcp.FieldHint
+    filter: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// A disabled exclusion keeps its configuration but drops nothing.
+    @gcp.FieldHint { hasProviderDefault = true }
+    disabled: Boolean?
+
+    hidden res: ProjectExclusionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

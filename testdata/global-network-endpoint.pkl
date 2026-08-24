@@ -1,0 +1,38 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/globalNetworkEndpointGroup.pkl"
+import "@gcp/compute/globalNetworkEndpoint.pkl"
+import "./config/vars.pkl" as v
+
+// An internet NEG plus the endpoint that gives it something to serve. The group
+// alone was inert; this pair is the usable unit.
+local neg = new globalNetworkEndpointGroup.GlobalNetworkEndpointGroup {
+  label = "plugin-sdk-test-gnep-neg"
+  name = "formae-plugin-sdk-test-gnep-neg-\(v.testRunID)"
+  description = "Internet NEG for the endpoint conformance test"
+  networkEndpointType = "INTERNET_FQDN_PORT"
+  defaultPort = 443
+}
+
+forma {
+  v.stack
+  v.target
+
+  neg
+
+  new globalNetworkEndpoint.GlobalNetworkEndpoint {
+    label = "plugin-sdk-test-global-network-endpoint"
+    // Resolvable -> the group exists before the attach verb runs.
+    networkEndpointGroup = neg.res.name
+    // example.com is reserved by IANA for documentation, so this points at
+    // nothing that could receive traffic.
+    fqdn = "origin.example.com"
+    port = 443
+  }
+}

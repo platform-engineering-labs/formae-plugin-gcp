@@ -1,0 +1,77 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/instanceTemplate.pkl"
+import "@gcp/compute/regionInstanceGroupManager.pkl"
+import "./config/vars.pkl" as v
+
+// Regional MIG: net + subnet + template + manager.
+// targetSize = 0 so no VM boots — the test project has no Cloud NAT and the org
+// policy forbids external IPs, so a VM could never pull its image. The MIG
+// object is what is under test.
+//
+// distributionPolicy is left unset: GCP picks the region's zones with an EVEN
+// shape and echoes them back as full URLs, so declaring short zone names here
+// would read back as drift.
+local net = new network.Network {
+  label = "plugin-sdk-test-rmig-net"
+  name = "formae-plugin-sdk-test-rmig-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-rmig-subnet"
+  name = "formae-plugin-sdk-test-rmig-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.95.0.0/24"
+}
+local tmpl = new instanceTemplate.InstanceTemplate {
+  label = "plugin-sdk-test-rmig-template"
+  name = "formae-plugin-sdk-test-rmig-tmpl-\(v.testRunID)"
+  description = "Blueprint for the regional MIG conformance test"
+  properties = new instanceTemplate.InstanceProperties {
+    machineType = "e2-micro"
+    disks = new Listing {
+      new instanceTemplate.TemplateAttachedDisk {
+        boot = true
+        autoDelete = true
+        initializeParams = new instanceTemplate.TemplateDiskInitializeParams {
+          sourceImage = "projects/debian-cloud/global/images/family/debian-12"
+        }
+      }
+    }
+    networkInterfaces = new Listing {
+      new instanceTemplate.TemplateNetworkInterface {
+        network = net.res.selfLink
+        subnetwork = subnet.res.selfLink
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+  tmpl
+
+  new regionInstanceGroupManager.RegionInstanceGroupManager {
+    label = "plugin-sdk-test-region-instance-group-manager"
+    name = "formae-plugin-sdk-test-rmig-\(v.testRunID)"
+    description = "Test regional managed instance group for plugin SDK conformance tests"
+    region = v.gcpRegion
+    baseInstanceName = "formae-rmig-vm"
+    // Resolvable -> establishes template-before-MIG create ordering.
+    instanceTemplate = tmpl.res.selfLink
+    targetSize = 0
+  }
+}

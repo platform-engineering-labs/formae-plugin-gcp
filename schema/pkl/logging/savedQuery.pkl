@@ -1,0 +1,94 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Logging SavedQuery
+///
+/// A stored Logs Explorer query. Declaring these keeps the queries an on-call
+/// rotation actually uses in version control instead of in someone's browser.
+///
+/// `visibility` is required: the API refuses a query that is neither PRIVATE
+/// (visible only to its creator) nor SHARED (visible project-wide).
+module gcp.logging.savedQuery
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::SavedQuery"
+
+typealias Visibility = "PRIVATE"|"SHARED"
+
+/// A column pinned in the Logs Explorer results table.
+@gcp.SubResourceHint
+open class SummaryField extends formae.SubResource {
+    @gcp.FieldHint
+    field: String?
+}
+
+/// A Logs Explorer (filter-based) query.
+@gcp.SubResourceHint
+open class LoggingQuery extends formae.SubResource {
+    /// Advanced logs filter this query runs.
+    @gcp.FieldHint
+    filter: String?
+
+    /// createOnly: the create path carries these correctly, but they are lost
+    /// on an in-place update (the API preserves them under the same updateMask,
+    /// so the value goes missing before the request is sent). Marking the field
+    /// createOnly makes a change replace the query, which reaches the right end
+    /// state instead of silently dropping the columns.
+    @gcp.FieldHint { createOnly = true }
+    summaryFields: Listing<SummaryField>?
+
+    @gcp.FieldHint
+    summaryFieldStart: Int?
+
+    @gcp.FieldHint
+    summaryFieldEnd: Int?
+}
+
+open class SavedQueryResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SavedQueryResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class SavedQuery extends formae.Resource {
+    hidden parent = this
+
+    /// Query id, unique within the project and location. Sent as the
+    /// `savedQueryId` query parameter on create.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Where the query is stored, e.g. "global". A path component, not a body
+    /// field.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// PRIVATE or SHARED. Required — the API rejects a query with neither.
+    @gcp.FieldHint
+    visibility: Visibility
+
+    @gcp.FieldHint
+    loggingQuery: LoggingQuery?
+
+    hidden res: SavedQueryResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,75 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP AlloyDB Backup
+///
+/// An on-demand backup of an AlloyDB cluster. Location-scoped rather than nested
+/// under the cluster: a backup names its cluster in the body and outlives it, so
+/// it can be restored into a new cluster after the original is gone.
+///
+/// A backup needs a serving primary instance, so pass
+/// `instance.res.cluster` rather than the cluster's own resolvable — that yields
+/// the same cluster id while ordering the backup after the instance.
+///
+/// ponytail: update is off, matching the rest of the AlloyDB set — create and
+/// delete are the async paths this proves out.
+module gcp.alloydb.alloydbBackup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AlloyDB::Backup"
+
+/// ON_DEMAND is a backup you asked for; AUTOMATED and CONTINUOUS are produced
+/// by the cluster's own backup policy.
+typealias BackupType = "ON_DEMAND"|"AUTOMATED"|"CONTINUOUS"
+
+open class BackupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BackupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Backup extends formae.Resource {
+    hidden parent = this
+
+    /// Backup id, unique within the location. Sent as the `backupId` query
+    /// parameter on create.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the cluster to back up. The API takes a full resource path; the
+    /// provisioner expands this short id, and folds it back on read.
+    @gcp.FieldHint { createOnly = true }
+    cluster: (String|formae.Resolvable)
+
+    /// Region the cluster lives in.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    type: BackupType?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: BackupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

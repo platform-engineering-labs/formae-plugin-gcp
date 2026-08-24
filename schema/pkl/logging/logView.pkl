@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Logging LogView
+///
+/// A filtered window onto a log bucket. Views are the unit of read access:
+/// grant a team `roles/logging.viewAccessor` on a view and they see only the
+/// entries its `filter` selects, rather than the whole bucket.
+///
+/// Nested three levels deep —
+/// /projects/{p}/locations/{location}/buckets/{bucket}/views/{name}.
+module gcp.logging.logView
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::LogView"
+
+open class LogViewResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: LogViewResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class LogView extends formae.Resource {
+    hidden parent = this
+
+    /// View id, unique within the bucket. Sent as the `viewId` query parameter
+    /// on create, not in the body.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the bucket this view reads from, e.g. "_Default". A path
+    /// component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    bucket: (String|formae.Resolvable)
+
+    /// Bucket location, e.g. "global" or "europe-west1". Must match the
+    /// bucket's own location.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Selects the entries this view exposes. Empty exposes the whole bucket.
+    @gcp.FieldHint
+    filter: String?
+
+    hidden res: LogViewResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

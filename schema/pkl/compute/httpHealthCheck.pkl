@@ -1,0 +1,82 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute HttpHealthCheck (global, legacy)
+///
+/// The legacy HTTP health check, kept alive by one thing: `targetPool.healthChecks`
+/// accepts only these, not the modern `healthCheck`. Reach for `healthCheck` /
+/// `regionHealthCheck` for every other load balancer; use this one when you are
+/// wiring a network load balancer through a target pool.
+module gcp.compute.httpHealthCheck
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::HttpHealthCheck"
+
+open class HttpHealthCheckResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: HttpHealthCheckResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: HttpHealthCheckResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: HttpHealthCheckResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class HttpHealthCheck extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// TCP port to probe. GCP defaults to 80.
+    @gcp.FieldHint { hasProviderDefault = true }
+    port: Int?
+
+    /// Path to request. GCP defaults to "/".
+    @gcp.FieldHint { hasProviderDefault = true }
+    requestPath: String?
+
+    /// Host header to send. GCP returns an empty string when unset, in which
+    /// case the backend's IP is used.
+    @gcp.FieldHint { hasProviderDefault = true }
+    host: String?
+
+    /// Seconds between probes. GCP defaults to 5.
+    @gcp.FieldHint { hasProviderDefault = true }
+    checkIntervalSec: Int?
+
+    /// Seconds to wait for a response. Must not exceed `checkIntervalSec`.
+    @gcp.FieldHint { hasProviderDefault = true }
+    timeoutSec: Int?
+
+    /// Consecutive successes before a backend is called healthy.
+    @gcp.FieldHint { hasProviderDefault = true }
+    healthyThreshold: Int?
+
+    /// Consecutive failures before a backend is called unhealthy.
+    @gcp.FieldHint { hasProviderDefault = true }
+    unhealthyThreshold: Int?
+
+    hidden res: HttpHealthCheckResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

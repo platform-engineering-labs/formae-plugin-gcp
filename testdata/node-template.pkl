@@ -1,0 +1,32 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/nodeTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// Zero-dependency, and free: a template provisions no hardware. The paired
+// nodeGroup that would reserve physical nodes is deliberately not created — it
+// bills for a whole sole-tenant host.
+//
+// n1-node-96-624 is the most widely available sole-tenant type; confirm with
+// `gcloud compute sole-tenancy node-types list` if the region changes.
+forma {
+  v.stack
+  v.target
+
+  new nodeTemplate.NodeTemplate {
+    label = "plugin-sdk-test-node-template"
+    name = "formae-plugin-sdk-test-nt-\(v.testRunID)"
+    description = "Test sole-tenant node template for plugin SDK conformance tests"
+    region = v.gcpRegion
+    nodeType = "n1-node-96-624"
+    nodeAffinityLabels = new Mapping {
+      ["workload"] = "conformance"
+    }
+  }
+}

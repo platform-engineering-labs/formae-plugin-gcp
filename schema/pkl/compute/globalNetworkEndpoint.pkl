@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute GlobalNetworkEndpoint
+///
+/// One endpoint inside a `globalNetworkEndpointGroup` — the external origin an
+/// HTTP(S) load balancer or Cloud CDN actually forwards to. A group without
+/// endpoints serves nothing, so this is what makes the group useful.
+///
+/// The endpoint is not a REST resource: it is a member of the group, attached and
+/// detached with `attachNetworkEndpoints` / `detachNetworkEndpoints`, so this is
+/// a hand-written provisioner.
+///
+/// Address the origin with `fqdn` **or** `ipAddress`, never both — which one is
+/// valid depends on the group's `networkEndpointType`.
+///
+/// ponytail: nothing is updatable — an endpoint is just a (host, port) pair, so
+/// a change detaches and reattaches.
+module gcp.compute.globalNetworkEndpoint
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::GlobalNetworkEndpoint"
+
+open class GlobalNetworkEndpointResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden fqdn: GlobalNetworkEndpointResolvable = (this) {
+        property = "fqdn"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "fqdn"
+}
+open class GlobalNetworkEndpoint extends formae.Resource {
+    hidden parent = this
+
+    /// Name of the owning group. A path component, not a body field — pass
+    /// `neg.res.name` so formae creates the group first.
+    @gcp.FieldHint { createOnly = true }
+    networkEndpointGroup: (String|formae.Resolvable)
+
+    /// Hostname of the origin, for an INTERNET_FQDN_PORT group.
+    @gcp.FieldHint { createOnly = true }
+    fqdn: String?
+
+    /// Literal address of the origin, for an INTERNET_IP_PORT group. Mutually
+    /// exclusive with `fqdn`.
+    @gcp.FieldHint { createOnly = true }
+    ipAddress: String?
+
+    /// Port the origin listens on.
+    @gcp.FieldHint { createOnly = true }
+    port: Int
+
+    hidden res: GlobalNetworkEndpointResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
