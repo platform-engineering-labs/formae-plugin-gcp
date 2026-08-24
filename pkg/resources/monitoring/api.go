@@ -79,8 +79,15 @@ var MonitoringNativeID = base.NativeIDConfig{
 // resources nested under another (SLOs under a service).
 func monitoringPathBuilder(ctx base.PathContext) string {
 	path := fmt.Sprintf("/projects/%s", ctx.Project)
-	if ctx.ParentType != "" && ctx.ParentResource != "" {
+	switch {
+	case ctx.ParentType != "" && ctx.ParentResource != "":
 		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	case ctx.ResourceType == "serviceLevelObjectives":
+		// Discovery lists with no properties, so no owning service is known.
+		// "services/-" lists the SLOs of every service, which is the only way an
+		// SLO can be discovered rather than merely managed. Create and read
+		// always carry a real service, so they never reach this branch.
+		path += "/services/-"
 	}
 	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {

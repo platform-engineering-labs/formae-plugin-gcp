@@ -139,6 +139,15 @@ func loggingLocationPathBuilder(ctx base.PathContext) string {
 	if location == "" {
 		location = "global"
 	}
+	// Log scopes exist only in the global location - the API rejects anything
+	// else outright ("The location europe-central2 is not supported by
+	// logScopes, which may only be global"), including the "-" wildcard. A
+	// target configured with a region would otherwise send discovery's List to a
+	// location that can never hold a scope, so the resource would be manageable
+	// but never discoverable.
+	if ctx.ResourceType == "logScopes" {
+		location = "global"
+	}
 	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, location)
 	if ctx.ParentResource != "" {
 		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)

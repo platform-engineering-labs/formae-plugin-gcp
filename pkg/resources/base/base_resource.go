@@ -380,21 +380,24 @@ func (b *BaseResource) List(
 	}
 
 	// Handle parent resource for nested resources
+	// Discovery lists with no AdditionalProperties, so a nested resource has no
+	// owning parent to name. Erroring here made every parented resource
+	// undiscoverable by construction, so instead the parent is left empty and
+	// the API config decides: a path builder can substitute the API's wildcard
+	// ("services/-" for Monitoring SLOs) where one exists. Where none exists the
+	// request simply fails and the caller sees no resources - no worse than
+	// before, and it no longer masks the ones that can be listed.
 	if b.ResourceConfig.ParentResource != nil && b.ResourceConfig.ParentResource.RequiresParent {
-		if request.AdditionalProperties == nil {
-			return nil, fmt.Errorf("nested resource %s requires parent info in AdditionalProperties", request.ResourceType)
-		}
-		// Extract parent info from additional properties
 		// Use PropertyName if specified, otherwise fall back to ParentType
 		propName := b.ResourceConfig.ParentResource.PropertyName
 		if propName == "" {
 			propName = b.ResourceConfig.ParentResource.ParentType
 		}
-		if parent, ok := request.AdditionalProperties[propName]; ok {
-			pathCtx.ParentResource = parent
-			pathCtx.ParentType = b.ResourceConfig.ParentResource.ParentType
-		} else {
-			return nil, fmt.Errorf("nested resource %s requires '%s' in AdditionalProperties", request.ResourceType, propName)
+		if request.AdditionalProperties != nil {
+			if parent, ok := request.AdditionalProperties[propName]; ok && parent != "" {
+				pathCtx.ParentResource = parent
+				pathCtx.ParentType = b.ResourceConfig.ParentResource.ParentType
+			}
 		}
 	}
 

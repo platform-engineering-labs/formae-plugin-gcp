@@ -414,6 +414,20 @@ Together these close the managed-instance-group gap: the plugin previously had
 
 ### Fixed
 
+- **Parented resources were undiscoverable by construction.** `BaseResource.List`
+  returned an error whenever a resource declared `RequiresParent` and the caller
+  supplied no parent — which is exactly how discovery calls it. It now leaves the
+  parent empty and lets the API config decide, so a path builder can substitute
+  the API's own wildcard where one exists. `monitoringPathBuilder` uses
+  `services/-` for `serviceLevelObjectives`, which lists every service's SLOs;
+  create and read always carry a real service and never reach that branch.
+
+- **Log scopes were listed in the wrong location.** They exist only in `global` —
+  the API rejects a region *and* the `-` wildcard ("which may only be global") —
+  but discovery has no properties to declare a location with, so `List` used the
+  target's region and never saw them. The path builder now pins `logScopes` to
+  `global`.
+
 - **Two resources could be managed but never discovered.** `TestPluginDiscovery`
   calls `List` with no hints, and both
   `GCP::Compute::GlobalNetworkEndpoint` and

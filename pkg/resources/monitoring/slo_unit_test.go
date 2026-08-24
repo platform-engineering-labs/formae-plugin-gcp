@@ -97,3 +97,28 @@ func TestCustomServiceMarkerInjectedOnCreate(t *testing.T) {
 		t.Errorf("custom marker not injected as an empty object: %#v", out)
 	}
 }
+
+// Discovery lists with no properties, so no owning service is known and both
+// ParentType and ParentResource are empty. "services/-" lists every service's
+// SLOs, which is the only way an SLO becomes discoverable; a real service must
+// still win when one is supplied.
+func TestSloCollectionPathUsesServiceWildcardForDiscovery(t *testing.T) {
+	got := monitoringPathBuilder(base.PathContext{
+		Project: "dev-1", ResourceType: "serviceLevelObjectives",
+	})
+	if want := "/projects/dev-1/services/-/serviceLevelObjectives"; got != want {
+		t.Errorf("discovery path: %q, want %q", got, want)
+	}
+	got = monitoringPathBuilder(base.PathContext{
+		Project: "dev-1", ParentType: "services", ParentResource: "svc-a",
+		ResourceType: "serviceLevelObjectives", ResourceName: "slo-a",
+	})
+	if want := "/projects/dev-1/services/svc-a/serviceLevelObjectives/slo-a"; got != want {
+		t.Errorf("addressed path: %q", got)
+	}
+	// An unrelated monitoring resource keeps its flat path.
+	got = monitoringPathBuilder(base.PathContext{Project: "dev-1", ResourceType: "alertPolicies"})
+	if want := "/projects/dev-1/alertPolicies"; got != want {
+		t.Errorf("flat path regressed: %q", got)
+	}
+}
