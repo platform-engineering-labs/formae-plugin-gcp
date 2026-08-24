@@ -41,6 +41,7 @@ func (b *BaseResource) Create(
 		return b.createFailureResult(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
+	props = UnwrapValues(props)
 
 	// Build path context
 	pathCtx := b.buildPathContext(request.TargetConfig, props)

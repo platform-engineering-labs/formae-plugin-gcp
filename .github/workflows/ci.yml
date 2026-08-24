@@ -226,6 +226,17 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=30
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
               ;;
+            alloydb-cluster|alloydb-instance|alloydb-user|alloydb-backup)
+              # An AlloyDB cluster takes 10-25 min to provision, and instance,
+              # user and backup each create one first, so every case in this
+              # family pays that cost before its own resource starts. The 5m
+              # default expires long before the cluster is READY, which is what
+              # "timeout waiting for command" on Create means here.
+              TIMEOUT_ARG="TIMEOUT=30"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
+              export FORMAE_TEST_OOB_TIMEOUT=30
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
+              ;;
             servicenetworking-connection)
               # PSA connections are async and global (VPC peering); create and
               # especially discovery take longer to surface in inventory than any

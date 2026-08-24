@@ -422,6 +422,17 @@ Together these close the managed-instance-group gap: the plugin previously had
   `services/-` for `serviceLevelObjectives`, which lists every service's SLOs;
   create and read always carry a real service and never reach that branch.
 
+- **A wrapped value reached the API as an empty field.** A forma can wrap a
+  property — `formae.value(secret).opaque` keeps a secret out of plans and state
+  — and formae unwraps those before calling a plugin, so the normal apply path
+  never sees a wrapper. The conformance harness's out-of-band path calls the
+  plugin directly with the evaluated forma, wrappers intact, so
+  `sharedSecret` arrived as `{"$value": "..."}` and GCP rejected it as empty
+  ("A shared secret must be..."), failing `vpn-tunnel`'s CreateOOB step. New
+  `base.UnwrapValues` unwraps them anywhere in the properties — nested and
+  inside lists — while leaving resolvables (`$res`) alone, since formae resolves
+  those and a half-resolved reference must not be mistaken for a literal.
+
 - **Saved queries were created where discovery could not look.** The fixture
   pinned `location = "global"` while discovery, having no properties to declare a
   location with, lists in the target's location. Saved queries are supported in
