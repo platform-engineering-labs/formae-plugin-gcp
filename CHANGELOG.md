@@ -729,6 +729,34 @@ Together these close the managed-instance-group gap: the plugin previously had
 
 ### Fixed
 
+- **More resources could be managed but never discovered.** Discovery calls `List`
+  with no hints, and several resources answered with an empty list or the wrong
+  location:
+  - `ArtifactRegistry::Rule` — a rule lives under a repository and Artifact
+    Registry has no wildcard for either segment (`repositories/-` answers
+    "Repository does not exist"), so listing now walks the repositories first.
+    Registered as a List-only override, leaving the generic create, read, update
+    and delete in place.
+  - `Compute::BackendServiceSignedUrlKey` — now reads the aggregated
+    backend-service list, one call carrying every service's `cdnPolicy`, rather
+    than requiring a service to be named.
+  - `Compute::DiskAsyncReplication` — now reports every pair whose replication is
+    ACTIVE. Stopped pairs stay absent deliberately: `Read` treats them as gone,
+    so listing them would produce ids that immediately read as not-found.
+  - `Eventarc::MessageBus` / `Pipeline` — Advanced runs in a subset of regions, so
+    a forma pins one that is rarely the target's, and discovery looked only in the
+    target's. `PathContext` gained an `IsList` marker so a path builder can tell a
+    collection URL built for listing from one built for create or read; the
+    Eventarc builder uses `locations/-` for the Advanced collections when listing.
+
+- **A synchronous update stored properties the read path never returns.** The
+  previous fix echoed the update response into state, but some APIs echo fields
+  their GET omits — a Storage bucket's PATCH returns `defaultObjectAcl`, which
+  made conformance report a property "not expected and not a provider default".
+  The update now reads the resource back instead, so state after an update has
+  exactly the shape it has after a create or a sync.
+
+
 - **Parented resources were undiscoverable by construction.** `BaseResource.List`
   returned an error whenever a resource declared `RequiresParent` and the caller
   supplied no parent — which is exactly how discovery calls it. It now leaves the

@@ -253,37 +253,70 @@ func (p *SignedUrlKeyProvisioner) Delete(
 	}, nil
 }
 
-// List enumerates one backend service's key names. Keys live inside their
-// backend service, so discovery has to be told which one to look in.
+// List reports every signed-URL key in the project. Discovery calls this with no
+// hints, so with no service named it reads the aggregated backend-service list -
+// one call that carries each service's cdnPolicy, rather than a GET per service.
+// A named service is still honoured as a fast path.
 func (p *SignedUrlKeyProvisioner) List(
 	ctx context.Context, request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	backendService := ""
-	if request.AdditionalProperties != nil {
-		backendService = request.AdditionalProperties[signedUrlKeyBackendProperty]
-	}
 	project := p.projectFor(request.TargetConfig, "")
-	if backendService == "" || project == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
-
 	client, err := transport.NewClient(ctx, p.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
-	resp, err := client.SendRequest(ctx, transport.RequestOptions{
+
+	if request.AdditionalProperties != nil {
+		if service := request.AdditionalProperties[signedUrlKeyBackendProperty]; service != "" {
+			resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
+				Method: "GET",
+				URL:    p.backendServiceURL(project, service),
+			})
+			if rErr != nil {
+				wrapped := transport.WrapError(rErr, "failed to read backend service")
+				return nil, fmt.Errorf("%s", wrapped.Message)
+			}
+			nativeIDs := []string{}
+			for _, name := range signedUrlKeyNames(resp.Body) {
+				nativeIDs = append(nativeIDs, buildSignedUrlKeyNativeID(project, service, name))
+			}
+			return &resource.ListResult{NativeIDs: nativeIDs}, nil
+		}
+	}
+
+	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
-		URL:    p.backendServiceURL(project, backendService),
+		URL:    fmt.Sprintf("%s/projects/%s/aggregated/backendServices", p.APIConfig.BaseURL, project),
 	})
-	if err != nil {
-		wrapped := transport.WrapError(err, "failed to list signed URL keys")
+	if rErr != nil {
+		wrapped := transport.WrapError(rErr, "failed to list backend services")
 		return nil, fmt.Errorf("%s", wrapped.Message)
 	}
 
-	names := signedUrlKeyNames(resp.Body)
-	nativeIDs := make([]string, 0, len(names))
-	for _, name := range names {
-		nativeIDs = append(nativeIDs, buildSignedUrlKeyNativeID(project, backendService, name))
+	nativeIDs := []string{}
+	scopes, _ := resp.Body["items"].(map[string]interface{})
+	for _, payload := range scopes {
+		entry, ok := payload.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		services, _ := entry["backendServices"].([]interface{})
+		for _, raw := range services {
+			svc, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			name, _ := svc["name"].(string)
+			if name == "" {
+				continue
+			}
+			for _, key := range signedUrlKeyNames(svc) {
+				nativeIDs = append(nativeIDs, buildSignedUrlKeyNativeID(project, name, key))
+			}
+		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }

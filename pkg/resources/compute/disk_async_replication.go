@@ -303,12 +303,61 @@ func (p *DiskAsyncReplicationProvisioner) Delete(
 	}, nil
 }
 
-// List needs to be told which pair to look at: the link is a relationship
-// between two disks, not something the API enumerates.
+// List reports every active replication pair in the project. Discovery calls
+// this with no hints, so it walks the aggregated disk list and reports each
+// secondary whose replication is ACTIVE, naming the primary it is paired with.
+// Stopped pairs are deliberately absent: Read treats them as gone, so listing
+// them would produce ids that immediately read as not-found.
 func (p *DiskAsyncReplicationProvisioner) List(
 	ctx context.Context, request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	return &resource.ListResult{NativeIDs: []string{}}, nil
+	project := p.projectFor(request.TargetConfig, "")
+	if project == "" {
+		return &resource.ListResult{NativeIDs: []string{}}, nil
+	}
+	client, err := transport.NewClient(ctx, p.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
+		Method: "GET",
+		URL:    fmt.Sprintf("%s/projects/%s/aggregated/disks", p.APIConfig.BaseURL, project),
+	})
+	if rErr != nil {
+		wrapped := transport.WrapError(rErr, "failed to list disks")
+		return nil, fmt.Errorf("%s", wrapped.Message)
+	}
+
+	nativeIDs := []string{}
+	scopes, _ := resp.Body["items"].(map[string]interface{})
+	for scope, payload := range scopes {
+		if !strings.HasPrefix(scope, "zones/") {
+			continue
+		}
+		secondaryZone := strings.TrimPrefix(scope, "zones/")
+		entry, ok := payload.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		disks, _ := entry["disks"].([]interface{})
+		for _, raw := range disks {
+			disk, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if asyncReplicationState(disk) != asyncReplicationActiveState {
+				continue
+			}
+			secondary, _ := disk["name"].(string)
+			primaryZone, primary, ok := diskRefParts(asyncPrimaryDiskRef(disk))
+			if !ok || secondary == "" {
+				continue
+			}
+			nativeIDs = append(nativeIDs, buildAsyncReplicationNativeID(
+				project, primaryZone, primary, secondaryZone, secondary))
+		}
+	}
+	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
 // Status routes through the shared read-back so post-create state reflects the

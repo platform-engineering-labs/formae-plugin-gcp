@@ -352,6 +352,7 @@ func (b *BaseResource) List(
 		Zone:         cfg.Zone,
 		Location:     cfg.Location, // Container/CloudRun use location (no Region fallback)
 		ResourceType: b.ResourceConfig.ResourceType,
+		IsList:       true,
 	}
 
 	// Respect resource scope
