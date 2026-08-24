@@ -376,7 +376,7 @@ func (p *RouterSubResourceProvisioner) List(
 	}
 	project := p.projectFor(request.TargetConfig, "")
 	region = p.regionFor(map[string]interface{}{"region": region}, request.TargetConfig, "")
-	if router == "" || project == "" || region == "" {
+	if project == "" || region == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
 
@@ -384,24 +384,43 @@ func (p *RouterSubResourceProvisioner) List(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
-	resp, err := client.SendRequest(ctx, transport.RequestOptions{
-		Method: "GET",
-		URL:    p.routerURL(project, region, router) + "/" + p.kind.listVerb,
-	})
-	if err != nil {
-		wrapped := transport.WrapError(err, "failed to list router route policies")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+
+	// A named router is the caller telling us where to look. Discovery names
+	// none, and these objects live inside their router rather than in a
+	// collection of their own, so the routers have to be walked first.
+	routers := []string{router}
+	if router == "" {
+		routers, err = listComputeCollectionNames(ctx, client,
+			fmt.Sprintf("%s/projects/%s/regions/%s/routers", p.APIConfig.BaseURL, project, region),
+			"routers")
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	objects, _ := resp.Body["result"].([]interface{})
-	nativeIDs := make([]string, 0, len(objects))
-	for _, entry := range objects {
-		object, ok := entry.(map[string]interface{})
-		if !ok {
+	nativeIDs := []string{}
+	for _, name := range routers {
+		resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
+			Method: "GET",
+			URL:    p.routerURL(project, region, name) + "/" + p.kind.listVerb,
+		})
+		if rErr != nil {
+			if router != "" {
+				wrapped := transport.WrapError(rErr, "failed to list "+p.kind.label+"s")
+				return nil, fmt.Errorf("%s", wrapped.Message)
+			}
+			// One unreadable router must not hide the rest.
 			continue
 		}
-		if name, ok := object["name"].(string); ok && name != "" {
-			nativeIDs = append(nativeIDs, p.kind.nativeID(project, region, router, name))
+		objects, _ := resp.Body["result"].([]interface{})
+		for _, entry := range objects {
+			object, ok := entry.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if objName, ok := object["name"].(string); ok && objName != "" {
+				nativeIDs = append(nativeIDs, p.kind.nativeID(project, region, name, objName))
+			}
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil

@@ -12,6 +12,19 @@ formae agent.
 
 ### Fixed
 
+- Sub-resources that live inside a parent object are now discoverable. A policy
+  rule, a firewall policy association, a router interface, named set or route
+  policy and a log view have no collection URL of their own, and discovery lists
+  with no properties, so each `List` returned nothing unless the caller named the
+  parent. They now walk the parents first (`securityPolicies`, `firewallPolicies`,
+  `routers`, and Logging buckets via the `locations/-` wildcard).
+- `GCP::Logging::LogView`'s List override is now installed from the package's
+  init rather than its own `init()`. Go runs init functions in filename order and
+  `log_view_list.go` sorts before `resources.go`, so the generic registration
+  silently replaced it and discovery listed a path that 404s.
+
+### Fixed
+
 - `GCP::Compute::BackendServiceSignedUrlKey` and `GCP::Compute::VpnTunnel` are
   now discoverable. Both declared a *required* write-only field (`keyValue`,
   `sharedSecret`) that the API never reports, so a discovered instance could

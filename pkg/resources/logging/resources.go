@@ -197,4 +197,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Log views need a List that walks the buckets; see log_view_list.go.
+	registerLogViewListOverride()
 }

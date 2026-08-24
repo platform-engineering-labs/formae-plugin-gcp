@@ -352,26 +352,51 @@ func (p *RouterInterfaceProvisioner) List(
 	}
 	project := p.projectFor(request.TargetConfig, "")
 	region = p.regionFor(map[string]interface{}{"region": region}, request.TargetConfig, "")
-	if router == "" || project == "" || region == "" {
+	if project == "" || region == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
 
-	current, gone, fErr := p.fetchRouter(ctx, project, region, router)
-	if fErr != nil {
-		return nil, fmt.Errorf("%s", fErr.Message)
+	// A named router is the caller telling us where to look. Discovery names
+	// none, and an interface lives inside its router rather than in a collection
+	// of its own, so the routers have to be walked first.
+	routers := []string{router}
+	if router == "" {
+		client, cErr := transport.NewClient(ctx, p.Config)
+		if cErr != nil {
+			return nil, fmt.Errorf("failed to create transport client: %w", cErr)
+		}
+		var lErr error
+		routers, lErr = listComputeCollectionNames(ctx, client,
+			fmt.Sprintf("%s/projects/%s/regions/%s/routers", p.APIConfig.BaseURL, project, region),
+			"routers")
+		if lErr != nil {
+			return nil, lErr
+		}
 	}
-	if gone {
-		return &resource.ListResult{NativeIDs: []string{}}, nil
-	}
-	interfaces, _ := current["interfaces"].([]interface{})
-	nativeIDs := make([]string, 0, len(interfaces))
-	for _, raw := range interfaces {
-		iface, ok := raw.(map[string]interface{})
-		if !ok {
+
+	nativeIDs := []string{}
+	for _, name := range routers {
+		current, gone, fErr := p.fetchRouter(ctx, project, region, name)
+		if fErr != nil {
+			if router != "" {
+				return nil, fmt.Errorf("%s", fErr.Message)
+			}
+			// One unreadable router must not hide the rest.
 			continue
 		}
-		if name, _ := iface["name"].(string); name != "" {
-			nativeIDs = append(nativeIDs, buildRouterInterfaceNativeID(project, region, router, name))
+		if gone {
+			continue
+		}
+		interfaces, _ := current["interfaces"].([]interface{})
+		for _, raw := range interfaces {
+			iface, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if ifaceName, _ := iface["name"].(string); ifaceName != "" {
+				nativeIDs = append(nativeIDs,
+					buildRouterInterfaceNativeID(project, region, name, ifaceName))
+			}
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil

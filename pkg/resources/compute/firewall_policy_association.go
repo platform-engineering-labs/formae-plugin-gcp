@@ -321,14 +321,16 @@ func (p *FirewallPolicyAssociationProvisioner) List(
 		policy = request.AdditionalProperties[associationPolicyProperty]
 	}
 	project := p.projectFor(request.TargetConfig, "")
-	if policy == "" || project == "" {
+	if project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
 	region := ""
 	if p.regional {
 		props := map[string]interface{}{}
-		if r := request.AdditionalProperties["region"]; r != "" {
-			props["region"] = r
+		if request.AdditionalProperties != nil {
+			if r := request.AdditionalProperties["region"]; r != "" {
+				props["region"] = r
+			}
 		}
 		if region = p.regionFor(props, request.TargetConfig); region == "" {
 			return &resource.ListResult{NativeIDs: []string{}}, nil
@@ -339,24 +341,44 @@ func (p *FirewallPolicyAssociationProvisioner) List(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
-	resp, err := client.SendRequest(ctx, transport.RequestOptions{
-		Method: "GET",
-		URL:    p.policyURL(project, region, policy),
-	})
-	if err != nil {
-		wrapped := transport.WrapError(err, "failed to list firewall policy associations")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+	// A named policy is the caller telling us where to look. Discovery names
+	// none, and an association has no collection URL of its own, so the only way
+	// to discover one is to walk the policies first.
+	policies := []string{policy}
+	if policy == "" {
+		policies, err = listComputeCollectionNames(ctx, client,
+			fmt.Sprintf("%s/projects/%s/%s/firewallPolicies",
+				p.APIConfig.BaseURL, project, p.scopePath(region)),
+			"firewall policies")
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	associations, _ := resp.Body["associations"].([]interface{})
-	nativeIDs := make([]string, 0, len(associations))
-	for _, a := range associations {
-		assoc, ok := a.(map[string]interface{})
-		if !ok {
+	nativeIDs := []string{}
+	for _, name := range policies {
+		resp, rErr := client.SendRequest(ctx, transport.RequestOptions{
+			Method: "GET",
+			URL:    p.policyURL(project, region, name),
+		})
+		if rErr != nil {
+			if policy != "" {
+				wrapped := transport.WrapError(rErr, "failed to list firewall policy associations")
+				return nil, fmt.Errorf("%s", wrapped.Message)
+			}
+			// One unreadable policy must not hide the rest.
 			continue
 		}
-		if name, ok := assoc["name"].(string); ok && name != "" {
-			nativeIDs = append(nativeIDs, p.buildAssociationNativeID(project, region, policy, name))
+		associations, _ := resp.Body["associations"].([]interface{})
+		for _, a := range associations {
+			assoc, ok := a.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if assocName, ok := assoc["name"].(string); ok && assocName != "" {
+				nativeIDs = append(nativeIDs,
+					p.buildAssociationNativeID(project, region, name, assocName))
+			}
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
