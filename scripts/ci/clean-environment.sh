@@ -771,6 +771,18 @@ else
 fi
 
 # --- Regional health checks (region-http-lb test) ---
+# A composite health check references health sources, so it goes before them.
+echo "Cleaning GCP composite health checks..."
+CHCS=$(gcloud compute composite-health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$CHCS" ]; then
+    echo "$CHCS" | while read -r chc region; do
+        echo "  Deleting composite health check: $chc (region: $region)"
+        gcloud compute composite-health-checks delete "$chc" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No composite health checks found"
+fi
+
 # Health sources reference an aggregation policy, so they go first.
 echo "Cleaning GCP health sources..."
 HEALTH_SOURCES=$(gcloud compute health-sources list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)

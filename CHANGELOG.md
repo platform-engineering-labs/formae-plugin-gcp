@@ -351,6 +351,35 @@ Together these close the managed-instance-group gap: the plugin previously had
   flag rather than a second copy. Conformance green on all eight steps, and the
   cleanup script detaches regional associations too.
 
+- `GCP::Compute::RegionCompositeHealthCheck` — completes the health-aggregation
+  trio: `RegionHealthAggregationPolicy` decides what "healthy" means,
+  `RegionHealthSource` applies that to a backend service, and this reports the
+  verdict where a load balancer can act on it. The other two were inert without
+  it. `healthDestination` must be a **forwarding rule** — the API rejects a
+  backend service with "Unexpected resource collection" — so the fixture builds
+  the full internal-load-balancer chain (network, subnet, health check, backend
+  service, forwarding rule) without booting a single VM.
+
+  Unlike its two siblings, update is supported, and it needs the fingerprint.
+  The API hides that: a patch without one returns **200 with a normal
+  operation**, and the *operation* then fails with 412 CONDITION_NOT_MET
+  ("missing fingerprint"). Registered with optimistic locking on `fingerprint`;
+  conformance green on all eight steps, Update included.
+
+- `GCP::Compute::BackendServiceSignedUrlKey` — a Cloud CDN signed-URL key on a
+  backend service. Without a key no signed URL can be issued, so this is what
+  makes `enableCDN` usable for private content. Added and removed with the
+  `addSignedUrlKey` / `deleteSignedUrlKey` verbs, so it is a hand-written
+  provisioner.
+
+  The secret is write-only in the strongest sense: the API reports key *names*
+  only, under `cdnPolicy.signedUrlKeyNames`, and omits the block entirely when a
+  service has no keys. `Read` therefore reports presence rather than value —
+  which is all drift detection can check — and `keyValue` accepts a wrapped
+  `formae.Value` so it stays out of plans and state. Nothing is updatable:
+  rotating a key removes it and adds the new value. Conformance green on all
+  eight steps.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
