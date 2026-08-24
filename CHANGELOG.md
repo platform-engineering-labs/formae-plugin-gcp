@@ -318,6 +318,39 @@ Together these close the managed-instance-group gap: the plugin previously had
   VPC: `testdata/network-endpoint-group-psc.pkl` is the only conformance case in
   the suite with no prerequisites at all, and runs in under 90 seconds.
 
+- `GCP::Compute::RegionDiskResourcePolicyAttachment` — binds a snapshot schedule
+  to a regional disk, the regional twin of the zonal attachment. Same two verbs
+  (`addResourcePolicies` / `removeResourcePolicies`), so
+  `DiskResourcePolicyAttachmentProvisioner` gained a `regional` flag rather than
+  a second copy: it picks the scope segment, swaps the `zone` property for
+  `region`, and puts the region into the operation poll. Conformance green on
+  all eight steps.
+
+  `clean-environment.sh` detached policies with `--zone` only, so a regional
+  attachment would have pinned its policy forever; the detach pass now uses
+  whichever of zone/region the disk actually reports.
+
+- `GCP::Compute::NetworkFirewallPolicyAssociation` — attaches a network firewall
+  policy to a VPC network, which is what puts the policy in the data path: a
+  policy with rules but no association is inert. Like the rules it is a set of
+  verbs on the policy (`addAssociation`, `getAssociation?name=N`,
+  `removeAssociation?name=N`), so it is a hand-written provisioner, and a removed
+  association answers `getAssociation` with **400, not 404**, so not-found is
+  mapped explicitly. Nothing is updatable — an association is a
+  (policy, network) pair — so a change replaces it. Conformance green on all
+  eight steps.
+
+  `clean-environment.sh` now detaches associations before deleting policies: an
+  association pins both its policy and its network, so a killed run used to
+  leave all three behind.
+
+- `GCP::Compute::RegionNetworkFirewallPolicyAssociation` — the regional twin of
+  the association above, for a `RegionNetworkFirewallPolicy`. The three verbs are
+  identical, only the policy sits under `regions/{region}` (the network itself
+  stays global), so `FirewallPolicyAssociationProvisioner` gained a `regional`
+  flag rather than a second copy. Conformance green on all eight steps, and the
+  cleanup script detaches regional associations too.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

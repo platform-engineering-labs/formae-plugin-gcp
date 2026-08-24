@@ -21,10 +21,13 @@ const (
 	FirewallResourceType              = "GCP::Compute::Firewall"
 	NetworkFirewallPolicyResourceType = "GCP::Compute::NetworkFirewallPolicy"
 	// Registered in firewall_policy_rule.go: every operation is a verb on the policy.
-	NetworkFirewallPolicyRuleResourceType   = "GCP::Compute::NetworkFirewallPolicyRule"
-	RegionNetworkFirewallPolicyResourceType = "GCP::Compute::RegionNetworkFirewallPolicy"
-	InstanceResourceType                    = "GCP::Compute::Instance"
-	NetworkResourceType                     = "GCP::Compute::Network"
+	NetworkFirewallPolicyRuleResourceType = "GCP::Compute::NetworkFirewallPolicyRule"
+	// Registered in firewall_policy_association.go: add/get/removeAssociation verbs.
+	NetworkFirewallPolicyAssociationResourceType       = "GCP::Compute::NetworkFirewallPolicyAssociation"
+	RegionNetworkFirewallPolicyAssociationResourceType = "GCP::Compute::RegionNetworkFirewallPolicyAssociation"
+	RegionNetworkFirewallPolicyResourceType            = "GCP::Compute::RegionNetworkFirewallPolicy"
+	InstanceResourceType                               = "GCP::Compute::Instance"
+	NetworkResourceType                                = "GCP::Compute::Network"
 	// Registered in network_peering.go: addPeering/removePeering verbs.
 	NetworkPeeringResourceType       = "GCP::Compute::NetworkPeering"
 	RouterResourceType               = "GCP::Compute::Router"
@@ -54,14 +57,15 @@ const (
 	BackendBucketResourceType         = "GCP::Compute::BackendBucket"
 	ResourcePolicyResourceType        = "GCP::Compute::ResourcePolicy"
 	// Registered in disk_resource_policy_attachment.go: add/removeResourcePolicies verbs.
-	DiskResourcePolicyAttachmentResourceType = "GCP::Compute::DiskResourcePolicyAttachment"
-	ImageResourceType                        = "GCP::Compute::Image"
-	MachineImageResourceType                 = "GCP::Compute::MachineImage"
-	SnapshotResourceType                     = "GCP::Compute::Snapshot"
-	InstantSnapshotResourceType              = "GCP::Compute::InstantSnapshot"
-	RegionInstantSnapshotResourceType        = "GCP::Compute::RegionInstantSnapshot"
-	NodeTemplateResourceType                 = "GCP::Compute::NodeTemplate"
-	RegionDiskResourceType                   = "GCP::Compute::RegionDisk"
+	DiskResourcePolicyAttachmentResourceType       = "GCP::Compute::DiskResourcePolicyAttachment"
+	RegionDiskResourcePolicyAttachmentResourceType = "GCP::Compute::RegionDiskResourcePolicyAttachment"
+	ImageResourceType                              = "GCP::Compute::Image"
+	MachineImageResourceType                       = "GCP::Compute::MachineImage"
+	SnapshotResourceType                           = "GCP::Compute::Snapshot"
+	InstantSnapshotResourceType                    = "GCP::Compute::InstantSnapshot"
+	RegionInstantSnapshotResourceType              = "GCP::Compute::RegionInstantSnapshot"
+	NodeTemplateResourceType                       = "GCP::Compute::NodeTemplate"
+	RegionDiskResourceType                         = "GCP::Compute::RegionDisk"
 
 	// HA VPN
 	ExternalVpnGatewayResourceType = "GCP::Compute::ExternalVpnGateway"

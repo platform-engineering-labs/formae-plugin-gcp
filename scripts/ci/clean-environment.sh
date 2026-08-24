@@ -89,6 +89,40 @@ else
     echo "  No global security policies found"
 fi
 
+# An association pins both its policy and the network it attaches to, so it has
+# to be detached before either can be deleted.
+echo "Detaching network firewall policy associations..."
+NFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$NFP_FOR_ASSOC" ]; then
+    echo "$NFP_FOR_ASSOC" | while read -r pol; do
+        ASSOCS=$(gcloud compute network-firewall-policies describe "$pol" --global --format="value(associations[].name)" 2>/dev/null || true)
+        for assoc in $(echo "$ASSOCS" | tr ';,' ' '); do
+            [ -z "$assoc" ] && continue
+            echo "  Detaching association $assoc from $pol"
+            gcloud compute network-firewall-policies associations delete --firewall-policy="$pol" --name="$assoc" --global-firewall-policy --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No network firewall policies to check for associations"
+fi
+
+# Regional policies keep their associations in a separate collection.
+echo "Detaching regional network firewall policy associations..."
+RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$RNFP_FOR_ASSOC" ]; then
+    echo "$RNFP_FOR_ASSOC" | while read -r pol region; do
+        [ -z "$region" ] && continue
+        ASSOCS=$(gcloud compute network-firewall-policies describe "$pol" --region="$region" --format="value(associations[].name)" 2>/dev/null || true)
+        for assoc in $(echo "$ASSOCS" | tr ';,' ' '); do
+            [ -z "$assoc" ] && continue
+            echo "  Detaching association $assoc from $pol (region: $region)"
+            gcloud compute network-firewall-policies associations delete --firewall-policy="$pol" --name="$assoc" --firewall-policy-region="$region" --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No regional network firewall policies to check for associations"
+fi
+
 echo "Cleaning GCP network firewall policies..."
 NET_FW_POLICIES=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$NET_FW_POLICIES" ]; then
@@ -258,16 +292,23 @@ else
     echo "  No snapshots found"
 fi
 
-# A policy still attached to a disk cannot be deleted, so detach first.
+# A policy still attached to a disk cannot be deleted, so detach first. A
+# regional disk reports a region and no zone, and remove-resource-policies needs
+# whichever one it actually has.
 echo "Detaching resource policies from test disks..."
-POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,resourcePolicies[])" 2>/dev/null || true)
+POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,region,resourcePolicies[])" 2>/dev/null || true)
 if [ -n "$POLICY_DISKS" ]; then
-    echo "$POLICY_DISKS" | while read -r dk zone policies; do
+    echo "$POLICY_DISKS" | while read -r dk zone region policies; do
         [ -z "$policies" ] && continue
+        if [ -n "$zone" ]; then
+            SCOPE_FLAG="--zone=$zone"
+        else
+            SCOPE_FLAG="--region=$region"
+        fi
         for pol in $(echo "$policies" | tr ';,' ' '); do
             [ -z "$pol" ] && continue
             echo "  Detaching $(basename "$pol") from $dk"
-            gcloud compute disks remove-resource-policies "$dk" --zone="$zone" --resource-policies="$pol" --quiet 2>/dev/null || true
+            gcloud compute disks remove-resource-policies "$dk" "$SCOPE_FLAG" --resource-policies="$pol" --quiet 2>/dev/null || true
         done
     done
 else
