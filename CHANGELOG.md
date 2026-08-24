@@ -12,6 +12,12 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Dataproc::WorkflowTemplate` is now discoverable. Its list response is
+  keyed `templates`, which matches neither `items` nor the collection name, so
+  the parser found nothing and the type was never discovered.
+
+### Fixed
+
 - `GCP::AlloyDB::Instance` and `GCP::AlloyDB::User` are now discoverable. Both
   live under a cluster and discovery names none, so each listed a path with an
   empty cluster segment and got a 404. Instances now use the API's `clusters/-`
