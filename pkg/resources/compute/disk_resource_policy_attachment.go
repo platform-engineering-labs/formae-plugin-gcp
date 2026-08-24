@@ -332,16 +332,20 @@ func (p *DiskResourcePolicyAttachmentProvisioner) List(
 		return nil, fmt.Errorf("%s", wrapped.Message)
 	}
 
+	// Keys are "zones/{zone}" or "regions/{region}". Each kind reports only its
+	// own scope: a regional id emitted by the zonal kind (or the reverse) would
+	// 404 on read.
+	wantPrefix := "zones/"
+	if p.regional {
+		wantPrefix = "regions/"
+	}
 	nativeIDs := []string{}
 	scopes, _ := resp.Body["items"].(map[string]interface{})
 	for scope, payload := range scopes {
-		// Keys are "zones/{zone}" or "regions/{region}". Only zonal disks carry
-		// attachments this provisioner can address; a regional key would produce
-		// a native ID whose read 404s.
-		if !strings.HasPrefix(scope, "zones/") {
+		if !strings.HasPrefix(scope, wantPrefix) {
 			continue
 		}
-		zone := strings.TrimPrefix(scope, "zones/")
+		location := strings.TrimPrefix(scope, wantPrefix)
 		entry, ok := payload.(map[string]interface{})
 		if !ok {
 			continue
@@ -363,7 +367,7 @@ func (p *DiskResourcePolicyAttachmentProvisioner) List(
 					continue
 				}
 				nativeIDs = append(nativeIDs,
-					buildAttachmentNativeID(project, zone, diskName, policyNameOf(policyURL)))
+					p.buildAttachmentNativeID(project, location, diskName, policyNameOf(policyURL)))
 			}
 		}
 	}

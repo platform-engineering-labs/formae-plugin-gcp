@@ -130,3 +130,16 @@ func TestRegionOfZone(t *testing.T) {
 		t.Errorf("zonal policy URL: %q", got)
 	}
 }
+
+// Discovery lists with no hints, and aggregated/disks mixes zonal and regional
+// scopes. Each kind must emit only ids its own Read can resolve.
+func TestAggregatedScopePrefixPerKind(t *testing.T) {
+	if got := zonalAttachmentProvisioner().buildAttachmentNativeID("dev-1", "europe-central2-b", "d", "pol"); got !=
+		"projects/dev-1/zones/europe-central2-b/disks/d/resourcePolicies/pol" {
+		t.Errorf("zonal id: %q", got)
+	}
+	if got := regionalAttachmentProvisioner().buildAttachmentNativeID("dev-1", "europe-central2", "d", "pol"); got !=
+		"projects/dev-1/regions/europe-central2/disks/d/resourcePolicies/pol" {
+		t.Errorf("regional id: %q", got)
+	}
+}
