@@ -17,7 +17,7 @@ forma {
   new savedQuery.SavedQuery {
     label = "plugin-sdk-test-logging-saved-query"
     name = "formae-plugin-sdk-test-sq-\(v.testRunID)"
-    location = "global"
+    location = v.gcpLocation
     displayName = "Formae conformance warning query"
     description = "Updated saved query description"
     visibility = "SHARED"

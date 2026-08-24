@@ -422,6 +422,14 @@ Together these close the managed-instance-group gap: the plugin previously had
   `services/-` for `serviceLevelObjectives`, which lists every service's SLOs;
   create and read always carry a real service and never reach that branch.
 
+- **Saved queries were created where discovery could not look.** The fixture
+  pinned `location = "global"` while discovery, having no properties to declare a
+  location with, lists in the target's location. Saved queries are supported in
+  either, so the fixture (and its update twin, or Update would try to change an
+  immutable field) now follows `v.gcpLocation`. A query pinned to global is still
+  created and managed correctly — it just cannot be discovered, which is a
+  property of the API, not of this plugin.
+
 - **Log scopes were listed in the wrong location.** They exist only in `global` —
   the API rejects a region *and* the `-` wildcard ("which may only be global") —
   but discovery has no properties to declare a location with, so `List` used the
