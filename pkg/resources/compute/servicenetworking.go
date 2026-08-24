@@ -88,7 +88,7 @@ func (h *ServiceNetworkingHelper) EstablishServiceNetworkingConnection(
 
 	// Build request body for service networking connection
 	body := map[string]interface{}{
-		"network":                network,
+		"network":               network,
 		"reservedPeeringRanges": reservedRanges,
 	}
 

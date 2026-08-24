@@ -473,3 +473,11 @@ func priorityOf(props map[string]interface{}) (int, error) {
 		return 0, fmt.Errorf("priority is required and must be a number")
 	}
 }
+
+// Status routes through the shared read-back so post-create and post-update
+// state carries the resource's real properties, not just what was declared.
+func (p *PolicyRuleProvisioner) Status(
+	ctx context.Context, request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
+}

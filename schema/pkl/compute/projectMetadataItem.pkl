@@ -1,0 +1,61 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute ProjectMetadataItem
+///
+/// One key of the project's common instance metadata — the project-wide defaults
+/// every VM inherits, such as `enable-oslogin`, `ssh-keys` or a default
+/// `startup-script`.
+///
+/// **This is shared, project-wide state.** The API has no per-key operation:
+/// `setCommonInstanceMetadata` replaces the whole list, so the provisioner does
+/// read-modify-write, touching one key and passing every other key through
+/// untouched. A stale fingerprint is rejected by the API rather than silently
+/// overwriting, so a concurrent editor causes a retry, never a lost key.
+///
+/// Declare one resource per key. Do not model the whole metadata map, or two
+/// declarations would fight over the same list.
+module gcp.compute.projectMetadataItem
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::ProjectMetadataItem"
+
+open class ProjectMetadataItemResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden key: ProjectMetadataItemResolvable = (this) {
+        property = "key"
+    }
+
+    hidden value: ProjectMetadataItemResolvable = (this) {
+        property = "value"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "key"
+}
+open class ProjectMetadataItem extends formae.Resource {
+    hidden parent = this
+
+    /// The metadata key, e.g. "startup-script". Renaming means removing the old
+    /// key and adding a new one.
+    @gcp.FieldHint { createOnly = true }
+    key: String
+
+    /// The value. Metadata values are strings; GCP returns no value at all for a
+    /// key set to the empty string.
+    @gcp.FieldHint
+    value: String?
+
+    hidden res: ProjectMetadataItemResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

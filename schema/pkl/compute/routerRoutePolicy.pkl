@@ -1,0 +1,104 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RouterRoutePolicy
+///
+/// A BGP route policy on a Cloud Router: it filters or rewrites the routes the
+/// router imports from, or advertises to, its peers. Without one a router takes
+/// and gives every route as-is, so this is how routing becomes selective.
+///
+/// The policy is a set of verbs on the router rather than a REST resource —
+/// updateRoutePolicy (which both creates and updates), getRoutePolicy,
+/// deleteRoutePolicy, listRoutePolicies — so it is a hand-written provisioner.
+module gcp.compute.routerRoutePolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RouterRoutePolicy"
+
+typealias RoutePolicyType = "ROUTE_POLICY_TYPE_IMPORT"|"ROUTE_POLICY_TYPE_EXPORT"
+
+/// A CEL expression. `match` uses it to select routes, each action to transform
+/// or accept them.
+@gcp.SubResourceHint
+open class RoutePolicyExpr extends formae.SubResource {
+    /// CEL, e.g. "destination == '10.0.0.0/8'" for a match or "accept()" for an
+    /// action.
+    @gcp.FieldHint
+    expression: String
+
+    @gcp.FieldHint
+    title: String?
+
+    @gcp.FieldHint
+    description: String?
+}
+
+/// One rule of the policy. Terms are evaluated in priority order, lowest first.
+@gcp.SubResourceHint
+open class RoutePolicyTerm extends formae.SubResource {
+    @gcp.FieldHint
+    priority: Int
+
+    /// Which routes this term applies to. Omit to match every route.
+    @gcp.FieldHint
+    match: RoutePolicyExpr?
+
+    /// What to do with a matching route. An empty list drops it.
+    @gcp.FieldHint
+    actions: Listing<RoutePolicyExpr>?
+}
+
+open class RouterRoutePolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RouterRoutePolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RouterRoutePolicy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Name of the owning router. A path component, not part of the verb body —
+    /// pass `router.res.name` so formae creates the router first.
+    @gcp.FieldHint { createOnly = true }
+    router: (String|formae.Resolvable)
+
+    /// Region of the owning router. Also a path component.
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Whether the policy governs routes coming in or going out.
+    @gcp.FieldHint { createOnly = true }
+    type: RoutePolicyType
+
+    @gcp.FieldHint
+    description: String?
+
+    /// The rules, evaluated in priority order.
+    @gcp.FieldHint
+    terms: Listing<RoutePolicyTerm>?
+
+    /// Server-managed. An update must carry the current value, so the
+    /// provisioner re-reads it rather than taking it from here — a declared
+    /// fingerprint would go stale on the first change.
+    @gcp.FieldHint { hasProviderDefault = true }
+    fingerprint: String?
+
+    hidden res: RouterRoutePolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
