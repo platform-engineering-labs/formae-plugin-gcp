@@ -436,6 +436,50 @@ Together these close the managed-instance-group gap: the plugin previously had
   no VMs. Conformance green on all eight steps, with Replace exercising the
   delete-then-create path.
 
+- `GCP::Compute::DiskAsyncReplication` — the replication link between a primary
+  disk and a secondary in another region, which is what cross-region disk
+  disaster recovery is. The disks are ordinary `Disk` resources; this models the
+  relationship, started and stopped with the startAsyncReplication /
+  stopAsyncReplication verbs on the primary.
+
+  The subtlety that shapes the whole implementation: **stopping replication does
+  not clear `asyncPrimaryDisk` from the secondary.** Only
+  `resourceStatus.asyncPrimaryDisk.state` changes, ACTIVE to STOPPED, so a read
+  that keyed on the field being present would report a dead pair as live
+  forever. `Read` judges by state, and also refuses a secondary that has been
+  re-paired with a different primary. `stopAsyncReplication` is idempotent, so
+  deleting twice is not an error. Nothing is updatable — the link is a pair.
+
+  `Disk.asyncPrimaryDisk.disk` was typed `String`, which made it impossible to
+  reference the primary through a resolvable; it now accepts one, so formae
+  orders the creates. That matters more than convenience here: a secondary
+  cannot be paired after creation, so the reference has to be right the first
+  time. A disk in active replication also cannot be deleted, so the cleanup
+  script stops replication before its disk passes run. Conformance green on all
+  eight steps.
+
+- `GCP::ArtifactRegistry::Rule` — a rule gates an operation on its repository
+  (denying downloads, for instance). A repository without rules allows whatever
+  the caller's IAM permits, so this is how one enforces policy of its own. It is
+  the first parented resource in this package, and config-driven rather than
+  hand-written, which took three fixes to the generic Artifact Registry plumbing:
+
+  - the path builder now inserts `repositories/{repo}` when a resource is
+    nested, so a rule lands on `.../repositories/{repo}/rules/{rule}`;
+  - the native-ID extractor keeps that parent segment, since a read URL is
+    rebuilt from the id and would otherwise address the location-level
+    collection; and
+  - `ArtifactRegistryNativeID` gained a `Parser` that restores
+    ParentType/ParentResource from a nested id.
+
+  A request transformer drops `repository` and `location` (path components the
+  API rejects as body fields) while keeping `name`, which the engine reads to
+  fill `?ruleId=`; a response transformer recovers `repository` and `location`
+  from the returned path. Rules are synchronous, unlike repositories, so the
+  definition carries its own `OperationConfig`. Note the API allows only **one
+  DOWNLOAD rule per repository**. Conformance green on all eight steps, Update
+  included.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a

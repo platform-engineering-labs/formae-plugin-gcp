@@ -49,8 +49,10 @@ class GuestOsFeature {
 /// Async primary disk for asynchronous replication
 @gcp.SubResourceHint
 class AsyncPrimaryDisk {
-    /// Primary disk for asynchronous disk replication
-    disk: String
+    /// Primary disk for asynchronous disk replication. Accepts a resolvable so
+    /// the pairing can reference the primary by `primary.res.selfLink` and
+    /// formae creates it first - a secondary cannot be paired after creation.
+    disk: (String|formae.Resolvable)
 }
 
 /// Additional params passed with the request

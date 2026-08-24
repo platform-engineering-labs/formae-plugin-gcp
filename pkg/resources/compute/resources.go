@@ -64,7 +64,9 @@ const (
 	BackendBucketResourceType         = "GCP::Compute::BackendBucket"
 	ResourcePolicyResourceType        = "GCP::Compute::ResourcePolicy"
 	// Registered in disk_resource_policy_attachment.go: add/removeResourcePolicies verbs.
-	DiskResourcePolicyAttachmentResourceType       = "GCP::Compute::DiskResourcePolicyAttachment"
+	DiskResourcePolicyAttachmentResourceType = "GCP::Compute::DiskResourcePolicyAttachment"
+	// Registered in disk_async_replication.go: start/stopAsyncReplication verbs.
+	DiskAsyncReplicationResourceType               = "GCP::Compute::DiskAsyncReplication"
 	RegionDiskResourcePolicyAttachmentResourceType = "GCP::Compute::RegionDiskResourcePolicyAttachment"
 	ImageResourceType                              = "GCP::Compute::Image"
 	MachineImageResourceType                       = "GCP::Compute::MachineImage"
