@@ -1,0 +1,131 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Eventarc Pipeline
+///
+/// Where an Eventarc Advanced `messageBus` sends the events it accepts. An
+/// enrollment picks which events reach a pipeline; the pipeline says where they
+/// go and how hard to retry.
+///
+/// **Eventarc Advanced runs in a subset of regions**, so a pipeline declares its
+/// own `location` — see `messageBus.pkl`.
+///
+/// Create and delete are slow even for long-running operations: roughly four
+/// minutes to create and two and a half to delete, measured against the live
+/// API. The API also refuses a PATCH while creation is still running.
+module gcp.eventarc.pipeline
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Eventarc::Pipeline"
+
+/// A private-network route to the destination. Required for an `httpEndpoint`
+/// destination: the attachment must exist, and a bogus one fails the create
+/// asynchronously rather than being rejected outright.
+@gcp.SubResourceHint
+open class PipelineNetworkConfig extends formae.SubResource {
+    /// Full path of a `Compute::NetworkAttachment`
+    /// ("projects/{p}/regions/{r}/networkAttachments/{n}").
+    @gcp.FieldHint
+    networkAttachment: (String|formae.Resolvable)
+}
+
+/// An HTTP target for events.
+@gcp.SubResourceHint
+open class HttpEndpoint extends formae.SubResource {
+    @gcp.FieldHint
+    uri: String
+
+    @gcp.FieldHint
+    messageBindingTemplate: String?
+}
+
+/// One place the pipeline delivers to. Set exactly one target.
+@gcp.SubResourceHint
+open class PipelineDestination extends formae.SubResource {
+    /// Another message bus, by full path. The simplest destination: it needs no
+    /// network attachment.
+    @gcp.FieldHint
+    messageBus: (String|formae.Resolvable)?
+
+    /// A Pub/Sub topic, by full path.
+    @gcp.FieldHint
+    topic: (String|formae.Resolvable)?
+
+    /// A Workflows workflow, by full path.
+    @gcp.FieldHint
+    workflow: (String|formae.Resolvable)?
+
+    /// An HTTP endpoint. Needs `networkConfig`.
+    @gcp.FieldHint
+    httpEndpoint: HttpEndpoint?
+
+    @gcp.FieldHint
+    networkConfig: PipelineNetworkConfig?
+}
+
+/// How the pipeline retries a failed delivery.
+@gcp.SubResourceHint
+open class RetryPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    maxAttempts: Int?
+
+    /// A duration such as "1s".
+    @gcp.FieldHint
+    minRetryDelay: String?
+
+    @gcp.FieldHint
+    maxRetryDelay: String?
+}
+
+open class PipelineResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PipelineResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Pipeline extends formae.Resource {
+    hidden parent = this
+
+    /// Short pipeline id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the pipeline. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// Where events go. At least one destination is required.
+    @gcp.FieldHint
+    destinations: Listing<PipelineDestination>
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// GCP fills this in (5 attempts, 1s to 60s) when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    retryPolicy: RetryPolicy?
+
+    /// Customer-managed encryption key for events at rest.
+    @gcp.FieldHint
+    cryptoKeyName: (String|formae.Resolvable)?
+
+    /// Server-assigned unique id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    uid: String?
+
+    hidden res: PipelineResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
