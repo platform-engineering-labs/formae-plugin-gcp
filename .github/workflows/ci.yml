@@ -294,22 +294,26 @@ jobs:
               export GCP_LOCATION="$GCP_ZONE"
               ;;
           esac
-          # The AlloyDB cases run their two phases separately with a cleanup in
-          # between: each leaves its prerequisite cluster behind (the harness
-          # spares prerequisites), and four cases x two phases needs more than
-          # the quota of 5 clusters per region. See clean-alloydb-case.sh.
+          # AlloyDB and Eventarc run their two phases separately with a cleanup
+          # in between. Both build a prerequisite the harness spares on Destroy -
+          # an AlloyDB cluster, an Eventarc message bus - and both prerequisites
+          # sit against a small quota (5 clusters per region, 1 bus per region),
+          # so the surviving one from the crud phase blocks the discovery phase.
+          # See clean-alloydb-case.sh and clean-eventarc-case.sh.
           case "${{ matrix.test-case }}" in
-            alloydb-*)
+            alloydb-*|eventarc-*)
               # "|| status=$?" keeps a failing phase from aborting the step
               # before its cleanup runs; the case still fails at the end.
+              TC="${{ matrix.test-case }}"
+              CLEAN="./scripts/ci/clean-${TC%%-*}-case.sh"
               crud_status=0
               make conformance-test-crud-run \
-                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG || crud_status=$?
-              ./scripts/ci/clean-alloydb-case.sh "${{ matrix.test-case }}"
+                TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || crud_status=$?
+              "$CLEAN" "$TC"
               discovery_status=0
               make conformance-test-discovery-run \
-                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG || discovery_status=$?
-              ./scripts/ci/clean-alloydb-case.sh "${{ matrix.test-case }}"
+                TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || discovery_status=$?
+              "$CLEAN" "$TC"
               [ "$crud_status" -eq 0 ] && [ "$discovery_status" -eq 0 ]
               ;;
             *)
