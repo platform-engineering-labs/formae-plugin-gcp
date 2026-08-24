@@ -278,7 +278,7 @@ func (b *BaseResource) performUpdate(
 				OperationStatus:    resource.OperationStatusSuccess,
 				NativeID:           request.NativeID,
 				StatusMessage:      "Resource updated successfully",
-				ResourceProperties: b.marshalUpdatedProperties(response.Body, pathCtx),
+				ResourceProperties: b.readBackAfterUpdate(ctx, request),
 			},
 		}, nil
 	}
@@ -598,22 +598,27 @@ func lockingValueString(raw interface{}) string {
 	}
 }
 
-// marshalUpdatedProperties renders an update response as stored properties,
-// applying the response transformer so the shape matches what Read would return.
-// A failure here is not worth failing the update over - the operation already
-// succeeded - so it yields nil and the next sync fills state in.
-func (b *BaseResource) marshalUpdatedProperties(responseBody map[string]interface{}, pathCtx PathContext) json.RawMessage {
-	if len(responseBody) == 0 {
+// readBackAfterUpdate returns the resource as Read would report it, so stored
+// state after a synchronous update has exactly the shape it has after a create
+// or a sync.
+//
+// The update *response* is not a safe substitute: some APIs echo fields their
+// GET omits - a Storage bucket's PATCH returns defaultObjectAcl, which the read
+// path does not - and storing those makes conformance report a property that is
+// "not expected and not a provider default". A failed read-back is not a failed
+// update; the operation already succeeded, so it yields nil and the next sync
+// fills state in.
+func (b *BaseResource) readBackAfterUpdate(ctx context.Context, request *resource.UpdateRequest) json.RawMessage {
+	if request.NativeID == "" {
 		return nil
 	}
-	apiResponse := responseBody
-	if b.ResponseTransformer != nil {
-		transformCtx := b.buildTransformContext(pathCtx, resource.OperationUpdate)
-		apiResponse = b.ResponseTransformer.Transform(apiResponse, transformCtx)
-	}
-	propsJSON, err := json.Marshal(apiResponse)
-	if err != nil {
+	readResult, err := b.Read(ctx, &resource.ReadRequest{
+		NativeID:     request.NativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	if err != nil || readResult == nil || readResult.ErrorCode != "" || readResult.Properties == "" {
 		return nil
 	}
-	return json.RawMessage(propsJSON)
+	return json.RawMessage(readResult.Properties)
 }

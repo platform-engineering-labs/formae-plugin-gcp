@@ -151,7 +151,16 @@ func locationResponseTransformer(collection string) base.ResponseTransformerFunc
 
 // eventarcPathBuilder builds
 // /projects/{project}/locations/{location}/{resourceType}[/{name}].
+// advancedCollections are the Eventarc Advanced collections that a forma pins to
+// a specific region, because Advanced runs in a subset of regions and rarely the
+// target's. Discovery would otherwise look only in the target's location and
+// never find them; Eventarc accepts "locations/-" on list, so use it.
+var advancedCollections = map[string]bool{"messageBuses": true, "pipelines": true}
+
 func eventarcPathBuilder(ctx base.PathContext) string {
+	if ctx.IsList && advancedCollections[ctx.ResourceType] {
+		return fmt.Sprintf("/projects/%s/locations/-/%s", ctx.Project, ctx.ResourceType)
+	}
 	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, ctx.Location, ctx.ResourceType)
 	if ctx.ResourceName != "" {
 		path += "/" + ctx.ResourceName

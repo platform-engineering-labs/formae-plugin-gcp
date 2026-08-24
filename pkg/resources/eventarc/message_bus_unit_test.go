@@ -179,3 +179,34 @@ func TestPipelineTransformersRoundTrip(t *testing.T) {
 		t.Errorf("http destination lost: %#v", dest)
 	}
 }
+
+// Advanced runs in a subset of regions, so a forma pins one that is rarely the
+// target's. Discovery lists with no properties and would look only in the
+// target's location; Eventarc accepts "locations/-" on list, so listing uses it
+// while create and read keep the concrete location.
+func TestEventarcListUsesLocationWildcard(t *testing.T) {
+	got := eventarcPathBuilder(base.PathContext{
+		Project: "dev-1", Location: "europe-central2",
+		ResourceType: "messageBuses", IsList: true,
+	})
+	if want := "/projects/dev-1/locations/-/messageBuses"; got != want {
+		t.Errorf("list path: %q, want %q", got, want)
+	}
+	// Create and read address a real location.
+	got = eventarcPathBuilder(base.PathContext{
+		Project: "dev-1", Location: "europe-west1",
+		ResourceType: "messageBuses", ResourceName: "bus-a",
+	})
+	if want := "/projects/dev-1/locations/europe-west1/messageBuses/bus-a"; got != want {
+		t.Errorf("addressed path: %q", got)
+	}
+	// Triggers are regional in the ordinary way and must keep the target's
+	// location even when listing.
+	got = eventarcPathBuilder(base.PathContext{
+		Project: "dev-1", Location: "europe-central2",
+		ResourceType: "triggers", IsList: true,
+	})
+	if want := "/projects/dev-1/locations/europe-central2/triggers"; got != want {
+		t.Errorf("trigger list path: %q", got)
+	}
+}
