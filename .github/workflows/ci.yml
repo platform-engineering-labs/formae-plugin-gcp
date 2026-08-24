@@ -258,6 +258,15 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=15
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
               ;;
+            eventarc-pipeline|eventarc-message-bus)
+              # An Eventarc message bus takes ~5-6 min to create and the pipeline
+              # case builds one first, so a single apply runs past the 5m default
+              # (6m20s locally for the re-apply, 22m for the whole lifecycle).
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
             machine-image)
               # A machine image snapshots every disk of an instance, and the case
               # builds the VM chain (network -> subnet -> disk -> instance) first.
