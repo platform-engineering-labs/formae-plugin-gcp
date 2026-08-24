@@ -407,9 +407,6 @@ func (p *PolicyRuleProvisioner) List(
 	if request.AdditionalProperties != nil {
 		policy = request.AdditionalProperties[p.kind.policyProperty]
 	}
-	if policy == "" {
-		return &resource.ListResult{NativeIDs: []string{}}, nil
-	}
 	project := p.projectFor(request.TargetConfig, "")
 	if project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
@@ -431,6 +428,46 @@ func (p *PolicyRuleProvisioner) List(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
+
+	// A named policy is the caller telling us where to look. Discovery names
+	// none, and a rule has no collection URL of its own - it lives inside its
+	// policy - so the only way to discover one is to walk the policies first.
+	policies := []string{policy}
+	if policy == "" {
+		policies, err = p.listPolicies(ctx, client, project, region)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	nativeIDs := []string{}
+	for _, name := range policies {
+		rules, err := p.rulesOfPolicy(ctx, client, project, region, name)
+		if err != nil {
+			// One unreadable policy must not hide the rest.
+			if policy != "" {
+				return nil, err
+			}
+			continue
+		}
+		nativeIDs = append(nativeIDs, rules...)
+	}
+	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
+
+// listPolicies names every policy of this kind in the project (and region).
+func (p *PolicyRuleProvisioner) listPolicies(
+	ctx context.Context, client *transport.Client, project, region string,
+) ([]string, error) {
+	return listComputeCollectionNames(ctx, client, fmt.Sprintf("%s/projects/%s/%s/%s",
+		p.APIConfig.BaseURL, project, p.kind.scopePath(region), p.kind.collection),
+		p.kind.label+" policies")
+}
+
+// rulesOfPolicy reports the manageable rules of one policy as native IDs.
+func (p *PolicyRuleProvisioner) rulesOfPolicy(
+	ctx context.Context, client *transport.Client, project, region, policy string,
+) ([]string, error) {
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "GET",
 		URL:    p.policyURL(project, region, policy),
@@ -453,11 +490,9 @@ func (p *PolicyRuleProvisioner) List(
 		}
 		nativeIDs = append(nativeIDs, p.kind.nativeID(project, region, policy, priority))
 	}
-	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+	return nativeIDs, nil
 }
 
-// priorityOf reads the rule priority, which arrives as a JSON number on reads
-// and may be an int from the declared forma.
 func priorityOf(props map[string]interface{}) (int, error) {
 	switch v := props["priority"].(type) {
 	case float64:
