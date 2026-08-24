@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionSecurityPolicy.pkl"
+import "@gcp/compute/regionSecurityPolicyRule.pkl"
+import "./config/vars.pkl" as v
+
+// The policy declares no rules of its own — GCP creates the catch-all allow at
+// 2147483647 — so nothing here fights the separately managed rule below.
+local policy = new regionSecurityPolicy.RegionSecurityPolicy {
+  label = "plugin-sdk-test-rspr-policy"
+  name = "formae-plugin-sdk-test-rspr-\(v.testRunID)"
+  description = "Regional Cloud Armor policy owning the rule under test"
+  // The API normalises CLOUD_ARMOR_REGIONAL to this on read.
+  type = "CLOUD_ARMOR"
+  region = v.gcpRegion
+}
+
+forma {
+  v.stack
+  v.target
+
+  policy
+
+  new regionSecurityPolicyRule.RegionSecurityPolicyRule {
+    label = "plugin-sdk-test-region-security-policy-rule"
+    // Resolvable -> the policy exists before addRule runs.
+    securityPolicy = policy.res.name
+    region = v.gcpRegion
+    priority = 1000
+    action = "deny(403)"
+    description = "Block a documentation range"
+    // TEST-NET-2, reserved by IANA for documentation.
+    match = new regionSecurityPolicy.Match {
+      versionedExpr = "SRC_IPS_V1"
+      config = new regionSecurityPolicy.MatchConfig {
+        srcIpRanges = new Listing { "198.51.100.0/24" }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/router.pkl"
+import "@gcp/compute/routerNamedSet.pkl"
+import "./config/vars.pkl" as v
+
+// Network + router + a named set of prefixes a route policy can match against.
+// No BGP peer is needed for the set to exist.
+local net = new network.Network {
+  label = "plugin-sdk-test-rns-network"
+  name = "formae-plugin-sdk-test-rns-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+local rt = new router.Router {
+  label = "plugin-sdk-test-rns-router"
+  name = "formae-plugin-sdk-test-rns-rt-\(v.testRunID)"
+  region = v.gcpRegion
+  network = net.res.selfLink
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  rt
+
+  new routerNamedSet.RouterNamedSet {
+    label = "plugin-sdk-test-router-named-set"
+    name = "formae-plugin-sdk-test-rns-\(v.testRunID)"
+    // Resolvable -> the router exists before the update verb runs.
+    router = rt.res.name
+    region = v.gcpRegion
+    type = "NAMED_SET_TYPE_PREFIX"
+    elements = new Listing {
+      new routerNamedSet.NamedSetElement {
+        // RFC 1918 space. The quotes are part of the expression.
+        expression = "'10.0.0.0/8'"
+      }
+      new routerNamedSet.NamedSetElement {
+        expression = "'172.16.0.0/12'"
+      }
+    }
+  }
+}

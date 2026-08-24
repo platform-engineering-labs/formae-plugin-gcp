@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/securityPolicy.pkl"
+import "@gcp/compute/securityPolicyRule.pkl"
+import "./config/vars.pkl" as v
+
+// The policy declares no rules of its own — GCP creates the catch-all allow at
+// 2147483647 — so nothing here fights the separately managed rule below.
+local policy = new securityPolicy.SecurityPolicy {
+  label = "plugin-sdk-test-spr-policy"
+  name = "formae-plugin-sdk-test-spr-\(v.testRunID)"
+  description = "Cloud Armor policy owning the rule under test"
+  type = "CLOUD_ARMOR"
+}
+
+forma {
+  v.stack
+  v.target
+
+  policy
+
+  new securityPolicyRule.SecurityPolicyRule {
+    label = "plugin-sdk-test-security-policy-rule"
+    // Resolvable -> the policy exists before addRule runs.
+    securityPolicy = policy.res.name
+    priority = 1000
+    action = "deny(404)"
+    preview = true
+    description = "Block two documentation ranges, in preview"
+    // TEST-NET-2 and TEST-NET-3, both reserved for documentation.
+    match = new securityPolicy.Match {
+      versionedExpr = "SRC_IPS_V1"
+      config = new securityPolicy.MatchConfig {
+        srcIpRanges = new Listing { "198.51.100.0/24"; "203.0.113.0/24" }
+      }
+    }
+  }
+}

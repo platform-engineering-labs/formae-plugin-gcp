@@ -11,6 +11,7 @@ import (
 )
 
 const RepositoryResourceType = "GCP::ArtifactRegistry::Repository"
+const RuleResourceType = "GCP::ArtifactRegistry::Rule"
 
 var artifactRegistryRegistry *base.ResourceRegistry
 
@@ -36,6 +37,34 @@ func init() {
 				resource.OperationCheckStatus,
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
+		},
+		{
+			// A rule gates pull/push on its repository. Unlike repositories,
+			// rules are synchronous, so this definition carries its own
+			// OperationConfig.
+			ResourceType:    RuleResourceType,
+			OperationConfig: ArtifactRegistryRuleOperations,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "rules",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "repositories",
+					PropertyName:   "repository",
+					RequiresParent: true,
+				},
+				CreateIDParam:      "ruleId", // id goes in ?ruleId=, not the body
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true, // PATCH ?updateMask=<body fields>
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(ruleRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(ruleResponseTransformer),
 		},
 	})
 	if err != nil {

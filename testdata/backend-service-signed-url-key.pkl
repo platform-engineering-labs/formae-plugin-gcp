@@ -1,0 +1,54 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/backendServiceSignedUrlKey.pkl"
+import "./config/vars.pkl" as v
+
+// CDN-enabled backend service + the signed-URL key that lets it serve private
+// content. Without the key, enableCDN can only serve public objects.
+local hc = new healthCheck.HealthCheck {
+  label = "plugin-sdk-test-suk-hc"
+  name = "formae-plugin-sdk-test-suk-hc-\(v.testRunID)"
+  type = "HTTP"
+  httpHealthCheck = new healthCheck.HttpHealthCheck {
+    port = 80
+  }
+}
+
+local bs = new backendService.BackendService {
+  label = "plugin-sdk-test-suk-backend-service"
+  name = "formae-plugin-sdk-test-suk-bs-\(v.testRunID)"
+  loadBalancingScheme = "EXTERNAL_MANAGED"
+  protocol = "HTTP"
+  timeoutSec = 30
+  enableCDN = true
+  healthChecks = new Listing {
+    hc.res.selfLink
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  hc
+  bs
+
+  new backendServiceSignedUrlKey.BackendServiceSignedUrlKey {
+    label = "plugin-sdk-test-backend-service-signed-url-key"
+    keyName = "formae-plugin-sdk-test-suk-key-\(v.testRunID)"
+    // Resolvable -> the backend service exists before the add verb runs.
+    backendService = bs.res.name
+    // A throwaway 16-byte test key: base64url of "0123456789abcdef". It signs
+    // nothing — the load balancer it belongs to has no backends and is deleted
+    // when the test finishes.
+    keyValue = "MDEyMzQ1Njc4OWFiY2RlZg=="
+  }
+}

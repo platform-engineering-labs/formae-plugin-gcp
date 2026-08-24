@@ -1,0 +1,90 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RouterInterface
+///
+/// One interface of a Cloud Router — where the router attaches to something it
+/// can peer over. A BGP peer is configured against an interface, so this is the
+/// first half of making a router speak BGP.
+///
+/// An interface is not a REST resource: it lives in `Router.interfaces[]` and is
+/// managed by read-modify-write through routers.patch, so sibling interfaces
+/// (and the router's NATs and BGP peers) survive every operation.
+///
+/// Every field is createOnly: the API rejects an in-place change to an existing
+/// interface ("the following field(s) ... cannot be updated"), so a change is a
+/// replacement — remove the interface and add it back.
+///
+/// Attach it one of three ways: `linkedVpnTunnel`,
+/// `linkedInterconnectAttachment`, or `subnetwork` + `privateIpAddress` for a
+/// router appliance. The last needs no VPN or interconnect at all.
+module gcp.compute.routerInterface
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RouterInterface"
+
+open class RouterInterfaceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RouterInterfaceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RouterInterface extends formae.Resource {
+    hidden parent = this
+
+    /// Name for the interface, unique within the router. A BGP peer references
+    /// it by this name.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Name of the owning router. A path component, not part of the interface
+    /// body — pass `router.res.name` so formae creates the router first.
+    @gcp.FieldHint { createOnly = true }
+    router: (String|formae.Resolvable)
+
+    /// Region of the owning router. Also a path component.
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Subnet the interface sits in, for a router appliance. Pass
+    /// `subnet.res.selfLink`.
+    @gcp.FieldHint { createOnly = true }
+    subnetwork: (String|formae.Resolvable)?
+
+    /// Address within `subnetwork`. GCP derives `ipRange` from it.
+    @gcp.FieldHint { createOnly = true }
+    privateIpAddress: String?
+
+    /// The link-local range for a VPN or interconnect interface. GCP fills this
+    /// in from `privateIpAddress` when a subnetwork is used instead.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    ipRange: String?
+
+    /// URL of a VPN tunnel to run BGP over.
+    @gcp.FieldHint { createOnly = true }
+    linkedVpnTunnel: (String|formae.Resolvable)?
+
+    /// URL of an interconnect attachment to run BGP over.
+    @gcp.FieldHint { createOnly = true }
+    linkedInterconnectAttachment: (String|formae.Resolvable)?
+
+    /// IPV4 or IPV6 — GCP fills IPV4.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    ipVersion: String?
+
+    hidden res: RouterInterfaceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

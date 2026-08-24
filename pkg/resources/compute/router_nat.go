@@ -518,15 +518,28 @@ func (p *RouterNatProvisioner) Status(
 			},
 		}, nil
 	}
-	return &resource.StatusResult{
-		ProgressResult: &resource.ProgressResult{
-			Operation:       resource.OperationCheckStatus,
-			OperationStatus: resource.OperationStatusSuccess,
-			StatusMessage:   "Operation completed successfully",
-			RequestID:       request.RequestID,
-			NativeID:        natID,
-		},
-	}, nil
+	// Read the NAT back so post-create and post-update state carries what the
+	// API actually built, not just what was declared. Without this a NAT's
+	// nested properties (logConfig, subnetworks) are missing from state until
+	// the next sync - the same defect base.StatusWithRead exists to prevent.
+	progress := &resource.ProgressResult{
+		Operation:       resource.OperationCheckStatus,
+		OperationStatus: resource.OperationStatusSuccess,
+		StatusMessage:   "Operation completed successfully",
+		RequestID:       request.RequestID,
+		NativeID:        natID,
+	}
+	if natID != "" {
+		readResult, readErr := p.Read(ctx, &resource.ReadRequest{
+			NativeID:     natID,
+			ResourceType: request.ResourceType,
+			TargetConfig: request.TargetConfig,
+		})
+		if readErr == nil && readResult != nil && readResult.ErrorCode == "" && readResult.Properties != "" {
+			progress.ResourceProperties = []byte(readResult.Properties)
+		}
+	}
+	return &resource.StatusResult{ProgressResult: progress}, nil
 }
 
 func createFailure(code resource.OperationErrorCode, msg string) *resource.CreateResult {

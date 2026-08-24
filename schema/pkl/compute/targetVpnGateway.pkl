@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute TargetVpnGateway
+///
+/// The classic, route-based VPN gateway. `HaVpnGateway` is the modern
+/// alternative with an SLA and BGP; this one terminates policy- and route-based
+/// tunnels, and still backs plenty of existing setups.
+///
+/// It is a different collection from the HA gateway (`targetVpnGateways` rather
+/// than `vpnGateways`) and draws on a separate quota, so a project out of HA
+/// gateway capacity can still create these.
+///
+/// Immutable: PATCH is not a method on this resource, so any change replaces it.
+module gcp.compute.targetVpnGateway
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::TargetVpnGateway"
+
+open class TargetVpnGatewayResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: TargetVpnGatewayResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: TargetVpnGatewayResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: TargetVpnGatewayResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class TargetVpnGateway extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// The VPC the gateway attaches to. Pass `network.res.selfLink` so formae
+    /// creates the network first.
+    @gcp.FieldHint { createOnly = true }
+    network: (String|formae.Resolvable)
+
+    /// CREATING, READY, FAILED or DELETING - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    status: String?
+
+    /// Server-managed, for setLabels.
+    @gcp.FieldHint { hasProviderDefault = true }
+    labelFingerprint: String?
+
+    hidden res: TargetVpnGatewayResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

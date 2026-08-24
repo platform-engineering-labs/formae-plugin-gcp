@@ -1,0 +1,29 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/eventarc/messageBus.pkl"
+import "./config/vars.pkl" as v
+
+// Eventarc Advanced is not available in every region — GCP_LOCATION's
+// europe-central2 is rejected outright — so the bus pins a supported one rather
+// than inheriting the target's location. Nothing publishes to it, so it costs
+// nothing.
+forma {
+  v.stack
+  v.target
+
+  new messageBus.MessageBus {
+    label = "plugin-sdk-test-eventarc-message-bus"
+    name = "formae-plugin-sdk-test-mb-\(v.testRunID)"
+    location = "europe-west1"
+    labels = new Mapping {
+      ["managed-by"] = "formae-conformance"
+      ["phase"] = "updated"
+    }
+  }
+}

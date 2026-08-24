@@ -10,6 +10,8 @@ import (
 )
 
 const AutoscalingPolicyResourceType = "GCP::Dataproc::AutoscalingPolicy"
+const SessionTemplateResourceType = "GCP::Dataproc::SessionTemplate"
+const WorkflowTemplateResourceType = "GCP::Dataproc::WorkflowTemplate"
 
 var dataprocRegistry *base.ResourceRegistry
 
@@ -29,7 +31,7 @@ func init() {
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:   "autoscalingPolicies",
 				Scope:          &base.ScopeConfig{Type: base.ScopeRegional},
-				SupportsUpdate: false, // update is a PUT; defer until verified
+				SupportsUpdate: false,      // update is a PUT; defer until verified
 				ListItemsKey:   "policies", // list response is {"policies":[...]}, not "items"
 			},
 			Operations: []resource.Operation{
@@ -41,6 +43,57 @@ func init() {
 			},
 			RequestTransformer:  dataprocIDRequestTransformer,
 			ResponseTransformer: base.ShortNameResponseTransformer,
+		},
+		{
+			// Serverless Spark session template. Location-scoped, so it carries
+			// its own APIConfig and native-ID parser, and synchronous like the
+			// autoscaling policy above.
+			ResourceType:   SessionTemplateResourceType,
+			APIConfig:      DataprocLocationAPI,
+			NativeIDConfig: DataprocLocationNativeID,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "sessionTemplates",
+				Scope:          &base.ScopeConfig{Type: base.ScopeLocationBased},
+				SupportsUpdate: true,
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(sessionTemplateRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(sessionTemplateResponseTransformer),
+		},
+		{
+			// A Spark job graph plus the cluster to run it on. Region-scoped like
+			// the autoscaling policy, so it shares the default API config.
+			// Update is a PUT carrying the current version, which the engine
+			// supplies through optimistic locking - the version is a number, not
+			// a string etag.
+			ResourceType: WorkflowTemplateResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "workflowTemplates",
+				Scope:          &base.ScopeConfig{Type: base.ScopeRegional},
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPut,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "version",
+					LocationInURL: false,
+				},
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			ResponseTransformer: base.ResponseTransformerFunc(workflowTemplateResponseTransformer),
 		},
 	})
 	if err != nil {

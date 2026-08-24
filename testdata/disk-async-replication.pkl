@@ -1,0 +1,55 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/disk.pkl"
+import "@gcp/compute/diskAsyncReplication.pkl"
+import "./config/vars.pkl" as v
+
+// A replicated disk pair. Async replication requires the two disks in different
+// regions, so the secondary is pinned to a zone away from GCP_ZONE rather than
+// derived from it.
+local secondaryZone = "europe-west4-a"
+
+local primary = new disk.Disk {
+  label = "plugin-sdk-test-dar-primary"
+  project = v.gcpProject
+  zone = v.gcpZone
+  name = "formae-plugin-sdk-test-dar-pri-\(v.testRunID)"
+  description = "Primary disk of the replicated pair"
+  sizeGb = 10
+  type = "pd-balanced"
+}
+
+// The secondary must name its primary at creation; it cannot be paired later.
+local secondary = new disk.Disk {
+  label = "plugin-sdk-test-dar-secondary"
+  project = v.gcpProject
+  zone = secondaryZone
+  name = "formae-plugin-sdk-test-dar-sec-\(v.testRunID)"
+  description = "Secondary disk receiving the replica"
+  sizeGb = 10
+  type = "pd-balanced"
+  asyncPrimaryDisk = new disk.AsyncPrimaryDisk {
+    disk = primary.res.selfLink
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  primary
+  secondary
+
+  new diskAsyncReplication.DiskAsyncReplication {
+    label = "plugin-sdk-test-disk-async-replication"
+    // Resolvables -> both disks exist before the start verb runs.
+    primaryDisk = primary.res.selfLink
+    secondaryDisk = secondary.res.selfLink
+  }
+}

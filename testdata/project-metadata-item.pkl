@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/projectMetadataItem.pkl"
+import "./config/vars.pkl" as v
+
+// One key of the project's shared metadata. The key name is scoped to the test
+// run so the fixture can never collide with a real setting, and the provisioner
+// leaves every other key untouched.
+forma {
+  v.stack
+  v.target
+
+  new projectMetadataItem.ProjectMetadataItem {
+    label = "plugin-sdk-test-project-metadata-item"
+    key = "formae-plugin-sdk-test-pmi-\(v.testRunID)"
+    value = "conformance-test-value"
+  }
+}

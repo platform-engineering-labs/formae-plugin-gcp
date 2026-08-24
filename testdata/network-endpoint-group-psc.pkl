@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/networkEndpointGroup.pkl"
+import "./config/vars.pkl" as v
+
+// The Private Service Connect flavour of a regional NEG. Unlike the serverless
+// one it needs no backend and no VPC — the API rejects network/subnetwork for
+// this type — so this is the cheapest NEG case there is.
+forma {
+  v.stack
+  v.target
+
+  new networkEndpointGroup.NetworkEndpointGroup {
+    label = "plugin-sdk-test-neg-psc"
+    name = "formae-plugin-sdk-test-negpsc-\(v.testRunID)"
+    description = "PSC network endpoint group for plugin SDK conformance tests"
+    networkEndpointType = "PRIVATE_SERVICE_CONNECT"
+    // A regional Google API endpoint; nothing is published or billed by naming it.
+    pscTargetService = "\(v.gcpRegion)-cloudkms.googleapis.com"
+    region = v.gcpRegion
+  }
+}

@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute TargetGrpcProxy
+///
+/// The proxy a proxyless gRPC service mesh points its clients at. The other
+/// target proxies terminate connections for a load balancer; this one hands an
+/// xDS-aware gRPC client the routing rules from its `urlMap`, with no proxy in
+/// the data path at all.
+module gcp.compute.targetGrpcProxy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::TargetGrpcProxy"
+
+open class TargetGrpcProxyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: TargetGrpcProxyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: TargetGrpcProxyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: TargetGrpcProxyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class TargetGrpcProxy extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// URL of the map holding the routing rules. Required — unlike the HTTP
+    /// proxies, the API rejects a gRPC proxy without one. Pass
+    /// `urlMap.res.selfLink` so formae creates the map first.
+    @gcp.FieldHint
+    urlMap: (String|formae.Resolvable)
+
+    /// Have the mesh validate that the referenced services are proxyless-gRPC
+    /// capable.
+    @gcp.FieldHint { hasProviderDefault = true }
+    validateForProxyless: Boolean?
+
+    /// Server-managed, and patch is rejected without it.
+    @gcp.FieldHint { hasProviderDefault = true }
+    fingerprint: String?
+
+    hidden res: TargetGrpcProxyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
