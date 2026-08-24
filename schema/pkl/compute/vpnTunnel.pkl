@@ -5,12 +5,12 @@
  */
 
 /// GCP Compute VpnTunnel (regional)
-///
+    ///
 /// One IPsec tunnel between a Google-side `haVpnGateway` interface and a
 /// peer-side `externalVpnGateway` interface. An HA VPN needs a `router` for the
 /// BGP session that carries routes; add a router interface and BGP peer to
 /// finish the wiring.
-///
+    ///
 /// ponytail: update is off — the API has no vpnTunnels.patch, so a change
 /// replaces the tunnel.
 module gcp.compute.vpnTunnel
@@ -75,8 +75,13 @@ open class VpnTunnel extends formae.Resource {
     /// IKE pre-shared key. Write-only: the API returns only
     /// `sharedSecretHash`. Wrap it so it stays out of plans and state, the way
     /// `sslCertificate.privateKey` does.
+    ///
+    /// Optional in the schema even though a tunnel needs one: a *discovered*
+    /// tunnel can never carry the secret, and a required field discovery cannot
+    /// fill keeps the resource out of inventory entirely. GCP still rejects a
+    /// create without it.
     @gcp.FieldHint { createOnly = true; writeOnly = true }
-    sharedSecret: (String|formae.Value)
+    sharedSecret: (String|formae.Value)?
 
     @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
     ikeVersion: Int?

@@ -10,6 +10,14 @@ formae agent.
 
 ## [Unreleased]
 
+### Fixed
+
+- `GCP::Compute::BackendServiceSignedUrlKey` and `GCP::Compute::VpnTunnel` are
+  now discoverable. Both declared a *required* write-only field (`keyValue`,
+  `sharedSecret`) that the API never reports, so a discovered instance could
+  never satisfy the schema and was silently dropped from inventory. Both fields
+  are now optional; the create path still rejects a missing value.
+
 ### Added
 
 - `GCP::Compute::InstanceTemplate` — the immutable global VM blueprint a

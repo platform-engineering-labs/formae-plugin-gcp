@@ -51,11 +51,16 @@ open class BackendServiceSignedUrlKey extends formae.Resource {
     /// reports key *names* only, never the value, so it can never round-trip.
     /// Accepts a `formae.Value` (e.g. `formae.value(read(...).text).opaque`) so
     /// callers can keep it out of plans and state.
+    ///
+    /// Optional in the schema even though a create needs one: the API never
+    /// reports a key's value, so a *discovered* key can never carry it, and a
+    /// required field that discovery cannot fill keeps the resource out of
+    /// inventory entirely. The provisioner still rejects a create without it.
     @gcp.FieldHint {
         createOnly = true
         writeOnly = true
     }
-    keyValue: (String|formae.Value)
+    keyValue: (String|formae.Value)?
 
     hidden res: BackendServiceSignedUrlKeyResolvable = new {
         label = parent.label
