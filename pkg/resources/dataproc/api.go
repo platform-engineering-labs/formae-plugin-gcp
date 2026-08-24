@@ -104,3 +104,83 @@ var dataprocIDRequestTransformer = base.RequestTransformerFunc(
 		}
 		return body, nil
 	})
+
+// DataprocLocationAPI is the same API with a location-based path. Dataproc is
+// split: autoscalingPolicies live under "regions/{region}" while sessionTemplates
+// live under "locations/{location}", so the two cannot share a path builder.
+var DataprocLocationAPI = base.APIConfig{
+	BaseURL:     "https://dataproc.googleapis.com/v1",
+	APIVersion:  "v1",
+	PathBuilder: dataprocLocationPathBuilder,
+	Pagination:  &base.PaginationConfig{PageSizeParam: "pageSize"},
+}
+
+// DataprocLocationNativeID - full path
+// "projects/{project}/locations/{location}/{resourceType}/{name}".
+var DataprocLocationNativeID = base.NativeIDConfig{
+	Format: base.FullPathFormat,
+	Parser: parseDataprocLocationNativeID,
+}
+
+// dataprocLocationPathBuilder builds
+// /projects/{project}/locations/{location}/{resourceType}[/{name}].
+func dataprocLocationPathBuilder(ctx base.PathContext) string {
+	location := ctx.Location
+	if location == "" {
+		location = ctx.Region
+	}
+	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, location, ctx.ResourceType)
+	if ctx.ResourceName != "" {
+		path += "/" + ctx.ResourceName
+	}
+	return path
+}
+
+func parseDataprocLocationNativeID(nativeID string) (base.PathContext, error) {
+	parts := strings.Split(nativeID, "/")
+	if len(parts) != 6 || parts[0] != "projects" || parts[2] != "locations" {
+		return base.PathContext{}, fmt.Errorf("invalid dataproc location native ID: %s", nativeID)
+	}
+	return base.PathContext{
+		Project:      parts[1],
+		Location:     parts[3],
+		Region:       parts[3],
+		ResourceType: parts[4],
+		ResourceName: parts[5],
+	}, nil
+}
+
+// sessionTemplateRequestTransformer expands the declared short name into the full
+// resource path. Session templates have no "?sessionTemplateId=" parameter -
+// the API binds the id from the body's "name", and rejects the query parameter
+// outright - so the path has to be built here.
+func sessionTemplateRequestTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		body[k] = v
+	}
+	location := ctx.Location
+	if location == "" {
+		location = ctx.Region
+	}
+	if name, ok := body["name"].(string); ok && name != "" && !strings.Contains(name, "/") {
+		body["name"] = fmt.Sprintf("projects/%s/locations/%s/sessionTemplates/%s",
+			ctx.Project, location, name)
+	}
+	return body, nil
+}
+
+// sessionTemplateResponseTransformer is its mirror: the read shortens the name
+// back so the declared value and the value read back can match.
+func sessionTemplateResponseTransformer(props map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		out[k] = v
+	}
+	if name, ok := props["name"].(string); ok {
+		if i := strings.LastIndex(name, "/sessionTemplates/"); i >= 0 {
+			out["name"] = name[i+len("/sessionTemplates/"):]
+		}
+	}
+	return out
+}

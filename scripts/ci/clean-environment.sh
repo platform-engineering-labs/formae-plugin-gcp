@@ -429,6 +429,20 @@ else
     echo "  No VPN tunnels found"
 fi
 
+# Classic VPN gateways are a separate collection from the HA ones and hold their
+# network, so they go before the network passes.
+echo "Cleaning GCP target VPN gateways..."
+TARGET_VPN_GWS=$(gcloud compute target-vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$TARGET_VPN_GWS" ]; then
+    echo "$TARGET_VPN_GWS" | while read -r gw region; do
+        [ -z "$gw" ] && continue
+        echo "  Deleting target VPN gateway: $gw ($region)"
+        gcloud compute target-vpn-gateways delete "$gw" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target VPN gateways found"
+fi
+
 echo "Cleaning GCP HA VPN gateways..."
 VPN_GATEWAYS=$(gcloud compute vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
 if [ -n "$VPN_GATEWAYS" ]; then
@@ -796,6 +810,33 @@ fi
 # instead of being inherited.
 # Pipelines hold their destination bus, so they go first. Only one bus is allowed
 # per project per region, so a leftover bus fails the next run's create outright.
+# Workflows definitions. Free to keep, but they are test debris.
+# Dataproc session templates. Free to keep, but they are test debris. Note these
+# are location-scoped, unlike autoscaling policies.
+echo "Cleaning GCP dataproc session templates..."
+STS=$(gcloud dataproc session-templates list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep 'formae-plugin-sdk' || true)
+if [ -n "$STS" ]; then
+    echo "$STS" | while read -r st; do
+        [ -z "$st" ] && continue
+        echo "  Deleting session template: $(basename "$st")"
+        gcloud dataproc session-templates delete "$(basename "$st")" --location="${GCP_LOCATION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No dataproc session templates found"
+fi
+
+echo "Cleaning GCP workflows..."
+WFS=$(gcloud workflows list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+if [ -n "$WFS" ]; then
+    echo "$WFS" | while read -r wf; do
+        [ -z "$wf" ] && continue
+        echo "  Deleting workflow: $wf"
+        gcloud workflows delete "$wf" --location="${GCP_LOCATION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No workflows found"
+fi
+
 echo "Cleaning GCP eventarc pipelines..."
 for pl_loc in europe-west1 us-central1; do
     PLS=$(gcloud eventarc pipelines list --location="$pl_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)

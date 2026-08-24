@@ -519,6 +519,46 @@ Together these close the managed-instance-group gap: the plugin previously had
   `TIMEOUT=30`. The API also refuses a PATCH while creation is still running.
   Conformance green on all eight steps, Update included.
 
+- `GCP::Compute::TargetVpnGateway` — the classic, route-based VPN gateway.
+  `HaVpnGateway` is the modern alternative with an SLA and BGP; this one
+  terminates policy- and route-based tunnels and still backs plenty of existing
+  setups.
+
+  It is a different collection (`targetVpnGateways`, not `vpnGateways`) drawing
+  on a **separate quota**, which is why this case passes in a project whose
+  `VPN_GATEWAYS_PER_REGION` is exhausted — the condition that still keeps
+  `vpn-tunnel` red. Immutable: PATCH is not a method on it at all (an attempt
+  answers with an HTML 404), so any change replaces. Conformance green on all
+  eight steps; the cleanup script gained a target-VPN-gateway pass, ordered before
+  the network passes since a gateway holds its network.
+
+- `GCP::Workflows::Workflow` — a workflow definition: the YAML program Workflows
+  runs to orchestrate calls to other services. **New service namespace** — the
+  plugin had no Workflows coverage at all — so this adds
+  `pkg/resources/workflows` (API config, LRO operations, native-ID parser) and
+  `schema/pkl/workflows`.
+
+  Defining a workflow costs nothing; only executions are billed, and nothing
+  executes this one. Editing `sourceContents` produces a new revision rather than
+  mutating the old one, which `revisionId` reports, and `serviceAccount` is
+  filled in with the project's default compute service account when unset.
+  Conformance green on all eight steps, Update included, in under two minutes.
+
+- `GCP::Dataproc::SessionTemplate` — a reusable configuration for a serverless
+  Spark session: runtime version, session kind, and the environment a session
+  inherits. The template runs nothing and costs nothing; only sessions started
+  from it are billed.
+
+  Two API shapes made this more than a copy of the autoscaling policy. Dataproc
+  is **split by scope**: session templates live under `locations/{location}` while
+  autoscaling policies live under `regions/{region}`, so this definition carries
+  its own `APIConfig` and native-ID parser. And there is **no
+  `?sessionTemplateId=` parameter** — the API rejects it as an unbindable query
+  parameter and takes the id from the body's `name` as a full path — so a request
+  transformer expands the declared short name and a response transformer shortens
+  it back, keeping declared and observed values comparable. Conformance green on
+  all eight steps in 16 seconds, the fastest case in the suite.
+
 ### Changed
 
 - The AlloyDB 8-segment native-ID parser is now a
