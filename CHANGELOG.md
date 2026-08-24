@@ -213,17 +213,9 @@ Together these close the managed-instance-group gap: the plugin previously had
   learn the rule is gone; and `List` skips priorities at or above 2147483644,
   where GCP's own implied rules live.
 
-  **No conformance fixture yet.** Create, Sync, Destroy and OOB-delete all pass
-  — so the verbs, native ID, List filtering and status wiring are right — but
-  Verify/Extract/Update fail with "Property match should exist in actual
-  resource". The `match` object never reaches stored state. This provisioner's
-  `Read` is hand-written and demonstrably returns the API body verbatim
-  (`getRule` includes `match`, verified directly), and the failure is identical
-  whether `match` is a typed sub-object or an untyped `Mapping`. That places the
-  loss downstream of the plugin's Read result rather than in the request path or
-  the schema, and makes this the fourth instance of the same class of problem
-  (see `Logging::SavedQuery.summaryFields`, `Monitoring::Dashboard` etag,
-  `Logging::LogScope` update).
+  Conformance green on all eight steps, with a fixture. (It had none for a while:
+  `match` went missing from state after create, which looked like a formae bug.
+  It was the missing `Status` read-back described under *Fixed* below.)
 - `GCP::Compute::InstantSnapshot` — a near-instant, same-zone copy of a disk: a
   fast rollback point rather than a backup, since it is not replicated outside
   the zone. Requires an SSD-class source disk, so its fixture uses `pd-ssd`
@@ -262,6 +254,329 @@ Together these close the managed-instance-group gap: the plugin previously had
   origin with `fqdn` or `ipAddress`, never both; which one is valid depends on
   the group's `networkEndpointType`. Everything is create-only, so any change
   detaches and reattaches.
+
+- `GCP::Compute::SecurityPolicyRule` — one rule inside a global Cloud Armor
+  policy. A new policy carries only a catch-all allow at priority 2147483647, so
+  a policy alone permits everything; the rules are what enforce anything. Like
+  the firewall policy rule it is a set of verbs on the policy rather than a REST
+  sub-collection, so `FirewallPolicyRuleProvisioner` was generalised into
+  `PolicyRuleProvisioner`, parameterised by a `policyRuleKind` (collection
+  segment, owning-policy property, and where GCP's own rules start). Both rule
+  types now share one implementation. Only global `securityPolicies` is wired up;
+  a `RegionSecurityPolicy` rule would need a regional kind.
+
+  Conformance green on all eight steps. (It was initially red on Verify, Extract
+  and Update over a missing `match.config`; that turned out to be the missing
+  `Status` read-back described under *Fixed* below, not anything about this
+  resource.)
+
+  Do not declare `rules` inline on the policy and manage rules with this
+  resource at the same time — both own the same list and each will remove what
+  the other added.
+
+- `GCP::Compute::TargetGrpcProxy` — the proxy a proxyless gRPC service mesh
+  points its clients at. The other target proxies terminate connections for a
+  load balancer; this one hands an xDS-aware gRPC client the routing rules from
+  its `urlMap`, with no proxy in the data path. `urlMap` is required, unlike on
+  the HTTP proxies, and `patch` is rejected without a `fingerprint`, so unlike
+  the other target proxies this one registers optimistic locking. Conformance is
+  green on all eight steps, Update included.
+
+- `GCP::Compute::RegionSecurityPolicyRule` — the regional twin of the Cloud Armor
+  rule above. The four verbs are identical, only the policy sits under
+  `regions/{region}`, so `policyRuleKind` gained a `regional` flag: it picks the
+  scope segment, makes `region` a path component that never travels in the rule
+  body, and passes the region to the operation poll so it hits
+  `regions/{r}/operations`. Three kinds now share the one provisioner.
+
+  Conformance green on all eight steps, once the `Status` read-back below was in
+  place. All four verbs were probed directly, and a direct `Create` against a
+  live regional policy returns the right composite native ID.
+
+- `GCP::Compute::NetworkEndpointGroup` gains `pscTargetService` and the
+  `PRIVATE_SERVICE_CONNECT` endpoint type, so the group can front a Google API
+  or a published service attachment rather than only a Cloud Run service. This
+  is what Terraform calls `google_compute_region_network_endpoint_group` — not a
+  separate resource here, since this one is already regional. The API rejects
+  `network` and `subnetwork` for a PSC group in regional scope, so it needs no
+  VPC: `testdata/network-endpoint-group-psc.pkl` is the only conformance case in
+  the suite with no prerequisites at all, and runs in under 90 seconds.
+
+- `GCP::Compute::RegionDiskResourcePolicyAttachment` — binds a snapshot schedule
+  to a regional disk, the regional twin of the zonal attachment. Same two verbs
+  (`addResourcePolicies` / `removeResourcePolicies`), so
+  `DiskResourcePolicyAttachmentProvisioner` gained a `regional` flag rather than
+  a second copy: it picks the scope segment, swaps the `zone` property for
+  `region`, and puts the region into the operation poll. Conformance green on
+  all eight steps.
+
+  `clean-environment.sh` detached policies with `--zone` only, so a regional
+  attachment would have pinned its policy forever; the detach pass now uses
+  whichever of zone/region the disk actually reports.
+
+- `GCP::Compute::NetworkFirewallPolicyAssociation` — attaches a network firewall
+  policy to a VPC network, which is what puts the policy in the data path: a
+  policy with rules but no association is inert. Like the rules it is a set of
+  verbs on the policy (`addAssociation`, `getAssociation?name=N`,
+  `removeAssociation?name=N`), so it is a hand-written provisioner, and a removed
+  association answers `getAssociation` with **400, not 404**, so not-found is
+  mapped explicitly. Nothing is updatable — an association is a
+  (policy, network) pair — so a change replaces it. Conformance green on all
+  eight steps.
+
+  `clean-environment.sh` now detaches associations before deleting policies: an
+  association pins both its policy and its network, so a killed run used to
+  leave all three behind.
+
+- `GCP::Compute::RegionNetworkFirewallPolicyAssociation` — the regional twin of
+  the association above, for a `RegionNetworkFirewallPolicy`. The three verbs are
+  identical, only the policy sits under `regions/{region}` (the network itself
+  stays global), so `FirewallPolicyAssociationProvisioner` gained a `regional`
+  flag rather than a second copy. Conformance green on all eight steps, and the
+  cleanup script detaches regional associations too.
+
+- `GCP::Compute::RegionCompositeHealthCheck` — completes the health-aggregation
+  trio: `RegionHealthAggregationPolicy` decides what "healthy" means,
+  `RegionHealthSource` applies that to a backend service, and this reports the
+  verdict where a load balancer can act on it. The other two were inert without
+  it. `healthDestination` must be a **forwarding rule** — the API rejects a
+  backend service with "Unexpected resource collection" — so the fixture builds
+  the full internal-load-balancer chain (network, subnet, health check, backend
+  service, forwarding rule) without booting a single VM.
+
+  Unlike its two siblings, update is supported, and it needs the fingerprint.
+  The API hides that: a patch without one returns **200 with a normal
+  operation**, and the *operation* then fails with 412 CONDITION_NOT_MET
+  ("missing fingerprint"). Registered with optimistic locking on `fingerprint`;
+  conformance green on all eight steps, Update included.
+
+- `GCP::Compute::BackendServiceSignedUrlKey` — a Cloud CDN signed-URL key on a
+  backend service. Without a key no signed URL can be issued, so this is what
+  makes `enableCDN` usable for private content. Added and removed with the
+  `addSignedUrlKey` / `deleteSignedUrlKey` verbs, so it is a hand-written
+  provisioner.
+
+  The secret is write-only in the strongest sense: the API reports key *names*
+  only, under `cdnPolicy.signedUrlKeyNames`, and omits the block entirely when a
+  service has no keys. `Read` therefore reports presence rather than value —
+  which is all drift detection can check — and `keyValue` accepts a wrapped
+  `formae.Value` so it stays out of plans and state. Nothing is updatable:
+  rotating a key removes it and adds the new value. Conformance green on all
+  eight steps.
+
+- `GCP::Compute::RouterRoutePolicy` — a BGP route policy on a Cloud Router,
+  filtering or rewriting the routes it imports from, or advertises to, its peers.
+  Without one a router takes and gives every route as-is. Verb-based
+  (`updateRoutePolicy`, which both creates and updates, plus `getRoutePolicy`,
+  `deleteRoutePolicy`, `listRoutePolicies`), so it is a hand-written provisioner.
+  Three API quirks: `getRoutePolicy` wraps the policy in a `resource` envelope,
+  `listRoutePolicies` returns `result` rather than the usual `items`, and an
+  update must carry the current fingerprint while a create must not carry one at
+  all — so `Update` re-reads the policy for a fresh fingerprint instead of
+  trusting the declared forma, where it would go stale after the first change.
+  A removed policy answers 400 ("The policy does not exist"), not 404.
+  Conformance green on all eight steps, Update included.
+
+- `GCP::Compute::RouterNamedSet` — a reusable list of prefixes on a Cloud
+  Router. A route policy term can match against a named set instead of spelling
+  out every prefix, so one edit here changes every policy referencing it.
+
+  Same shape as the route policy down to the quirks — the update verb also
+  creates, the get verb wraps its payload in a `resource` envelope, the list verb
+  returns `result` rather than `items`, and an update needs the current
+  fingerprint while a create must not carry one — so
+  `RouterRoutePolicyProvisioner` became `RouterSubResourceProvisioner`,
+  parameterised by a `routerSubKind` holding the four verb names, the query
+  parameter and the native-ID segment. The verbs cannot be derived from one
+  noun (`listRoutePolicies` pluralises, `listNamedSets` does not), so a unit
+  test pins all six strings per kind. `NAMED_SET_TYPE_PREFIX` must be spelled in
+  full — `PREFIX` is rejected — and a prefix element carries its own quotes
+  (`'10.0.0.0/8'`). A missing set answers 404 `NAMED_SET_NOT_FOUND` where a
+  missing policy answers 400 `does not exist`, so both spellings count as gone.
+  Conformance green on all eight steps for both kinds, Update included.
+
+- `GCP::Compute::ProjectMetadataItem` — one key of the project's common instance
+  metadata: the project-wide defaults every VM inherits, such as
+  `enable-oslogin`, `ssh-keys` or a default `startup-script`. There was no way to
+  manage any of that before.
+
+  This is **shared, project-wide state**, and the API has no per-key operation:
+  `setCommonInstanceMetadata` replaces the whole list. So every write is
+  read-modify-write that touches one key and copies every other key verbatim,
+  and the merge carries the resource's whole safety story — it is unit-tested
+  against foreign keys, in-place overwrite, absent-key removal, a project with no
+  metadata, and junk entries (keyless items, non-maps, keys with no value). A
+  stale fingerprint is rejected by the API rather than silently overwriting, so a
+  concurrent editor causes one retry, never a lost key; `writeMetadataItem`
+  retries once on that error.
+
+  Declare one resource per key — modelling the whole map would have two
+  declarations fighting over one list. `List` reports every key, so undeclared
+  ones surface as unmanaged, which is honest: they are real project settings.
+  Conformance green on all eight steps, and the project's pre-existing
+  `enable-oslogin` was verified intact afterwards. The cleanup script removes
+  only `formae-plugin-sdk`-prefixed keys.
+
+- `GCP::Compute::RouterInterface` — one entry of `Router.interfaces[]`, where a
+  Cloud Router attaches to whatever it peers over. A BGP peer is configured
+  against an interface, so this is the first half of making a router speak BGP,
+  and `Router` did not model interfaces at all.
+
+  Like Cloud NAT it lives inside the router and is managed by read-modify-write
+  through routers.patch, so sibling interfaces — and the router's NATs and BGP
+  peers — survive every operation. The merge is unit-tested against sibling
+  preservation, in-place overwrite, absent-key removal, an empty router and junk
+  entries.
+
+  Every field is createOnly: the API rejects an in-place change ("the following
+  field(s) specified in the router interface cannot be updated"), so `Update`
+  reports not-updatable and formae replaces instead. Attaching by `subnetwork` +
+  `privateIpAddress` — a router appliance interface — needs no VPN tunnel, so the
+  fixture sidesteps the exhausted per-region VPN gateway quota entirely and boots
+  no VMs. Conformance green on all eight steps, with Replace exercising the
+  delete-then-create path.
+
+- `GCP::Compute::DiskAsyncReplication` — the replication link between a primary
+  disk and a secondary in another region, which is what cross-region disk
+  disaster recovery is. The disks are ordinary `Disk` resources; this models the
+  relationship, started and stopped with the startAsyncReplication /
+  stopAsyncReplication verbs on the primary.
+
+  The subtlety that shapes the whole implementation: **stopping replication does
+  not clear `asyncPrimaryDisk` from the secondary.** Only
+  `resourceStatus.asyncPrimaryDisk.state` changes, ACTIVE to STOPPED, so a read
+  that keyed on the field being present would report a dead pair as live
+  forever. `Read` judges by state, and also refuses a secondary that has been
+  re-paired with a different primary. `stopAsyncReplication` is idempotent, so
+  deleting twice is not an error. Nothing is updatable — the link is a pair.
+
+  `Disk.asyncPrimaryDisk.disk` was typed `String`, which made it impossible to
+  reference the primary through a resolvable; it now accepts one, so formae
+  orders the creates. That matters more than convenience here: a secondary
+  cannot be paired after creation, so the reference has to be right the first
+  time. A disk in active replication also cannot be deleted, so the cleanup
+  script stops replication before its disk passes run. Conformance green on all
+  eight steps.
+
+- `GCP::ArtifactRegistry::Rule` — a rule gates an operation on its repository
+  (denying downloads, for instance). A repository without rules allows whatever
+  the caller's IAM permits, so this is how one enforces policy of its own. It is
+  the first parented resource in this package, and config-driven rather than
+  hand-written, which took three fixes to the generic Artifact Registry plumbing:
+
+  - the path builder now inserts `repositories/{repo}` when a resource is
+    nested, so a rule lands on `.../repositories/{repo}/rules/{rule}`;
+  - the native-ID extractor keeps that parent segment, since a read URL is
+    rebuilt from the id and would otherwise address the location-level
+    collection; and
+  - `ArtifactRegistryNativeID` gained a `Parser` that restores
+    ParentType/ParentResource from a nested id.
+
+  A request transformer drops `repository` and `location` (path components the
+  API rejects as body fields) while keeping `name`, which the engine reads to
+  fill `?ruleId=`; a response transformer recovers `repository` and `location`
+  from the returned path. Rules are synchronous, unlike repositories, so the
+  definition carries its own `OperationConfig`. Note the API allows only **one
+  DOWNLOAD rule per repository**. Conformance green on all eight steps, Update
+  included.
+
+- `GCP::Eventarc::MessageBus` — the hub of an Eventarc Advanced setup, where
+  publishers send events and enrollments and pipelines route them onward. A
+  `Trigger` wires one source to one destination; a bus is the fan-out point
+  between many, and it supports PATCH where Trigger does not.
+
+  **Eventarc Advanced is not available in every region.** `europe-central2` —
+  this project's `GCP_LOCATION` — is rejected outright with "region ... is not
+  supported in Eventarc Advanced", so the resource declares its own `location`
+  and the fixture pins `europe-west1`. A request transformer keeps `location` out
+  of the body (it addresses the URL) while keeping `name` for `?messageBusId=`,
+  and a response transformer recovers `location` from the returned path so a
+  declared location is not reported missing. Because the fixture's region differs
+  from `GCP_LOCATION`, the cleanup script names the Advanced regions explicitly.
+  Conformance green on all eight steps, Update included.
+
+- `GCP::Eventarc::Pipeline` — where a message bus sends the events it accepts. An
+  enrollment decides which events reach a pipeline; the pipeline says where they
+  go and how hard to retry.
+
+  Two API facts govern the fixture. First, **only one message bus is allowed per
+  project per region** (`MessageBusesPerProjectPerRegion`, limit 1), so the
+  pipeline case pins `us-central1` while `eventarc-message-bus` keeps
+  `europe-west1` — otherwise whichever ran first would hold the region's only
+  slot and fail the other. Second, an `httpEndpoint` destination needs a real
+  `networkAttachment`, and a bogus one fails the create *asynchronously*; a
+  `messageBus` destination needs nothing but the bus, so that is what the fixture
+  uses.
+
+  A forma passes `bus.res.name`, so formae orders the creates; the request
+  transformer expands that short name into the full path Eventarc wants and the
+  response transformer shortens it back. That symmetry is the point — expanding
+  on write without shortening on read made all four comparison steps report drift
+  on a pipeline that was in fact correct.
+
+  This resource is slow: roughly four minutes to create and two and a half to
+  delete, so the conformance case takes about 25 minutes and needs
+  `TIMEOUT=30`. The API also refuses a PATCH while creation is still running.
+  Conformance green on all eight steps, Update included.
+
+- `GCP::Compute::TargetVpnGateway` — the classic, route-based VPN gateway.
+  `HaVpnGateway` is the modern alternative with an SLA and BGP; this one
+  terminates policy- and route-based tunnels and still backs plenty of existing
+  setups.
+
+  It is a different collection (`targetVpnGateways`, not `vpnGateways`) drawing
+  on a **separate quota**, which is why this case passes in a project whose
+  `VPN_GATEWAYS_PER_REGION` is exhausted — the condition that still keeps
+  `vpn-tunnel` red. Immutable: PATCH is not a method on it at all (an attempt
+  answers with an HTML 404), so any change replaces. Conformance green on all
+  eight steps; the cleanup script gained a target-VPN-gateway pass, ordered before
+  the network passes since a gateway holds its network.
+
+- `GCP::Workflows::Workflow` — a workflow definition: the YAML program Workflows
+  runs to orchestrate calls to other services. **New service namespace** — the
+  plugin had no Workflows coverage at all — so this adds
+  `pkg/resources/workflows` (API config, LRO operations, native-ID parser) and
+  `schema/pkl/workflows`.
+
+  Defining a workflow costs nothing; only executions are billed, and nothing
+  executes this one. Editing `sourceContents` produces a new revision rather than
+  mutating the old one, which `revisionId` reports, and `serviceAccount` is
+  filled in with the project's default compute service account when unset.
+  Conformance green on all eight steps, Update included, in under two minutes.
+
+- `GCP::Dataproc::SessionTemplate` — a reusable configuration for a serverless
+  Spark session: runtime version, session kind, and the environment a session
+  inherits. The template runs nothing and costs nothing; only sessions started
+  from it are billed.
+
+  Two API shapes made this more than a copy of the autoscaling policy. Dataproc
+  is **split by scope**: session templates live under `locations/{location}` while
+  autoscaling policies live under `regions/{region}`, so this definition carries
+  its own `APIConfig` and native-ID parser. And there is **no
+  `?sessionTemplateId=` parameter** — the API rejects it as an unbindable query
+  parameter and takes the id from the body's `name` as a full path — so a request
+  transformer expands the declared short name and a response transformer shortens
+  it back, keeping declared and observed values comparable. Conformance green on
+  all eight steps in 16 seconds, the fastest case in the suite.
+
+- `GCP::Dataproc::WorkflowTemplate` — a Spark job graph plus the cluster to run it
+  on. Instantiating one creates a cluster, runs the jobs in dependency order and
+  tears it down; defining the template runs nothing and costs nothing.
+  Region-scoped, so it shares the existing path builder.
+
+  Two conventions of its own: the create body carries `id` rather than a
+  `?workflowTemplateId=` parameter, and an update is a **PUT** that must carry the
+  template's current `version`, supplied through optimistic locking. Step ids must
+  match `[a-zA-Z0-9][-_a-zA-Z0-9]{1,48}[a-zA-Z0-9]` — a two-character id like
+  "s1" is rejected.
+
+  **Conformance is 7/8: Update is red on `labels`.** Create, Verify, Extract,
+  Sync, Destroy and out-of-band delete all pass. What is established: the update
+  itself works — driving the engine's `Update` directly applies the labels and a
+  following read returns them — and the base fix below now attaches the update
+  response to stored state, which did not change the outcome. The remaining
+  cause is not yet identified, so this is shipped working but with Update
+  unverified end to end.
 
 ### Changed
 
@@ -459,6 +774,50 @@ Together these close the managed-instance-group gap: the plugin previously had
   path). `DiskResourcePolicyAttachment.List` walks `aggregated/disks` and reports
   each attached policy, filtered to zonal scopes so a native ID it emits is one
   its own `Read` can resolve.
+
+- **A synchronous resource's update left stale properties in state.**
+  `handleSynchronousCreate` attaches the create response as
+  `ProgressResult.ResourceProperties`, but the synchronous branch of
+  `performUpdate` attached nothing: with no operation to poll there is no
+  read-back either, so every changed field stayed at its pre-update value until
+  the next sync. `performUpdate` now marshals the update response the same way
+  Create does, through the response transformer. Verified no regression by
+  re-running `dataproc-sessiontemplate` and `artifactregistry-rule` (both
+  synchronous with updates): 8/8 each.
+
+- **Optimistic locking only understood string etags.** The locking value was read
+  with `Body[field].(string)`, so a numeric etag — Dataproc's
+  `workflowTemplates.version` — silently became `""` and the API rejected the
+  update. The raw value now goes into the request body with its own type
+  preserved, and a new `lockingValueString` renders it for the query-parameter
+  case; unit-tested across string, float64, int, int64, `json.Number`, absent and
+  junk inputs.
+
+- `GCP::Compute::RouterNat` now returns the NAT's properties from `Status` after
+  a successful operation. It has a bespoke `Status` (its RequestID carries the
+  synthetic native ID), so it missed the read-back that `base.StatusWithRead`
+  adds elsewhere, meaning a NAT's nested `logConfig` and `subnetworks` would be
+  absent from state until the next sync. Unit-tested only: `RouterNat` has no
+  conformance fixture, so this is unverified end to end.
+
+
+- **Hand-written provisioners lost structured properties from post-create state.**
+  `base.UnifiedProvisioner.Status` re-reads a resource after a successful
+  operation and returns the result in `ProgressResult.ResourceProperties`; a
+  provisioner that overrode CRUD and delegated `Status` straight to
+  `BaseResource` skipped that read-back. Scalars survived from the declared
+  forma, nested objects and arrays did not, and only the next sync filled them
+  in — so `SecurityPolicyRule`, `RegionSecurityPolicyRule`,
+  `NetworkFirewallPolicyRule` and `RouterRoutePolicy` all failed Verify, Extract
+  and Update while passing Sync. That pattern looked like a formae bug and was
+  recorded as one; it was ours.
+
+  New `base.StatusWithRead` does the read-back, and all seven hand-written
+  provisioners route `Status` through it. Re-running the affected fixtures
+  unchanged apart from the fix took each from three failing steps to 8/8.
+  **Any new provisioner that overrides CRUD must override `Status` too and route
+  it through `StatusWithRead`.**
+
 
 
 - `GCP::SecretManager::SecretVersion` `data` (the secret payload) was typed

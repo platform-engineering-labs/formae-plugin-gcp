@@ -1,0 +1,64 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionDisk.pkl"
+import "@gcp/compute/resourcePolicy.pkl"
+import "@gcp/compute/regionDiskResourcePolicyAttachment.pkl"
+import "./config/vars.pkl" as v
+
+// Regional disk + snapshot schedule + the attachment that binds them. Same
+// shape as the zonal case, but the disk is replicated across two zones.
+local src = new regionDisk.RegionDisk {
+  label = "plugin-sdk-test-rdrpa-disk"
+  project = v.gcpProject
+  region = v.gcpRegion
+  name = "formae-plugin-sdk-test-rdrpa-disk-\(v.testRunID)"
+  description = "Regional disk the snapshot schedule is attached to"
+  sizeGb = 10
+  type = "pd-balanced"
+  // A regional disk is replicated across exactly two zones in its region.
+  replicaZones = new Listing {
+    "\(v.gcpRegion)-a"
+    "\(v.gcpRegion)-b"
+  }
+}
+
+local policy = new resourcePolicy.ResourcePolicy {
+  label = "plugin-sdk-test-rdrpa-policy"
+  name = "formae-plugin-sdk-test-rdrpa-pol-\(v.testRunID)"
+  description = "Nightly snapshot schedule for the attachment test"
+  region = v.gcpRegion
+  snapshotSchedulePolicy = new resourcePolicy.SnapshotSchedulePolicy {
+    schedule = new resourcePolicy.SnapshotSchedule {
+      dailySchedule = new resourcePolicy.DailyCycle {
+        daysInCycle = 1
+        startTime = "04:00"
+      }
+    }
+    retentionPolicy = new resourcePolicy.SnapshotRetentionPolicy {
+      maxRetentionDays = 7
+      onSourceDiskDelete = "APPLY_RETENTION_POLICY"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+  policy
+
+  new regionDiskResourcePolicyAttachment.RegionDiskResourcePolicyAttachment {
+    label = "plugin-sdk-test-region-disk-resource-policy-attachment"
+    // Resolvables -> both the disk and the policy exist before the attach verb.
+    name = policy.res.name
+    disk = src.res.name
+    region = v.gcpRegion
+  }
+}

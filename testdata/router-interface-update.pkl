@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/router.pkl"
+import "@gcp/compute/routerInterface.pkl"
+import "./config/vars.pkl" as v
+
+// Network + subnet + router + an interface attached to the subnet. Attaching by
+// subnetwork rather than by VPN tunnel keeps this free of the per-region VPN
+// gateway quota, and nothing here boots a VM.
+local net = new network.Network {
+  label = "plugin-sdk-test-ri-network"
+  name = "formae-plugin-sdk-test-ri-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+local sub = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-ri-subnet"
+  name = "formae-plugin-sdk-test-ri-sub-\(v.testRunID)"
+  region = v.gcpRegion
+  ipCidrRange = "10.44.0.0/24"
+  network = net.res.selfLink
+}
+
+local rt = new router.Router {
+  label = "plugin-sdk-test-ri-router"
+  name = "formae-plugin-sdk-test-ri-rt-\(v.testRunID)"
+  region = v.gcpRegion
+  network = net.res.selfLink
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  sub
+  rt
+
+  new routerInterface.RouterInterface {
+    label = "plugin-sdk-test-router-interface"
+    name = "formae-plugin-sdk-test-ri-if"
+    // Resolvables -> the router and subnet exist before the patch runs.
+    router = rt.res.name
+    region = v.gcpRegion
+    subnetwork = sub.res.selfLink
+    privateIpAddress = "10.44.0.6"
+  }
+}

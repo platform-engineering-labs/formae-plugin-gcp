@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Artifact Registry Rule
+///
+/// A rule gates an operation on its repository — denying downloads of packages
+/// matching a condition, for example. Without rules a repository allows anything
+/// the caller's IAM permits, so this is how a repository enforces policy of its
+/// own.
+///
+/// Rules live under their repository
+/// (`.../repositories/{repo}/rules/{rule}`) and, unlike repositories, are
+/// synchronous: create returns the rule and delete returns an empty body, with
+/// no operation to poll.
+module gcp.artifactregistry.rule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ArtifactRegistry::Rule"
+
+typealias RuleAction = "ALLOW"|"DENY"
+
+/// Only DOWNLOAD is accepted today; the enum exists for what the API adds later.
+typealias RuleOperation = "DOWNLOAD"
+
+open class RuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RuleResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Rule extends formae.Resource {
+    hidden parent = this
+
+    /// Short rule id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning repository. A path component, not a body field —
+    /// pass `repo.res.name` so formae creates the repository first.
+    @gcp.FieldHint { createOnly = true }
+    repository: (String|formae.Resolvable)
+
+    /// Whether the operation is allowed or denied.
+    @gcp.FieldHint
+    action: RuleAction
+
+    /// Which operation the rule governs.
+    @gcp.FieldHint
+    operation: RuleOperation
+
+    /// Optional CEL condition narrowing what the rule applies to. Passed
+    /// through untyped — the accepted attributes depend on `operation`, and the
+    /// API validates the expression rather than the shape.
+    @gcp.FieldHint
+    condition: Mapping<String, Any>?
+
+    hidden res: RuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

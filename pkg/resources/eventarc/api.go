@@ -37,6 +37,118 @@ var EventarcNativeID = base.NativeIDConfig{
 	Format: base.FullPathFormat,
 }
 
+// eventarcRequestTransformer drops "location", which addresses the resource in
+// the URL and is not a body field. "name" stays: the engine reads the create id
+// (?messageBusId=, ?pipelineId=) from the transformed body.
+func eventarcRequestTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "location" {
+			continue
+		}
+		body[k] = v
+	}
+	return body, nil
+}
+
+// pipelineRequestTransformer prepares a pipeline body. Beyond dropping the
+// location it expands a destination's bare message-bus name into the full path
+// the API wants. That is what lets a forma pass `bus.res.name` — a resolvable,
+// so formae creates the bus first — instead of interpolating a path by hand,
+// which would stringify the resolvable and lose the ordering edge.
+func pipelineRequestTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body, err := eventarcRequestTransformer(props, ctx)
+	if err != nil {
+		return nil, err
+	}
+	location, _ := props["location"].(string)
+	if location == "" {
+		location = ctx.Location
+	}
+	destinations, ok := body["destinations"].([]interface{})
+	if !ok {
+		return body, nil
+	}
+	expanded := make([]interface{}, 0, len(destinations))
+	for _, raw := range destinations {
+		dest, ok := raw.(map[string]interface{})
+		if !ok {
+			expanded = append(expanded, raw)
+			continue
+		}
+		copied := make(map[string]interface{}, len(dest))
+		for k, v := range dest {
+			copied[k] = v
+		}
+		if bus, ok := copied["messageBus"].(string); ok && bus != "" && !strings.Contains(bus, "/") {
+			copied["messageBus"] = fmt.Sprintf("projects/%s/locations/%s/messageBuses/%s",
+				ctx.Project, location, bus)
+		}
+		expanded = append(expanded, copied)
+	}
+	body["destinations"] = expanded
+	return body, nil
+}
+
+// pipelineResponseTransformer is the mirror of pipelineRequestTransformer: the
+// request expands a bare bus name into a full path, so the read shortens it back
+// again. Without the symmetry the declared value (a resolvable that resolves to
+// the bus's short name) could never equal the value read back, and every
+// comparison step would report drift on a resource that is in fact correct.
+func pipelineResponseTransformer(props map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	out := locationResponseTransformer("pipelines")(props, ctx)
+	destinations, ok := out["destinations"].([]interface{})
+	if !ok {
+		return out
+	}
+	shortened := make([]interface{}, 0, len(destinations))
+	for _, raw := range destinations {
+		dest, ok := raw.(map[string]interface{})
+		if !ok {
+			shortened = append(shortened, raw)
+			continue
+		}
+		copied := make(map[string]interface{}, len(dest))
+		for k, v := range dest {
+			copied[k] = v
+		}
+		if bus, ok := copied["messageBus"].(string); ok {
+			if i := strings.LastIndex(bus, "/messageBuses/"); i >= 0 {
+				copied["messageBus"] = bus[i+len("/messageBuses/"):]
+			}
+		}
+		shortened = append(shortened, copied)
+	}
+	out["destinations"] = shortened
+	return out
+}
+
+// locationResponseTransformer shortens the resource name and puts back the
+// location, which lives only in the returned path. Eventarc Advanced runs in a
+// subset of regions, so these resources usually declare a location of their own
+// rather than inheriting the target's - and a declared field the read never
+// reports would look like it went missing.
+//
+// The collection is passed in so a path is only parsed when it is the expected
+// kind: a trigger's path must not be read as a message bus.
+func locationResponseTransformer(collection string) base.ResponseTransformerFunc {
+	return func(props map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+		out := make(map[string]interface{}, len(props)+1)
+		for k, v := range props {
+			out[k] = v
+		}
+		if name, ok := props["name"].(string); ok {
+			parts := strings.Split(name, "/")
+			// projects/{p}/locations/{l}/{collection}/{name}
+			if len(parts) == 6 && parts[2] == "locations" && parts[4] == collection {
+				out["location"] = parts[3]
+				out["name"] = parts[5]
+			}
+		}
+		return out
+	}
+}
+
 // eventarcPathBuilder builds
 // /projects/{project}/locations/{location}/{resourceType}[/{name}].
 func eventarcPathBuilder(ctx base.PathContext) string {

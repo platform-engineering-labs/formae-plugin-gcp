@@ -37,4 +37,5 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/sql"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/storage"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/vpcaccess"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/workflows"
 )
