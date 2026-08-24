@@ -1091,9 +1091,13 @@ fi
 # untidy. Instances must go before their cluster.
 # Backups outlive their cluster, so they are cleaned independently.
 echo "Cleaning GCP AlloyDB backups..."
-ALLOYDB_BACKUPS=$(gcloud alloydb backups list --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+# "value(name,region)" yields an empty region column - the region lives only
+# inside the resource path - so a delete built from it ran with --region="" and
+# failed silently. Parse the region out of the path instead.
+ALLOYDB_BACKUPS=$(gcloud alloydb backups list --region=- --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$ALLOYDB_BACKUPS" ]; then
-    echo "$ALLOYDB_BACKUPS" | while read -r bkp region; do
+    echo "$ALLOYDB_BACKUPS" | while read -r bkp; do
+        region=$(echo "$bkp" | sed -E 's#.*/locations/([^/]+)/.*#\1#')
         echo "  Deleting AlloyDB backup: $(basename "$bkp") (region: $region)"
         gcloud alloydb backups delete "$(basename "$bkp")" --region="$region" --quiet 2>/dev/null || true
     done
@@ -1102,9 +1106,10 @@ else
 fi
 
 echo "Cleaning GCP AlloyDB instances and clusters..."
-ALLOYDB_CLUSTERS=$(gcloud alloydb clusters list --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+ALLOYDB_CLUSTERS=$(gcloud alloydb clusters list --region=- --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$ALLOYDB_CLUSTERS" ]; then
-    echo "$ALLOYDB_CLUSTERS" | while read -r cluster region; do
+    echo "$ALLOYDB_CLUSTERS" | while read -r cluster; do
+        region=$(echo "$cluster" | sed -E 's#.*/locations/([^/]+)/.*#\1#')
         cname=$(basename "$cluster")
         INSTS=$(gcloud alloydb instances list --cluster="$cname" --region="$region" --format="value(name)" 2>/dev/null || true)
         if [ -n "$INSTS" ]; then
