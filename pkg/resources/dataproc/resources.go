@@ -75,8 +75,11 @@ func init() {
 			// a string etag.
 			ResourceType: WorkflowTemplateResourceType,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "workflowTemplates",
-				Scope:          &base.ScopeConfig{Type: base.ScopeRegional},
+				ResourceType: "workflowTemplates",
+				Scope:        &base.ScopeConfig{Type: base.ScopeRegional},
+				// list response is {"templates":[...]}, which matches neither
+				// "items" nor the collection name, so nothing was ever discovered.
+				ListItemsKey:   "templates",
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPut,
 				OptimisticLocking: &base.OptimisticLockingConfig{
