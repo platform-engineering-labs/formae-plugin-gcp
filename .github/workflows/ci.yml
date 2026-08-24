@@ -294,8 +294,29 @@ jobs:
               export GCP_LOCATION="$GCP_ZONE"
               ;;
           esac
-          make conformance-test-crud-run conformance-test-discovery-run \
-            TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
+          # The AlloyDB cases run their two phases separately with a cleanup in
+          # between: each leaves its prerequisite cluster behind (the harness
+          # spares prerequisites), and four cases x two phases needs more than
+          # the quota of 5 clusters per region. See clean-alloydb-case.sh.
+          case "${{ matrix.test-case }}" in
+            alloydb-*)
+              # "|| status=$?" keeps a failing phase from aborting the step
+              # before its cleanup runs; the case still fails at the end.
+              crud_status=0
+              make conformance-test-crud-run \
+                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG || crud_status=$?
+              ./scripts/ci/clean-alloydb-case.sh "${{ matrix.test-case }}"
+              discovery_status=0
+              make conformance-test-discovery-run \
+                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG || discovery_status=$?
+              ./scripts/ci/clean-alloydb-case.sh "${{ matrix.test-case }}"
+              [ "$crud_status" -eq 0 ] && [ "$discovery_status" -eq 0 ]
+              ;;
+            *)
+              make conformance-test-crud-run conformance-test-discovery-run \
+                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
+              ;;
+          esac
 
   # Clean up test resources after all conformance tests (always runs)
   post-cleanup:
