@@ -184,3 +184,18 @@ func sessionTemplateResponseTransformer(props map[string]interface{}, _ base.Tra
 	}
 	return out
 }
+
+// workflowTemplateResponseTransformer drops the server-assigned full path. A
+// workflow template reports both "name" (the full path) and "id" (the short id a
+// forma declares); keeping the path under "name" would look like an extra
+// property with no declared counterpart, and the id is what identifies it.
+func workflowTemplateResponseTransformer(props map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "name" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
