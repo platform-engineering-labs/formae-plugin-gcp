@@ -65,11 +65,49 @@ open class Config {
   hidden zone: Zone?
   hidden location: Location?
 
+  /// Authentication strategy. Omitting it means the agent's ambient
+  /// credentials: GCP_CREDENTIALS_JSON, GCP_CREDENTIALS_FILE, or Application
+  /// Default Credentials, exactly as before this block existed.
+  ///
+  /// Mutable, like the AWS plugin's equivalent: how the agent authenticates is
+  /// not where the resources live, so switching a target between ambient
+  /// credentials and federation must be a target update rather than a replace
+  /// that destroys and recreates every resource on it.
+  @formae.ConfigFieldHint { createOnly = false }
+  hidden auth: Auth?
+
   fixed Type: String = type
   fixed Project: String = project
   fixed Region: Region? = region
   fixed Zone: Zone? = zone
   fixed Location: Location? = location
+  fixed Auth: Auth? = auth
+}
+
+/// How the agent authenticates to this project.
+abstract class Auth {
+  hidden fixed type: String
+  fixed Type: String = type
+}
+
+/// Workload Identity Federation: the agent exchanges a short-lived OIDC
+/// identity token for Google credentials, with no service account key and no
+/// static credential anywhere.
+///
+/// There is no `DefaultChain` counterpart to this class. The AWS plugin has
+/// one because its default chain carries a profile name; GCP's takes no
+/// parameters at all, so the variant would be empty and its only meaning
+/// would be "what happens when you omit auth" - which omitting auth already
+/// says.
+class OidcAuth extends Auth {
+  fixed type = "Oidc"
+
+  /// The full resource name of the workload identity pool provider that
+  /// trusts this installation, as reported by `formae connect gcp`. It is
+  /// also the audience of every token minted for this target, so it must be
+  /// the canonical spelling: `//iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>`.
+  hidden workloadIdentityProvider: String
+  fixed WorkloadIdentityProvider: String = workloadIdentityProvider
 }
 
 class FieldHint extends formae.FieldHint {}

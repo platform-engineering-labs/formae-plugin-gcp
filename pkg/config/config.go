@@ -7,11 +7,13 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 
 	"cloud.google.com/go/auth/credentials"
-	"google.golang.org/api/option"
 	pkgmodel "github.com/platform-engineering-labs/formae/pkg/model"
+	"google.golang.org/api/option"
 )
 
 // Config represents GCP configuration for a target.
@@ -34,12 +36,65 @@ type Config struct {
 
 	// Scopes are the OAuth2 scopes to request
 	Scopes []string `json:"Scopes,omitempty"`
+
+	// Auth is the target's authentication strategy, as rendered by the Pkl
+	// schema. Absent means the historical behaviour: environment variables,
+	// then Application Default Credentials.
+	Auth json.RawMessage `json:"Auth,omitempty"`
+
+	// deps carries what the plugin instance owns: the OIDC token source and
+	// the per-instance token-source cache. Never serialized; nil deps means
+	// Oidc auth fails closed.
+	deps *OidcDeps
+}
+
+// WithOidcDeps threads the plugin instance's OidcDeps onto Config without
+// changing FromTargetConfig's signature, which has 40-odd call sites and
+// deliberately returns no error.
+func (c *Config) WithOidcDeps(d *OidcDeps) *Config {
+	c.deps = d
+	return c
+}
+
+// authDiscriminator is the shape every Auth block variant shares.
+type authDiscriminator struct {
+	Type string `json:"Type"`
+}
+
+// effectiveAuth reports the auth type this config resolves to. An absent
+// block means the default chain, which is what every target used before the
+// block existed.
+//
+// An unknown Type is an error rather than a fall-through: silently treating
+// an auth block nobody understands as "use ambient credentials" is how a
+// hosted agent ends up acting as itself instead of as the customer.
+func (c *Config) effectiveAuth() (string, []byte, error) {
+	if len(c.Auth) == 0 || string(c.Auth) == "null" {
+		return "", nil, nil
+	}
+	var disc authDiscriminator
+	if err := json.Unmarshal(c.Auth, &disc); err != nil {
+		return "", nil, fmt.Errorf("config: malformed Auth block: %w", err)
+	}
+	if disc.Type == "" {
+		return "", nil, errors.New("config: Auth block is missing its Type discriminator")
+	}
+	if disc.Type != AuthTypeOidc {
+		return "", nil, fmt.Errorf("config: unknown Auth type %q", disc.Type)
+	}
+	return disc.Type, c.Auth, nil
 }
 
 // ToClientOptions converts the config to Google API client options.
-// Credentials are read from environment variables (GCP_CREDENTIALS_JSON or GCP_CREDENTIALS_FILE)
-// to avoid storing sensitive data in the target config/database.
-func (c *Config) ToClientOptions(_ context.Context) ([]option.ClientOption, error) {
+//
+// This is the single credential seam, so it is also where an auth block is
+// validated: a malformed provider name fails here, before any Google client
+// is constructed and any API call is made.
+//
+// With no auth block, credentials are read from environment variables
+// (GCP_CREDENTIALS_JSON or GCP_CREDENTIALS_FILE) or Application Default
+// Credentials, exactly as before.
+func (c *Config) ToClientOptions(ctx context.Context) ([]option.ClientOption, error) {
 	// Determine scopes so credentials are minted with them.
 	scopes := c.Scopes
 	if len(scopes) == 0 {
@@ -49,6 +104,14 @@ func (c *Config) ToClientOptions(_ context.Context) ([]option.ClientOption, erro
 			"https://www.googleapis.com/auth/compute",
 			"https://www.googleapis.com/auth/devstorage.full_control",
 		}
+	}
+
+	authType, rawAuth, err := c.effectiveAuth()
+	if err != nil {
+		return nil, err
+	}
+	if authType == AuthTypeOidc {
+		return c.oidcClientOptions(ctx, rawAuth, scopes)
 	}
 
 	// Resolve credentials from environment variables, falling back to ADC.
