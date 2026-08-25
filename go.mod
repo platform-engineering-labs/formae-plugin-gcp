@@ -13,13 +13,17 @@ require (
 	// the aws plugin does from the same commit.
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.2-0.20260821224650-dc5149d5a102
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.6
-	// Pinned at the commit adding oox/gcpname. Re-pin when oox cuts a tag.
-	github.com/platform-engineering-labs/oox v0.1.1-0.20260825163728-f6764087e822
+	// Provides oidcx/gcp, the token exchange. Re-pin when oox cuts a tag.
+	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.291.0
 	google.golang.org/grpc v1.82.1
 )
+
+// gcpname is its own dependency-free module: the canonical parser shared with
+// the provisioner, the credential broker and the CLI. Re-pin when oox tags.
+require github.com/platform-engineering-labs/oox/gcpname v0.0.0-20260825170105-3bd97cb18d15
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
