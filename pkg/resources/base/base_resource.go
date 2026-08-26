@@ -213,6 +213,9 @@ func (b *BaseResource) Update(
 			resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
+	// As on create: a declared formae.Value arrives wrapped, and the wrapper is
+	// not what the API expects to receive.
+	props = UnwrapValues(props)
 
 	// Parse native ID
 	pathCtx, err := ParseNativeID(b.NativeIDConfig, request.NativeID)
@@ -352,6 +355,7 @@ func (b *BaseResource) List(
 		Zone:         cfg.Zone,
 		Location:     cfg.Location, // Container/CloudRun use location (no Region fallback)
 		ResourceType: b.ResourceConfig.ResourceType,
+		IsList:       true,
 	}
 
 	// Respect resource scope
@@ -548,3 +552,57 @@ func (b *BaseResource) Status(
 }
 
 // Helper methods continue in next part...
+
+// ResourceReader is the Read half of a provisioner, enough for StatusWithRead.
+type ResourceReader func(context.Context, *resource.ReadRequest) (*resource.ReadResult, error)
+
+// StatusWithRead runs the normal operation poll and, once the operation has
+// succeeded, reads the resource back and hands the properties along in
+// ResourceProperties.
+//
+// The generic UnifiedProvisioner does this for config-driven resources. A
+// hand-written provisioner that delegates Status straight to BaseResource does
+// not, and the difference is not cosmetic: without the read-back, a resource's
+// non-scalar properties are missing from state right after create and update
+// (they only appear on the next sync), which reads as drift or as a failed
+// verify. Any provisioner overriding CRUD should route Status through here.
+func StatusWithRead(
+	ctx context.Context,
+	b *BaseResource,
+	read ResourceReader,
+	request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	result, err := b.Status(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || result.ProgressResult == nil {
+		return result, nil
+	}
+	if result.ProgressResult.OperationStatus != resource.OperationStatusSuccess {
+		return result, nil
+	}
+
+	nativeID := result.ProgressResult.NativeID
+	if nativeID == "" {
+		nativeID = request.NativeID
+	}
+	if nativeID == "" || read == nil {
+		return result, nil
+	}
+
+	readResult, readErr := read(ctx, &resource.ReadRequest{
+		NativeID:     nativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	// A failed read-back is not a failed operation: the operation succeeded, and
+	// the next sync will fill the properties in.
+	if readErr == nil && readResult != nil && readResult.ErrorCode == "" && readResult.Properties != "" {
+		result.ProgressResult.ResourceProperties = []byte(readResult.Properties)
+		if result.ProgressResult.NativeID == "" {
+			result.ProgressResult.NativeID = nativeID
+		}
+	}
+	return result, nil
+}

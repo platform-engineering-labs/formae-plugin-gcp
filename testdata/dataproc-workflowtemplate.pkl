@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataproc/workflowTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// A Spark job graph and the cluster it would run on. Defining the template
+// creates nothing: no cluster exists until someone instantiates it, and nothing
+// here does.
+forma {
+  v.stack
+  v.target
+
+  new workflowTemplate.WorkflowTemplate {
+    label = "plugin-sdk-test-dataproc-workflow-template"
+    id = "formae-plugin-sdk-test-wt-\(v.testRunID)"
+    placement = new workflowTemplate.WorkflowPlacement {
+      managedCluster = new workflowTemplate.ManagedCluster {
+        clusterName = "formae-wt-cluster"
+        config = new workflowTemplate.WorkflowClusterConfig {
+          masterConfig = new workflowTemplate.InstanceGroupConfig {
+            numInstances = 1
+            machineTypeUri = "n2-standard-2"
+          }
+          workerConfig = new workflowTemplate.InstanceGroupConfig {
+            numInstances = 2
+            machineTypeUri = "n2-standard-2"
+          }
+          softwareConfig = new workflowTemplate.ClusterSoftwareConfig {
+            imageVersion = "2.2-debian12"
+          }
+        }
+      }
+    }
+    jobs = new Listing {
+      new workflowTemplate.OrderedJob {
+        stepId = "spark-pi"
+        sparkJob = new workflowTemplate.SparkJob {
+          mainClass = "org.apache.spark.examples.SparkPi"
+          jarFileUris = new Listing {
+            // Ships with the Dataproc image; nothing is fetched or stored.
+            "file:///usr/lib/spark/examples/jars/spark-examples.jar"
+          }
+        }
+      }
+    }
+  }
+}

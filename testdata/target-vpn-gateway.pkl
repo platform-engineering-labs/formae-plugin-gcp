@@ -1,0 +1,35 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/targetVpnGateway.pkl"
+import "./config/vars.pkl" as v
+
+// The classic VPN gateway. It draws on a different quota from the HA gateway,
+// so this case passes even when VPN_GATEWAYS_PER_REGION is exhausted. No tunnel
+// is attached, so nothing is billed for traffic.
+local net = new network.Network {
+  label = "plugin-sdk-test-tvg-network"
+  name = "formae-plugin-sdk-test-tvg-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new targetVpnGateway.TargetVpnGateway {
+    label = "plugin-sdk-test-target-vpn-gateway"
+    name = "formae-plugin-sdk-test-tvg-\(v.testRunID)"
+    region = v.gcpRegion
+    description = "Test classic VPN gateway for plugin SDK conformance tests"
+    network = net.res.selfLink
+  }
+}

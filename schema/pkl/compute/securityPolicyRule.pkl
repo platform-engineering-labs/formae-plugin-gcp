@@ -1,0 +1,82 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute SecurityPolicyRule (Cloud Armor)
+///
+/// One rule inside a global `securityPolicy`. A new policy comes with a single
+/// catch-all allow at priority 2147483647, so a policy on its own permits
+/// everything — the rules are what make it enforce anything.
+///
+/// A rule is not a REST resource but a set of verbs on the policy — addRule,
+/// getRule, patchRule, removeRule — so this is a hand-written provisioner.
+///
+/// **Do not** also declare `rules` inline on the owning `SecurityPolicy`: both
+/// manage the same list, and each will try to remove what the other added.
+/// Pick one — inline for a fixed set, this resource to manage rules separately.
+module gcp.compute.securityPolicyRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+import "securityPolicy.pkl"
+
+const type = "GCP::Compute::SecurityPolicyRule"
+
+open class SecurityPolicyRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden priority: SecurityPolicyRuleResolvable = (this) {
+        property = "priority"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "priority"
+}
+open class SecurityPolicyRule extends formae.Resource {
+    hidden parent = this
+
+    /// Name of the owning policy. A path component, not part of the rule body —
+    /// pass `policy.res.name` so formae creates the policy first.
+    @gcp.FieldHint { createOnly = true }
+    securityPolicy: (String|formae.Resolvable)
+
+    /// Evaluation order, lower first, and the only thing the API addresses a
+    /// rule by. Must be below 2147483647, which the default rule holds.
+    @gcp.FieldHint { createOnly = true }
+    priority: Int
+
+    /// What to do with a matching request: "allow", "deny(403)" (or 404 / 502),
+    /// "redirect", "throttle", or "rate_based_ban".
+    @gcp.FieldHint
+    action: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// What the rule matches. Reuses the owning policy's own classes, since an
+    /// inline rule and a separately managed one match traffic identically.
+    ///
+    /// **Known limitation.** `match.config` — an object nested inside `match` —
+    /// is missing from stored state immediately after create and update, so
+    /// conformance is red on Verify, Extract and Update. A later sync fills it
+    /// in and matches exactly, which places the loss in how post-create state
+    /// is materialised, not in this plugin's read. Both representations were
+    /// tried: an untyped `Mapping<String, Any>` (what
+    /// `NetworkFirewallPolicyRule.match` uses) drops it too, so the typed
+    /// classes are kept for being the clearer of the two.
+    @gcp.FieldHint
+    match: securityPolicy.Match?
+
+    /// Evaluate and log the rule without enforcing it. GCP fills false.
+    @gcp.FieldHint { hasProviderDefault = true }
+    preview: Boolean?
+
+    hidden res: SecurityPolicyRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataproc/sessionTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// A serverless Spark session template with no prerequisites. Templates are free
+// — only sessions started from one are billed, and nothing starts a session
+// here.
+forma {
+  v.stack
+  v.target
+
+  new sessionTemplate.SessionTemplate {
+    label = "plugin-sdk-test-dataproc-session-template"
+    name = "formae-plugin-sdk-test-st-\(v.testRunID)"
+    description = "Updated session template description"
+    jupyterSession = new sessionTemplate.JupyterSession {
+      kernel = "PYTHON"
+      displayName = "conformance probe"
+    }
+    runtimeConfig = new sessionTemplate.SessionRuntimeConfig {
+      version = "2.2"
+    }
+  }
+}

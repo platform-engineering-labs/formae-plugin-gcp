@@ -247,12 +247,31 @@ jobs:
               export FORMAE_TEST_OOB_TIMEOUT=30
               export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
               ;;
-            url-map|target-http-proxy|region-http-lb|global-forwarding-rule)
+            url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule)
               # Load-balancer chains create 3-5 dependent resources serially
               # (health-check -> backend-service -> url-map -> proxy -> rule).
               # The CRUD lifecycle already runs ~4m13s on a good day - 84% of
               # the 5m default - so any per-op or operator-startup jitter tips
               # it over. Give the chain headroom.
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
+            eventarc-pipeline|eventarc-message-bus)
+              # An Eventarc message bus takes ~5-6 min to create and the pipeline
+              # case builds one first, so a single apply runs past the 5m default
+              # (6m20s locally for the re-apply, 22m for the whole lifecycle).
+              TIMEOUT_ARG="TIMEOUT=15"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
+              export FORMAE_TEST_OOB_TIMEOUT=15
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              ;;
+            machine-image)
+              # A machine image snapshots every disk of an instance, and the case
+              # builds the VM chain (network -> subnet -> disk -> instance) first.
+              # It runs ~7m30s end to end locally, so the 5m default leaves no
+              # room for the image capture itself under CI load.
               TIMEOUT_ARG="TIMEOUT=15"
               export FORMAE_TEST_DISCOVERY_TIMEOUT=15
               export FORMAE_TEST_OOB_TIMEOUT=15
@@ -275,8 +294,33 @@ jobs:
               export GCP_LOCATION="$GCP_ZONE"
               ;;
           esac
-          make conformance-test-crud-run conformance-test-discovery-run \
-            TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
+          # AlloyDB and Eventarc run their two phases separately with a cleanup
+          # in between. Both build a prerequisite the harness spares on Destroy -
+          # an AlloyDB cluster, an Eventarc message bus - and both prerequisites
+          # sit against a small quota (5 clusters per region, 1 bus per region),
+          # so the surviving one from the crud phase blocks the discovery phase.
+          # See clean-alloydb-case.sh and clean-eventarc-case.sh.
+          case "${{ matrix.test-case }}" in
+            alloydb-*|eventarc-*)
+              # "|| status=$?" keeps a failing phase from aborting the step
+              # before its cleanup runs; the case still fails at the end.
+              TC="${{ matrix.test-case }}"
+              CLEAN="./scripts/ci/clean-${TC%%-*}-case.sh"
+              crud_status=0
+              make conformance-test-crud-run \
+                TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || crud_status=$?
+              "$CLEAN" "$TC"
+              discovery_status=0
+              make conformance-test-discovery-run \
+                TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || discovery_status=$?
+              "$CLEAN" "$TC"
+              [ "$crud_status" -eq 0 ] && [ "$discovery_status" -eq 0 ]
+              ;;
+            *)
+              make conformance-test-crud-run conformance-test-discovery-run \
+                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
+              ;;
+          esac
 
   # Clean up test resources after all conformance tests (always runs)
   post-cleanup:

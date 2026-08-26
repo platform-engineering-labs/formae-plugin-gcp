@@ -119,3 +119,34 @@ func TestClusterScopedNativeIDIsTypeSpecific(t *testing.T) {
 		t.Errorf("user parse: %#v", ctx)
 	}
 }
+
+// A discovery List names no cluster, so the builder has to supply both halves
+// of the "clusters/-" segment itself - PathContext.ParentType is empty too.
+func TestInstanceListPathUsesClusterWildcard(t *testing.T) {
+	got := alloyDBPathBuilder(base.PathContext{
+		Project:      "p",
+		Location:     "europe-central2",
+		ResourceType: "instances",
+		IsList:       true,
+	})
+	want := "/projects/p/locations/europe-central2/clusters/-/instances"
+	if got != want {
+		t.Errorf("list path = %q, want %q", got, want)
+	}
+}
+
+// A named cluster still wins over the wildcard.
+func TestInstanceListPathKeepsNamedCluster(t *testing.T) {
+	got := alloyDBPathBuilder(base.PathContext{
+		Project:        "p",
+		Location:       "europe-central2",
+		ParentType:     "clusters",
+		ParentResource: "c1",
+		ResourceType:   "instances",
+		IsList:         true,
+	})
+	want := "/projects/p/locations/europe-central2/clusters/c1/instances"
+	if got != want {
+		t.Errorf("list path = %q, want %q", got, want)
+	}
+}

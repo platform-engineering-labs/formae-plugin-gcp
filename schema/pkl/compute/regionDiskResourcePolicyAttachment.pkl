@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionDiskResourcePolicyAttachment
+///
+/// Attaches a `resourcePolicy` to a disk. This is what makes a snapshot schedule
+/// do anything: a policy on its own defines *when* to snapshot but has nothing
+/// to snapshot until it is attached to a disk.
+///
+/// The attachment is not a REST resource — it is an entry in the disk's
+/// `resourcePolicies` array, added and removed with the
+/// `addResourcePolicies` / `removeResourcePolicies` verbs, so this resource is a
+/// hand-written provisioner.
+///
+/// ponytail: there is nothing to update — the attachment is just a
+/// (disk, policy) pair, so a change detaches and reattaches.
+module gcp.compute.regionDiskResourcePolicyAttachment
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionDiskResourcePolicyAttachment"
+
+open class RegionDiskResourcePolicyAttachmentResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RegionDiskResourcePolicyAttachmentResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionDiskResourcePolicyAttachment extends formae.Resource {
+    hidden parent = this
+
+    /// Name of the resource policy to attach. A bare name is expanded to the
+    /// disk's region; a full path is used as given.
+    @gcp.FieldHint { createOnly = true }
+    name: (String|formae.Resolvable)
+
+    /// Name of the regional disk to attach it to. Pass `disk.res.name` so formae
+    /// creates the disk first.
+    @gcp.FieldHint { createOnly = true }
+    disk: (String|formae.Resolvable)
+
+    /// Region the disk lives in. The policy must live in the same region.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    region: String?
+
+    hidden res: RegionDiskResourcePolicyAttachmentResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

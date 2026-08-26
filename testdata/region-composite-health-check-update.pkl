@@ -1,0 +1,116 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/regionHealthCheck.pkl"
+import "@gcp/compute/regionBackendService.pkl"
+import "@gcp/compute/forwardingRule.pkl"
+import "@gcp/compute/regionHealthAggregationPolicy.pkl"
+import "@gcp/compute/regionHealthSource.pkl"
+import "@gcp/compute/regionCompositeHealthCheck.pkl"
+import "./config/vars.pkl" as v
+
+// The composite health check completes the health-aggregation trio: the policy
+// decides what "healthy" means, the health source applies it to a backend
+// service, and this reports the verdict at a forwarding rule. The API insists
+// the destination is a forwarding rule (a backend service is rejected), which is
+// why the chain runs all the way to an internal load balancer.
+//
+// Nothing here boots a VM: the backend service has no backends, and an internal
+// forwarding rule with no healthy backends is still a valid resource.
+local net = new network.Network {
+  label = "plugin-sdk-test-chc-network"
+  name = "formae-plugin-sdk-test-chc-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+local sub = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-chc-subnet"
+  name = "formae-plugin-sdk-test-chc-sub-\(v.testRunID)"
+  region = v.gcpRegion
+  ipCidrRange = "10.43.0.0/24"
+  network = net.res.selfLink
+}
+
+local hc = new regionHealthCheck.RegionHealthCheck {
+  label = "plugin-sdk-test-chc-hc"
+  name = "formae-plugin-sdk-test-chc-hc-\(v.testRunID)"
+  region = v.gcpRegion
+  type = "TCP"
+  tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
+    port = 80
+  }
+}
+
+local bes = new regionBackendService.RegionBackendService {
+  label = "plugin-sdk-test-chc-bes"
+  name = "formae-plugin-sdk-test-chc-bes-\(v.testRunID)"
+  region = v.gcpRegion
+  loadBalancingScheme = "INTERNAL"
+  protocol = "TCP"
+  network = net.res.selfLink
+  healthChecks = new Listing {
+    hc.res.selfLink
+  }
+}
+
+local fr = new forwardingRule.ForwardingRule {
+  label = "plugin-sdk-test-chc-fr"
+  name = "formae-plugin-sdk-test-chc-fr-\(v.testRunID)"
+  region = v.gcpRegion
+  loadBalancingScheme = "INTERNAL"
+  IPProtocol = "TCP"
+  ports = new Listing { "80" }
+  network = net.res.selfLink
+  subnetwork = sub.res.selfLink
+  backendService = bes.res.selfLink
+}
+
+local policy = new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
+  label = "plugin-sdk-test-chc-policy"
+  name = "formae-plugin-sdk-test-chc-hap-\(v.testRunID)"
+  region = v.gcpRegion
+  policyType = "BACKEND_SERVICE_POLICY"
+  healthyPercentThreshold = 60
+}
+
+local hs = new regionHealthSource.RegionHealthSource {
+  label = "plugin-sdk-test-chc-health-source"
+  name = "formae-plugin-sdk-test-chc-hs-\(v.testRunID)"
+  region = v.gcpRegion
+  sourceType = "BACKEND_SERVICE"
+  healthAggregationPolicy = policy.res.selfLink
+  sources = new Listing {
+    bes.res.selfLink
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  sub
+  hc
+  bes
+  fr
+  policy
+  hs
+
+  new regionCompositeHealthCheck.RegionCompositeHealthCheck {
+    label = "plugin-sdk-test-region-composite-health-check"
+    name = "formae-plugin-sdk-test-chc-\(v.testRunID)"
+    description = "Updated composite health check description"
+    region = v.gcpRegion
+    healthSources = new Listing {
+      hs.res.selfLink
+    }
+    healthDestination = fr.res.selfLink
+  }
+}

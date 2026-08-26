@@ -74,6 +74,55 @@ else
     echo "  No regional security policies found"
 fi
 
+# Global Cloud Armor policies. The security-policy-rule fixture creates one as a
+# prerequisite, and conformance Destroy only removes the resource under test, so
+# a killed run leaves the policy behind. Rules die with their policy.
+echo "Cleaning GCP global security policies..."
+GLOBAL_SEC_POLICIES=$(gcloud compute security-policies list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$GLOBAL_SEC_POLICIES" ]; then
+    echo "$GLOBAL_SEC_POLICIES" | while read -r pol region; do
+        [ -n "$region" ] && continue
+        echo "  Deleting global security policy: $pol"
+        gcloud compute security-policies delete "$pol" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No global security policies found"
+fi
+
+# An association pins both its policy and the network it attaches to, so it has
+# to be detached before either can be deleted.
+echo "Detaching network firewall policy associations..."
+NFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$NFP_FOR_ASSOC" ]; then
+    echo "$NFP_FOR_ASSOC" | while read -r pol; do
+        ASSOCS=$(gcloud compute network-firewall-policies describe "$pol" --global --format="value(associations[].name)" 2>/dev/null || true)
+        for assoc in $(echo "$ASSOCS" | tr ';,' ' '); do
+            [ -z "$assoc" ] && continue
+            echo "  Detaching association $assoc from $pol"
+            gcloud compute network-firewall-policies associations delete --firewall-policy="$pol" --name="$assoc" --global-firewall-policy --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No network firewall policies to check for associations"
+fi
+
+# Regional policies keep their associations in a separate collection.
+echo "Detaching regional network firewall policy associations..."
+RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$RNFP_FOR_ASSOC" ]; then
+    echo "$RNFP_FOR_ASSOC" | while read -r pol region; do
+        [ -z "$region" ] && continue
+        ASSOCS=$(gcloud compute network-firewall-policies describe "$pol" --region="$region" --format="value(associations[].name)" 2>/dev/null || true)
+        for assoc in $(echo "$ASSOCS" | tr ';,' ' '); do
+            [ -z "$assoc" ] && continue
+            echo "  Detaching association $assoc from $pol (region: $region)"
+            gcloud compute network-firewall-policies associations delete --firewall-policy="$pol" --name="$assoc" --firewall-policy-region="$region" --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No regional network firewall policies to check for associations"
+fi
+
 echo "Cleaning GCP network firewall policies..."
 NET_FW_POLICIES=$(gcloud compute network-firewall-policies list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$NET_FW_POLICIES" ]; then
@@ -243,16 +292,23 @@ else
     echo "  No snapshots found"
 fi
 
-# A policy still attached to a disk cannot be deleted, so detach first.
+# A policy still attached to a disk cannot be deleted, so detach first. A
+# regional disk reports a region and no zone, and remove-resource-policies needs
+# whichever one it actually has.
 echo "Detaching resource policies from test disks..."
-POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,resourcePolicies[])" 2>/dev/null || true)
+POLICY_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk" --format="value(name,zone,region,resourcePolicies[])" 2>/dev/null || true)
 if [ -n "$POLICY_DISKS" ]; then
-    echo "$POLICY_DISKS" | while read -r dk zone policies; do
+    echo "$POLICY_DISKS" | while read -r dk zone region policies; do
         [ -z "$policies" ] && continue
+        if [ -n "$zone" ]; then
+            SCOPE_FLAG="--zone=$zone"
+        else
+            SCOPE_FLAG="--region=$region"
+        fi
         for pol in $(echo "$policies" | tr ';,' ' '); do
             [ -z "$pol" ] && continue
             echo "  Detaching $(basename "$pol") from $dk"
-            gcloud compute disks remove-resource-policies "$dk" --zone="$zone" --resource-policies="$pol" --quiet 2>/dev/null || true
+            gcloud compute disks remove-resource-policies "$dk" "$SCOPE_FLAG" --resource-policies="$pol" --quiet 2>/dev/null || true
         done
     done
 else
@@ -373,6 +429,20 @@ else
     echo "  No VPN tunnels found"
 fi
 
+# Classic VPN gateways are a separate collection from the HA ones and hold their
+# network, so they go before the network passes.
+echo "Cleaning GCP target VPN gateways..."
+TARGET_VPN_GWS=$(gcloud compute target-vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$TARGET_VPN_GWS" ]; then
+    echo "$TARGET_VPN_GWS" | while read -r gw region; do
+        [ -z "$gw" ] && continue
+        echo "  Deleting target VPN gateway: $gw ($region)"
+        gcloud compute target-vpn-gateways delete "$gw" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target VPN gateways found"
+fi
+
 echo "Cleaning GCP HA VPN gateways..."
 VPN_GATEWAYS=$(gcloud compute vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
 if [ -n "$VPN_GATEWAYS" ]; then
@@ -385,7 +455,11 @@ else
 fi
 
 echo "Cleaning GCP external VPN gateways..."
-EXT_GATEWAYS=$(gcloud compute external-vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+# This collection pushes the filter server-side and the API rejects it
+# ("Invalid list filter expression"), so the list came back empty and nothing
+# was ever deleted - the gateways then sat on a quota of 5 and every VPN case
+# failed. Filter client-side instead. Other compute collections accept it.
+EXT_GATEWAYS=$(gcloud compute external-vpn-gateways list --format="value(name)" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$EXT_GATEWAYS" ]; then
     echo "$EXT_GATEWAYS" | while read -r egw; do
         echo "  Deleting external VPN gateway: $egw"
@@ -520,6 +594,19 @@ else
     echo "  No node templates found"
 fi
 
+# A disk in active async replication cannot be deleted, so stop replication on
+# any test primary before the disk passes below run.
+echo "Stopping async replication on test disks..."
+REPL_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk AND -zone:''" --format="value(name,zone)" 2>/dev/null || true)
+if [ -n "$REPL_DISKS" ]; then
+    echo "$REPL_DISKS" | while read -r dsk zone; do
+        [ -z "$zone" ] && continue
+        gcloud compute disks stop-async-replication "$dsk" --zone="$zone" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No zonal test disks to check"
+fi
+
 echo "Cleaning GCP regional disks..."
 REGION_DISKS=$(gcloud compute disks list --filter="name~^formae-plugin-sdk AND -zone:*" --format="value(name,region)" 2>/dev/null || true)
 if [ -n "$REGION_DISKS" ]; then
@@ -543,6 +630,20 @@ if [ -n "$TARGET_INSTANCES" ]; then
     done
 else
     echo "  No target instances found"
+fi
+
+# Target gRPC proxies hold a url map reference, so they go before the url maps
+# loop; the fixture's map and backend service are prerequisites that Destroy
+# leaves behind.
+echo "Cleaning GCP target gRPC proxies..."
+TARGET_GRPC_PROXIES=$(gcloud compute target-grpc-proxies list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$TARGET_GRPC_PROXIES" ]; then
+    echo "$TARGET_GRPC_PROXIES" | while read -r tgp; do
+        echo "  Deleting target gRPC proxy: $tgp"
+        gcloud compute target-grpc-proxies delete "$tgp" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No target gRPC proxies found"
 fi
 
 echo "Cleaning GCP target TCP proxies..."
@@ -701,6 +802,105 @@ else
 fi
 
 # --- Regional health checks (region-http-lb test) ---
+# A composite health check references health sources, so it goes before them.
+# Project metadata is shared, project-wide state, so this removes only keys the
+# test fixtures own and never touches anything else (enable-oslogin, ssh-keys).
+# Artifact Registry repositories (and the rules inside them, which go with the
+# repository). Both the repository and rule fixtures leave one behind when a run
+# is killed, and neither the repository nor its rules are named by the compute
+# passes above.
+# Eventarc Advanced message buses. These live in a region Eventarc Advanced
+# supports rather than GCP_LOCATION, so the fixture's region is listed explicitly
+# instead of being inherited.
+# Pipelines hold their destination bus, so they go first. Only one bus is allowed
+# per project per region, so a leftover bus fails the next run's create outright.
+# Workflows definitions. Free to keep, but they are test debris.
+# Dataproc session templates. Free to keep, but they are test debris. Note these
+# are location-scoped, unlike autoscaling policies.
+echo "Cleaning GCP dataproc session templates..."
+STS=$(gcloud dataproc session-templates list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep 'formae-plugin-sdk' || true)
+if [ -n "$STS" ]; then
+    echo "$STS" | while read -r st; do
+        [ -z "$st" ] && continue
+        echo "  Deleting session template: $(basename "$st")"
+        gcloud dataproc session-templates delete "$(basename "$st")" --location="${GCP_LOCATION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No dataproc session templates found"
+fi
+
+echo "Cleaning GCP workflows..."
+WFS=$(gcloud workflows list --location="${GCP_LOCATION:-europe-central2}" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+if [ -n "$WFS" ]; then
+    echo "$WFS" | while read -r wf; do
+        [ -z "$wf" ] && continue
+        echo "  Deleting workflow: $wf"
+        gcloud workflows delete "$wf" --location="${GCP_LOCATION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No workflows found"
+fi
+
+echo "Cleaning GCP eventarc pipelines..."
+for pl_loc in europe-west1 us-central1; do
+    PLS=$(gcloud eventarc pipelines list --location="$pl_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+    [ -z "$PLS" ] && continue
+    echo "$PLS" | while read -r pl; do
+        [ -z "$pl" ] && continue
+        echo "  Deleting pipeline: $pl ($pl_loc)"
+        gcloud eventarc pipelines delete "$pl" --location="$pl_loc" --quiet 2>/dev/null || true
+    done
+done
+
+echo "Cleaning GCP eventarc message buses..."
+for mb_loc in europe-west1 us-central1; do
+    MBS=$(gcloud eventarc message-buses list --location="$mb_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
+    [ -z "$MBS" ] && continue
+    echo "$MBS" | while read -r mb; do
+        [ -z "$mb" ] && continue
+        echo "  Deleting message bus: $mb ($mb_loc)"
+        gcloud eventarc message-buses delete "$mb" --location="$mb_loc" --quiet 2>/dev/null || true
+    done
+done
+
+echo "Cleaning GCP artifact registry repositories..."
+AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)
+if [ -n "$AR_REPOS" ]; then
+    echo "$AR_REPOS" | while read -r repo; do
+        [ -z "$repo" ] && continue
+        short=$(basename "$repo")
+        loc=$(echo "$repo" | awk -F/ '{for(i=1;i<=NF;i++) if($i=="locations") print $(i+1)}')
+        [ -z "$loc" ] && loc="${GCP_LOCATION:-europe-central2}"
+        echo "  Deleting artifact repository: $short ($loc)"
+        gcloud artifacts repositories delete "$short" --location="$loc" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No artifact registry repositories found"
+fi
+
+echo "Cleaning GCP project metadata test keys..."
+PMI_KEYS=$(gcloud compute project-info describe --format="value(commonInstanceMetadata.items[].key)" 2>/dev/null | tr ';,' '\n' | grep '^formae-plugin-sdk' || true)
+if [ -n "$PMI_KEYS" ]; then
+    echo "$PMI_KEYS" | while read -r mkey; do
+        [ -z "$mkey" ] && continue
+        echo "  Removing project metadata key: $mkey"
+        gcloud compute project-info remove-metadata --keys="$mkey" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No project metadata test keys found"
+fi
+
+echo "Cleaning GCP composite health checks..."
+CHCS=$(gcloud compute composite-health-checks list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+if [ -n "$CHCS" ]; then
+    echo "$CHCS" | while read -r chc region; do
+        echo "  Deleting composite health check: $chc (region: $region)"
+        gcloud compute composite-health-checks delete "$chc" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No composite health checks found"
+fi
+
 # Health sources reference an aggregation policy, so they go first.
 echo "Cleaning GCP health sources..."
 HEALTH_SOURCES=$(gcloud compute health-sources list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
@@ -895,9 +1095,13 @@ fi
 # untidy. Instances must go before their cluster.
 # Backups outlive their cluster, so they are cleaned independently.
 echo "Cleaning GCP AlloyDB backups..."
-ALLOYDB_BACKUPS=$(gcloud alloydb backups list --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+# "value(name,region)" yields an empty region column - the region lives only
+# inside the resource path - so a delete built from it ran with --region="" and
+# failed silently. Parse the region out of the path instead.
+ALLOYDB_BACKUPS=$(gcloud alloydb backups list --region=- --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$ALLOYDB_BACKUPS" ]; then
-    echo "$ALLOYDB_BACKUPS" | while read -r bkp region; do
+    echo "$ALLOYDB_BACKUPS" | while read -r bkp; do
+        region=$(echo "$bkp" | sed -E 's#.*/locations/([^/]+)/.*#\1#')
         echo "  Deleting AlloyDB backup: $(basename "$bkp") (region: $region)"
         gcloud alloydb backups delete "$(basename "$bkp")" --region="$region" --quiet 2>/dev/null || true
     done
@@ -906,9 +1110,10 @@ else
 fi
 
 echo "Cleaning GCP AlloyDB instances and clusters..."
-ALLOYDB_CLUSTERS=$(gcloud alloydb clusters list --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
+ALLOYDB_CLUSTERS=$(gcloud alloydb clusters list --region=- --filter="name~formae-test OR name~formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
 if [ -n "$ALLOYDB_CLUSTERS" ]; then
-    echo "$ALLOYDB_CLUSTERS" | while read -r cluster region; do
+    echo "$ALLOYDB_CLUSTERS" | while read -r cluster; do
+        region=$(echo "$cluster" | sed -E 's#.*/locations/([^/]+)/.*#\1#')
         cname=$(basename "$cluster")
         INSTS=$(gcloud alloydb instances list --cluster="$cname" --region="$region" --format="value(name)" 2>/dev/null || true)
         if [ -n "$INSTS" ]; then

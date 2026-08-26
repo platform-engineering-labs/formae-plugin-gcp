@@ -1,0 +1,69 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute BackendServiceSignedUrlKey
+///
+/// A Cloud CDN signed-URL key on a backend service. Without a key no signed URL
+/// can be issued, so this is what makes `enableCDN` usable for private content.
+///
+/// The key is not a REST resource: it is added and removed with the
+/// addSignedUrlKey / deleteSignedUrlKey verbs, so this is a hand-written
+/// provisioner.
+///
+/// ponytail: nothing is updatable — the API never returns the secret, so there
+/// is nothing to compare and rotating a key means removing it and adding the new
+/// value.
+module gcp.compute.backendServiceSignedUrlKey
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::BackendServiceSignedUrlKey"
+
+open class BackendServiceSignedUrlKeyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden keyName: BackendServiceSignedUrlKeyResolvable = (this) {
+        property = "keyName"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "keyName"
+}
+open class BackendServiceSignedUrlKey extends formae.Resource {
+    hidden parent = this
+
+    /// Name for the key, unique within the backend service.
+    @gcp.FieldHint { createOnly = true }
+    keyName: String
+
+    /// Name of the owning backend service. A path component, not part of the
+    /// verb body — pass `backendService.res.name` so formae creates it first.
+    @gcp.FieldHint { createOnly = true }
+    backendService: (String|formae.Resolvable)
+
+    /// The shared secret, 16 bytes base64url-encoded. Write-only: the API
+    /// reports key *names* only, never the value, so it can never round-trip.
+    /// Accepts a `formae.Value` (e.g. `formae.value(read(...).text).opaque`) so
+    /// callers can keep it out of plans and state.
+    ///
+    /// Optional in the schema even though a create needs one: the API never
+    /// reports a key's value, so a *discovered* key can never carry it, and a
+    /// required field that discovery cannot fill keeps the resource out of
+    /// inventory entirely. The provisioner still rejects a create without it.
+    @gcp.FieldHint {
+        createOnly = true
+        writeOnly = true
+    }
+    keyValue: (String|formae.Value)?
+
+    hidden res: BackendServiceSignedUrlKeyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

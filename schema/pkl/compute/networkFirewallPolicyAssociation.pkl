@@ -1,0 +1,59 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute NetworkFirewallPolicyAssociation
+///
+/// Attaches a network firewall policy to a VPC network. A policy with rules but
+/// no association is inert — the association is what puts it in the data path,
+/// so this is what makes `NetworkFirewallPolicy` do anything.
+///
+/// Like the policy's rules, an association is not a REST resource but a set of
+/// verbs on the policy — addAssociation, getAssociation, removeAssociation — so
+/// this is a hand-written provisioner.
+///
+/// ponytail: nothing is updatable — an association is a (policy, network) pair,
+/// so a change replaces it.
+module gcp.compute.networkFirewallPolicyAssociation
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::NetworkFirewallPolicyAssociation"
+
+open class NetworkFirewallPolicyAssociationResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: NetworkFirewallPolicyAssociationResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class NetworkFirewallPolicyAssociation extends formae.Resource {
+    hidden parent = this
+
+    /// Name for the association itself, unique within the policy.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the owning policy. A path component, not part of the attach body —
+    /// pass `policy.res.name` so formae creates the policy first.
+    @gcp.FieldHint { createOnly = true }
+    firewallPolicy: (String|formae.Resolvable)
+
+    /// URL of the VPC network to attach the policy to. Pass
+    /// `network.res.selfLink` so formae creates the network first.
+    @gcp.FieldHint { createOnly = true }
+    attachmentTarget: (String|formae.Resolvable)
+
+    hidden res: NetworkFirewallPolicyAssociationResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
