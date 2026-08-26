@@ -262,6 +262,18 @@ jobs:
               # An Eventarc message bus takes ~5-6 min to create and the pipeline
               # case builds one first, so a single apply runs past the 5m default
               # (6m20s locally for the re-apply, 22m for the whole lifecycle).
+              # 15m still was not enough for Update under CI load, which timed
+              # out after the case had already spent 19m; give it the same 30m
+              # as Cloud SQL and AlloyDB.
+              TIMEOUT_ARG="TIMEOUT=30"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
+              export FORMAE_TEST_OOB_TIMEOUT=30
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
+              ;;
+            security-policy|region-security-policy|security-policy-rule|region-security-policy-rule)
+              # A Cloud Armor policy insert is a slow global/regional operation
+              # and the rule cases build one as a prerequisite first;
+              # region-security-policy timed out on Create at the 5m default.
               TIMEOUT_ARG="TIMEOUT=15"
               export FORMAE_TEST_DISCOVERY_TIMEOUT=15
               export FORMAE_TEST_OOB_TIMEOUT=15
@@ -294,18 +306,21 @@ jobs:
               export GCP_LOCATION="$GCP_ZONE"
               ;;
           esac
-          # AlloyDB and Eventarc run their two phases separately with a cleanup
-          # in between. Both build a prerequisite the harness spares on Destroy -
-          # an AlloyDB cluster, an Eventarc message bus - and both prerequisites
-          # sit against a small quota (5 clusters per region, 1 bus per region),
-          # so the surviving one from the crud phase blocks the discovery phase.
-          # See clean-alloydb-case.sh and clean-eventarc-case.sh.
+          # Cases whose prerequisite outlives the crud phase run their two
+          # phases separately with a cleanup in between. Conformance Destroy only
+          # removes the resource under test, so the prerequisite survives and the
+          # discovery phase then either collides with it by name (Cloud Armor
+          # policies: "The resource ... already exists") or runs out of quota
+          # (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
+          # See clean-case-prereqs.sh.
           case "${{ matrix.test-case }}" in
-            alloydb-*|eventarc-*)
+            alloydb-*|eventarc-*|security-policy-rule|region-security-policy-rule|\
+            network-firewall-policy-association|region-network-firewall-policy-association|\
+            network-firewall-policy-rule|machine-image)
               # "|| status=$?" keeps a failing phase from aborting the step
               # before its cleanup runs; the case still fails at the end.
               TC="${{ matrix.test-case }}"
-              CLEAN="./scripts/ci/clean-${TC%%-*}-case.sh"
+              CLEAN="./scripts/ci/clean-case-prereqs.sh"
               crud_status=0
               make conformance-test-crud-run \
                 TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || crud_status=$?

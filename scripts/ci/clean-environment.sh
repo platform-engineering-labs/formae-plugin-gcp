@@ -62,31 +62,31 @@ cleanup_resources() {
 # --- 1. Firewalls (must delete before networks) ---
 # Network firewall policies are global; a policy with associations must have
 # them removed first, but the fixtures create none.
-echo "Cleaning GCP regional security policies..."
-REGION_SEC_POLICIES=$(gcloud compute security-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
-if [ -n "$REGION_SEC_POLICIES" ]; then
-    echo "$REGION_SEC_POLICIES" | while read -r pol region; do
-        [ -z "$region" ] && continue
-        echo "  Deleting regional security policy: $pol (region: $region)"
-        gcloud compute security-policies delete "$pol" --region="$region" --quiet 2>/dev/null || true
+# Cloud Armor policies, regional and global in one pass. The rule fixtures each
+# create one as a prerequisite and conformance Destroy only removes the resource
+# under test, so every run leaves one behind.
+#
+# This used to run twice with two filters, and neither reached a regional
+# policy: "name~^formae-plugin-sdk AND -region:''" matches nothing at all, and
+# the global pass explicitly skipped any row that had a region. Regional
+# policies were therefore never deleted - nine had piled up in europe-central2
+# when this was found, and a rerun of the same CI run collided with its own
+# leftover ("The resource ... already exists"). Filter client-side and branch on
+# whether the row carries a region.
+echo "Cleaning GCP security policies (regional and global)..."
+SEC_POLICIES=$(gcloud compute security-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
+if [ -n "$SEC_POLICIES" ]; then
+    echo "$SEC_POLICIES" | while read -r pol region; do
+        if [ -n "$region" ]; then
+            echo "  Deleting regional security policy: $pol (region: $region)"
+            gcloud compute security-policies delete "$pol" --region="$region" --quiet 2>/dev/null || true
+        else
+            echo "  Deleting global security policy: $pol"
+            gcloud compute security-policies delete "$pol" --global --quiet 2>/dev/null || true
+        fi
     done
 else
-    echo "  No regional security policies found"
-fi
-
-# Global Cloud Armor policies. The security-policy-rule fixture creates one as a
-# prerequisite, and conformance Destroy only removes the resource under test, so
-# a killed run leaves the policy behind. Rules die with their policy.
-echo "Cleaning GCP global security policies..."
-GLOBAL_SEC_POLICIES=$(gcloud compute security-policies list --filter="name~^formae-plugin-sdk" --format="value(name,region)" 2>/dev/null || true)
-if [ -n "$GLOBAL_SEC_POLICIES" ]; then
-    echo "$GLOBAL_SEC_POLICIES" | while read -r pol region; do
-        [ -n "$region" ] && continue
-        echo "  Deleting global security policy: $pol"
-        gcloud compute security-policies delete "$pol" --global --quiet 2>/dev/null || true
-    done
-else
-    echo "  No global security policies found"
+    echo "  No security policies found"
 fi
 
 # An association pins both its policy and the network it attaches to, so it has
@@ -107,8 +107,12 @@ else
 fi
 
 # Regional policies keep their associations in a separate collection.
+#
+# These listings filter client-side: "name~... AND -region:''" matches nothing,
+# so every regional pass below was a no-op and the resources leaked. Twelve
+# regional network firewall policies had accumulated against a quota of 10.
 echo "Detaching regional network firewall policy associations..."
-RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$RNFP_FOR_ASSOC" ]; then
     echo "$RNFP_FOR_ASSOC" | while read -r pol region; do
         [ -z "$region" ] && continue
@@ -135,7 +139,7 @@ else
 fi
 
 echo "Cleaning GCP regional network firewall policies..."
-REGION_FW_POLICIES=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+REGION_FW_POLICIES=$(gcloud compute network-firewall-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_FW_POLICIES" ]; then
     echo "$REGION_FW_POLICIES" | while read -r pol region; do
         [ -z "$region" ] && continue
@@ -210,7 +214,7 @@ fi
 # --- 1d. Instance templates (hold a network reference, so delete before networks) ---
 # Regional instance templates are a separate collection from the global ones.
 echo "Cleaning GCP regional instance templates..."
-REGION_TEMPLATES=$(gcloud compute instance-templates list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+REGION_TEMPLATES=$(gcloud compute instance-templates list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_TEMPLATES" ]; then
     echo "$REGION_TEMPLATES" | while read -r tmpl region; do
         [ -z "$region" ] && continue
@@ -483,7 +487,7 @@ fi
 # --- 1g. SSL policies (must delete after the proxies that reference them) ---
 # Regional SSL policies are a separate collection from the global ones.
 echo "Cleaning GCP regional SSL policies..."
-REGION_SSL=$(gcloud compute ssl-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+REGION_SSL=$(gcloud compute ssl-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_SSL" ]; then
     echo "$REGION_SSL" | while read -r pol region; do
         [ -z "$region" ] && continue
