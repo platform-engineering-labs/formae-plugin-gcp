@@ -262,10 +262,13 @@ jobs:
               # An Eventarc message bus takes ~5-6 min to create and the pipeline
               # case builds one first, so a single apply runs past the 5m default
               # (6m20s locally for the re-apply, 22m for the whole lifecycle).
-              TIMEOUT_ARG="TIMEOUT=15"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
-              export FORMAE_TEST_OOB_TIMEOUT=15
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+              # 15m still was not enough for Update under CI load, which timed
+              # out after the case had already spent 19m; give it the same 30m
+              # as Cloud SQL and AlloyDB.
+              TIMEOUT_ARG="TIMEOUT=30"
+              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
+              export FORMAE_TEST_OOB_TIMEOUT=30
+              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
               ;;
             security-policy|region-security-policy|security-policy-rule|region-security-policy-rule)
               # A Cloud Armor policy insert is a slow global/regional operation
