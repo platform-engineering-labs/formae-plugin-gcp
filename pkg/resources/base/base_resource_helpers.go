@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -266,12 +267,18 @@ func (b *BaseResource) performUpdate(
 
 	// Handle synchronous operations
 	if b.OperationConfig.Synchronous {
+		// Return the updated resource's properties, exactly as
+		// handleSynchronousCreate does. Without this the caller keeps the
+		// pre-update state: there is no operation to poll and so no later
+		// read-back, and every changed field reads as missing until the next
+		// sync.
 		return &resource.UpdateResult{
 			ProgressResult: &resource.ProgressResult{
-				Operation:       resource.OperationUpdate,
-				OperationStatus: resource.OperationStatusSuccess,
-				NativeID:        request.NativeID,
-				StatusMessage:   "Resource updated successfully",
+				Operation:          resource.OperationUpdate,
+				OperationStatus:    resource.OperationStatusSuccess,
+				NativeID:           request.NativeID,
+				StatusMessage:      "Resource updated successfully",
+				ResourceProperties: b.readBackAfterUpdate(ctx, request),
 			},
 		}, nil
 	}
@@ -314,9 +321,14 @@ func (b *BaseResource) updateWithOptimisticLocking(
 			wrappedErr.Message), nil
 	}
 
-	// Extract locking field
+	// Extract locking field. Most GCP etags are strings ("fingerprint",
+	// "labelFingerprint", "etag"), but some are numbers - Dataproc's
+	// workflowTemplates.version is an int - so keep the raw value for the body
+	// and derive a string only for the query-parameter case. A string assertion
+	// alone silently yielded "" and the API rejected the update.
 	lockingField := b.ResourceConfig.OptimisticLocking.FieldName
-	lockingValue, _ := getResponse.Body[lockingField].(string)
+	lockingRaw := getResponse.Body[lockingField]
+	lockingValue := lockingValueString(lockingRaw)
 
 	// Transform request properties
 	body := props
@@ -334,9 +346,10 @@ func (b *BaseResource) updateWithOptimisticLocking(
 	if b.ResourceConfig.OptimisticLocking.LocationInURL {
 		// Add as query parameter
 		url, _ = transport.AddQueryParam(url, lockingField, lockingValue)
-	} else {
-		// Add to request body
-		body[lockingField] = lockingValue
+	} else if lockingRaw != nil {
+		// Add to request body, keeping the API's own type: a numeric version
+		// must not become the string "2".
+		body[lockingField] = lockingRaw
 	}
 
 	// Apply request wrapper if configured
@@ -374,6 +387,10 @@ func (b *BaseResource) updateWithOptimisticLocking(
 				OperationStatus: resource.OperationStatusSuccess,
 				NativeID:        request.NativeID,
 				StatusMessage:   "Resource updated successfully",
+				// As in performUpdate: without the read-back the update reports no
+				// properties at all, so anything the update changed is missing from
+				// state until some later sync happens to pick it up.
+				ResourceProperties: b.readBackAfterUpdate(ctx, request),
 			},
 		}, nil
 	}
@@ -563,4 +580,49 @@ func unwrapValue(v interface{}) interface{} {
 	default:
 		return v
 	}
+}
+
+// lockingValueString renders an optimistic-locking value for a URL query
+// parameter. Strings pass through; numeric etags are formatted without a decimal
+// point, since JSON decodes every number to float64.
+func lockingValueString(raw interface{}) string {
+	switch v := raw.(type) {
+	case string:
+		return v
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case json.Number:
+		return v.String()
+	default:
+		return ""
+	}
+}
+
+// readBackAfterUpdate returns the resource as Read would report it, so stored
+// state after a synchronous update has exactly the shape it has after a create
+// or a sync.
+//
+// The update *response* is not a safe substitute: some APIs echo fields their
+// GET omits - a Storage bucket's PATCH returns defaultObjectAcl, which the read
+// path does not - and storing those makes conformance report a property that is
+// "not expected and not a provider default". A failed read-back is not a failed
+// update; the operation already succeeded, so it yields nil and the next sync
+// fills state in.
+func (b *BaseResource) readBackAfterUpdate(ctx context.Context, request *resource.UpdateRequest) json.RawMessage {
+	if request.NativeID == "" {
+		return nil
+	}
+	readResult, err := b.Read(ctx, &resource.ReadRequest{
+		NativeID:     request.NativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	if err != nil || readResult == nil || readResult.ErrorCode != "" || readResult.Properties == "" {
+		return nil
+	}
+	return json.RawMessage(readResult.Properties)
 }

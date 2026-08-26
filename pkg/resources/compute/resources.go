@@ -21,18 +21,31 @@ const (
 	FirewallResourceType              = "GCP::Compute::Firewall"
 	NetworkFirewallPolicyResourceType = "GCP::Compute::NetworkFirewallPolicy"
 	// Registered in firewall_policy_rule.go: every operation is a verb on the policy.
-	NetworkFirewallPolicyRuleResourceType   = "GCP::Compute::NetworkFirewallPolicyRule"
-	RegionNetworkFirewallPolicyResourceType = "GCP::Compute::RegionNetworkFirewallPolicy"
-	InstanceResourceType                    = "GCP::Compute::Instance"
-	NetworkResourceType                     = "GCP::Compute::Network"
+	NetworkFirewallPolicyRuleResourceType = "GCP::Compute::NetworkFirewallPolicyRule"
+	// Registered in firewall_policy_association.go: add/get/removeAssociation verbs.
+	NetworkFirewallPolicyAssociationResourceType       = "GCP::Compute::NetworkFirewallPolicyAssociation"
+	RegionNetworkFirewallPolicyAssociationResourceType = "GCP::Compute::RegionNetworkFirewallPolicyAssociation"
+	RegionNetworkFirewallPolicyResourceType            = "GCP::Compute::RegionNetworkFirewallPolicy"
+	InstanceResourceType                               = "GCP::Compute::Instance"
+	NetworkResourceType                                = "GCP::Compute::Network"
 	// Registered in network_peering.go: addPeering/removePeering verbs.
-	NetworkPeeringResourceType       = "GCP::Compute::NetworkPeering"
-	RouterResourceType               = "GCP::Compute::Router"
-	RouterNatResourceType            = "GCP::Compute::RouterNat"
-	SubnetworkResourceType           = "GCP::Compute::Subnetwork"
-	RouteResourceType                = "GCP::Compute::Route"
+	NetworkPeeringResourceType = "GCP::Compute::NetworkPeering"
+	RouterResourceType         = "GCP::Compute::Router"
+	RouterNatResourceType      = "GCP::Compute::RouterNat"
+	// Registered in router_interface.go: merge into Router.interfaces[].
+	RouterInterfaceResourceType = "GCP::Compute::RouterInterface"
+	// Registered in router_route_policy.go: update/get/delete/listRoutePolicies verbs.
+	RouterRoutePolicyResourceType = "GCP::Compute::RouterRoutePolicy"
+	RouterNamedSetResourceType    = "GCP::Compute::RouterNamedSet"
+	SubnetworkResourceType        = "GCP::Compute::Subnetwork"
+	RouteResourceType             = "GCP::Compute::Route"
+	// Registered in project_metadata_item.go: setCommonInstanceMetadata merge.
+	ProjectMetadataItemResourceType  = "GCP::Compute::ProjectMetadataItem"
 	SecurityPolicyResourceType       = "GCP::Compute::SecurityPolicy"
 	RegionSecurityPolicyResourceType = "GCP::Compute::RegionSecurityPolicy"
+	// Registered in policy_rule.go: add/get/patch/removeRule verbs.
+	SecurityPolicyRuleResourceType       = "GCP::Compute::SecurityPolicyRule"
+	RegionSecurityPolicyRuleResourceType = "GCP::Compute::RegionSecurityPolicyRule"
 
 	// Managed instance groups
 	InstanceTemplateResourceType           = "GCP::Compute::InstanceTemplate"
@@ -52,17 +65,21 @@ const (
 	ResourcePolicyResourceType        = "GCP::Compute::ResourcePolicy"
 	// Registered in disk_resource_policy_attachment.go: add/removeResourcePolicies verbs.
 	DiskResourcePolicyAttachmentResourceType = "GCP::Compute::DiskResourcePolicyAttachment"
-	ImageResourceType                        = "GCP::Compute::Image"
-	MachineImageResourceType                 = "GCP::Compute::MachineImage"
-	SnapshotResourceType                     = "GCP::Compute::Snapshot"
-	InstantSnapshotResourceType              = "GCP::Compute::InstantSnapshot"
-	RegionInstantSnapshotResourceType        = "GCP::Compute::RegionInstantSnapshot"
-	NodeTemplateResourceType                 = "GCP::Compute::NodeTemplate"
-	RegionDiskResourceType                   = "GCP::Compute::RegionDisk"
+	// Registered in disk_async_replication.go: start/stopAsyncReplication verbs.
+	DiskAsyncReplicationResourceType               = "GCP::Compute::DiskAsyncReplication"
+	RegionDiskResourcePolicyAttachmentResourceType = "GCP::Compute::RegionDiskResourcePolicyAttachment"
+	ImageResourceType                              = "GCP::Compute::Image"
+	MachineImageResourceType                       = "GCP::Compute::MachineImage"
+	SnapshotResourceType                           = "GCP::Compute::Snapshot"
+	InstantSnapshotResourceType                    = "GCP::Compute::InstantSnapshot"
+	RegionInstantSnapshotResourceType              = "GCP::Compute::RegionInstantSnapshot"
+	NodeTemplateResourceType                       = "GCP::Compute::NodeTemplate"
+	RegionDiskResourceType                         = "GCP::Compute::RegionDisk"
 
 	// HA VPN
 	ExternalVpnGatewayResourceType = "GCP::Compute::ExternalVpnGateway"
 	HaVpnGatewayResourceType       = "GCP::Compute::HaVpnGateway"
+	TargetVpnGatewayResourceType   = "GCP::Compute::TargetVpnGateway"
 	VpnTunnelResourceType          = "GCP::Compute::VpnTunnel"
 	SslCertificateResourceType     = "GCP::Compute::SslCertificate"
 	SslPolicyResourceType          = "GCP::Compute::SslPolicy"
@@ -73,20 +90,24 @@ const (
 	ServiceAttachmentResourceType  = "GCP::Compute::ServiceAttachment"
 
 	// Load Balancer - Global resources
-	GlobalAddressResourceType        = "GCP::Compute::GlobalAddress"
-	HealthCheckResourceType          = "GCP::Compute::HealthCheck"
-	BackendServiceResourceType       = "GCP::Compute::BackendService"
-	UrlMapResourceType               = "GCP::Compute::UrlMap"
-	TargetHttpProxyResourceType      = "GCP::Compute::TargetHttpProxy"
-	TargetHttpsProxyResourceType     = "GCP::Compute::TargetHttpsProxy"
-	TargetTcpProxyResourceType       = "GCP::Compute::TargetTcpProxy"
-	TargetSslProxyResourceType       = "GCP::Compute::TargetSslProxy"
-	GlobalForwardingRuleResourceType = "GCP::Compute::GlobalForwardingRule"
+	GlobalAddressResourceType  = "GCP::Compute::GlobalAddress"
+	HealthCheckResourceType    = "GCP::Compute::HealthCheck"
+	BackendServiceResourceType = "GCP::Compute::BackendService"
+	// Registered in backend_service_signed_url_key.go: add/deleteSignedUrlKey verbs.
+	BackendServiceSignedUrlKeyResourceType = "GCP::Compute::BackendServiceSignedUrlKey"
+	UrlMapResourceType                     = "GCP::Compute::UrlMap"
+	TargetHttpProxyResourceType            = "GCP::Compute::TargetHttpProxy"
+	TargetHttpsProxyResourceType           = "GCP::Compute::TargetHttpsProxy"
+	TargetTcpProxyResourceType             = "GCP::Compute::TargetTcpProxy"
+	TargetSslProxyResourceType             = "GCP::Compute::TargetSslProxy"
+	TargetGrpcProxyResourceType            = "GCP::Compute::TargetGrpcProxy"
+	GlobalForwardingRuleResourceType       = "GCP::Compute::GlobalForwardingRule"
 
 	// Load Balancer - Regional resources
 	RegionHealthCheckResourceType             = "GCP::Compute::RegionHealthCheck"
 	RegionHealthAggregationPolicyResourceType = "GCP::Compute::RegionHealthAggregationPolicy"
 	RegionHealthSourceResourceType            = "GCP::Compute::RegionHealthSource"
+	RegionCompositeHealthCheckResourceType    = "GCP::Compute::RegionCompositeHealthCheck"
 	RegionBackendServiceResourceType          = "GCP::Compute::RegionBackendService"
 	RegionUrlMapResourceType                  = "GCP::Compute::RegionUrlMap"
 	RegionTargetHttpProxyResourceType         = "GCP::Compute::RegionTargetHttpProxy"
@@ -395,6 +416,32 @@ func init() {
 		// policy. NOTE the URL segment is "healthSources" while the method group
 		// is "regionHealthSources". ponytail: patch needs the fingerprint dance;
 		// deferred, so a change replaces.
+		// Region Composite Health Check - aggregates health sources and reports the
+		// verdict at a forwarding rule, which is what makes a health source and
+		// its aggregation policy do anything.
+		//
+		// Patch needs the fingerprint, and the API hides that: a patch without
+		// one is accepted with a 200 and an operation, then the *operation*
+		// fails with 412 CONDITION_NOT_MET ("missing fingerprint"). Only the
+		// operation outcome tells the truth.
+		{
+			ResourceType: RegionCompositeHealthCheckResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "compositeHealthChecks",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate: true,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "fingerprint",
+					LocationInURL: false,
+				},
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
 		{
 			ResourceType: RegionHealthSourceResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -546,6 +593,23 @@ func init() {
 		},
 		// VPN Tunnel - one IPsec tunnel between a gateway interface pair.
 		// ponytail: no vpnTunnels.patch exists, so a change replaces.
+		// Target VPN Gateway - the classic (route-based) VPN gateway, a separate
+		// collection from the HA gateway above and drawing on a separate quota.
+		// Immutable: PATCH is not a method on it at all.
+		{
+			ResourceType: TargetVpnGatewayResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "targetVpnGateways",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    false,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
 		{
 			ResourceType: VpnTunnelResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -929,6 +993,27 @@ func init() {
 					Type: base.ScopeGlobal,
 				},
 				SupportsUpdate: true,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "fingerprint",
+					LocationInURL: false,
+				},
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: nil,
+		},
+
+		// Target gRPC Proxy - Global proxy for proxyless gRPC service mesh
+		{
+			ResourceType: TargetGrpcProxyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "targetGrpcProxies",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeGlobal,
+				},
+				SupportsUpdate: true,
+				// Unlike the other target proxies, patch rejects a request
+				// without a fingerprint.
 				OptimisticLocking: &base.OptimisticLockingConfig{
 					Enabled:       true,
 					FieldName:     "fingerprint",

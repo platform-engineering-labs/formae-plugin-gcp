@@ -1,0 +1,37 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/artifactregistry/repository.pkl"
+import "@gcp/artifactregistry/rule.pkl"
+import "./config/vars.pkl" as v
+
+// Repository + a rule that denies downloads from it. The repository alone
+// enforces nothing of its own, which is the gap the rule closes. Both are free:
+// an empty repository stores nothing.
+local repo = new repository.Repository {
+  label = "plugin-sdk-test-arr-repository"
+  name = "formae-test-arr-repo-\(v.testRunID)"
+  format = "DOCKER"
+  description = "Repository owning the rule under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  repo
+
+  new rule.Rule {
+    label = "plugin-sdk-test-artifactregistry-rule"
+    name = "formae-test-arr-rule-\(v.testRunID)"
+    // Resolvable -> the repository exists before the rule is created.
+    repository = repo.res.name
+    action = "DENY"
+    operation = "DOWNLOAD"
+  }
+}

@@ -1,0 +1,87 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RouterNamedSet
+///
+/// A reusable list of prefixes on a Cloud Router. A `routerRoutePolicy` term can
+/// match against a named set instead of spelling out every prefix, so one edit
+/// here changes every policy that references it.
+///
+/// The set is a series of verbs on the router rather than a REST resource —
+/// updateNamedSet (which both creates and updates), getNamedSet, deleteNamedSet,
+/// listNamedSets — so it shares a hand-written provisioner with the route policy.
+module gcp.compute.routerNamedSet
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RouterNamedSet"
+
+/// The API spells this out in full; "PREFIX" alone is rejected.
+typealias NamedSetType = "NAMED_SET_TYPE_PREFIX"|"NAMED_SET_TYPE_COMMUNITY"|"NAMED_SET_TYPE_AS_PATH"
+
+/// One entry of the set.
+@gcp.SubResourceHint
+open class NamedSetElement extends formae.SubResource {
+    /// CEL, and quoted: a prefix element is written `'10.0.0.0/8'`, quotes
+    /// included, not `10.0.0.0/8`.
+    @gcp.FieldHint
+    expression: String
+
+    @gcp.FieldHint
+    title: String?
+
+    @gcp.FieldHint
+    description: String?
+}
+
+open class RouterNamedSetResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RouterNamedSetResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RouterNamedSet extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Name of the owning router. A path component, not part of the verb body —
+    /// pass `router.res.name` so formae creates the router first.
+    @gcp.FieldHint { createOnly = true }
+    router: (String|formae.Resolvable)
+
+    /// Region of the owning router. Also a path component.
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// What kind of value the elements hold.
+    @gcp.FieldHint { createOnly = true }
+    type: NamedSetType
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    elements: Listing<NamedSetElement>?
+
+    /// Server-managed. An update must carry the current value, so the
+    /// provisioner re-reads it rather than taking it from here.
+    @gcp.FieldHint { hasProviderDefault = true }
+    fingerprint: String?
+
+    hidden res: RouterNamedSetResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

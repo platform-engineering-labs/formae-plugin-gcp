@@ -50,11 +50,11 @@ func TestNormalizeInstanceDisksDropsAutoDeviceName(t *testing.T) {
 
 func TestAutoDeviceName(t *testing.T) {
 	for name, want := range map[string]bool{
-		"persistent-disk-0":  true,
-		"persistent-disk-12": true,
-		"tsnet":              false,
-		"persistent-disk-":   false,
-		"persistent-disk-a":  false,
+		"persistent-disk-0":    true,
+		"persistent-disk-12":   true,
+		"tsnet":                false,
+		"persistent-disk-":     false,
+		"persistent-disk-a":    false,
 		"my-persistent-disk-0": false,
 	} {
 		if got := autoDeviceName(name); got != want {

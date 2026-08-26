@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/networkFirewallPolicy.pkl"
+import "@gcp/compute/networkFirewallPolicyRule.pkl"
+import "./config/vars.pkl" as v
+
+// Policy + rule. The policy alone carries only GCP's implied rules, so the rule
+// is what makes it enforce anything.
+local policy = new networkFirewallPolicy.NetworkFirewallPolicy {
+  label = "plugin-sdk-test-nfpr-policy"
+  name = "formae-plugin-sdk-test-nfpr-pol-\(v.testRunID)"
+  description = "Policy owning the rule under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  policy
+
+  new networkFirewallPolicyRule.NetworkFirewallPolicyRule {
+    label = "plugin-sdk-test-network-firewall-policy-rule"
+    ruleName = "allow-doc-range"
+    // Resolvable -> the policy exists before the addRule verb runs.
+    firewallPolicy = policy.res.name
+    priority = 1000
+    action = "allow"
+    direction = "INGRESS"
+    description = "Allow two documentation ranges on 443"
+    match = new Mapping {
+      // TEST-NET-2, reserved by IANA for documentation.
+      ["srcIpRanges"] = new Listing { "198.51.100.0/24"; "203.0.113.0/24" }
+      ["layer4Configs"] = new Listing {
+        new Mapping {
+          ["ipProtocol"] = "tcp"
+          ["ports"] = new Listing { "443" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/workflows/workflow.pkl"
+import "./config/vars.pkl" as v
+
+// A workflow definition with no prerequisites. Defining one is free — only
+// executions are billed, and nothing executes this.
+forma {
+  v.stack
+  v.target
+
+  new workflow.Workflow {
+    label = "plugin-sdk-test-workflows-workflow"
+    name = "formae-plugin-sdk-test-wf-\(v.testRunID)"
+    description = "Updated test workflow description"
+    // Returns immediately; it calls nothing and needs no permissions.
+    sourceContents = """
+      main:
+        steps:
+          - done:
+              return: "ok"
+
+      """
+  }
+}

@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute DiskAsyncReplication
+///
+/// The replication link between a primary disk and a secondary disk in another
+/// region — the pairing behind cross-region disaster recovery. The disks are
+/// ordinary `Disk` resources; this is the relationship between them, started and
+/// stopped with the startAsyncReplication / stopAsyncReplication verbs on the
+/// primary.
+///
+/// The secondary disk must be created with `asyncPrimaryDisk` naming the
+/// primary, and must live in a different region.
+///
+/// ponytail: nothing is updatable — the link is a (primary, secondary) pair, so
+/// a change stops replication and starts it again.
+module gcp.compute.diskAsyncReplication
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::DiskAsyncReplication"
+
+open class DiskAsyncReplicationResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden primaryDisk: DiskAsyncReplicationResolvable = (this) {
+        property = "primaryDisk"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "primaryDisk"
+}
+open class DiskAsyncReplication extends formae.Resource {
+    hidden parent = this
+
+    /// URL of the disk being replicated. Pass `primary.res.selfLink` so formae
+    /// creates it first.
+    @gcp.FieldHint { createOnly = true }
+    primaryDisk: (String|formae.Resolvable)
+
+    /// URL of the disk receiving the replica, in another region. Pass
+    /// `secondary.res.selfLink`.
+    @gcp.FieldHint { createOnly = true }
+    secondaryDisk: (String|formae.Resolvable)
+
+    hidden res: DiskAsyncReplicationResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

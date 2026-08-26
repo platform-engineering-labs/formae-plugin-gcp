@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/urlMap.pkl"
+import "@gcp/compute/targetGrpcProxy.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  // A proxyless gRPC mesh routes to INTERNAL_SELF_MANAGED backends. No
+  // instances or health checks are attached — the proxy only needs the routing
+  // rules to exist, not anything serving behind them.
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-tgp-backend-service"
+    name = "formae-plugin-sdk-test-tgp-bs-\(v.testRunID)"
+    loadBalancingScheme = "INTERNAL_SELF_MANAGED"
+    protocol = "GRPC"
+    portName = "grpc"
+    timeoutSec = 30
+  }
+
+  local um = new urlMap.UrlMap {
+    label = "plugin-sdk-test-tgp-url-map"
+    name = "formae-plugin-sdk-test-tgp-um-\(v.testRunID)"
+    defaultService = bs.res.selfLink
+  }
+
+  v.stack
+  v.target
+
+  bs
+  um
+
+  new targetGrpcProxy.TargetGrpcProxy {
+    label = "plugin-sdk-test-target-grpc-proxy"
+    name = "formae-plugin-sdk-test-tgp-\(v.testRunID)"
+    description = "Test target gRPC proxy for plugin SDK conformance tests"
+    urlMap = um.res.selfLink
+    validateForProxyless = true
+  }
+}

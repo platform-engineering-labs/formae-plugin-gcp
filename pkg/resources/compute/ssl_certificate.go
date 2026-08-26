@@ -14,6 +14,7 @@ import (
 // awkward to model:
 //   - MANAGED:      managedDomains        -> managed { domains: [...] }
 //   - SELF_MANAGED: certificate/privateKey -> selfManaged { certificate, privateKey }
+//
 // GCP rejects a self-managed cert whose details are sent at the top level
 // ("Self-managed certificate details must be specified if type = SELF_MANAGED").
 func sslCertificateRequestTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {

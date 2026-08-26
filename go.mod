@@ -3,8 +3,8 @@ module github.com/platform-engineering-labs/formae-plugin-gcp
 go 1.26.4
 
 require (
-	cloud.google.com/go/auth v0.22.0
-	cloud.google.com/go/bigquery v1.79.0
+	cloud.google.com/go/auth v0.23.2
+	cloud.google.com/go/bigquery v1.81.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.23.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.26
@@ -17,8 +17,8 @@ require (
 	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/oauth2 v0.36.0
-	google.golang.org/api v0.291.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/api v0.293.0
+	google.golang.org/grpc v1.83.1
 )
 
 // gcpname is its own dependency-free module: the canonical parser shared with
@@ -67,7 +67,7 @@ require (
 	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/google/flatbuffers v23.5.26+incompatible // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.19 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.20 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
@@ -125,7 +125,7 @@ require (
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260630182238-925bb5da69e7 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260724162435-b2f20204f0df // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260807164820-c8921c73eeea // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	resty.dev/v3 v3.0.0-beta.6.0.20260127085140-f531c9de7027 // indirect

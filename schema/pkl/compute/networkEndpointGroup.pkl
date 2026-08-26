@@ -10,6 +10,13 @@
 /// backend - here a Cloud Run service. This is the backend a Cloud-Run-fronted
 /// external HTTPS load balancer points at. NEGs are immutable, so every field
 /// is createOnly.
+///
+/// A Private Service Connect NEG is the other useful flavour: set
+/// `networkEndpointType = "PRIVATE_SERVICE_CONNECT"` and `pscTargetService`,
+/// and the group targets a Google API or a published service attachment instead
+/// of a serverless backend. This is Terraform's
+/// `google_compute_region_network_endpoint_group` — the same API surface, since
+/// this resource is already the regional one.
 module gcp.compute.networkEndpointGroup
 
 import "../gcp.pkl"
@@ -17,7 +24,7 @@ import "@formae/formae.pkl"
 
 const type = "GCP::Compute::NetworkEndpointGroup"
 
-typealias NetworkEndpointType = "SERVERLESS"|"GCE_VM_IP_PORT"|"INTERNET_IP_PORT"|"INTERNET_FQDN_PORT"
+typealias NetworkEndpointType = "SERVERLESS"|"GCE_VM_IP_PORT"|"INTERNET_IP_PORT"|"INTERNET_FQDN_PORT"|"PRIVATE_SERVICE_CONNECT"
 
 /// Cloud Run serverless backend selector. Set `service` to route the NEG to a
 /// Cloud Run service in the NEG's region.
@@ -77,6 +84,15 @@ open class NetworkEndpointGroup extends formae.Resource {
         createOnly = true
     }
     cloudRun: CloudRun?
+
+    /// Target of a PRIVATE_SERVICE_CONNECT group: a Google API hostname such as
+    /// "europe-central2-cloudkms.googleapis.com", or a service attachment URL.
+    /// The API rejects `network` and `subnetwork` for this type in regional
+    /// scope, so a PSC group needs no VPC of its own.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    pscTargetService: String?
 
     @gcp.FieldHint {
         createOnly = true

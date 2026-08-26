@@ -83,6 +83,14 @@ type PathContext struct {
 
 	// Custom segments for hierarchical APIs (e.g., Storage)
 	CustomSegments []string
+
+	// IsList marks a collection URL built for List rather than for create or
+	// read. Discovery lists with no properties, so a path builder cannot tell
+	// a declared location or parent from a target default - this can. Builders
+	// use it to substitute an API's own wildcard (Eventarc's "locations/-")
+	// where one exists, which is the difference between a resource that can be
+	// discovered and one that can only be managed.
+	IsList bool
 }
 
 // URLBuilder builds URLs for GCP API resources
