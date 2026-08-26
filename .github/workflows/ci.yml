@@ -230,6 +230,29 @@ jobs:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         run: |
+          # The harness acquires the formae binary and starts an agent before it
+          # runs anything. Both steps reach the network and both have failed on
+          # their own - "no available packages for: formae" when the package
+          # channel is unreachable, "timeout waiting for agent to become ready
+          # after 30s" when the agent is slow to boot. Neither has touched cloud
+          # infrastructure yet, so retrying the phase is safe and costs seconds;
+          # any other failure is reported as-is on the first attempt.
+          run_make() {
+            local log rc attempt
+            log="$(mktemp)"
+            for attempt in 1 2; do
+              make "$@" 2>&1 | tee "$log"
+              rc=${PIPESTATUS[0]}
+              [ "$rc" -eq 0 ] && return 0
+              if [ "$attempt" -lt 2 ] && grep -qE "no available packages for: formae|timeout waiting for agent to become ready" "$log"; then
+                echo "::warning::harness setup failed before any test ran, retrying ${{ matrix.test-case }}"
+                continue
+              fi
+              return "$rc"
+            done
+            return "$rc"
+          }
+
           # Slow resources (Cloud SQL: 5-10 min/instance) need raised timeouts.
           # TIMEOUT sets the per-operation poll (FORMAE_TEST_TIMEOUT); the
           # discovery and OOB timeouts are separate env vars the SDK reads.
@@ -340,17 +363,17 @@ jobs:
               TC="${{ matrix.test-case }}"
               CLEAN="./scripts/ci/clean-case-prereqs.sh"
               crud_status=0
-              make conformance-test-crud-run \
+              run_make conformance-test-crud-run \
                 TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || crud_status=$?
               "$CLEAN" "$TC"
               discovery_status=0
-              make conformance-test-discovery-run \
+              run_make conformance-test-discovery-run \
                 TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || discovery_status=$?
               "$CLEAN" "$TC"
               [ "$crud_status" -eq 0 ] && [ "$discovery_status" -eq 0 ]
               ;;
             *)
-              make conformance-test-crud-run conformance-test-discovery-run \
+              run_make conformance-test-crud-run conformance-test-discovery-run \
                 TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
               ;;
           esac
