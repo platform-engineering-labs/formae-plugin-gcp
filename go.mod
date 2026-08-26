@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	cloud.google.com/go/auth v0.23.0
-	cloud.google.com/go/bigquery v1.79.0
+	cloud.google.com/go/bigquery v1.81.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.23.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.26
