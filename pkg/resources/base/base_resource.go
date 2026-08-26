@@ -571,18 +571,27 @@ func (b *BaseResource) Status(
 // Helper methods continue in next part...
 
 // isTransientPollError reports whether a failed operation-status poll leaves the
-// operation's outcome unknown, as opposed to answering it. Only the transport
-// failures qualify: a not-found, denied or malformed request is an answer, and
-// polling it again would just burn the timeout.
+// operation's outcome unknown, as opposed to answering it.
+//
+// The question is not "was this error transient" but "did the API tell us
+// anything about the operation". Only a definitive answer - the operation does
+// not exist, we may not look at it, we asked wrongly - closes the question;
+// everything else, including an error we could not classify, leaves the
+// operation running and unread, so the right move is to read it again.
+//
+// Erring the other way is expensive: a burst of unclassified transport errors
+// against compute.googleapis.com once turned into eleven red conformance jobs
+// in a single run, every one of them reporting "failed to get operation status"
+// for an operation that had not actually failed.
 func isTransientPollError(code transport.ErrorCode) bool {
 	switch code {
-	case transport.ErrorCodeNetworkFailure,
-		transport.ErrorCodeTimeout,
-		transport.ErrorCodeThrottling,
-		transport.ErrorCodeInternalError:
-		return true
-	default:
+	case transport.ErrorCodeResourceNotFound,
+		transport.ErrorCodeUnauthorized,
+		transport.ErrorCodeInvalidInput,
+		transport.ErrorCodeAlreadyExists:
 		return false
+	default:
+		return true
 	}
 }
 
