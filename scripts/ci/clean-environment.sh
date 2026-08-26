@@ -107,8 +107,12 @@ else
 fi
 
 # Regional policies keep their associations in a separate collection.
+#
+# These listings filter client-side: "name~... AND -region:''" matches nothing,
+# so every regional pass below was a no-op and the resources leaked. Twelve
+# regional network firewall policies had accumulated against a quota of 10.
 echo "Detaching regional network firewall policy associations..."
-RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+RNFP_FOR_ASSOC=$(gcloud compute network-firewall-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$RNFP_FOR_ASSOC" ]; then
     echo "$RNFP_FOR_ASSOC" | while read -r pol region; do
         [ -z "$region" ] && continue
@@ -135,7 +139,7 @@ else
 fi
 
 echo "Cleaning GCP regional network firewall policies..."
-REGION_FW_POLICIES=$(gcloud compute network-firewall-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+REGION_FW_POLICIES=$(gcloud compute network-firewall-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_FW_POLICIES" ]; then
     echo "$REGION_FW_POLICIES" | while read -r pol region; do
         [ -z "$region" ] && continue
@@ -210,7 +214,7 @@ fi
 # --- 1d. Instance templates (hold a network reference, so delete before networks) ---
 # Regional instance templates are a separate collection from the global ones.
 echo "Cleaning GCP regional instance templates..."
-REGION_TEMPLATES=$(gcloud compute instance-templates list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+REGION_TEMPLATES=$(gcloud compute instance-templates list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_TEMPLATES" ]; then
     echo "$REGION_TEMPLATES" | while read -r tmpl region; do
         [ -z "$region" ] && continue
@@ -483,7 +487,7 @@ fi
 # --- 1g. SSL policies (must delete after the proxies that reference them) ---
 # Regional SSL policies are a separate collection from the global ones.
 echo "Cleaning GCP regional SSL policies..."
-REGION_SSL=$(gcloud compute ssl-policies list --filter="name~^formae-plugin-sdk AND -region:''" --format="value(name,region)" 2>/dev/null || true)
+REGION_SSL=$(gcloud compute ssl-policies list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_SSL" ]; then
     echo "$REGION_SSL" | while read -r pol region; do
         [ -z "$region" ] && continue

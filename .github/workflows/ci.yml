@@ -311,7 +311,9 @@ jobs:
           # (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
           # See clean-case-prereqs.sh.
           case "${{ matrix.test-case }}" in
-            alloydb-*|eventarc-*|security-policy-rule|region-security-policy-rule)
+            alloydb-*|eventarc-*|security-policy-rule|region-security-policy-rule|\
+            network-firewall-policy-association|region-network-firewall-policy-association|\
+            network-firewall-policy-rule)
               # "|| status=$?" keeps a failing phase from aborting the step
               # before its cleanup runs; the case still fails at the end.
               TC="${{ matrix.test-case }}"
