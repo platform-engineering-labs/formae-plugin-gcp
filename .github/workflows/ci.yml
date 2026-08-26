@@ -207,6 +207,24 @@ jobs:
       - name: Install plugin
         run: make install
 
+      # The conformance binary pulls test-only modules that "make install" does
+      # not need, so they are fetched when the test compiles - and a transient
+      # "read https://proxy.golang.org/..." there fails the case outright, after
+      # the job has already spent minutes on setup and, for the split cases,
+      # after a phase has already run against real infrastructure. Fetch them up
+      # front and retry, so a proxy hiccup costs seconds instead of a red run.
+      - name: Download Go modules
+        run: |
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            echo "go mod download failed (attempt $attempt), retrying in 15s"
+            sleep 15
+          done
+          echo "go mod download still failing after 3 attempts"
+          exit 1
+
       - name: Run conformance test (${{ matrix.test-case }})
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
