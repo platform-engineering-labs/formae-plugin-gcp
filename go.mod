@@ -1,6 +1,6 @@
 module github.com/platform-engineering-labs/formae-plugin-gcp
 
-go 1.26.0
+go 1.26.4
 
 require (
 	cloud.google.com/go/auth v0.23.2
@@ -8,12 +8,22 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.23.0
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.26
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.1
+	// The OidcAware interface this plugin implements landed after
+	// pkg/plugin/v0.4.1. Re-pin to the next official tag when one is cut, as
+	// the aws plugin does from the same commit.
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.2-0.20260821224650-dc5149d5a102
 	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.6
+	// Provides oidcx/gcp, the token exchange. Re-pin when oox cuts a tag.
+	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.293.0
 	google.golang.org/grpc v1.83.1
 )
+
+// gcpname is its own dependency-free module: the canonical parser shared with
+// the provisioner, the credential broker and the CLI. Re-pin when oox tags.
+require github.com/platform-engineering-labs/oox/gcpname v0.0.0-20260825170105-3bd97cb18d15
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
@@ -25,26 +35,25 @@ require (
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/apple/pkl-go v0.13.2 // indirect
 	github.com/asdine/storm v2.1.2+incompatible // indirect
-	github.com/aws/aws-sdk-go-v2 v1.41.4 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.43.5 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.7 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.12 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.12 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.20 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.35 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.34 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.35 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.1.10 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.20 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.20 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.6 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.36 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.36 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.36 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.12 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.20 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.35 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.20 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.30.13 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9 // indirect
-	github.com/aws/smithy-go v1.24.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.5.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.33.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.45.4 // indirect
+	github.com/aws/smithy-go v1.27.7 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -70,6 +79,7 @@ require (
 	github.com/naegelejd/go-acl v0.0.0-20260323030528-42e4d61407df // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/platform-engineering-labs/formae/pkg/api/model v0.1.1 // indirect
+	github.com/platform-engineering-labs/formae/pkg/credential v0.0.0-20260821213704-ba68bacf6dd6 // indirect
 	github.com/platform-engineering-labs/orbital v0.1.36 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
@@ -105,7 +115,6 @@ require (
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260625142307-59b4966ccb57 // indirect

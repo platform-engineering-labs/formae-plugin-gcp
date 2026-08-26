@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/platform-engineering-labs/formae/pkg/model"
 	"github.com/platform-engineering-labs/formae/pkg/plugin"
@@ -20,10 +21,37 @@ import (
 // Plugin implements the Formae ResourcePlugin interface for GCP.
 // The SDK automatically provides identity methods (Name, Version, Namespace)
 // by reading formae-plugin.pkl at startup.
-type Plugin struct{}
+type Plugin struct {
+	// oidc carries the token source the SDK installs via SetOidcTokenSource,
+	// plus the plugin-lifetime token-source cache it backs. Nil until the SDK
+	// calls SetOidcTokenSource (or on an agent too old to pair a broker), in
+	// which case every target config threads nil deps and Oidc auth fails
+	// closed rather than falling back to ambient credentials.
+	oidc *config.OidcDeps
+}
 
 // Compile-time check: Plugin must satisfy ResourcePlugin interface.
 var _ plugin.ResourcePlugin = &Plugin{}
+
+// Compile-time check: Plugin must satisfy OidcAware, so the SDK hands it an
+// OidcTokenSource at startup.
+var _ plugin.OidcAware = &Plugin{}
+
+// SetOidcTokenSource receives the token source the SDK mints OIDC identity
+// tokens through. It is called once at startup, before any operation, and
+// threads the resulting deps onto every parsed target config so Oidc auth
+// blocks can exchange a token for Google credentials.
+func (p *Plugin) SetOidcTokenSource(src plugin.OidcTokenSource) {
+	p.oidc = config.NewOidcDeps(src)
+}
+
+// targetConfig parses a request's target config and threads this plugin
+// instance's OIDC deps onto it. Every operation goes through here: a call site
+// that used config.FromTargetConfig directly would silently lose the token
+// source and fail closed on an Oidc target.
+func (p *Plugin) targetConfig(raw json.RawMessage) *config.Config {
+	return config.FromTargetConfig(raw).WithOidcDeps(p.oidc)
+}
 
 // GKEAutopilotResourceTypes lists GCP resource types that GKE Autopilot manages
 var GKEAutopilotResourceTypes = []string{
@@ -101,7 +129,7 @@ func (p *Plugin) Create(ctx context.Context, request *resource.CreateRequest) (r
 		}
 	}()
 
-	targetConfig := config.FromTargetConfig(request.TargetConfig)
+	targetConfig := p.targetConfig(request.TargetConfig)
 
 	// Check for custom provisioner
 	if registry.HasProvisioner(request.ResourceType, resource.OperationCreate) {
@@ -121,11 +149,11 @@ func (p *Plugin) Create(ctx context.Context, request *resource.CreateRequest) (r
 // Read retrieves the current state of a GCP resource.
 func (p *Plugin) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
 	if registry.HasProvisioner(request.ResourceType, resource.OperationRead) {
-		provisioner := registry.Get(request.ResourceType, resource.OperationRead, config.FromTargetConfig(request.TargetConfig))
+		provisioner := registry.Get(request.ResourceType, resource.OperationRead, p.targetConfig(request.TargetConfig))
 		return provisioner.Read(ctx, request)
 	}
 
-	client, err := gcp.NewClient(ctx, config.FromTargetConfig(request.TargetConfig))
+	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +170,11 @@ func (p *Plugin) Update(ctx context.Context, request *resource.UpdateRequest) (r
 	}()
 
 	if registry.HasProvisioner(request.ResourceType, resource.OperationUpdate) {
-		provisioner := registry.Get(request.ResourceType, resource.OperationUpdate, config.FromTargetConfig(request.TargetConfig))
+		provisioner := registry.Get(request.ResourceType, resource.OperationUpdate, p.targetConfig(request.TargetConfig))
 		return provisioner.Update(ctx, request)
 	}
 
-	client, err := gcp.NewClient(ctx, config.FromTargetConfig(request.TargetConfig))
+	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -163,11 +191,11 @@ func (p *Plugin) Delete(ctx context.Context, request *resource.DeleteRequest) (r
 	}()
 
 	if registry.HasProvisioner(request.ResourceType, resource.OperationDelete) {
-		provisioner := registry.Get(request.ResourceType, resource.OperationDelete, config.FromTargetConfig(request.TargetConfig))
+		provisioner := registry.Get(request.ResourceType, resource.OperationDelete, p.targetConfig(request.TargetConfig))
 		return provisioner.Delete(ctx, request)
 	}
 
-	client, err := gcp.NewClient(ctx, config.FromTargetConfig(request.TargetConfig))
+	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -185,12 +213,12 @@ func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (r
 
 	if request.ResourceType != "" {
 		if registry.HasProvisioner(request.ResourceType, resource.OperationCheckStatus) {
-			provisioner := registry.Get(request.ResourceType, resource.OperationCheckStatus, config.FromTargetConfig(request.TargetConfig))
+			provisioner := registry.Get(request.ResourceType, resource.OperationCheckStatus, p.targetConfig(request.TargetConfig))
 			return provisioner.Status(ctx, request)
 		}
 	}
 
-	client, err := gcp.NewClient(ctx, config.FromTargetConfig(request.TargetConfig))
+	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -201,11 +229,11 @@ func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (r
 // List returns all resource identifiers of a given type for discovery.
 func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	if registry.HasProvisioner(request.ResourceType, resource.OperationList) {
-		provisioner := registry.Get(request.ResourceType, resource.OperationList, config.FromTargetConfig(request.TargetConfig))
+		provisioner := registry.Get(request.ResourceType, resource.OperationList, p.targetConfig(request.TargetConfig))
 		return provisioner.List(ctx, request)
 	}
 
-	client, err := gcp.NewClient(ctx, config.FromTargetConfig(request.TargetConfig))
+	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
 	if err != nil {
 		return nil, err
 	}
