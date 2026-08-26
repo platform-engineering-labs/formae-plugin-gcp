@@ -455,7 +455,11 @@ else
 fi
 
 echo "Cleaning GCP external VPN gateways..."
-EXT_GATEWAYS=$(gcloud compute external-vpn-gateways list --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+# This collection pushes the filter server-side and the API rejects it
+# ("Invalid list filter expression"), so the list came back empty and nothing
+# was ever deleted - the gateways then sat on a quota of 5 and every VPN case
+# failed. Filter client-side instead. Other compute collections accept it.
+EXT_GATEWAYS=$(gcloud compute external-vpn-gateways list --format="value(name)" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$EXT_GATEWAYS" ]; then
     echo "$EXT_GATEWAYS" | while read -r egw; do
         echo "  Deleting external VPN gateway: $egw"
