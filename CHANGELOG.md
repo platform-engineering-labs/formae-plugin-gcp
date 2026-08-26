@@ -19,6 +19,13 @@ formae agent.
   into eleven red conformance jobs in one run, each reporting "failed to get
   operation status" for an operation that had not failed. Only a definitive
   answer - not found, denied, bad request - now ends the poll.
+- A Monitoring resource is no longer discovered a second time as an unmanaged
+  copy of itself. Monitoring answers `dashboards.create` with
+  `projects/{project_number}/...` and `dashboards.list` with
+  `projects/{project_id}/...` for the same dashboard, so a native ID taken
+  verbatim depended on which call produced it and the managed resource never
+  correlated with the discovered one. The project segment is now normalised to
+  the configured project.
 
 ### Fixed
 

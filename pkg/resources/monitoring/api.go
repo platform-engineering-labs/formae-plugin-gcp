@@ -120,13 +120,35 @@ func parseSloNativeID(nativeID string) (base.PathContext, error) {
 	}, nil
 }
 
+// normalizeMonitoringProject rewrites the project segment of a Monitoring
+// resource path to the project the caller configured.
+//
+// Monitoring answers with whichever form it likes: dashboards.create returns
+// "projects/{project_number}/dashboards/x" while dashboards.list returns
+// "projects/{project_id}/dashboards/x" for that same dashboard. A native ID
+// taken verbatim therefore depends on which call produced it, so a dashboard
+// created as projects/1234567890/... is rediscovered as projects/my-project/...
+// and the two never correlate - the managed resource appears a second time as
+// an unmanaged one.
+func normalizeMonitoringProject(path, project string) string {
+	if project == "" {
+		return path
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 || parts[0] != "projects" {
+		return path
+	}
+	parts[1] = project
+	return strings.Join(parts, "/")
+}
+
 // extractMonitoringNativeID returns the full resource path. Monitoring echoes
 // the fully-qualified name in "name" (e.g. "projects/p/notificationChannels/123");
 // fall back to building it from context when absent.
 func extractMonitoringNativeID(response map[string]interface{}, ctx base.PathContext) string {
 	if name, ok := response["name"].(string); ok && name != "" {
 		if i := strings.Index(name, "projects/"); i >= 0 {
-			return name[i:]
+			return normalizeMonitoringProject(name[i:], ctx.Project)
 		}
 	}
 	if ctx.ResourceName != "" {
