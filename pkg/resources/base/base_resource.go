@@ -481,6 +481,23 @@ func (b *BaseResource) Status(
 	if err != nil {
 		wrappedErr := transport.WrapError(err, "failed to get operation status")
 		statusMessage := fmt.Sprintf("%s (URL: %s)", wrappedErr.Message, operationURL)
+		// A poll that could not reach the API says nothing about the operation:
+		// it is still running. Reporting failure here makes the caller re-issue
+		// the whole create, which then collides with what the first attempt
+		// already built - AlloyDB answers PRIMARY_ALREADY_EXISTS, and a single
+		// network blip while polling turns into a failed conformance run. Keep
+		// polling instead; a definitive answer still fails the operation.
+		if isTransientPollError(wrappedErr.Code) {
+			return &resource.StatusResult{
+				ProgressResult: &resource.ProgressResult{
+					Operation:       resource.OperationCheckStatus,
+					OperationStatus: resource.OperationStatusInProgress,
+					StatusMessage:   statusMessage,
+					RequestID:       request.RequestID,
+					NativeID:        request.NativeID,
+				},
+			}, nil
+		}
 		return &resource.StatusResult{
 			ProgressResult: &resource.ProgressResult{
 				Operation:       resource.OperationCheckStatus,
@@ -552,6 +569,22 @@ func (b *BaseResource) Status(
 }
 
 // Helper methods continue in next part...
+
+// isTransientPollError reports whether a failed operation-status poll leaves the
+// operation's outcome unknown, as opposed to answering it. Only the transport
+// failures qualify: a not-found, denied or malformed request is an answer, and
+// polling it again would just burn the timeout.
+func isTransientPollError(code transport.ErrorCode) bool {
+	switch code {
+	case transport.ErrorCodeNetworkFailure,
+		transport.ErrorCodeTimeout,
+		transport.ErrorCodeThrottling,
+		transport.ErrorCodeInternalError:
+		return true
+	default:
+		return false
+	}
+}
 
 // ResourceReader is the Read half of a provisioner, enough for StatusWithRead.
 type ResourceReader func(context.Context, *resource.ReadRequest) (*resource.ReadResult, error)

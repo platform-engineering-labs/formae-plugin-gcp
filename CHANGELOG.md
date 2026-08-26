@@ -12,6 +12,16 @@ formae agent.
 
 ### Fixed
 
+- A failed operation-status poll no longer fails the operation it was polling. A
+  transient transport error (network, timeout, throttling, 5xx) says nothing
+  about the operation, but reporting it as a failure made the caller re-issue
+  the whole create - which then collided with what the first attempt had already
+  built. One network blip while polling an AlloyDB instance create surfaced as
+  `PRIMARY_ALREADY_EXISTS`. A definitive answer (not found, denied, bad request)
+  still fails.
+
+### Fixed
+
 - `GCP::Dataproc::WorkflowTemplate` is now discoverable. Its list response is
   keyed `templates`, which matches neither `items` nor the collection name, so
   the parser found nothing and the type was never discovered.
