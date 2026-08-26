@@ -126,12 +126,28 @@ jobs:
         run: |
           # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
           # and extract the base test case name
-          TEST_CASES=$(ls testdata/*.pkl 2>/dev/null \
+          ALL=$(ls testdata/*.pkl 2>/dev/null \
             | xargs -n1 basename \
             | grep -v '\-update\.pkl$' \
             | grep -v '\-replace\.pkl$' \
-            | sed 's/\.pkl$//' \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            | sed 's/\.pkl$//')
+
+          # Focus mode: with testdata/ci-focus.txt present, run only the cases it
+          # names. A full matrix is ~125 jobs and takes hours, which is a poor
+          # loop to debug a handful of broken cases in. Delete the file to
+          # restore full coverage - and do delete it before merging.
+          if [ -f testdata/ci-focus.txt ]; then
+            WANT=$(grep -vE '^[[:space:]]*(#|$)' testdata/ci-focus.txt | tr -d '\r')
+            SELECTED=$(echo "$ALL" | grep -Fx -f <(echo "$WANT") || true)
+            echo "::warning::Conformance focus mode: running only $(echo "$SELECTED" | grep -c .) of $(echo "$ALL" | grep -c .) cases"
+            for want in $WANT; do
+              echo "$ALL" | grep -qFx "$want" || echo "::warning::ci-focus.txt names '$want', which is not a test case"
+            done
+          else
+            SELECTED="$ALL"
+          fi
+
+          TEST_CASES=$(echo "$SELECTED" | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "Discovered test cases: ${TEST_CASES}"
           echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
 

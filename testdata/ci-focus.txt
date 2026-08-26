@@ -1,0 +1,38 @@
+# Conformance focus list - TEMPORARY, delete this file before merging.
+#
+# While this file exists the CI matrix runs only the cases named here instead of
+# all ~125. It exists so the cases still failing on the parent PR can be
+# iterated on in minutes rather than hours.
+#
+# One name per line; blank lines and #-comments are ignored. A name that matches
+# no test case is reported as a workflow warning, not a silent no-op.
+
+# Failed on the parent PR's last run: leaked gateways sat on a quota of 5.
+# The cleanup that should have removed them was silently broken (fixed in
+# 38329f0); this proves the fix.
+external-vpn-gateway
+
+# Same quota family - passed locally after the manual cleanup, unproven in CI.
+vpn-tunnel
+
+# The AlloyDB family shares a 5-cluster-per-region quota and each case leaves a
+# prerequisite cluster behind per phase. alloydb-cluster already passes; these
+# three are unproven since the phase-split (d19d457) and the instance list
+# wildcard (3e92db4).
+alloydb-instance
+alloydb-user
+alloydb-backup
+
+# MessageBusesPerProjectPerRegion is 1 and the crud phase's bus outlived it.
+# Unproven since the between-phase bus cleanup (93915e1).
+eventarc-pipeline
+
+# Failed in CI within a second because the CI service account lacked
+# roles/workflows.admin. Role granted; unproven since.
+workflows-workflow
+
+# Both failed once on "timeout waiting for agent to become ready after 30s", an
+# SDK-side startup flake rather than a plugin defect. Kept here to see whether
+# they recur.
+machine-image
+target-tcp-proxy
