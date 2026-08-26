@@ -316,7 +316,7 @@ jobs:
           case "${{ matrix.test-case }}" in
             alloydb-*|eventarc-*|security-policy-rule|region-security-policy-rule|\
             network-firewall-policy-association|region-network-firewall-policy-association|\
-            network-firewall-policy-rule)
+            network-firewall-policy-rule|machine-image)
               # "|| status=$?" keeps a failing phase from aborting the step
               # before its cleanup runs; the case still fails at the end.
               TC="${{ matrix.test-case }}"

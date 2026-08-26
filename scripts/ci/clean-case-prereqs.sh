@@ -25,11 +25,43 @@ case "${1:-}" in
     network-firewall-policy-association)        PREFIX="formae-plugin-sdk-test-nfpa-pol-"  KIND=firewall ;;
     region-network-firewall-policy-association) PREFIX="formae-plugin-sdk-test-rnfpa-pol-" KIND=firewall ;;
     network-firewall-policy-rule)               PREFIX="formae-plugin-sdk-test-nfpr-pol-"  KIND=firewall ;;
+    machine-image)                              PREFIX="formae-plugin-sdk-test-mi-"        KIND=vmchain ;;
     *)
         echo "clean-case-prereqs: nothing to do for '${1:-}'"
         exit 0
         ;;
 esac
+
+# A machine image is captured from a whole VM, so its case builds a network, a
+# subnet, a disk and an instance first. All four outlive the crud phase, and the
+# discovery phase then tries to build them again under the same names:
+# "The resource 'projects/.../disks/...-mi-disk-...' already exists".
+if [ "${KIND:-}" = "vmchain" ]; then
+    echo "Cleaning the VM chain named ${PREFIX}* ..."
+    # Dependency order: an attached disk cannot be deleted while its instance
+    # exists, and a network cannot go before its subnets.
+    gcloud compute instances list --format="value(name,zone.basename())" 2>/dev/null \
+        | grep "^${PREFIX}" | while read -r n z; do
+        echo "  Deleting instance $n ($z)"
+        gcloud compute instances delete "$n" --zone="$z" --quiet 2>&1 | tail -1 || true
+    done
+    gcloud compute disks list --format="value(name,zone.basename())" 2>/dev/null \
+        | grep "^${PREFIX}" | while read -r n z; do
+        echo "  Deleting disk $n ($z)"
+        gcloud compute disks delete "$n" --zone="$z" --quiet 2>&1 | tail -1 || true
+    done
+    gcloud compute networks subnets list --format="value(name,region.basename())" 2>/dev/null \
+        | grep "^${PREFIX}" | while read -r n r; do
+        echo "  Deleting subnet $n ($r)"
+        gcloud compute networks subnets delete "$n" --region="$r" --quiet 2>&1 | tail -1 || true
+    done
+    gcloud compute networks list --format="value(name)" 2>/dev/null \
+        | grep "^${PREFIX}" | while read -r n; do
+        echo "  Deleting network $n"
+        gcloud compute networks delete "$n" --quiet 2>&1 | tail -1 || true
+    done
+    exit 0
+fi
 
 # Both collections list regional and global entries together and report the
 # region only in a column, so the scope is decided per row rather than by flag.
