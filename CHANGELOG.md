@@ -12,6 +12,15 @@ formae agent.
 
 ### Fixed
 
+- A `GCP::Compute::DiskAsyncReplication` no longer plans a replacement of itself.
+  Its two disk references are createOnly, and an extracted forma writes a
+  reference to another resource unresolved, so comparing it against the URL
+  already in state read as a change to an immutable field. Which disks a pair
+  joins is fixed at creation and is what its native ID is made of, so the two
+  fields are now write-only - excluded from drift detection, unchanged on create.
+
+### Fixed
+
 - A `GCP::Compute::Disk` no longer plans a delete-and-recreate of itself. Compute
   reports int64 fields as JSON strings, so `physicalBlockSizeBytes` came back as
   `"4096"` against a declared `4096`; the field is createOnly, so the two forms
