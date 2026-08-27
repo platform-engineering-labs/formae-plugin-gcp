@@ -12,6 +12,16 @@ formae agent.
 
 ### Fixed
 
+- An operation-status poll that cannot be read no longer fails the operation it
+  was polling, whatever the reason. The earlier fix listed the transport errors
+  it would tolerate, which left an unclassified error (`Unknown`) still failing
+  the operation - and a burst of those against compute.googleapis.com turned
+  into eleven red conformance jobs in one run, each reporting "failed to get
+  operation status" for an operation that had not failed. Only a definitive
+  answer - not found, denied, bad request - now ends the poll.
+
+### Fixed
+
 - A failed operation-status poll no longer fails the operation it was polling. A
   transient transport error (network, timeout, throttling, 5xx) says nothing
   about the operation, but reporting it as a failure made the caller re-issue

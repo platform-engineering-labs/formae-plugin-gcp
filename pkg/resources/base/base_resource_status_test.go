@@ -18,6 +18,11 @@ func TestTransientPollErrorsKeepPolling(t *testing.T) {
 		transport.ErrorCodeTimeout,
 		transport.ErrorCodeThrottling,
 		transport.ErrorCodeInternalError,
+		// An error the transport could not classify says nothing about the
+		// operation either - a burst of these once failed eleven jobs whose
+		// operations were fine.
+		transport.ErrorCodeUnknown,
+		transport.ErrorCodeCancelled,
 	} {
 		if !isTransientPollError(code) {
 			t.Errorf("%s should keep polling", code)
