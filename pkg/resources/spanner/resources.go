@@ -79,9 +79,20 @@ func init() {
 					GrandParentType:         "instances",
 					GrandParentPropertyName: "instance",
 				},
-				CreateIDParam:      "backupScheduleId",
-				SupportsUpdate:     true,
-				UpdateMaskFromBody: true, // PATCH ?updateMask=<body fields>
+				CreateIDParam:  "backupScheduleId",
+				SupportsUpdate: true,
+				// The update mask is fixed rather than computed from the body.
+				// backupSchedules.patch accepts exactly three paths - it answers
+				// "Field mask contains invalid path(s): spec, full_backup_spec.
+				// Allowed paths are: encryption_config, retention_duration,
+				// spec.cron_spec.text" - and a mask reaching one field *inside*
+				// spec is not something UpdateMaskFromBody can express, since
+				// that lists the body's top-level fields. encryption_config is
+				// left out: it is a provider default nobody declares, so
+				// masking it would rewrite a server value on every update.
+				UpdateQueryParams: map[string]string{
+					"updateMask": "retentionDuration,spec.cronSpec.text",
+				},
 			},
 			RequestTransformer: &base.CompositeRequestTransformer{Transformers: []base.RequestTransformer{
 				// "instance" and "database" address the schedule rather than

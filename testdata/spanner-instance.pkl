@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/spanner/instance_spanner.pkl" as instance
+import "./config/vars.pkl" as v
+
+// 100 processing units is the smallest a Spanner instance can be, and it is
+// billed for as long as it exists — this case creates and destroys one, so keep
+// it at the floor. The instance config is what pins the region; it is written
+// as the bare id and the plugin qualifies it.
+forma {
+  v.stack
+  v.target
+
+  new instance.Instance {
+    label = "plugin-sdk-test-spanner-instance"
+    name = "formae-test-spanner-\(v.testRunID)"
+    config = "regional-\(v.gcpRegion)"
+    displayName = "Formae conformance"
+    processingUnits = 100
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

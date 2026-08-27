@@ -24,19 +24,29 @@ import "@formae/formae.pkl"
 const type = "GCP::Spanner::BackupSchedule"
 
 /// When the schedule runs.
+///
+/// Spanner fills in `timeZone` and `creationWindow` itself, so both are marked
+/// as provider defaults - without that a schedule reads back with two fields no
+/// forma declared and every sync plans a change.
 @gcp.SubResourceHint
 open class CronSpec extends formae.SubResource {
     /// Standard 5-field cron, in `timeZone` (e.g. "0 2 * * *").
+    @gcp.FieldHint
     text: String
+
     /// GCP fills this in as "UTC" when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     timeZone: String?
+
     /// How long after the cron time a backup may still start (e.g. "14400s").
     /// Computed by GCP.
+    @gcp.FieldHint { hasProviderDefault = true }
     creationWindow: String?
 }
 
 @gcp.SubResourceHint
 open class BackupScheduleSpec extends formae.SubResource {
+    @gcp.FieldHint
     cronSpec: CronSpec?
 }
 

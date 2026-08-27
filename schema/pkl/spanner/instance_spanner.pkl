@@ -45,9 +45,11 @@ open class Instance extends formae.Resource {
     @gcp.FieldHint { createOnly = true }
     config: String
 
-    /// Human-readable name shown in the console. Required by the API.
+    /// Human-readable name shown in the console. Required by the API, and
+    /// rejected outside 4-30 characters ("Display name must be between 4-30
+    /// characters long").
     @gcp.FieldHint
-    displayName: String
+    displayName: String(length >= 4 && length <= 30)
 
     /// Compute capacity in processing units (100 is the minimum, and multiples
     /// of 100 below 1000). Set this or `nodeCount`, not both — 1000 processing
