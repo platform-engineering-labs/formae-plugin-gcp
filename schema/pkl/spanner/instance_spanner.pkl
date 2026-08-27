@@ -1,0 +1,75 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Spanner Instance
+///
+/// The compute and storage a Spanner deployment runs on. An instance is
+/// project-scoped rather than location-scoped: its region is its `config`, not
+/// a path segment, and that config is fixed at creation.
+///
+/// Instances are billed for as long as they exist, by processing units.
+module gcp.spanner.instance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Spanner::Instance"
+
+open class InstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Short instance id (e.g. "my-instance"). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Instance config id, which is what pins the instance's geography
+    /// (e.g. "regional-europe-central2", "nam3"). Written as the bare id; the
+    /// plugin qualifies it to the full path the API wants and shortens it back
+    /// on read, so a forma carries no project id and stays portable between
+    /// targets. Immutable — `config` is rejected in an update's field mask.
+    @gcp.FieldHint { createOnly = true }
+    config: String
+
+    /// Human-readable name shown in the console. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    /// Compute capacity in processing units (100 is the minimum, and multiples
+    /// of 100 below 1000). Set this or `nodeCount`, not both — 1000 processing
+    /// units is one node, and GCP reports whichever it computed.
+    @gcp.FieldHint { hasProviderDefault = true }
+    processingUnits: Int?
+
+    /// Compute capacity in nodes. Computed by GCP when `processingUnits` is
+    /// used.
+    @gcp.FieldHint { hasProviderDefault = true }
+    nodeCount: Int?
+
+    /// Feature tier ("STANDARD", "ENTERPRISE", "ENTERPRISE_PLUS"). GCP picks
+    /// one when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    edition: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: InstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

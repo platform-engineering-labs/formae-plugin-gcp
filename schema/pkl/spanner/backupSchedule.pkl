@@ -1,0 +1,98 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Spanner Backup Schedule
+///
+/// A recurring backup of one database. A database on its own keeps only its
+/// point-in-time retention window, which is what a schedule extends.
+///
+/// Schedules live two collections deep
+/// (`.../instances/{instance}/databases/{database}/backupSchedules/{name}`) and,
+/// unlike instances and databases, are synchronous: create returns the schedule
+/// itself, with no operation to poll.
+///
+/// Note that Spanner creates a `default_daily_full_backup_schedule` alongside
+/// every database, so discovery reports one nobody declared.
+module gcp.spanner.backupSchedule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Spanner::BackupSchedule"
+
+/// When the schedule runs.
+@gcp.SubResourceHint
+open class CronSpec extends formae.SubResource {
+    /// Standard 5-field cron, in `timeZone` (e.g. "0 2 * * *").
+    text: String
+    /// GCP fills this in as "UTC" when unset.
+    timeZone: String?
+    /// How long after the cron time a backup may still start (e.g. "14400s").
+    /// Computed by GCP.
+    creationWindow: String?
+}
+
+@gcp.SubResourceHint
+open class BackupScheduleSpec extends formae.SubResource {
+    cronSpec: CronSpec?
+}
+
+open class BackupScheduleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BackupScheduleResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class BackupSchedule extends formae.Resource {
+    hidden parent = this
+
+    /// Short schedule id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning instance. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// Short id of the owning database. A path component, not a body field —
+    /// pass `db.res.name` so formae creates the database first.
+    @gcp.FieldHint { createOnly = true }
+    database: (String|formae.Resolvable)
+
+    /// How long each backup is kept (e.g. "86400s" for a day).
+    @gcp.FieldHint
+    retentionDuration: String?
+
+    @gcp.FieldHint
+    spec: BackupScheduleSpec?
+
+    /// Marks the schedule as taking full backups. Pass an empty mapping; the
+    /// API takes the presence of the field, not its contents. Mutually
+    /// exclusive with `incrementalBackupSpec`.
+    @gcp.FieldHint
+    fullBackupSpec: Mapping<String, Any>?
+
+    /// Marks the schedule as taking incremental backups. Mutually exclusive
+    /// with `fullBackupSpec`.
+    @gcp.FieldHint
+    incrementalBackupSpec: Mapping<String, Any>?
+
+    /// Backup encryption. GCP fills this in as
+    /// `{ encryptionType = "USE_DATABASE_ENCRYPTION" }` when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    encryptionConfig: Mapping<String, Any>?
+
+    hidden res: BackupScheduleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
