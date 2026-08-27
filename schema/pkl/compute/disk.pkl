@@ -184,10 +184,17 @@ open class Disk extends formae.Resource {
     }
     sourceSnapshotEncryptionKey: EncryptionKey?
 
-    /// Physical block size of the persistent disk in bytes (4096 or 16384)
+    /// Physical block size of the persistent disk in bytes (4096 or 16384).
+    ///
+    /// Compute reports its int64 fields as JSON strings, so this comes back as
+    /// "4096" while the declared value is the number 4096. The field is
+    /// createOnly, so the two forms compare unequal and plan a
+    /// delete-and-recreate; `sizeGb` above carries the same transformation for
+    /// the same reason.
     @gcp.FieldHint {
         createOnly = true
         hasProviderDefault = true
+        outputTransformation = formae.transform.toString
     }
     physicalBlockSizeBytes: Int?
 

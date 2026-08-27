@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- A `GCP::Compute::Disk` no longer plans a delete-and-recreate of itself. Compute
+  reports int64 fields as JSON strings, so `physicalBlockSizeBytes` came back as
+  `"4096"` against a declared `4096`; the field is createOnly, so the two forms
+  compared unequal and every re-apply planned a replacement. It now carries the
+  same `toString` transformation `sizeGb` already had.
+
+### Fixed
+
 - An operation-status poll that cannot be read no longer fails the operation it
   was polling, whatever the reason. The earlier fix listed the transport errors
   it would tolerate, which left an unclassified error (`Unknown`) still failing
