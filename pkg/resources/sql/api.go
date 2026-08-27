@@ -75,7 +75,8 @@ var SQLNativeID = base.NativeIDConfig{
 // sqlPathBuilder builds SQL API paths.
 // Top-level:  /projects/{project}/{resourceType}/{name}          (e.g. instances)
 // Nested:     /projects/{project}/{parentType}/{parent}/{resourceType}/{name}
-//             (e.g. databases under an instance)
+//
+//	(e.g. databases under an instance)
 func sqlPathBuilder(ctx base.PathContext) string {
 	prefix := fmt.Sprintf("/projects/%s", ctx.Project)
 	if ctx.ParentType != "" && ctx.ParentResource != "" {
@@ -89,6 +90,17 @@ func sqlPathBuilder(ctx base.PathContext) string {
 
 // extractSQLNativeID extracts the native ID from SQL API response
 func extractSQLNativeID(response map[string]interface{}, ctx base.PathContext) string {
+	// A nested resource must be addressed by its own path, never by the
+	// operation's targetLink. Every sqladmin mutation answers with an Operation
+	// whose targetLink points at the *instance* - so a user or a database whose
+	// native ID came from there would be stored under the instance's id, two
+	// resources would share one native ID, and the next sync would read the
+	// instance and reconcile the nested resource away as absent.
+	if ctx.ParentType != "" && ctx.ParentResource != "" && ctx.ResourceName != "" {
+		return fmt.Sprintf("projects/%s/%s/%s/%s/%s",
+			ctx.Project, ctx.ParentType, ctx.ParentResource, ctx.ResourceType, ctx.ResourceName)
+	}
+
 	// For operations, check targetLink first
 	if targetLink, ok := response["targetLink"].(string); ok {
 		return utils.SelfLinkToNativeID(targetLink)

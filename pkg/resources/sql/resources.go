@@ -6,6 +6,7 @@ package sql
 
 import (
 	"fmt"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -15,6 +16,9 @@ import (
 // Resource type constants
 const (
 	DatabaseInstanceResourceType = "GCP::SQL::DatabaseInstance"
+	UserResourceType             = "GCP::SQL::User"
+	SslCertResourceType          = "GCP::SQL::SslCert"
+	BackupRunResourceType        = "GCP::SQL::BackupRun"
 	DatabaseResourceType         = "GCP::SQL::Database"
 )
 
@@ -90,9 +94,104 @@ func init() {
 			RequestTransformer:  nil, // Pass through properties
 			ResponseTransformer: nil,
 		},
+		{
+			// A user is nested under its instance like a database is, but the
+			// API addresses it inconsistently: get takes the name as a path
+			// segment while delete takes it as a query parameter.
+			// user.go overrides delete, plus List.
+			ResourceType: UserResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "users",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				// ponytail: no update. Every field the schema models is fixed at
+				// creation, so a change correctly replaces.
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.DropFields("instance"),
+			ResponseTransformer: base.ResponseTransformerFunc(userResponseTransformer),
+		},
+		{
+			// A client certificate is addressed by its server-generated
+			// sha1Fingerprint - get and delete both take it as the path
+			// segment - while a forma declares only commonName. It is also the
+			// one sqladmin resource whose create answers with the resource
+			// itself rather than only an Operation, hence its own
+			// OperationConfig.
+			ResourceType:    SslCertResourceType,
+			OperationConfig: SQLSslCertOperations,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "sslCerts",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				// A certificate is immutable: sqladmin has no update method for
+				// one at all.
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.DropFields("instance"),
+			ResponseTransformer: base.ResponseTransformerFunc(sslCertResponseTransformer),
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+		},
+		{
+			// A backup run is addressed by the numeric id sqladmin assigns it,
+			// which arrives on the create Operation as backupContext.backupId -
+			// hence its own OperationConfig. There is no update method: a
+			// backup is a point in time, not a thing you edit.
+			ResourceType:    BackupRunResourceType,
+			OperationConfig: SQLBackupRunOperations,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "backupRuns",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.DropFields("instance"),
+			ResponseTransformer: base.ResponseTransformerFunc(backupRunResponseTransformer),
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+		},
 	})
 
 	if err != nil {
 		panic(err)
 	}
+
+	registerUserOverrides()
+	registerSslCertOverrides()
+	registerBackupRunOverrides()
+}
+
+// userResponseTransformer puts back the instance the API leaves in the resource
+// path, and drops the fields sqladmin echoes that only address the user. A user
+// reports "project" and "instance" of its own, but "project" is the target's
+// and would read as a property nobody declared.
+func userResponseTransformer(props map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "project" || k == "kind" || k == "etag" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
