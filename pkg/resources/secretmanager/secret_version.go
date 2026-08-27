@@ -78,7 +78,7 @@ func (p *SecretVersionProvisioner) Create(ctx context.Context, request *resource
 		return createFailure(resource.OperationErrorCodeInvalidRequest, "data is required"), nil
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.cfg.Deps())
 	if cfg.Project == "" && p.cfg != nil {
 		cfg.Project = p.cfg.Project
 	}
@@ -123,7 +123,7 @@ func (p *SecretVersionProvisioner) Create(ctx context.Context, request *resource
 }
 
 func (p *SecretVersionProvisioner) Read(ctx context.Context, request *resource.ReadRequest) (*resource.ReadResult, error) {
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.cfg.Deps())
 	if cfg.Project == "" && p.cfg != nil {
 		cfg.Project = p.cfg.Project
 	}
@@ -170,7 +170,7 @@ func (p *SecretVersionProvisioner) Update(ctx context.Context, request *resource
 }
 
 func (p *SecretVersionProvisioner) Delete(ctx context.Context, request *resource.DeleteRequest) (*resource.DeleteResult, error) {
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.cfg.Deps())
 	if cfg.Project == "" && p.cfg != nil {
 		cfg.Project = p.cfg.Project
 	}
@@ -196,7 +196,7 @@ func (p *SecretVersionProvisioner) Delete(ctx context.Context, request *resource
 }
 
 func (p *SecretVersionProvisioner) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.cfg.Deps())
 	if cfg.Project == "" && p.cfg != nil {
 		cfg.Project = p.cfg.Project
 	}

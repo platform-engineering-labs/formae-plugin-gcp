@@ -347,7 +347,7 @@ func (b *BaseResource) List(
 	}
 
 	// Build path context from target
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, b.Config.Deps())
 	// Use explicit Location only - no fallback to Region
 	pathCtx := PathContext{
 		Project:      cfg.Project,

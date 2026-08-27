@@ -47,7 +47,7 @@ func (p *CloudRunProvisioner) Create(
 	}
 
 	// Build path context from config and properties
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.Config.Deps())
 	// Use explicit Location only - no fallback to Region
 	pathCtx := base.PathContext{
 		Project:      cfg.Project,

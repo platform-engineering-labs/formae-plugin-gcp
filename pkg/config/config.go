@@ -48,9 +48,20 @@ type Config struct {
 	deps *OidcDeps
 }
 
-// WithOidcDeps threads the plugin instance's OidcDeps onto Config without
-// changing FromTargetConfig's signature, which has 40-odd call sites and
-// deliberately returns no error.
+// Deps returns the OIDC deps this config carries, so a config derived from
+// another inherits them rather than silently losing the ability to
+// authenticate.
+func (c *Config) Deps() *OidcDeps {
+	if c == nil {
+		return nil
+	}
+	return c.deps
+}
+
+// WithOidcDeps threads the plugin instance's OidcDeps onto an existing Config.
+//
+// Kept for the paths that already hold a Config. New code should pass deps to
+// FromTargetConfig instead, which cannot produce an unwired one.
 func (c *Config) WithOidcDeps(d *OidcDeps) *Config {
 	c.deps = d
 	return c
@@ -137,20 +148,54 @@ func (c *Config) ToClientOptions(ctx context.Context) ([]option.ClientOption, er
 	return []option.ClientOption{option.WithAuthCredentials(creds)}, nil
 }
 
-// FromTargetConfig converts a target config JSON to GCP config
-func FromTargetConfig(targetConfig json.RawMessage) *Config {
+// TargetPath is where a target puts things: the fields that address a
+// resource, with nothing that can authenticate one.
+//
+// Most callers that parse a target config only want these, to build a URL.
+// Handing them a Config instead would mean handing them something that looks
+// able to reach Google and is not, since a Config without OIDC deps fails
+// closed on an Oidc target. This type cannot be passed to transport.NewClient
+// at all, so that mistake does not compile.
+type TargetPath struct {
+	Project  string
+	Region   string
+	Zone     string
+	Location string
+}
+
+// PathFromTargetConfig reads the addressing fields out of a target config.
+//
+// Use this wherever the result is only used to build a path. Use
+// FromTargetConfig, with deps, wherever a client is built.
+func PathFromTargetConfig(targetConfig json.RawMessage) TargetPath {
 	if targetConfig == nil {
-		return &Config{}
+		return TargetPath{}
+	}
+	var c Config
+	_ = json.Unmarshal(targetConfig, &c)
+	return TargetPath{Project: c.Project, Region: c.Region, Zone: c.Zone, Location: c.Location}
+}
+
+// FromTargetConfig converts a target config JSON to GCP config.
+//
+// deps is a parameter rather than something attached afterwards: a Config that
+// reaches ToClientOptions without it cannot authenticate an Oidc target, so
+// requiring it here makes that a compile error. Callers that only need
+// addressing fields want PathFromTargetConfig instead.
+func FromTargetConfig(targetConfig json.RawMessage, deps *OidcDeps) *Config {
+	if targetConfig == nil {
+		return &Config{deps: deps}
 	}
 	config := &Config{}
 	_ = json.Unmarshal(targetConfig, config)
+	config.deps = deps
 	return config
 }
 
 // FromTarget converts a Formae target to GCP config
-func FromTarget(target *pkgmodel.Target) *Config {
+func FromTarget(target *pkgmodel.Target, deps *OidcDeps) *Config {
 	if target == nil || target.Config == nil {
-		return &Config{}
+		return &Config{deps: deps}
 	}
-	return FromTargetConfig(target.Config)
+	return FromTargetConfig(target.Config, deps)
 }

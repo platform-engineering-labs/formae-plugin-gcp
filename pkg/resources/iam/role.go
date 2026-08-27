@@ -109,7 +109,7 @@ func (p *RoleProvisioner) Create(ctx context.Context, req *resource.CreateReques
 		return createFailure(resource.OperationErrorCodeInvalidRequest, "name (roleId) is required"), nil
 	}
 
-	cfg := config.FromTargetConfig(req.TargetConfig)
+	cfg := config.FromTargetConfig(req.TargetConfig, p.Config.Deps())
 	pathCtx := base.PathContext{Project: cfg.Project, ResourceType: "roles"}
 
 	body := map[string]interface{}{"role": pickRoleFields(props)}

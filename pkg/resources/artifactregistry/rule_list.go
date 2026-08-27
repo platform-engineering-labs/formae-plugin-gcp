@@ -50,14 +50,10 @@ func (p *ruleListProvisioner) List(
 		return p.Provisioner.List(ctx, request)
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig)
-	project, location := "", ""
-	if cfg != nil {
-		project = cfg.Project
-		location = cfg.Location
-		if location == "" {
-			location = cfg.Region
-		}
+	cfg := config.PathFromTargetConfig(request.TargetConfig)
+	project, location := cfg.Project, cfg.Location
+	if location == "" {
+		location = cfg.Region
 	}
 	if project == "" || location == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil

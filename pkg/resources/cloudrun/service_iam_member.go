@@ -80,7 +80,7 @@ func (p *ServiceIamMemberProvisioner) newService(ctx context.Context, cfg *confi
 }
 
 func siamCfg(targetConfig json.RawMessage, fallback *config.Config) *config.Config {
-	c := config.FromTargetConfig(targetConfig)
+	c := config.FromTargetConfig(targetConfig, fallback.Deps())
 	if fallback != nil {
 		if c.Project == "" {
 			c.Project = fallback.Project

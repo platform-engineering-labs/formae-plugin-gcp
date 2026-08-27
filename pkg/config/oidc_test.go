@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/oauth2"
 
@@ -43,17 +44,20 @@ func (f *fakeTokenSource) IdentityToken(_ context.Context, _ string) (string, er
 	return "an-identity-token", nil
 }
 
-// countingDeps builds deps whose token-source construction is counted, so a
-// cache test can assert one construction rather than the equality of two
-// opaque option values.
+// countingDeps builds deps whose exchange is counted, so a cache test can
+// assert one exchange rather than the equality of two opaque option values.
+//
+// The exchange returns a long-lived credential: these tests are about how
+// often the exchange runs, not about expiry, and a token already inside the
+// refresh margin would make every call exchange again.
 func countingDeps(src plugin.OidcTokenSource, built *atomic.Int64, seen *[]oidcxgcp.Config) *OidcDeps {
 	d := NewOidcDeps(src)
-	d.newTokenSource = func(_ context.Context, cfg oidcxgcp.Config, _ plugin.OidcTokenSource) (oauth2.TokenSource, error) {
+	d.exchange = func(_ context.Context, cfg oidcxgcp.Config, _ plugin.OidcTokenSource) (*oauth2.Token, error) {
 		built.Add(1)
 		if seen != nil {
 			*seen = append(*seen, cfg)
 		}
-		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "x"}), nil
+		return &oauth2.Token{AccessToken: "x", Expiry: time.Now().Add(time.Hour)}, nil
 	}
 	return d
 }
@@ -63,7 +67,7 @@ func countingDeps(src plugin.OidcTokenSource, built *atomic.Int64, seen *[]oidcx
 // authenticate as itself with whatever credentials the environment happens to
 // hold.
 func TestOidcAuthWithoutBrokerFailsClosed(t *testing.T) {
-	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider)) // no WithOidcDeps
+	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider), nil) // no WithOidcDeps
 
 	opts, err := cfg.ToClientOptions(t.Context())
 	if err == nil {
@@ -80,7 +84,7 @@ func TestOidcAuthWithoutBrokerFailsClosed(t *testing.T) {
 // TestNilSourceAlsoFailsClosed covers deps that exist but carry no source,
 // which is what an agent too old to pair a broker produces.
 func TestNilSourceAlsoFailsClosed(t *testing.T) {
-	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider)).WithOidcDeps(&OidcDeps{})
+	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider), &OidcDeps{})
 
 	if _, err := cfg.ToClientOptions(t.Context()); err == nil {
 		t.Fatal("ToClientOptions succeeded with deps carrying no source")
@@ -91,7 +95,7 @@ func TestAbsentAuthKeepsExistingBehaviour(t *testing.T) {
 	// A config with no Auth block must not go near the OIDC path, even when
 	// deps are wired: every existing target has no Auth block.
 	var built atomic.Int64
-	cfg := FromTargetConfig(json.RawMessage(`{"Project":"test-project"}`)).
+	cfg := FromTargetConfig(json.RawMessage(`{"Project":"test-project"}`), nil).
 		WithOidcDeps(countingDeps(&fakeTokenSource{}, &built, nil))
 
 	// Credential detection may fail in a bare test environment; what matters
@@ -105,7 +109,7 @@ func TestAbsentAuthKeepsExistingBehaviour(t *testing.T) {
 
 func TestUnknownAuthTypeIsRejected(t *testing.T) {
 	raw := json.RawMessage(`{"Project":"p","Auth":{"Type":"SomethingElse"}}`)
-	cfg := FromTargetConfig(raw).WithOidcDeps(NewOidcDeps(&fakeTokenSource{}))
+	cfg := FromTargetConfig(raw, nil).WithOidcDeps(NewOidcDeps(&fakeTokenSource{}))
 
 	_, err := cfg.ToClientOptions(t.Context())
 	if err == nil {
@@ -118,7 +122,7 @@ func TestUnknownAuthTypeIsRejected(t *testing.T) {
 
 func TestAuthBlockWithoutTypeIsRejected(t *testing.T) {
 	raw := json.RawMessage(`{"Project":"p","Auth":{"WorkloadIdentityProvider":"` + goldenProvider + `"}}`)
-	cfg := FromTargetConfig(raw).WithOidcDeps(NewOidcDeps(&fakeTokenSource{}))
+	cfg := FromTargetConfig(raw, nil).WithOidcDeps(NewOidcDeps(&fakeTokenSource{}))
 
 	if _, err := cfg.ToClientOptions(t.Context()); err == nil {
 		t.Fatal("an Auth block with no discriminator was accepted")
@@ -138,7 +142,7 @@ func TestMalformedProviderNameFailsBeforeAnyAPICall(t *testing.T) {
 		"https://iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/formae-ai/providers/formae-ai",
 	}
 	for _, provider := range bad {
-		cfg := FromTargetConfig(oidcTargetConfig(t, provider)).
+		cfg := FromTargetConfig(oidcTargetConfig(t, provider), nil).
 			WithOidcDeps(countingDeps(&fakeTokenSource{}, &built, nil))
 
 		if _, err := cfg.ToClientOptions(t.Context()); err == nil {
@@ -156,7 +160,7 @@ func TestTokenSourceConstructedOncePerProviderAndScopes(t *testing.T) {
 	deps := countingDeps(&fakeTokenSource{}, &built, &seen)
 
 	same := func() *Config {
-		return FromTargetConfig(oidcTargetConfig(t, goldenProvider)).WithOidcDeps(deps)
+		return FromTargetConfig(oidcTargetConfig(t, goldenProvider), deps)
 	}
 	if _, err := same().ToClientOptions(t.Context()); err != nil {
 		t.Fatalf("first: %v", err)
@@ -171,7 +175,7 @@ func TestTokenSourceConstructedOncePerProviderAndScopes(t *testing.T) {
 	// Different scopes are a different credential and must not share.
 	scoped := json.RawMessage(`{"Project":"p","Scopes":["https://www.googleapis.com/auth/devstorage.read_only"],` +
 		`"Auth":{"Type":"Oidc","WorkloadIdentityProvider":"` + goldenProvider + `"}}`)
-	if _, err := FromTargetConfig(scoped).WithOidcDeps(deps).ToClientOptions(t.Context()); err != nil {
+	if _, err := FromTargetConfig(scoped, deps).ToClientOptions(t.Context()); err != nil {
 		t.Fatalf("scoped: %v", err)
 	}
 	if built.Load() != 2 {
@@ -188,7 +192,7 @@ func TestProviderNameIsDecomposedForTheExchange(t *testing.T) {
 	var seen []oidcxgcp.Config
 	deps := countingDeps(&fakeTokenSource{}, &built, &seen)
 
-	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider)).WithOidcDeps(deps)
+	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider), deps)
 	if _, err := cfg.ToClientOptions(t.Context()); err != nil {
 		t.Fatalf("ToClientOptions: %v", err)
 	}
@@ -203,5 +207,167 @@ func TestProviderNameIsDecomposedForTheExchange(t *testing.T) {
 	// the broker's allowlist validates and what the provider itself pins.
 	if got.Audience() != goldenProvider {
 		t.Errorf("audience = %q, want %q", got.Audience(), goldenProvider)
+	}
+}
+
+// opKey identifies which operation's context a mint was called with. Real
+// contexts carry the SDK's broker client, which names one PluginOperator
+// actor; this stands in for that identity without importing the SDK's
+// unexported key.
+type opKey struct{}
+
+func opCtx(name string) context.Context {
+	return context.WithValue(context.Background(), opKey{}, name)
+}
+
+// recordingExchange counts exchanges and records the operation identity of the
+// context each one ran under.
+func recordingExchange(t *testing.T, d *OidcDeps, seenOps *[]string, expiry func() time.Time) {
+	t.Helper()
+	d.exchange = func(ctx context.Context, _ oidcxgcp.Config, _ plugin.OidcTokenSource) (*oauth2.Token, error) {
+		op, _ := ctx.Value(opKey{}).(string)
+		*seenOps = append(*seenOps, op)
+		return &oauth2.Token{AccessToken: "access-" + op, Expiry: expiry()}, nil
+	}
+}
+
+// A cached credential must never carry the context that produced it. The
+// broker mint is an Ergo call, legal only from the PluginOperator actor that
+// is currently Running; a credential built under operation A and refreshed
+// later would mint through A's process long after A stopped running, which is
+// what Ergo refuses with ErrNotAllowed.
+//
+// Expressed as behaviour: once an entry needs refreshing, the exchange must
+// run under the context of the operation asking for it now.
+func TestRefreshUsesTheCurrentOperationsContext(t *testing.T) {
+	var seenOps []string
+	now := time.Now()
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.now = func() time.Time { return now }
+	// Every exchange returns a token that is already inside the refresh
+	// margin, so the next call must exchange again rather than reuse it.
+	recordingExchange(t, d, &seenOps, func() time.Time { return now.Add(time.Minute) })
+
+	raw := oidcTargetConfig(t, goldenProvider)
+	cfg := FromTargetConfig(raw, d)
+
+	for _, op := range []string{"operation-A", "operation-B"} {
+		if _, err := cfg.ToClientOptions(opCtx(op)); err != nil {
+			t.Fatalf("%s: %v", op, err)
+		}
+	}
+
+	want := []string{"operation-A", "operation-B"}
+	if len(seenOps) != len(want) {
+		t.Fatalf("exchanges = %v, want one per operation %v", seenOps, want)
+	}
+	for i := range want {
+		if seenOps[i] != want[i] {
+			t.Errorf("exchange %d ran under %q, want %q — a cached credential carried an earlier operation's context",
+				i, seenOps[i], want[i])
+		}
+	}
+}
+
+// The cache still has to earn its place: a credential comfortably inside its
+// lifetime is reused, so discovery's ~154 operations do not each mint.
+func TestFreshCredentialIsReusedWithoutExchanging(t *testing.T) {
+	var seenOps []string
+	now := time.Now()
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.now = func() time.Time { return now }
+	recordingExchange(t, d, &seenOps, func() time.Time { return now.Add(time.Hour) })
+
+	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider), d)
+	for _, op := range []string{"operation-A", "operation-B", "operation-C"} {
+		if _, err := cfg.ToClientOptions(opCtx(op)); err != nil {
+			t.Fatalf("%s: %v", op, err)
+		}
+	}
+
+	if len(seenOps) != 1 {
+		t.Fatalf("exchanges = %v, want exactly one for three operations", seenOps)
+	}
+}
+
+// A client built for one call may be reused for a long multi-page traversal:
+// secretmanager's discovery lists every secret and every version through one
+// client. A credential fixed when the client was built cannot survive that, so
+// the source handed to Google has to be able to refresh — and, because the
+// refresh is an Ergo call, it must still be running under the operation's own
+// context when it does.
+func TestClientRefreshesMidCallUnderTheSameOperationContext(t *testing.T) {
+	var seenOps []string
+	now := time.Now()
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.now = func() time.Time { return now }
+	// Each exchange yields a credential already inside the margin, standing in
+	// for one that lapses partway through a long page walk.
+	recordingExchange(t, d, &seenOps, func() time.Time { return now.Add(time.Minute) })
+
+	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider), d)
+
+	// Take the source once, as the Google client does, then draw from it twice
+	// as it would across two pages.
+	src := tokenSourceFromOptions(t, cfg, opCtx("operation-A"))
+	before := len(seenOps)
+	for page := 1; page <= 2; page++ {
+		if _, err := src.Token(); err != nil {
+			t.Fatalf("page %d: %v", page, err)
+		}
+	}
+
+	refreshes := len(seenOps) - before
+	if refreshes < 2 {
+		t.Fatalf("drawing twice from the client's source caused %d exchanges, want 2 — "+
+			"a credential fixed when the client was built cannot outlast a multi-page call", refreshes)
+	}
+	for i, op := range seenOps {
+		if op != "operation-A" {
+			t.Errorf("exchange %d ran under %q, want operation-A — a refresh escaped the calling operation", i, op)
+		}
+	}
+}
+
+// tokenSourceFromOptions returns the very source oidcClientOptions hands the
+// Google client, so a static source would fail this test rather than slip past
+// a lookalike built in the test itself.
+func tokenSourceFromOptions(t *testing.T, c *Config, ctx context.Context) oauth2.TokenSource {
+	t.Helper()
+	authType, raw, err := c.effectiveAuth()
+	if err != nil || authType != AuthTypeOidc {
+		t.Fatalf("effectiveAuth: %v (type %q)", err, authType)
+	}
+	return c.callSource(ctx, raw, []string{"https://www.googleapis.com/auth/cloud-platform"})
+}
+
+// A slow exchange finishing after a fast one must not replace the longer-lived
+// credential with its own shorter-lived result.
+func TestSlowExchangeDoesNotOverwriteALongerLivedCredential(t *testing.T) {
+	now := time.Now()
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.now = func() time.Time { return now }
+
+	key := "k"
+	d.cache(key, &oauth2.Token{AccessToken: "fresh", Expiry: now.Add(time.Hour)})
+	// A straggler that was minted earlier and lands later.
+	d.cache(key, &oauth2.Token{AccessToken: "stale", Expiry: now.Add(10 * time.Minute)})
+
+	got, ok := d.creds.Load(key)
+	if !ok {
+		t.Fatal("entry vanished")
+	}
+	if entry := got.(credEntry); entry.accessToken != "fresh" {
+		t.Errorf("cached %q expiring %v, want the longer-lived \"fresh\"", entry.accessToken, entry.expiry.Sub(now))
+	}
+}
+
+// A credential with no expiry cannot be reasoned about, so it is used for the
+// call that fetched it and never cached for another.
+func TestCredentialWithoutExpiryIsNotCached(t *testing.T) {
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.cache("k", &oauth2.Token{AccessToken: "no-expiry"})
+	if _, ok := d.creds.Load("k"); ok {
+		t.Error("a credential with no expiry was cached; every later operation would trust it indefinitely")
 	}
 }

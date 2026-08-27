@@ -141,7 +141,7 @@ func regionOfZone(zone string) string {
 }
 
 func (p *DiskResourcePolicyAttachmentProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.PathFromTargetConfig(targetConfig); cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback
@@ -149,14 +149,12 @@ func (p *DiskResourcePolicyAttachmentProvisioner) projectFor(targetConfig json.R
 
 // locationFor prefers the target's configured zone or region, depending on kind.
 func (p *DiskResourcePolicyAttachmentProvisioner) locationFor(targetConfig json.RawMessage, fallback string) string {
-	cfg := config.FromTargetConfig(targetConfig)
-	if cfg != nil {
-		if p.regional && cfg.Region != "" {
-			return cfg.Region
-		}
-		if !p.regional && cfg.Zone != "" {
-			return cfg.Zone
-		}
+	cfg := config.PathFromTargetConfig(targetConfig)
+	if p.regional && cfg.Region != "" {
+		return cfg.Region
+	}
+	if !p.regional && cfg.Zone != "" {
+		return cfg.Zone
 	}
 	return fallback
 }

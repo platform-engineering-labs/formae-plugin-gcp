@@ -154,14 +154,14 @@ func (p *FirewallPolicyAssociationProvisioner) regionFor(props map[string]interf
 	if region, ok := props["region"].(string); ok && region != "" {
 		return region
 	}
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil {
+	if cfg := config.PathFromTargetConfig(targetConfig); true {
 		return cfg.Region
 	}
 	return ""
 }
 
 func (p *FirewallPolicyAssociationProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.PathFromTargetConfig(targetConfig); cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback

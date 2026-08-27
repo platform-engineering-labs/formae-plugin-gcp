@@ -44,7 +44,7 @@ func (p *GKEHubProvisioner) Create(
 			"resource name is required"), nil
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.Config.Deps())
 	pathCtx := base.PathContext{
 		Project:      cfg.Project,
 		Location:     cfg.Location,

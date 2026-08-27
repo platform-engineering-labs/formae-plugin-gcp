@@ -131,7 +131,7 @@ func (p *GlobalNetworkEndpointProvisioner) groupURL(project, group string) strin
 }
 
 func (p *GlobalNetworkEndpointProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.PathFromTargetConfig(targetConfig); cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback

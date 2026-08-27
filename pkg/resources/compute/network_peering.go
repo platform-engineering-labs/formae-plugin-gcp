@@ -107,7 +107,7 @@ func (p *NetworkPeeringProvisioner) networkURL(project, network string) string {
 }
 
 func (p *NetworkPeeringProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.PathFromTargetConfig(targetConfig); cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback
