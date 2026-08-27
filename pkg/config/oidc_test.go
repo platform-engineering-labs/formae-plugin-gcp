@@ -289,3 +289,85 @@ func TestFreshCredentialIsReusedWithoutExchanging(t *testing.T) {
 		t.Fatalf("exchanges = %v, want exactly one for three operations", seenOps)
 	}
 }
+
+// A client built for one call may be reused for a long multi-page traversal:
+// secretmanager's discovery lists every secret and every version through one
+// client. A credential fixed when the client was built cannot survive that, so
+// the source handed to Google has to be able to refresh — and, because the
+// refresh is an Ergo call, it must still be running under the operation's own
+// context when it does.
+func TestClientRefreshesMidCallUnderTheSameOperationContext(t *testing.T) {
+	var seenOps []string
+	now := time.Now()
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.now = func() time.Time { return now }
+	// Each exchange yields a credential already inside the margin, standing in
+	// for one that lapses partway through a long page walk.
+	recordingExchange(t, d, &seenOps, func() time.Time { return now.Add(time.Minute) })
+
+	cfg := FromTargetConfig(oidcTargetConfig(t, goldenProvider), d)
+
+	// Take the source once, as the Google client does, then draw from it twice
+	// as it would across two pages.
+	src := tokenSourceFromOptions(t, cfg, opCtx("operation-A"))
+	before := len(seenOps)
+	for page := 1; page <= 2; page++ {
+		if _, err := src.Token(); err != nil {
+			t.Fatalf("page %d: %v", page, err)
+		}
+	}
+
+	refreshes := len(seenOps) - before
+	if refreshes < 2 {
+		t.Fatalf("drawing twice from the client's source caused %d exchanges, want 2 — "+
+			"a credential fixed when the client was built cannot outlast a multi-page call", refreshes)
+	}
+	for i, op := range seenOps {
+		if op != "operation-A" {
+			t.Errorf("exchange %d ran under %q, want operation-A — a refresh escaped the calling operation", i, op)
+		}
+	}
+}
+
+// tokenSourceFromOptions returns the very source oidcClientOptions hands the
+// Google client, so a static source would fail this test rather than slip past
+// a lookalike built in the test itself.
+func tokenSourceFromOptions(t *testing.T, c *Config, ctx context.Context) oauth2.TokenSource {
+	t.Helper()
+	authType, raw, err := c.effectiveAuth()
+	if err != nil || authType != AuthTypeOidc {
+		t.Fatalf("effectiveAuth: %v (type %q)", err, authType)
+	}
+	return c.callSource(ctx, raw, []string{"https://www.googleapis.com/auth/cloud-platform"})
+}
+
+// A slow exchange finishing after a fast one must not replace the longer-lived
+// credential with its own shorter-lived result.
+func TestSlowExchangeDoesNotOverwriteALongerLivedCredential(t *testing.T) {
+	now := time.Now()
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.now = func() time.Time { return now }
+
+	key := "k"
+	d.cache(key, &oauth2.Token{AccessToken: "fresh", Expiry: now.Add(time.Hour)})
+	// A straggler that was minted earlier and lands later.
+	d.cache(key, &oauth2.Token{AccessToken: "stale", Expiry: now.Add(10 * time.Minute)})
+
+	got, ok := d.creds.Load(key)
+	if !ok {
+		t.Fatal("entry vanished")
+	}
+	if entry := got.(credEntry); entry.accessToken != "fresh" {
+		t.Errorf("cached %q expiring %v, want the longer-lived \"fresh\"", entry.accessToken, entry.expiry.Sub(now))
+	}
+}
+
+// A credential with no expiry cannot be reasoned about, so it is used for the
+// call that fetched it and never cached for another.
+func TestCredentialWithoutExpiryIsNotCached(t *testing.T) {
+	d := NewOidcDeps(&fakeTokenSource{})
+	d.cache("k", &oauth2.Token{AccessToken: "no-expiry"})
+	if _, ok := d.creds.Load("k"); ok {
+		t.Error("a credential with no expiry was cached; every later operation would trust it indefinitely")
+	}
+}

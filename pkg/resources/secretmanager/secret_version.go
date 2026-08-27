@@ -78,7 +78,7 @@ func (p *SecretVersionProvisioner) Create(ctx context.Context, request *resource
 		return createFailure(resource.OperationErrorCodeInvalidRequest, "data is required"), nil
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig, nil /* path context only; this config never authenticates */)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.cfg.Deps())
 	if cfg.Project == "" && p.cfg != nil {
 		cfg.Project = p.cfg.Project
 	}

@@ -162,15 +162,41 @@ func (d *OidcDeps) credentialsFor(ctx context.Context, raw []byte, scopes []stri
 		return nil, err
 	}
 
-	// Store, not LoadOrStore: this call exchanged because what was cached was
-	// spent, so the fresh credential has to replace it rather than lose to it.
-	//
-	// Two operators refreshing the same key at once each mint, and the later
-	// write wins. That is a duplicated broker call, not a correctness problem,
-	// and the alternative - holding a lock across a cross-process call - would
-	// block one actor's goroutine on another's.
-	d.creds.Store(key, credEntry{accessToken: tok.AccessToken, expiry: tok.Expiry})
+	d.cache(key, tok)
 	return tok, nil
+}
+
+// cache keeps the credential that stays usable longest.
+//
+// Concurrent operators refreshing one key each mint, which is a duplicated
+// broker call rather than a correctness problem: holding a lock across a
+// cross-process call would block one actor's goroutine on another's. But
+// "last write wins" orders by when an exchange finished, not by how long its
+// result lives, so a slow exchange could land after a fast one and replace a
+// fresher credential with a staler one. Compare instead, and retry rather than
+// clobber a concurrent writer.
+//
+// A credential with no expiry is never cached. Google's STS always returns one,
+// so this is defensive: an entry that cannot be reasoned about would either be
+// treated as permanently spent (re-exchanged by every operation) or trusted
+// forever, and neither is a cache.
+func (d *OidcDeps) cache(key string, tok *oauth2.Token) {
+	if tok.Expiry.IsZero() {
+		return
+	}
+	entry := credEntry{accessToken: tok.AccessToken, expiry: tok.Expiry}
+	for {
+		prev, loaded := d.creds.LoadOrStore(key, entry)
+		if !loaded {
+			return
+		}
+		if !entry.expiry.After(prev.(credEntry).expiry) {
+			return
+		}
+		if d.creds.CompareAndSwap(key, prev, entry) {
+			return
+		}
+	}
 }
 
 // exchangeFn returns the configured exchange, defaulting when a zero-value
@@ -197,15 +223,49 @@ func (c *Config) oidcClientOptions(ctx context.Context, raw []byte, scopes []str
 		return nil, errors.New("config: Oidc auth requires an OIDC token source, but this plugin instance has none wired " +
 			"(failing closed rather than falling back to ambient credentials)")
 	}
-	tok, err := c.deps.credentialsFor(ctx, raw, scopes)
-	if err != nil {
+	// Resolve once now so a broken auth block fails here rather than on the
+	// first request, then hand the client a source that can refresh.
+	if _, err := c.deps.credentialsFor(ctx, raw, scopes); err != nil {
 		return nil, err
 	}
-	// A static source: the credential was resolved above, under this call's
-	// context, and stays fixed for the rest of the call. Handing the client a
-	// source that could refresh itself is exactly what must not happen here -
-	// it would refresh whenever Google decided, on Google's goroutine.
-	return []option.ClientOption{option.WithTokenSource(oauth2.StaticTokenSource(tok))}, nil
+	return []option.ClientOption{option.WithTokenSource(c.callSource(ctx, raw, scopes))}, nil
+}
+
+// callSource builds the token source for one plugin call. Separate from
+// oidcClientOptions so a test can hold the same source the Google client is
+// handed, rather than a lookalike built beside it.
+func (c *Config) callSource(ctx context.Context, raw []byte, scopes []string) oauth2.TokenSource {
+	return &callTokenSource{deps: c.deps, ctx: ctx, raw: raw, scopes: scopes}
+}
+
+// callTokenSource authenticates one plugin call, and must not outlive it.
+//
+// A static token cannot work here. Several list implementations build one
+// client and then page through everything with it - secretmanager walks every
+// secret and every version of each - so one call can outrun any margin we could
+// put on a credential fixed up front. Google's client would keep presenting the
+// expired token, because a static source has nothing else to return.
+//
+// So this refreshes, and holding ctx is what makes that safe rather than a
+// repeat of the bug it replaces. The context belongs to the operation on the
+// stack; the source is built in ToClientOptions and handed to a client built in
+// the same function, both of which are discarded when the call returns. Every
+// refresh therefore happens inside that call, on the operator's own goroutine,
+// while the operator is Running - which is the only state Ergo will let the
+// mint out in.
+//
+// The invariant is the lifetime: NEVER cache this, or anything holding it,
+// beyond the call it was built for. Cache credentials instead - OidcDeps.creds
+// holds those as data precisely so nothing durable needs a context.
+type callTokenSource struct {
+	deps   *OidcDeps
+	ctx    context.Context
+	raw    []byte
+	scopes []string
+}
+
+func (s *callTokenSource) Token() (*oauth2.Token, error) {
+	return s.deps.credentialsFor(s.ctx, s.raw, s.scopes)
 }
 
 func sortedCopy(in []string) []string {
