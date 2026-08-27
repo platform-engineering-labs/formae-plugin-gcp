@@ -12,6 +12,27 @@ formae agent.
 
 ### Added
 
+- `GCP::Spanner::Instance` — the compute and storage a Spanner deployment runs
+  on. Project-scoped rather than location-scoped: an instance's region is its
+  `config`, not a path segment, and is fixed at creation. `config` is written as
+  the bare instance-config id (`regional-europe-central2`) and qualified by the
+  plugin, so a forma carries no project id and stays portable between targets.
+- `GCP::Spanner::Database` — a database on an instance. Spanner has no `name`
+  field on create; the id goes into a `CREATE DATABASE` statement, quoted with
+  backticks for GoogleSQL and double quotes for PostgreSQL.
+- `GCP::Spanner::BackupSchedule` — a recurring backup of one database, which is
+  what extends a database beyond its point-in-time retention window. Sits two
+  collections deep and, unlike instances and databases, is synchronous.
+
+  Spanner rejects a wildcard for both nested collections —
+  `instances/-/databases` and `databases/-/backupSchedules` answer 400 "Invalid
+  List... request" — so databases and schedules are discovered by walking the
+  collections above them, following `nextPageToken` at each level.
+
+  Note that Spanner creates a `default_daily_full_backup_schedule` alongside
+  every database, so discovery reports one nobody declared, and that
+  `clean-environment.sh` now sweeps Spanner instances: they are billed by the
+  hour, and the database and backup-schedule fixtures each leave one behind.
 - `GCP::ServiceDirectory::Namespace` — the top-level container of a Service
   Directory registry. Location-scoped and free; deleting one deletes every
   service and endpoint under it.
