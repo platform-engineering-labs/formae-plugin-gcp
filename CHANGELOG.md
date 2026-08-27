@@ -17,6 +17,12 @@ formae agent.
   `"4096"` against a declared `4096`; the field is createOnly, so the two forms
   compared unequal and every re-apply planned a replacement. It now carries the
   same `toString` transformation `sizeGb` already had.
+- A `GCP::SQL::DatabaseInstance` no longer plans an endless
+  `replace /settings/dataDiskSizeGb` against itself. The provisioner parses Cloud
+  SQL's string form back to a number when it reads the instance, while the schema
+  stringified the declared number on the way out, so the two normalisations
+  pointed at each other: state held `10` and the desired side produced `"10"`.
+  The field is typed `Int`, so the plugin's parse is the half to keep.
 
 ### Fixed
 

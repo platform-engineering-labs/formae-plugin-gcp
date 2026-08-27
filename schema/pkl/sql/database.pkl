@@ -95,10 +95,15 @@ open class Settings extends formae.SubResource {
   @gcp.FieldHint
   availabilityType: String?
 
-  /// Data disk size in GB
-  @gcp.FieldHint{
-    outputTransformation = formae.transform.toString
-  }
+  /// Data disk size in GB.
+  ///
+  /// No toString here, unlike Compute's int64 fields: the provisioner already
+  /// parses Cloud SQL's string form back to a number when it reads the
+  /// instance, so state holds 10 and the field is typed Int - an extracted
+  /// forma has to write an int for it. Stringifying the declared side as well
+  /// left the two normalisations pointing at each other, and every re-apply
+  /// planned `replace /settings/dataDiskSizeGb "10"` against a state of 10.
+  @gcp.FieldHint
   dataDiskSizeGb: Int?
 
   /// Data disk type (PD_SSD or PD_HDD)
