@@ -5,15 +5,9 @@
 package sql
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
-	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // SQLSslCertOperations - a client certificate is the one sqladmin resource that
@@ -82,82 +76,4 @@ func sslCertResponseTransformer(props map[string]interface{}, _ base.TransformCo
 		out[k] = v
 	}
 	return out
-}
-
-// sslCertListProvisioner walks the instances for discovery, which names none,
-// and delegates everything else. sqladmin has no wildcard for instances.
-type sslCertListProvisioner struct {
-	prov.Provisioner
-	cfg *config.Config
-}
-
-// registerSslCertOverrides is called from the package init in resources.go so
-// the generic registration is guaranteed to have landed first.
-func registerSslCertOverrides() {
-	registry.Register(SslCertResourceType,
-		[]resource.Operation{resource.OperationList},
-		func(cfg *config.Config) prov.Provisioner {
-			return &sslCertListProvisioner{
-				Provisioner: sqlRegistry.CreateProvisioner(cfg, SslCertResourceType),
-				cfg:         cfg,
-			}
-		})
-}
-
-func (p *sslCertListProvisioner) List(
-	ctx context.Context, request *resource.ListRequest,
-) (*resource.ListResult, error) {
-	if request.AdditionalProperties != nil && request.AdditionalProperties["instance"] != "" {
-		return p.Provisioner.List(ctx, request)
-	}
-
-	cfg := config.PathFromTargetConfig(request.TargetConfig)
-	if cfg.Project == "" {
-		return &resource.ListResult{NativeIDs: []string{}}, nil
-	}
-
-	client, err := transport.NewClient(ctx, p.cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transport client: %w", err)
-	}
-
-	instancesURL := fmt.Sprintf("%s/projects/%s/instances", SQLAPI.BaseURL, cfg.Project)
-	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: instancesURL})
-	if err != nil {
-		wrapped := transport.WrapError(err, "failed to list SQL instances")
-		return nil, fmt.Errorf("%s", wrapped.Message)
-	}
-
-	nativeIDs := []string{}
-	instances, _ := resp.Body["items"].([]interface{})
-	for _, raw := range instances {
-		inst, ok := raw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		instName, _ := inst["name"].(string)
-		if instName == "" {
-			continue
-		}
-		certsResp, listErr := client.SendRequest(ctx, transport.RequestOptions{
-			Method: "GET",
-			URL:    fmt.Sprintf("%s/%s/sslCerts", instancesURL, instName),
-		})
-		if listErr != nil {
-			// One unreadable instance must not hide the rest.
-			continue
-		}
-		certs, _ := certsResp.Body["items"].([]interface{})
-		for _, rawCert := range certs {
-			cert, ok := rawCert.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if fp := sslCertFingerprint(cert); fp != "" {
-				nativeIDs = append(nativeIDs,
-					fmt.Sprintf("projects/%s/instances/%s/sslCerts/%s", cfg.Project, instName, fp))
-			}
-		}
-	}
-	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }

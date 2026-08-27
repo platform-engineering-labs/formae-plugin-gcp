@@ -130,14 +130,19 @@ func TestBackupRunResponseDropsEchoedFields(t *testing.T) {
 	}
 }
 
-// Both types keep the generic provisioner everywhere except List, which has to
-// walk the instances because discovery names none and sqladmin has no wildcard.
-func TestSslCertAndBackupRunListOverrides(t *testing.T) {
-	if _, ok := registry.Get(SslCertResourceType, resource.OperationList, nil).(*sslCertListProvisioner); !ok {
-		t.Error("SslCert List is not the parent-walking provisioner")
-	}
-	if _, ok := registry.Get(BackupRunResourceType, resource.OperationList, nil).(*backupRunListProvisioner); !ok {
-		t.Error("BackupRun List is not the parent-walking provisioner")
+// All four instance-scoped types share one parent-walking List: discovery
+// lists with no properties, so it can name no instance to look in, and sqladmin
+// has no wildcard. Databases were the type that proved this - they predate the
+// batch, had no override, and their discovery case failed with "resource did
+// not appear in inventory" until they got one.
+func TestEveryInstanceScopedTypeWalksTheInstances(t *testing.T) {
+	for _, rt := range []string{
+		UserResourceType, DatabaseResourceType, SslCertResourceType, BackupRunResourceType,
+	} {
+		p := registry.Get(rt, resource.OperationList, nil)
+		if _, ok := p.(*instanceWalkingListProvisioner); !ok {
+			t.Errorf("%s List is %T, want *instanceWalkingListProvisioner", rt, p)
+		}
 	}
 	for _, rt := range []string{SslCertResourceType, BackupRunResourceType} {
 		for _, op := range []resource.Operation{
@@ -146,6 +151,31 @@ func TestSslCertAndBackupRunListOverrides(t *testing.T) {
 			if !registry.HasProvisioner(rt, op) {
 				t.Errorf("%s %v not registered", rt, op)
 			}
+		}
+	}
+}
+
+// Each type names its items differently: users and databases by name, a
+// certificate by fingerprint, a backup run by a server-assigned id. Getting
+// that wrong yields native IDs nothing can be read back from.
+func TestInstanceWalkingListIDExtractors(t *testing.T) {
+	cases := map[string]struct {
+		resourceType string
+		item         map[string]interface{}
+		want         string
+	}{
+		"user":      {UserResourceType, map[string]interface{}{"name": "alice"}, "alice"},
+		"database":  {DatabaseResourceType, map[string]interface{}{"name": "appdb"}, "appdb"},
+		"sslCert":   {SslCertResourceType, map[string]interface{}{"sha1Fingerprint": "abc123"}, "abc123"},
+		"backupRun": {BackupRunResourceType, map[string]interface{}{"id": "987"}, "987"},
+	}
+	for name, tc := range cases {
+		p, ok := registry.Get(tc.resourceType, resource.OperationList, nil).(*instanceWalkingListProvisioner)
+		if !ok {
+			t.Fatalf("%s: not the walking provisioner", name)
+		}
+		if got := p.idOf(tc.item); got != tc.want {
+			t.Errorf("%s: idOf = %q, want %q", name, got, tc.want)
 		}
 	}
 }

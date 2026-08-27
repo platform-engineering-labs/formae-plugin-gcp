@@ -47,6 +47,12 @@ formae agent.
   This affected `GCP::SQL::Database`, which has been registered for some time
   but had no conformance case and so had never exercised the path;
   `testdata/cloudsql-database.pkl` now covers it.
+- `GCP::SQL::Database` is now discoverable. It had no parent-walking `List`, so
+  discovery — which lists with no properties — asked a collection URL with no
+  instance in it and found nothing. Every instance-scoped Cloud SQL type now
+  shares one walker, since the only thing that differed between them was how an
+  item names itself: users and databases by `name`, a certificate by
+  `sha1Fingerprint`, a backup run by its server-assigned `id`.
 
 ### Added
 

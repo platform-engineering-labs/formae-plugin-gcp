@@ -74,13 +74,13 @@ func TestUserOperationRequestID(t *testing.T) {
 	}
 }
 
-// The two overridden verbs must keep the custom provisioner; create and read
-// must keep the generic one. registerUserOverrides is called from the package
-// init in resources.go so the generic registration always lands first.
+// Delete is the one verb the generic engine cannot express for a user, so it
+// alone keeps the custom provisioner; create and read keep the generic one and
+// List belongs to the shared instance walker. registerUserOverrides is called
+// from the package init in resources.go so the generic registration always
+// lands first.
 func TestUserOverridesAreRegistered(t *testing.T) {
-	for _, op := range []resource.Operation{
-		resource.OperationDelete, resource.OperationList,
-	} {
+	for _, op := range []resource.Operation{resource.OperationDelete} {
 		p := registry.Get(UserResourceType, op, nil)
 		if _, ok := p.(*userProvisioner); !ok {
 			t.Errorf("%v is %T, want *userProvisioner", op, p)

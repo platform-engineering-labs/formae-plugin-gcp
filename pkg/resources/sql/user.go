@@ -15,16 +15,14 @@ import (
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
-// userProvisioner overrides the two operations the generic engine cannot
-// express for Cloud SQL users, and delegates create, read and check-status.
+// userProvisioner overrides the one operation the generic engine cannot express
+// for Cloud SQL users, and delegates the rest. List is handled for every
+// instance-scoped type by instance_walking_list.go.
 //
 // Users are addressed inconsistently by this API: `get` takes the name as a
 // path segment, but `delete` takes it as a *query parameter* against the
 // collection URL - "DELETE .../users?name=x". The generic engine builds
 // ".../users/{name}", which addresses nothing.
-//
-// List is overridden for the usual reason: discovery lists with no properties,
-// so it can name no instance to look in, and sqladmin has no wildcard.
 type userProvisioner struct {
 	prov.Provisioner
 	cfg *config.Config
@@ -36,10 +34,7 @@ type userProvisioner struct {
 // there would be no provisioner to wrap.
 func registerUserOverrides() {
 	registry.Register(UserResourceType,
-		[]resource.Operation{
-			resource.OperationDelete,
-			resource.OperationList,
-		},
+		[]resource.Operation{resource.OperationDelete},
 		func(cfg *config.Config) prov.Provisioner {
 			return &userProvisioner{
 				Provisioner: sqlRegistry.CreateProvisioner(cfg, UserResourceType),
@@ -102,66 +97,6 @@ func (p *userProvisioner) Delete(
 		RequestID:       p.operationRequestID(response.Body, request.NativeID),
 		StatusMessage:   "user deletion in progress",
 	}}, nil
-}
-
-// List walks the instances, because discovery names none and sqladmin has no
-// wildcard for them.
-func (p *userProvisioner) List(
-	ctx context.Context, request *resource.ListRequest,
-) (*resource.ListResult, error) {
-	if request.AdditionalProperties != nil && request.AdditionalProperties["instance"] != "" {
-		return p.Provisioner.List(ctx, request)
-	}
-
-	cfg := config.PathFromTargetConfig(request.TargetConfig)
-	if cfg.Project == "" {
-		return &resource.ListResult{NativeIDs: []string{}}, nil
-	}
-
-	client, err := transport.NewClient(ctx, p.cfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transport client: %w", err)
-	}
-
-	instancesURL := fmt.Sprintf("%s/projects/%s/instances", SQLAPI.BaseURL, cfg.Project)
-	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: instancesURL})
-	if err != nil {
-		wrapped := transport.WrapError(err, "failed to list SQL instances")
-		return nil, fmt.Errorf("%s", wrapped.Message)
-	}
-
-	nativeIDs := []string{}
-	instances, _ := resp.Body["items"].([]interface{})
-	for _, raw := range instances {
-		inst, ok := raw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		instName, _ := inst["name"].(string)
-		if instName == "" {
-			continue
-		}
-		usersResp, listErr := client.SendRequest(ctx, transport.RequestOptions{
-			Method: "GET",
-			URL:    fmt.Sprintf("%s/%s/users", instancesURL, instName),
-		})
-		if listErr != nil {
-			// One unreadable instance must not hide the rest.
-			continue
-		}
-		users, _ := usersResp.Body["items"].([]interface{})
-		for _, rawUser := range users {
-			user, ok := rawUser.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if name, _ := user["name"].(string); name != "" {
-				nativeIDs = append(nativeIDs,
-					fmt.Sprintf("projects/%s/instances/%s/users/%s", cfg.Project, instName, name))
-			}
-		}
-	}
-	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
 // operationRequestID turns the Operation the API answers with into the path

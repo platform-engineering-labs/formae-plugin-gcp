@@ -98,7 +98,7 @@ func init() {
 			// A user is nested under its instance like a database is, but the
 			// API addresses it inconsistently: get takes the name as a path
 			// segment while delete takes it as a query parameter.
-			// user.go overrides delete, plus List.
+			// user.go overrides delete.
 			ResourceType: UserResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "users",
@@ -177,8 +177,7 @@ func init() {
 	}
 
 	registerUserOverrides()
-	registerSslCertOverrides()
-	registerBackupRunOverrides()
+	registerInstanceWalkingLists()
 }
 
 // userResponseTransformer puts back the instance the API leaves in the resource
