@@ -217,3 +217,23 @@ func TestOperationInProgressIsRetryable(t *testing.T) {
 		t.Error("nil is not an error")
 	}
 }
+
+// Cloud SQL does not remove a deleted backup run: the record survives as a
+// tombstone and a get answers 200 with status "DELETED". Reporting that as a
+// live resource is what made the OOB-delete step time out waiting for it to
+// leave inventory.
+func TestDeletedBackupRunsAreTreatedAsAbsent(t *testing.T) {
+	tombstone := map[string]interface{}{"id": "1787866839352", "status": "DELETED"}
+	if got := liveBackupRunID(tombstone); got != "" {
+		t.Errorf("a tombstone must not be listed, got %q", got)
+	}
+	live := map[string]interface{}{"id": "1787866839352", "status": "SUCCESSFUL"}
+	if got := liveBackupRunID(live); got != "1787866839352" {
+		t.Errorf("live backup id = %q", got)
+	}
+	// A create response carries no status yet, and must still yield an id.
+	fresh := map[string]interface{}{"backupContext": map[string]interface{}{"backupId": "42"}}
+	if got := liveBackupRunID(fresh); got != "42" {
+		t.Errorf("fresh backup id = %q", got)
+	}
+}

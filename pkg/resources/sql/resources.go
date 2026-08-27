@@ -177,6 +177,7 @@ func init() {
 	}
 
 	registerUserOverrides()
+	registerBackupRunReadOverride()
 	registerInstanceWalkingLists()
 }
 

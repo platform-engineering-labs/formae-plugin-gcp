@@ -53,7 +53,7 @@ func registerInstanceWalkingLists() {
 		// asked a collection URL with no instance in it and found nothing.
 		{DatabaseResourceType, "databases", byName},
 		{SslCertResourceType, "sslCerts", sslCertFingerprint},
-		{BackupRunResourceType, "backupRuns", backupRunID},
+		{BackupRunResourceType, "backupRuns", liveBackupRunID},
 	} {
 		spec := spec
 		registry.Register(spec.resourceType,

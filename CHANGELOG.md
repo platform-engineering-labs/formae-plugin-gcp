@@ -47,6 +47,12 @@ formae agent.
   This affected `GCP::SQL::Database`, which has been registered for some time
   but had no conformance case and so had never exercised the path;
   `testdata/cloudsql-database.pkl` now covers it.
+- A deleted `GCP::SQL::BackupRun` is now treated as gone. Cloud SQL does not
+  remove a deleted backup run — the record survives as a tombstone and a get
+  answers 200 with `status: "DELETED"` rather than 404 — so a backup deleted
+  outside formae was reported as still present and never left inventory.
+  Discovery also no longer offers long-dead backups as unmanaged resources to
+  import.
 - Cloud SQL now retries a 409 "another operation was already in progress"
   instead of failing the resource. Operations are serialised per instance and
   every nested type shares its instance's queue, so a mutation issued while
