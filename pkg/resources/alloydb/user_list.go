@@ -51,7 +51,7 @@ func (p *userListProvisioner) List(
 		return p.Provisioner.List(ctx, request)
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, nil /* path context only; this config never authenticates */)
 	project, location := "", ""
 	if cfg != nil {
 		project = cfg.Project

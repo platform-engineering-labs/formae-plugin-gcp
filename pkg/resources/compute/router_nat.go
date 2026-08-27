@@ -187,7 +187,7 @@ func (p *RouterNatProvisioner) Create(
 			"RouterNat requires non-empty name, region, and router"), nil
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.Config.Deps())
 	parent, err := p.fetchRouter(ctx, client, cfg.Project, region, router)
 	if err != nil {
 		return createFailure(resource.OperationErrorCodeServiceInternalError, err.Error()), nil
@@ -423,7 +423,7 @@ func (p *RouterNatProvisioner) List(
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.Config.Deps())
 	if cfg.Region == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}

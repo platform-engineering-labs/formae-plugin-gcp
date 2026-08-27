@@ -86,7 +86,7 @@ func (p *SignedUrlKeyProvisioner) backendServiceURL(project, backendService stri
 }
 
 func (p *SignedUrlKeyProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */); cfg != nil && cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback

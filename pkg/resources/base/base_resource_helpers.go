@@ -34,7 +34,7 @@ func buildUpdateMask(enabled bool, body map[string]interface{}) string {
 
 // buildPathContext builds a PathContext from target config and properties
 func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[string]interface{}) PathContext {
-	cfg := config.FromTargetConfig(targetConfig)
+	cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */)
 	// Use explicit Location only - no fallback to Region
 	ctx := PathContext{
 		Project:      cfg.Project,
@@ -94,7 +94,7 @@ func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[
 
 // fillPathContextFromTarget fills missing fields in PathContext from target config
 func (b *BaseResource) fillPathContextFromTarget(targetConfig json.RawMessage, ctx *PathContext) {
-	cfg := config.FromTargetConfig(targetConfig)
+	cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */)
 	if ctx.Project == "" {
 		ctx.Project = cfg.Project
 	}

@@ -148,7 +148,7 @@ func (p *RouterSubResourceProvisioner) routerURL(project, region, router string)
 }
 
 func (p *RouterSubResourceProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */); cfg != nil && cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback
@@ -158,7 +158,7 @@ func (p *RouterSubResourceProvisioner) regionFor(props map[string]interface{}, t
 	if region, ok := props["region"].(string); ok && region != "" {
 		return region
 	}
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Region != "" {
+	if cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */); cfg != nil && cfg.Region != "" {
 		return cfg.Region
 	}
 	return fallback

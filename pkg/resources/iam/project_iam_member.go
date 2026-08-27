@@ -70,7 +70,7 @@ func (p *ProjectIamMemberProvisioner) newService(ctx context.Context, cfg *confi
 }
 
 func cfgFrom(targetConfig json.RawMessage, fallback *config.Config) *config.Config {
-	c := config.FromTargetConfig(targetConfig)
+	c := config.FromTargetConfig(targetConfig, fallback.Deps())
 	if c.Project == "" && fallback != nil {
 		c.Project = fallback.Project
 	}

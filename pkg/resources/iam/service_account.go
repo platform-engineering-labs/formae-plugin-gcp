@@ -95,7 +95,7 @@ func (p *ServiceAccountProvisioner) Create(ctx context.Context, req *resource.Cr
 		return createFailure(resource.OperationErrorCodeInvalidRequest, "name (accountId) is required"), nil
 	}
 
-	cfg := config.FromTargetConfig(req.TargetConfig)
+	cfg := config.FromTargetConfig(req.TargetConfig, p.Config.Deps())
 	pathCtx := base.PathContext{Project: cfg.Project, ResourceType: "serviceAccounts"}
 
 	sa := make(map[string]interface{})

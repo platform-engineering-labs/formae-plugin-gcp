@@ -48,7 +48,7 @@ func (p *BigtableProvisioner) Create(
 	}
 
 	// Build path context from config and properties
-	cfg := config.FromTargetConfig(request.TargetConfig)
+	cfg := config.FromTargetConfig(request.TargetConfig, p.Config.Deps())
 	pathCtx := base.PathContext{
 		Project:      cfg.Project,
 		ResourceType: p.ResourceConfig.ResourceType,

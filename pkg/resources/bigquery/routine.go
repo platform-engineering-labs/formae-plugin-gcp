@@ -68,7 +68,7 @@ func (r *Routine) Create(ctx context.Context, req *resource.CreateRequest) (*res
 		}, nil
 	}
 
-	project := config.FromTargetConfig(req.TargetConfig).Project
+	project := config.FromTargetConfig(req.TargetConfig, nil /* path context only; this config never authenticates */).Project
 	datasetID := utils.GetString(props, "datasetId")
 	routineID := utils.GetString(props, "routineId")
 
@@ -214,7 +214,7 @@ func (r *Routine) Delete(ctx context.Context, req *resource.DeleteRequest) (*res
 
 // List lists all BigQuery routines in a dataset
 func (r *Routine) List(ctx context.Context, req *resource.ListRequest) (*resource.ListResult, error) {
-	project := config.FromTargetConfig(req.TargetConfig).Project
+	project := config.FromTargetConfig(req.TargetConfig, nil /* path context only; this config never authenticates */).Project
 
 	// Get dataset ID from additional properties
 	datasetID := ""

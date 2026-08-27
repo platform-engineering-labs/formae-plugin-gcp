@@ -45,12 +45,16 @@ func (p *Plugin) SetOidcTokenSource(src plugin.OidcTokenSource) {
 	p.oidc = config.NewOidcDeps(src)
 }
 
-// targetConfig parses a request's target config and threads this plugin
-// instance's OIDC deps onto it. Every operation goes through here: a call site
-// that used config.FromTargetConfig directly would silently lose the token
-// source and fail closed on an Oidc target.
+// targetConfig parses a request's target config with this plugin instance's
+// OIDC deps attached.
+//
+// This used to be the only place that attached them, guarded by a comment
+// asking call sites not to bypass it. Around thirty of them did, and each
+// produced a config that failed closed on the first Oidc target it met.
+// FromTargetConfig now takes deps as an argument, so bypassing this helper
+// still gets you a decision rather than a silent nil.
 func (p *Plugin) targetConfig(raw json.RawMessage) *config.Config {
-	return config.FromTargetConfig(raw).WithOidcDeps(p.oidc)
+	return config.FromTargetConfig(raw, p.oidc)
 }
 
 // GKEAutopilotResourceTypes lists GCP resource types that GKE Autopilot manages

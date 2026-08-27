@@ -48,9 +48,23 @@ type Config struct {
 	deps *OidcDeps
 }
 
-// WithOidcDeps threads the plugin instance's OidcDeps onto Config without
-// changing FromTargetConfig's signature, which has 40-odd call sites and
-// deliberately returns no error.
+// Deps returns the OIDC deps this config carries, so a config derived from
+// another can inherit them.
+//
+// Deriving is where they used to get lost: a helper that copied Project and
+// Region off a parent config produced something that looked complete and
+// failed closed on the first Oidc target it met.
+func (c *Config) Deps() *OidcDeps {
+	if c == nil {
+		return nil
+	}
+	return c.deps
+}
+
+// WithOidcDeps threads the plugin instance's OidcDeps onto an existing Config.
+//
+// Kept for the paths that already hold a Config. New code should pass deps to
+// FromTargetConfig instead, which cannot produce an unwired one.
 func (c *Config) WithOidcDeps(d *OidcDeps) *Config {
 	c.deps = d
 	return c
@@ -137,20 +151,28 @@ func (c *Config) ToClientOptions(ctx context.Context) ([]option.ClientOption, er
 	return []option.ClientOption{option.WithAuthCredentials(creds)}, nil
 }
 
-// FromTargetConfig converts a target config JSON to GCP config
-func FromTargetConfig(targetConfig json.RawMessage) *Config {
+// FromTargetConfig converts a target config JSON to GCP config.
+//
+// deps is required rather than threaded afterwards. It was optional once, and
+// of the call sites that produced a Config exactly one remembered to attach
+// deps: every other one built a config that failed closed the moment it met an
+// Oidc target. Taking deps here makes that omission a compile error instead of
+// a credential failure discovered in a customer's project. Pass nil only where
+// no Oidc target can reach the config, and say why at the call site.
+func FromTargetConfig(targetConfig json.RawMessage, deps *OidcDeps) *Config {
 	if targetConfig == nil {
-		return &Config{}
+		return &Config{deps: deps}
 	}
 	config := &Config{}
 	_ = json.Unmarshal(targetConfig, config)
+	config.deps = deps
 	return config
 }
 
 // FromTarget converts a Formae target to GCP config
-func FromTarget(target *pkgmodel.Target) *Config {
+func FromTarget(target *pkgmodel.Target, deps *OidcDeps) *Config {
 	if target == nil || target.Config == nil {
-		return &Config{}
+		return &Config{deps: deps}
 	}
-	return FromTargetConfig(target.Config)
+	return FromTargetConfig(target.Config, deps)
 }

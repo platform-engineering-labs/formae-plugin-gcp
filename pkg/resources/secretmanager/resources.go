@@ -130,7 +130,7 @@ func (p *SecretProvisioner) Create(ctx context.Context, req *resource.CreateRequ
 		return createFailure(resource.OperationErrorCodeInvalidRequest, "name is required"), nil
 	}
 
-	cfg := config.FromTargetConfig(req.TargetConfig)
+	cfg := config.FromTargetConfig(req.TargetConfig, p.Config.Deps())
 	pathCtx := base.PathContext{
 		Project:      cfg.Project,
 		ResourceType: p.ResourceConfig.ResourceType,

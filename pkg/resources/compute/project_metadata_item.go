@@ -130,7 +130,7 @@ func metadataItemValue(items []interface{}, key string) (string, bool) {
 }
 
 func (p *ProjectMetadataItemProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig); cfg != nil && cfg.Project != "" {
+	if cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */); cfg != nil && cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback
