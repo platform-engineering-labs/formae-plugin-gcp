@@ -311,3 +311,56 @@ func TestBuildUpdateMask(t *testing.T) {
 		assert.Equal(t, "ackDeadlineSeconds,description,labels", buildUpdateMask(true, body))
 	})
 }
+
+// Read, Update and Delete rebuild the whole context from the native ID, so
+// Create is the one operation that has nothing but the declared properties to
+// route with. A resource nested two collections deep (Service Directory:
+// namespaces > services > endpoints) would otherwise lose its grandparent
+// there and POST to the wrong collection.
+func TestBuildPathContextCarriesGrandParent(t *testing.T) {
+	b := &BaseResource{
+		ResourceConfig: ResourceConfig{
+			ResourceType: "endpoints",
+			Scope:        &ScopeConfig{Type: ScopeLocationBased},
+			ParentResource: &ParentResourceConfig{
+				ParentType:              "services",
+				PropertyName:            "service",
+				RequiresParent:          true,
+				GrandParentType:         "namespaces",
+				GrandParentPropertyName: "namespace",
+			},
+		},
+	}
+
+	ctx := b.buildPathContext(nil, map[string]interface{}{
+		"name":      "ep",
+		"service":   "svc",
+		"namespace": "ns",
+	})
+
+	if ctx.ParentType != "services" || ctx.ParentResource != "svc" {
+		t.Errorf("parent = %s/%s, want services/svc", ctx.ParentType, ctx.ParentResource)
+	}
+	if len(ctx.CustomSegments) != 1 || ctx.CustomSegments[0] != "ns" {
+		t.Errorf("grandparent = %v, want [ns]", ctx.CustomSegments)
+	}
+}
+
+// A resource one level deep must not gain a phantom segment.
+func TestBuildPathContextLeavesCustomSegmentsEmptyWithoutAGrandParent(t *testing.T) {
+	b := &BaseResource{
+		ResourceConfig: ResourceConfig{
+			ResourceType: "services",
+			ParentResource: &ParentResourceConfig{
+				ParentType:     "namespaces",
+				PropertyName:   "namespace",
+				RequiresParent: true,
+			},
+		},
+	}
+
+	ctx := b.buildPathContext(nil, map[string]interface{}{"name": "svc", "namespace": "ns"})
+	if len(ctx.CustomSegments) != 0 {
+		t.Errorf("CustomSegments = %v, want empty", ctx.CustomSegments)
+	}
+}
