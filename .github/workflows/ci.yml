@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      run_conformance:
-        description: 'Run conformance tests'
-        required: false
-        default: 'false'
-        type: boolean
 
 # Prevent concurrent conformance tests (CI and nightly share test resources)
 concurrency:
@@ -114,7 +108,9 @@ jobs:
   discover-tests:
     needs: [build, lint, pkl-validate, verify-schema, test-unit]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    # Conformance does not run on pull requests - see debug-conformance.yml
+    # for the targeted per-branch run. PRs are gated on the fast checks above.
+    if: github.event_name != 'pull_request'
     outputs:
       test-cases: ${{ steps.discover.outputs.test-cases }}
     steps:
@@ -160,7 +156,8 @@ jobs:
       - name: Clean test resources
         run: ./scripts/ci/clean-environment.sh
 
-  # Conformance tests run the full CRUD lifecycle against real GCP resources.
+  # Conformance tests run the full CRUD lifecycle against real GCP resources,
+  # on push to main and on manual dispatch - not on pull requests.
   # Each test case runs in its own isolated job via matrix strategy.
   # Cleanup is handled by separate pre/post-cleanup jobs, NOT per test.
   conformance-tests:
@@ -229,159 +226,12 @@ jobs:
         env:
           FORMAE_TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
-        run: |
-          # The harness acquires the formae binary and starts an agent before it
-          # runs anything. Both steps reach the network and both have failed on
-          # their own - "no available packages for: formae" when the package
-          # channel is unreachable, "timeout waiting for agent to become ready
-          # after 30s" when the agent is slow to boot. Neither has touched cloud
-          # infrastructure yet, so retrying the phase is safe and costs seconds;
-          # any other failure is reported as-is on the first attempt.
-          run_make() {
-            local log rc attempt
-            log="$(mktemp)"
-            for attempt in 1 2; do
-              make "$@" 2>&1 | tee "$log"
-              rc=${PIPESTATUS[0]}
-              [ "$rc" -eq 0 ] && return 0
-              if [ "$attempt" -lt 2 ] && grep -qE "no available packages for: formae|timeout waiting for agent to become ready" "$log"; then
-                echo "::warning::harness setup failed before any test ran, retrying ${{ matrix.test-case }}"
-                continue
-              fi
-              return "$rc"
-            done
-            return "$rc"
-          }
-
-          # Slow resources (Cloud SQL: 5-10 min/instance) need raised timeouts.
-          # TIMEOUT sets the per-operation poll (FORMAE_TEST_TIMEOUT); the
-          # discovery and OOB timeouts are separate env vars the SDK reads.
-          TIMEOUT_ARG=""
-          case "${{ matrix.test-case }}" in
-            cloudsql-instance)
-              # Cloud SQL provisions an instance per create (5-15 min each).
-              # The CRUD lifecycle creates two (initial + OOB-delete re-apply)
-              # and discovery creates a third, so allow 30 min per operation.
-              TIMEOUT_ARG="TIMEOUT=30"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
-              export FORMAE_TEST_OOB_TIMEOUT=30
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
-              ;;
-            alloydb-cluster|alloydb-instance|alloydb-user|alloydb-backup)
-              # An AlloyDB cluster takes 10-25 min to provision, and instance,
-              # user and backup each create one first, so every case in this
-              # family pays that cost before its own resource starts. The 5m
-              # default expires long before the cluster is READY, which is what
-              # "timeout waiting for command" on Create means here.
-              TIMEOUT_ARG="TIMEOUT=30"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
-              export FORMAE_TEST_OOB_TIMEOUT=30
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
-              ;;
-            servicenetworking-connection)
-              # PSA connections are async and global (VPC peering); create and
-              # especially discovery take longer to surface in inventory than any
-              # other resource. Give them the same 30m window as Cloud SQL - 15m
-              # was borderline and timed out under load.
-              TIMEOUT_ARG="TIMEOUT=30"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
-              export FORMAE_TEST_OOB_TIMEOUT=30
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
-              ;;
-            url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule)
-              # Load-balancer chains create 3-5 dependent resources serially
-              # (health-check -> backend-service -> url-map -> proxy -> rule).
-              # The CRUD lifecycle already runs ~4m13s on a good day - 84% of
-              # the 5m default - so any per-op or operator-startup jitter tips
-              # it over. Give the chain headroom.
-              TIMEOUT_ARG="TIMEOUT=15"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
-              export FORMAE_TEST_OOB_TIMEOUT=15
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
-              ;;
-            eventarc-pipeline|eventarc-message-bus)
-              # An Eventarc message bus takes ~5-6 min to create and the pipeline
-              # case builds one first, so a single apply runs past the 5m default
-              # (6m20s locally for the re-apply, 22m for the whole lifecycle).
-              # 15m still was not enough for Update under CI load, which timed
-              # out after the case had already spent 19m; give it the same 30m
-              # as Cloud SQL and AlloyDB.
-              TIMEOUT_ARG="TIMEOUT=30"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=30
-              export FORMAE_TEST_OOB_TIMEOUT=30
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=20
-              ;;
-            security-policy|region-security-policy|security-policy-rule|region-security-policy-rule)
-              # A Cloud Armor policy insert is a slow global/regional operation
-              # and the rule cases build one as a prerequisite first;
-              # region-security-policy timed out on Create at the 5m default.
-              TIMEOUT_ARG="TIMEOUT=15"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
-              export FORMAE_TEST_OOB_TIMEOUT=15
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
-              ;;
-            machine-image)
-              # A machine image snapshots every disk of an instance, and the case
-              # builds the VM chain (network -> subnet -> disk -> instance) first.
-              # It runs ~7m30s end to end locally, so the 5m default leaves no
-              # room for the image capture itself under CI load.
-              TIMEOUT_ARG="TIMEOUT=15"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
-              export FORMAE_TEST_OOB_TIMEOUT=15
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
-              ;;
-            instance-group)
-              # Creates a VM chain (network -> subnet -> boot-disk -> instance)
-              # then the group + synchronous member attach, and the update does
-              # removeInstances + setNamedPorts. More serial work than a plain
-              # instance, so give it the same headroom as the LB chains.
-              TIMEOUT_ARG="TIMEOUT=15"
-              export FORMAE_TEST_DISCOVERY_TIMEOUT=15
-              export FORMAE_TEST_OOB_TIMEOUT=15
-              export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
-              ;;
-            filestore-instance)
-              # Filestore BASIC/BASIC_HDD is zonal: its location must be a zone,
-              # not a region. The shared GCP_LOCATION secret is a region, so
-              # override it with the zone for this test only.
-              export GCP_LOCATION="$GCP_ZONE"
-              ;;
-          esac
-          # Cases whose prerequisite outlives the crud phase run their two
-          # phases separately with a cleanup in between. Conformance Destroy only
-          # removes the resource under test, so the prerequisite survives and the
-          # discovery phase then either collides with it by name (Cloud Armor
-          # policies: "The resource ... already exists") or runs out of quota
-          # (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
-          # See clean-case-prereqs.sh.
-          case "${{ matrix.test-case }}" in
-            alloydb-*|eventarc-*|security-policy-rule|region-security-policy-rule|\
-            network-firewall-policy-association|region-network-firewall-policy-association|\
-            network-firewall-policy-rule|machine-image)
-              # "|| status=$?" keeps a failing phase from aborting the step
-              # before its cleanup runs; the case still fails at the end.
-              TC="${{ matrix.test-case }}"
-              CLEAN="./scripts/ci/clean-case-prereqs.sh"
-              crud_status=0
-              run_make conformance-test-crud-run \
-                TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || crud_status=$?
-              "$CLEAN" "$TC"
-              discovery_status=0
-              run_make conformance-test-discovery-run \
-                TEST="$TC" PARALLEL=1 $TIMEOUT_ARG || discovery_status=$?
-              "$CLEAN" "$TC"
-              [ "$crud_status" -eq 0 ] && [ "$discovery_status" -eq 0 ]
-              ;;
-            *)
-              run_make conformance-test-crud-run conformance-test-discovery-run \
-                TEST=${{ matrix.test-case }} PARALLEL=1 $TIMEOUT_ARG
-              ;;
-          esac
+        run: ./scripts/ci/run-conformance-case.sh ${{ matrix.test-case }} both
 
   # Clean up test resources after all conformance tests (always runs)
   post-cleanup:
     needs: [conformance-tests]
-    if: always()
+    if: always() && needs.conformance-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

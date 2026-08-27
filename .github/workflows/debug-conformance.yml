@@ -1,0 +1,179 @@
+name: Debug Conformance
+
+# On-demand workflow for running a focused set of conformance cases against a
+# branch. Use it to validate a resource change before opening the pull request,
+# to bisect a regression, or to iterate on a fix without paying for the full
+# matrix (80-100 minutes).
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_cases:
+        description: "Comma-separated test cases (e.g. bucket,disk)"
+        required: true
+        type: string
+      phases:
+        description: "Which phases to run"
+        required: false
+        default: both
+        type: choice
+        options: [both, crud, discovery]
+      pre_cleanup:
+        description: "Run pre-cleanup before tests"
+        required: false
+        default: true
+        type: boolean
+
+# Share the serialization group with ci.yml and nightly.yml so runs never race
+# for the same GCP test project. A debug invocation queues behind an in-flight
+# CI or nightly run.
+concurrency:
+  group: gcp-conformance-tests
+  cancel-in-progress: false
+
+jobs:
+  parse-input:
+    runs-on: ubuntu-latest
+    outputs:
+      test-cases: ${{ steps.parse.outputs.test-cases }}
+    steps:
+      - name: Parse test_cases input
+        id: parse
+        env:
+          TEST_CASES_INPUT: ${{ inputs.test_cases }}
+        run: |
+          # Convert "a, b,c" -> ["a","b","c"]
+          TEST_CASES=$(printf '%s' "$TEST_CASES_INPUT" \
+            | tr ',' '\n' \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Parsed test cases: ${TEST_CASES}"
+          echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
+
+  pre-cleanup:
+    needs: [parse-input]
+    if: inputs.pre_cleanup
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh
+
+  conformance-tests:
+    needs: [parse-input, pre-cleanup]
+    # When pre_cleanup=false the pre-cleanup job is skipped; without an explicit
+    # if-clause this job would skip too, because a needed job did not succeed.
+    if: ${{ !cancelled() && needs.parse-input.result == 'success' && (needs.pre-cleanup.result == 'success' || needs.pre-cleanup.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      matrix:
+        test-case: ${{ fromJson(needs.parse-input.outputs.test-cases) }}
+      max-parallel: 5
+      fail-fast: false
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+
+      - name: Set up Pkl
+        uses: pkl-community/setup-pkl@v0
+        with:
+          pkl-version: 0.30.0
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Install plugin
+        run: make install
+
+      # The conformance binary pulls test-only modules that "make install" does
+      # not need, and a transient proxy error there fails the case outright
+      # after minutes of setup. Fetch them up front and retry.
+      - name: Download Go modules
+        run: |
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            echo "go mod download failed (attempt $attempt), retrying in 15s"
+            sleep 15
+          done
+          echo "go mod download still failing after 3 attempts"
+          exit 1
+
+      - name: Run conformance test (${{ matrix.test-case }})
+        env:
+          FORMAE_TEST_RUN_ID: debug-${{ github.run_id }}-${{ github.run_attempt }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: ./scripts/ci/run-conformance-case.sh ${{ matrix.test-case }} ${{ inputs.phases }}
+
+      - name: Dump formae client log on failure
+        if: failure()
+        run: |
+          LOG="$HOME/.pel/formae/log/client.log"
+          if [ -f "$LOG" ]; then
+            echo "::group::client.log (last 400 lines)"
+            tail -400 "$LOG"
+            echo "::endgroup::"
+          else
+            echo "No client.log at $LOG"
+          fi
+
+  post-cleanup:
+    needs: [conformance-tests]
+    if: always() && needs.conformance-tests.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ZONE: ${{ secrets.GCP_ZONE }}
+      GCP_LOCATION: ${{ secrets.GCP_LOCATION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Clean test resources
+        run: ./scripts/ci/clean-environment.sh

@@ -97,13 +97,25 @@ namespace prefix.
 
 ### GitHub Actions
 
-The `.github/workflows/ci.yml` workflow includes a `conformance-tests` job
-that is disabled by default. To enable it:
+Two workflows run conformance against real GCP, and both authenticate through
+Workload Identity Federation (see
+[docs/gcp-github-actions-setup.md](docs/gcp-github-actions-setup.md) and the
+secrets below):
 
-1. Configure Workload Identity Federation in GCP (see
-   [docs/gcp-github-actions-setup.md](docs/gcp-github-actions-setup.md))
-2. Add the required GitHub secrets (see below)
-3. Set `run_conformance` to `true` when triggering the workflow
+- **`ci.yml`** runs the whole matrix on push to `main` and on manual dispatch.
+  It does **not** run on pull requests: a full matrix takes 80-100 minutes, and
+  every conformance workflow here shares the `gcp-conformance-tests`
+  serialization group, so a run queued behind another is usually evicted before
+  it starts. Pull requests are gated on the fast checks (build, lint, unit
+  tests, manifest, schema).
+- **`debug-conformance.yml`** runs only the test cases you name, against the ref
+  you dispatch it on. This is how you validate a resource change on your branch
+  before opening the pull request:
+
+  ```bash
+  gh workflow run debug-conformance.yml --ref <your-branch> \
+    -f test_cases=bucket,disk
+  ```
 
 #### Required GitHub Secrets
 
