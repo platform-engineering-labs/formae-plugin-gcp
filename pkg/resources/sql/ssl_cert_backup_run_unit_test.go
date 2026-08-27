@@ -7,6 +7,7 @@
 package sql
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -177,5 +178,42 @@ func TestInstanceWalkingListIDExtractors(t *testing.T) {
 		if got := p.idOf(tc.item); got != tc.want {
 			t.Errorf("%s: idOf = %q, want %q", name, got, tc.want)
 		}
+	}
+}
+
+// The insert response carries the operation beside the certificate rather than
+// at the top level, which is where every other sqladmin mutation puts it.
+// Missing it made the create look synchronous, and the Destroy that followed
+// was issued into a still-busy per-instance operation queue and answered 409.
+func TestSslCertOperationIDComesFromTheNestedOperation(t *testing.T) {
+	insert := map[string]interface{}{
+		"clientCert": map[string]interface{}{"certInfo": map[string]interface{}{"sha1Fingerprint": "abc"}},
+		"operation":  map[string]interface{}{"name": "op-1"},
+	}
+	if got := extractSslCertOperationID(insert); got != "op-1" {
+		t.Errorf("operation id = %q", got)
+	}
+	if got := extractSslCertOperationID(map[string]interface{}{"name": "op-2"}); got != "op-2" {
+		t.Errorf("top-level fallback = %q", got)
+	}
+}
+
+// Cloud SQL serialises operations per instance, so a mutation issued while
+// another is running is contention, not a fault: it has to be retried rather
+// than failing the resource.
+func TestOperationInProgressIsRetryable(t *testing.T) {
+	for _, msg := range []string{
+		"Operation failed because another operation was already in progress. Try your request after the current operation is complete.",
+		"database 'x' is being accessed by other users",
+	} {
+		if !isRetryableSQLError(errors.New(msg)) {
+			t.Errorf("should be retryable: %s", msg)
+		}
+	}
+	if isRetryableSQLError(errors.New("invalid request")) {
+		t.Error("a permanent error must not be retried")
+	}
+	if isRetryableSQLError(nil) {
+		t.Error("nil is not an error")
 	}
 }

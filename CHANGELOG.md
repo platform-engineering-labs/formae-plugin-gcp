@@ -47,6 +47,11 @@ formae agent.
   This affected `GCP::SQL::Database`, which has been registered for some time
   but had no conformance case and so had never exercised the path;
   `testdata/cloudsql-database.pkl` now covers it.
+- Cloud SQL now retries a 409 "another operation was already in progress"
+  instead of failing the resource. Operations are serialised per instance and
+  every nested type shares its instance's queue, so a mutation issued while
+  another is still running is ordinary contention rather than a fault. It joins
+  the existing "database is being accessed by other users" case.
 - `GCP::SQL::Database` is now discoverable. It had no parent-walking `List`, so
   discovery — which lists with no properties — asked a collection URL with no
   instance in it and found nothing. Every instance-scoped Cloud SQL type now

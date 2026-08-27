@@ -8,17 +8,37 @@ import (
 	"fmt"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 )
 
-// SQLSslCertOperations - a client certificate is the one sqladmin resource that
-// comes back whole from its own create: the insert response carries the
-// certificate alongside the Operation, so there is nothing to poll.
+// SQLSslCertOperations - a client certificate is the one sqladmin resource whose
+// create answers with the resource itself, carried alongside the Operation. It
+// is tempting to call that synchronous, and this code did: the certificate is
+// usable the moment insert returns, so there is nothing to wait for.
+//
+// That is wrong, and Cloud SQL says so with a 409. Operations are serialised
+// per instance, so reporting the create done while its operation is still
+// running means the next mutation - the conformance Destroy, say - is issued
+// into a busy queue and answers "Operation failed because another operation was
+// already in progress". The certificate has to be polled like everything else;
+// only its native ID comes from somewhere unusual.
 var SQLSslCertOperations = base.OperationConfig{
-	Synchronous:            true,
-	OperationIDExtractor:   func(map[string]interface{}) string { return "" },
-	OperationURLBuilder:    func(base.PathContext, string) string { return "" },
+	Synchronous:            false,
+	OperationIDExtractor:   extractSslCertOperationID,
+	OperationURLBuilder:    SQLOperations.OperationURLBuilder,
 	NativeIDExtractor:      extractSslCertNativeID,
-	OperationStatusChecker: func(map[string]interface{}) (bool, error) { return true, nil },
+	OperationStatusChecker: SQLOperations.OperationStatusChecker,
+	RetryableError:         isRetryableSQLError,
+}
+
+// extractSslCertOperationID digs the operation out of the insert response,
+// where it sits beside the certificate rather than at the top level as it does
+// for every other sqladmin mutation.
+func extractSslCertOperationID(response map[string]interface{}) string {
+	if operation, ok := response["operation"].(map[string]interface{}); ok {
+		return utils.GetString(operation, "name")
+	}
+	return utils.GetString(response, "name")
 }
 
 // extractSslCertNativeID addresses a certificate by its server-generated
