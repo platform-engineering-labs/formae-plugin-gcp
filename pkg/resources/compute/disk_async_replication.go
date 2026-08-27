@@ -131,7 +131,7 @@ func (p *DiskAsyncReplicationProvisioner) diskURL(project, zone, disk string) st
 }
 
 func (p *DiskAsyncReplicationProvisioner) projectFor(targetConfig json.RawMessage, fallback string) string {
-	if cfg := config.FromTargetConfig(targetConfig, nil /* path context only; this config never authenticates */); cfg != nil && cfg.Project != "" {
+	if cfg := config.PathFromTargetConfig(targetConfig); cfg.Project != "" {
 		return cfg.Project
 	}
 	return fallback

@@ -49,11 +49,8 @@ type Config struct {
 }
 
 // Deps returns the OIDC deps this config carries, so a config derived from
-// another can inherit them.
-//
-// Deriving is where they used to get lost: a helper that copied Project and
-// Region off a parent config produced something that looked complete and
-// failed closed on the first Oidc target it met.
+// another inherits them rather than silently losing the ability to
+// authenticate.
 func (c *Config) Deps() *OidcDeps {
 	if c == nil {
 		return nil
@@ -151,14 +148,40 @@ func (c *Config) ToClientOptions(ctx context.Context) ([]option.ClientOption, er
 	return []option.ClientOption{option.WithAuthCredentials(creds)}, nil
 }
 
+// TargetPath is where a target puts things: the fields that address a
+// resource, with nothing that can authenticate one.
+//
+// Most callers that parse a target config only want these, to build a URL.
+// Handing them a Config instead would mean handing them something that looks
+// able to reach Google and is not, since a Config without OIDC deps fails
+// closed on an Oidc target. This type cannot be passed to transport.NewClient
+// at all, so that mistake does not compile.
+type TargetPath struct {
+	Project  string
+	Region   string
+	Zone     string
+	Location string
+}
+
+// PathFromTargetConfig reads the addressing fields out of a target config.
+//
+// Use this wherever the result is only used to build a path. Use
+// FromTargetConfig, with deps, wherever a client is built.
+func PathFromTargetConfig(targetConfig json.RawMessage) TargetPath {
+	if targetConfig == nil {
+		return TargetPath{}
+	}
+	var c Config
+	_ = json.Unmarshal(targetConfig, &c)
+	return TargetPath{Project: c.Project, Region: c.Region, Zone: c.Zone, Location: c.Location}
+}
+
 // FromTargetConfig converts a target config JSON to GCP config.
 //
-// deps is required rather than threaded afterwards. It was optional once, and
-// of the call sites that produced a Config exactly one remembered to attach
-// deps: every other one built a config that failed closed the moment it met an
-// Oidc target. Taking deps here makes that omission a compile error instead of
-// a credential failure discovered in a customer's project. Pass nil only where
-// no Oidc target can reach the config, and say why at the call site.
+// deps is a parameter rather than something attached afterwards: a Config that
+// reaches ToClientOptions without it cannot authenticate an Oidc target, so
+// requiring it here makes that a compile error. Callers that only need
+// addressing fields want PathFromTargetConfig instead.
 func FromTargetConfig(targetConfig json.RawMessage, deps *OidcDeps) *Config {
 	if targetConfig == nil {
 		return &Config{deps: deps}

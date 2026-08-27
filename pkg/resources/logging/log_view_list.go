@@ -55,11 +55,8 @@ func (p *logViewListProvisioner) List(
 		return p.Provisioner.List(ctx, request)
 	}
 
-	cfg := config.FromTargetConfig(request.TargetConfig, nil /* path context only; this config never authenticates */)
-	project := ""
-	if cfg != nil {
-		project = cfg.Project
-	}
+	cfg := config.PathFromTargetConfig(request.TargetConfig)
+	project := cfg.Project
 	if project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}

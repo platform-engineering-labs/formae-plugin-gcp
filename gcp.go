@@ -47,12 +47,6 @@ func (p *Plugin) SetOidcTokenSource(src plugin.OidcTokenSource) {
 
 // targetConfig parses a request's target config with this plugin instance's
 // OIDC deps attached.
-//
-// This used to be the only place that attached them, guarded by a comment
-// asking call sites not to bypass it. Around thirty of them did, and each
-// produced a config that failed closed on the first Oidc target it met.
-// FromTargetConfig now takes deps as an argument, so bypassing this helper
-// still gets you a decision rather than a silent nil.
 func (p *Plugin) targetConfig(raw json.RawMessage) *config.Config {
 	return config.FromTargetConfig(raw, p.oidc)
 }

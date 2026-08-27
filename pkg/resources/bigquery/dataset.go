@@ -69,7 +69,7 @@ func (d *Dataset) Create(ctx context.Context, req *resource.CreateRequest) (*res
 		}, nil
 	}
 
-	project := config.FromTargetConfig(req.TargetConfig, nil /* path context only; this config never authenticates */).Project
+	project := config.PathFromTargetConfig(req.TargetConfig).Project
 	datasetID := utils.GetString(props, "datasetId")
 	if datasetID == "" {
 		return &resource.CreateResult{
@@ -233,7 +233,7 @@ func (d *Dataset) Delete(ctx context.Context, req *resource.DeleteRequest) (*res
 
 // List lists all BigQuery datasets in the project
 func (d *Dataset) List(ctx context.Context, req *resource.ListRequest) (*resource.ListResult, error) {
-	project := config.FromTargetConfig(req.TargetConfig, nil /* path context only; this config never authenticates */).Project
+	project := config.PathFromTargetConfig(req.TargetConfig).Project
 
 	client, err := d.getClient(ctx, project)
 	if err != nil {

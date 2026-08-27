@@ -43,13 +43,11 @@ type OidcDeps struct {
 	// creds caches exchanged credentials per (provider, scopes) pair as plain
 	// data: an access token and the instant it expires.
 	//
-	// Data, deliberately, and this is the whole point of the type. Minting an
-	// identity token is an Ergo call, and Ergo permits one only from a process
-	// in Init or Running - in practice, the PluginOperator actor whose handler
-	// is on the stack right now. Anything cached here outlives that operator,
-	// so it must not be able to reach one: an oauth2.TokenSource would, via
-	// the context it captures at construction, and would then mint through an
-	// actor that stopped running operations ago.
+	// Data, deliberately. Minting an identity token is an Ergo call, and Ergo
+	// permits one only from a process in Init or Running - in practice, the
+	// PluginOperator actor whose handler is on the stack. Entries here outlive
+	// any single operator, so they must hold nothing that could reach one: an
+	// oauth2.TokenSource would, through the context it captures when built.
 	//
 	// Concurrent by necessity rather than by taste. Operators are one process
 	// per operation and many run at once against this single plugin instance,
@@ -91,14 +89,13 @@ func NewOidcDeps(src plugin.OidcTokenSource) *OidcDeps {
 // defaultExchange builds oidcx's external-account source, takes exactly one
 // token from it, and throws the source away.
 //
-// Construct-and-discard is the mechanism that keeps the mint inside the
-// caller's context. oidcx hands that context to Google's externalaccount
-// package, which stores it and replays it into every later refresh - so a
-// source kept beyond this call would keep minting under a context whose actor
-// is gone. Taking one token while the caller is still on the stack means the
-// only mint happens while their operator is Running. The AWS plugin does the
-// same thing for the same reason, rebuilding its web-identity provider inside
-// every Retrieve.
+// Construct-and-discard keeps the mint inside the caller's context. oidcx
+// hands that context to Google's externalaccount package, which stores it and
+// replays it into every later refresh, so a source kept beyond this call would
+// mint under a context whose actor is no longer running. Taking one token while
+// the caller is on the stack keeps the only mint inside their operator. The AWS
+// plugin rebuilds its web-identity provider inside every Retrieve for the same
+// reason.
 func defaultExchange(ctx context.Context, cfg oidcxgcp.Config, src plugin.OidcTokenSource) (*oauth2.Token, error) {
 	ts, err := oidcxgcp.TokenSource(ctx, brokerClient{src: src}, cfg)
 	if err != nil {
@@ -170,11 +167,10 @@ func (d *OidcDeps) credentialsFor(ctx context.Context, raw []byte, scopes []stri
 //
 // Concurrent operators refreshing one key each mint, which is a duplicated
 // broker call rather than a correctness problem: holding a lock across a
-// cross-process call would block one actor's goroutine on another's. But
-// "last write wins" orders by when an exchange finished, not by how long its
-// result lives, so a slow exchange could land after a fast one and replace a
-// fresher credential with a staler one. Compare instead, and retry rather than
-// clobber a concurrent writer.
+// cross-process call would block one actor's goroutine on another's. Storing
+// unconditionally would order entries by when an exchange finished rather than
+// by how long its result lives, so compare, and retry rather than clobber a
+// concurrent writer.
 //
 // A credential with no expiry is never cached. Google's STS always returns one,
 // so this is defensive: an entry that cannot be reasoned about would either be
@@ -246,13 +242,12 @@ func (c *Config) callSource(ctx context.Context, raw []byte, scopes []string) oa
 // put on a credential fixed up front. Google's client would keep presenting the
 // expired token, because a static source has nothing else to return.
 //
-// So this refreshes, and holding ctx is what makes that safe rather than a
-// repeat of the bug it replaces. The context belongs to the operation on the
-// stack; the source is built in ToClientOptions and handed to a client built in
-// the same function, both of which are discarded when the call returns. Every
-// refresh therefore happens inside that call, on the operator's own goroutine,
-// while the operator is Running - which is the only state Ergo will let the
-// mint out in.
+// So this refreshes, and holding ctx is what makes that safe. The context
+// belongs to the operation on the stack; the source is built in
+// ToClientOptions and handed to a client built in the same function, both
+// discarded when the call returns. Every refresh therefore happens inside that
+// call, on the operator's own goroutine, while the operator is Running - the
+// only state Ergo will let the mint out in.
 //
 // The invariant is the lifetime: NEVER cache this, or anything holding it,
 // beyond the call it was built for. Cache credentials instead - OidcDeps.creds

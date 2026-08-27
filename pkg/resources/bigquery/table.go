@@ -70,7 +70,7 @@ func (t *Table) Create(ctx context.Context, req *resource.CreateRequest) (*resou
 		}, nil
 	}
 
-	project := config.FromTargetConfig(req.TargetConfig, nil /* path context only; this config never authenticates */).Project
+	project := config.PathFromTargetConfig(req.TargetConfig).Project
 	datasetID := utils.GetString(props, "datasetId")
 	tableID := utils.GetString(props, "tableId")
 
@@ -229,7 +229,7 @@ func (t *Table) Delete(ctx context.Context, req *resource.DeleteRequest) (*resou
 
 // List lists all BigQuery tables in a dataset
 func (t *Table) List(ctx context.Context, req *resource.ListRequest) (*resource.ListResult, error) {
-	project := config.FromTargetConfig(req.TargetConfig, nil /* path context only; this config never authenticates */).Project
+	project := config.PathFromTargetConfig(req.TargetConfig).Project
 
 	// Get dataset ID from additional properties
 	datasetID := ""
