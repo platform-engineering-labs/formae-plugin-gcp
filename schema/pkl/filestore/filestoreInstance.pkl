@@ -28,7 +28,15 @@ open class FileShareConfig extends formae.SubResource {
 
     /// File share capacity in gigabytes (GB). Filestore defines 1 GB as
     /// 1024^3 bytes.
-    @gcp.FieldHint
+    ///
+    /// Filestore reports this int64 as a JSON string, so state holds "1024"
+    /// while a forma declares the number 1024. The share is an element of a
+    /// list, so the mismatch does not read as one changed field: the declared
+    /// share matches nothing in state and the plan appends it as a second
+    /// share. Sending the declared value as a string keeps both forms equal.
+    @gcp.FieldHint {
+        outputTransformation = formae.transform.toString
+    }
     capacityGb: Int
 }
 

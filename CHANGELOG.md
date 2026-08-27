@@ -32,6 +32,12 @@ formae agent.
   stringified the declared number on the way out, so the two normalisations
   pointed at each other: state held `10` and the desired side produced `"10"`.
   The field is typed `Int`, so the plugin's parse is the half to keep.
+- A `GCP::Filestore::Instance` no longer plans a second copy of its own file
+  share. Filestore reports `capacityGb` as a JSON string, so state held `"1024"`
+  against a declared `1024`; because a share is a list element, the mismatch did
+  not read as one changed field - the declared share matched nothing in state
+  and the plan appended it. The declared value is now sent as a string, as
+  Compute's int64 fields already are.
 
 ### Fixed
 
