@@ -6,6 +6,7 @@ package dns
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -37,6 +38,13 @@ func registerResponsePolicyRuleList() {
 			return &responsePolicyRuleListProvisioner{
 				Provisioner: dnsRegistry.CreateProvisioner(cfg, ResponsePolicyRuleResourceType),
 				cfg:         cfg,
+			}
+		})
+	registry.Register(ResponsePolicyRuleResourceType,
+		[]resource.Operation{resource.OperationRead},
+		func(cfg *config.Config) prov.Provisioner {
+			return &responsePolicyRuleReadProvisioner{
+				Provisioner: dnsRegistry.CreateProvisioner(cfg, ResponsePolicyRuleResourceType),
 			}
 		})
 }
@@ -101,4 +109,50 @@ func (p *responsePolicyRuleListProvisioner) List(
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
+
+// responsePolicyRuleReadProvisioner adds back the one property a rule's own
+// representation never carries: the policy it belongs to.
+//
+// Cloud DNS answers a rule read with ruleName, dnsName, localData and behavior
+// - and nothing naming the owning response policy, which lives only in the URL.
+// A discovered rule therefore arrived without `responsePolicy`, a required
+// createOnly property, and was dropped instead of entering inventory: the
+// listing found it every time ("Received 1 resources ... Discovery finished"
+// with nothing discovered) while the conformance Discover step timed out.
+//
+// TransformContext carries no parent, so this cannot be a response transformer;
+// the parent has to come from the native ID.
+type responsePolicyRuleReadProvisioner struct {
+	prov.Provisioner
+}
+
+func (p *responsePolicyRuleReadProvisioner) Read(
+	ctx context.Context, request *resource.ReadRequest,
+) (*resource.ReadResult, error) {
+	result, err := p.Provisioner.Read(ctx, request)
+	if err != nil || result == nil || result.ErrorCode != "" || result.Properties == "" {
+		return result, err
+	}
+
+	pathCtx, parseErr := parseDNSNativeID(request.NativeID)
+	if parseErr != nil || pathCtx.ParentResource == "" {
+		return result, nil
+	}
+
+	var props map[string]interface{}
+	if unmarshalErr := json.Unmarshal([]byte(result.Properties), &props); unmarshalErr != nil {
+		return result, nil
+	}
+	if _, present := props["responsePolicy"]; present {
+		return result, nil
+	}
+	props["responsePolicy"] = pathCtx.ParentResource
+
+	enriched, marshalErr := json.Marshal(props)
+	if marshalErr != nil {
+		return result, nil
+	}
+	result.Properties = string(enriched)
+	return result, nil
 }
