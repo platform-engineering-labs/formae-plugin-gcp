@@ -42,23 +42,17 @@ open class DiskAsyncReplication extends formae.Resource {
     /// URL of the disk being replicated. Pass `primary.res.selfLink` so formae
     /// creates it first.
     ///
-    /// Write-only: an extracted forma writes this reference unresolved, so
-    /// comparing it against the URL already in state reads as a change to a
-    /// createOnly field and plans a replacement of the pair that is already in
-    /// place. Which disks a pair joins is fixed at creation and is what its
-    /// native ID is made of, so there is no drift to detect here.
+    /// Immutable: which disks a pair joins is fixed at creation, and is what
+    /// its native ID is made of.
     @gcp.FieldHint {
         createOnly = true
-        writeOnly = true
     }
     primaryDisk: (String|formae.Resolvable)
 
     /// URL of the disk receiving the replica, in another region. Pass
-    /// `secondary.res.selfLink`. Write-only for the same reason as
-    /// `primaryDisk`.
+    /// `secondary.res.selfLink`. Immutable for the same reason as `primaryDisk`.
     @gcp.FieldHint {
         createOnly = true
-        writeOnly = true
     }
     secondaryDisk: (String|formae.Resolvable)
 
