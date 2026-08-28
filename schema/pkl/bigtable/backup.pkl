@@ -55,12 +55,12 @@ open class Backup extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    instance: String
+    instance: (String|formae.Resolvable)
 
     @gcp.FieldHint {
         createOnly = true
     }
-    cluster: String
+    cluster: (String|formae.Resolvable)
 
     @gcp.FieldHint {
         createOnly = true
@@ -70,7 +70,7 @@ open class Backup extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    sourceTable: String
+    sourceTable: (String|formae.Resolvable)
 
     @gcp.FieldHint
     expireTime: String

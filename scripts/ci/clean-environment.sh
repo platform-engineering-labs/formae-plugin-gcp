@@ -1078,7 +1078,7 @@ fi
 
 # --- 9. Bigtable instances ---
 echo "Cleaning GCP Bigtable instances..."
-INSTANCES=$(gcloud bigtable instances list --filter="name~formae-test-instance" --format="value(name)" 2>/dev/null || true)
+INSTANCES=$(gcloud bigtable instances list --filter="name~^formae-test-instance" --format="value(name)" 2>/dev/null || true)
 if [ -n "$INSTANCES" ]; then
     echo "$INSTANCES" | while read -r instance; do
         echo "  Deleting Bigtable instance: $instance"

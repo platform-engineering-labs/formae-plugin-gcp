@@ -75,7 +75,7 @@ open class Table extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    instance: String
+    instance: (String|formae.Resolvable)
 
     @gcp.FieldHint {
         createOnly = true

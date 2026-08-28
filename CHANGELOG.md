@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- Bigtable's nested types can now reference their parent. `Table.instance`,
+  `Cluster.instance`, `Backup.instance`/`cluster`/`sourceTable` and the same
+  three on `MaterializedView` were plain `String`, so a forma could name a
+  parent but not reference it. Ordering in a forma comes only from resolvable
+  references, so declaring an instance and a table together gave formae no edge
+  between them and nothing guaranteed the instance existed first. All eight
+  fields now accept `(String|formae.Resolvable)`.
+
 - Four Compute types no longer claim to support updates their API cannot
   perform: `TargetPool`, `TargetSslProxy`, `TargetTcpProxy` and
   `RegionTargetTcpProxy`. None of `targetPools`, `targetSslProxies`,
@@ -31,6 +39,9 @@ formae agent.
   bucket uses uniform bucket-level access. A UBLA bucket is controlled by IAM
   alone and rejects ACLs outright, so without this field a bucket meant to carry
   a `BucketAccessControl` depended on a project or organisation default.
+
+- A conformance case for `GCP::Bigtable::Table`, the first for any nested
+  Bigtable type.
 
 - Conformance cases for `GCP::Storage::BucketAccessControl` and
   `GCP::Storage::DefaultObjectAccessControl`. Both shipped without one.
