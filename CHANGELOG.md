@@ -25,6 +25,12 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Storage::Bucket`'s resolvable names properties the resource actually
+  has. It pointed at `"Id"`, `"SelfLink"` and `"Name"` — capitalised, matching
+  nothing — so `bkt.res.name` resolved to no value and **any resource
+  referencing a bucket reached the plugin with the reference unresolved**. It
+  went unnoticed because nothing in the repository referenced a bucket until the
+  folder types did. `selfLink` is removed: the bucket has no such property.
 - Storage names containing a slash survive a native-ID round trip. Both folder
   types are named with a **trailing slash that is part of the identity**
   ("reports/" is not "reports"), and the parser took a single path segment, so
