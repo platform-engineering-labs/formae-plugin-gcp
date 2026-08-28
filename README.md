@@ -46,7 +46,6 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::Compute::BackendService` | Global backend service for load balancers |
 | `GCP::Compute::BackendServiceSignedUrlKey` | Cloud CDN signed-URL key on a backend service |
 | `GCP::Compute::Disk` | Persistent disk |
-| `GCP::Compute::DiskAsyncReplication` | Replication link between a primary disk and a secondary disk in another region |
 | `GCP::Compute::DiskResourcePolicyAttachment` | Attaches a `resourcePolicy` to a disk |
 | `GCP::Compute::ExternalVpnGateway` | Describes the *other* end of a VPN: the on-prem or other-cloud device, by its public IP(s) |
 | `GCP::Compute::Firewall` | VPC firewall rule |
