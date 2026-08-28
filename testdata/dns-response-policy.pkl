@@ -1,0 +1,23 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/responsePolicy.pkl" as responsePolicy
+import "./config/vars.pkl" as v
+
+// Cloud DNS calls this resource's identifier "responsePolicyName"; a forma
+// declares "name" like every other resource here and the plugin translates.
+forma {
+  v.stack
+  v.target
+
+  new responsePolicy.ResponsePolicy {
+    label = "plugin-sdk-test-dns-response-policy"
+    name = "formae-test-dns-rp-\(v.testRunID)"
+    description = "Test response policy for plugin SDK conformance tests"
+  }
+}

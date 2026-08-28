@@ -1,0 +1,94 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS Response Policy Rule
+///
+/// Overrides what one DNS name resolves to for the networks attached to the
+/// rule's response policy. The policy on its own changes nothing; a rule is
+/// where the override is written.
+///
+/// Rules live under their policy (`.../responsePolicies/{policy}/rules/{rule}`)
+/// and Cloud DNS calls a rule's identifier `ruleName`. A forma declares `name`,
+/// as it does everywhere else here, and the plugin translates at the API
+/// boundary. The collection is `rules` in the URL but `responsePolicyRules` in
+/// a list response.
+module gcp.dns.responsePolicyRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::ResponsePolicyRule"
+
+/// Answer the rule returns instead of the real one. Mutually exclusive with
+/// `behavior`.
+@gcp.SubResourceHint
+open class LocalDataRecordSet extends formae.SubResource {
+    /// Fully qualified domain name, with the trailing dot.
+    @gcp.FieldHint
+    name: String
+
+    /// Record type, e.g. "A", "AAAA", "CNAME".
+    @gcp.FieldHint
+    type: String
+
+    /// Time to live, in seconds.
+    @gcp.FieldHint
+    ttl: Int?
+
+    /// The record data, e.g. ["10.0.0.1"].
+    @gcp.FieldHint
+    rrdatas: Listing<String>?
+}
+
+@gcp.SubResourceHint
+open class LocalData extends formae.SubResource {
+    @gcp.FieldHint
+    localDatas: Listing<LocalDataRecordSet>?
+}
+
+open class ResponsePolicyRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ResponsePolicyRuleResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ResponsePolicyRule extends formae.Resource {
+    hidden parent = this
+
+    /// User-assigned rule name. Immutable. Sent to the API as `ruleName`.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Name of the owning response policy. A path component, not a body field —
+    /// pass `policy.res.name` so formae creates the policy first.
+    @gcp.FieldHint { createOnly = true }
+    responsePolicy: (String|formae.Resolvable)
+
+    /// The DNS name this rule answers for, with the trailing dot
+    /// (e.g. "internal.example.com."). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    dnsName: String
+
+    /// The answer to return. Mutually exclusive with `behavior`.
+    @gcp.FieldHint
+    localData: LocalData?
+
+    /// Set to "bypassResponsePolicy" to let the query through untouched instead
+    /// of answering it. Mutually exclusive with `localData`.
+    @gcp.FieldHint
+    behavior: String?
+
+    hidden res: ResponsePolicyRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -12,6 +12,23 @@ formae agent.
 
 ### Added
 
+- `GCP::DNS::Policy` — governs resolution for the VPC networks attached to it:
+  inbound forwarding from an on-premises resolver, alternative name servers,
+  and query logging. A policy attached to no network is valid and applies to
+  nothing.
+- `GCP::DNS::ResponsePolicy` — the container for rules that override resolution
+  for its networks, the private-DNS equivalent of a hosts file.
+- `GCP::DNS::ResponsePolicyRule` — one override, saying what a given DNS name
+  resolves to. Discovered by walking the response policies, since discovery
+  lists with no properties and Cloud DNS has no wildcard for that segment.
+
+  Cloud DNS does not agree with itself about what an identifier is called: a
+  managed zone and a policy use `name`, a response policy uses
+  `responsePolicyName`, a rule uses `ruleName`. A forma declares `name` for all
+  of them and the plugin translates at the API boundary, so the inconsistency
+  stays inside the plugin. The rule collection is likewise `rules` in the URL
+  but `responsePolicyRules` in a list response.
+
 - `GCP::SQL::User` — a database user on a Cloud SQL instance. An instance ships
   with no usable login of its own, so this is what makes one reachable by an
   application. `password` is write-only and createOnly: the API never returns
