@@ -12,7 +12,25 @@
 # fails with "The IP range specified overlaps with a reserved IP range".
 #
 # Streams and routes are removed first: a private connection in use will not go.
+#
+# Scoped to ONE case's resources: the matrix runs the Datastream cases in
+# parallel and this is invoked between phases while siblings are still live, so
+# a project-wide sweep here would delete another job's resources mid-run.
 set -uo pipefail
+
+CASE="${1:-all}"
+case "$CASE" in
+    # Each case names its resources after itself; see the fixtures.
+    datastream-stream)             PREFIX_RE="formae-test-(src|dst|stream)-" ;;
+    datastream-private-connection) PREFIX_RE="formae-test-pc-" ;;
+    datastream-route)              PREFIX_RE="formae-test-(rt-pc|route)-" ;;
+    datastream-connection-profile) PREFIX_RE="formae-test-cp-" ;;
+    all)                           PREFIX_RE="formae-test-" ;;
+    *)
+        echo "clean-datastream-case: nothing to do for '${CASE}'"
+        exit 0
+        ;;
+esac
 
 PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
 LOCATION="${GCP_LOCATION:-}"
@@ -29,10 +47,10 @@ names_in() { # collection URL -> test-owned resource names
     curl -s -H "Authorization: Bearer ${TOKEN}" "$1" \
         | grep -o "\"name\": *\"[^\"]*\"" \
         | sed -E 's/.*"(projects\/[^"]*)".*/\1/' \
-        | grep "formae-test-" || true
+        | grep -E "${PREFIX_RE}" || true
 }
 
-echo "Cleaning GCP datastream resources..."
+echo "Cleaning GCP datastream resources (${CASE})..."
 
 for stream in $(names_in "${base}/streams"); do
     echo "  Deleting stream: $(basename "$stream")"

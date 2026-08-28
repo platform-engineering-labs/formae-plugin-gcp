@@ -14,7 +14,29 @@
 #
 # Snapshots live inside their instance and go with it; backups outlive it and
 # must be deleted on their own.
+#
+# Scoped to ONE case's resources, because the matrix runs the Filestore cases in
+# parallel and this is invoked between phases while siblings are still live. A
+# project-wide sweep here deleted another job's instance mid-run, and that job
+# then failed at Sync with "Inventory should still contain exactly 1 resource
+# after sync, got 0" - the resource was genuinely gone, killed by this script.
+#
+# The argument is the test case name, or "all" for the whole-environment sweep
+# in clean-environment.sh, which runs when nothing else does.
 set -uo pipefail
+
+CASE="${1:-all}"
+case "$CASE" in
+    # Each case names its resources after itself; see the fixtures.
+    filestore-backup)   PREFIX="formae-test-bkp" ;;
+    filestore-snapshot) PREFIX="formae-test-snap" ;;
+    filestore-instance) PREFIX="formae-test-fs" ;;
+    all)                PREFIX="formae-test-" ;;
+    *)
+        echo "clean-filestore-case: nothing to do for '${CASE}'"
+        exit 0
+        ;;
+esac
 
 PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
 TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
@@ -32,10 +54,10 @@ names_in() { # collection URL -> test-owned resource names
     curl -s -H "Authorization: Bearer ${TOKEN}" "$1" \
         | grep -o "\"name\": *\"[^\"]*\"" \
         | sed -E 's/.*"(projects\/[^"]*)".*/\1/' \
-        | grep "formae-test-" || true
+        | grep "${PREFIX}" || true
 }
 
-echo "Cleaning GCP filestore resources..."
+echo "Cleaning GCP filestore resources (${CASE}, prefix ${PREFIX})..."
 
 for backup in $(names_in "${all}/backups"); do
     echo "  Deleting backup: $(basename "$backup")"

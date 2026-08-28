@@ -14,7 +14,22 @@
 #
 # Deleting a CA needs skipGracePeriod: without it the CA moves to state DELETED
 # and lingers - and is still billed - for 30 days.
+# Scoped to ONE case's resources: the matrix runs the private CA cases in
+# parallel, so a project-wide sweep between phases would delete another job's
+# certificate authority mid-run.
 set -uo pipefail
+
+CASE="${1:-all}"
+case "$CASE" in
+    certificateauthority-certificate-authority) PREFIX_RE="formae-test-ca-" ;;
+    certificateauthority-certificate-template)  PREFIX_RE="formae-test-tmpl-" ;;
+    certificateauthority-capool)                PREFIX_RE="formae-test-pool-" ;;
+    all)                                        PREFIX_RE="formae-test-" ;;
+    *)
+        echo "clean-privateca: nothing to do for '${CASE}'"
+        exit 0
+        ;;
+esac
 
 PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
 LOCATION="${GCP_LOCATION:-}"
@@ -31,10 +46,10 @@ names_in() { # collection URL, items key -> test-owned resource names
     curl -s -H "Authorization: Bearer ${TOKEN}" "$1" \
         | grep -o "\"name\": *\"[^\"]*\"" \
         | sed -E 's/.*"(projects\/[^"]*)".*/\1/' \
-        | grep "formae-test-" || true
+        | grep -E "${PREFIX_RE}" || true
 }
 
-echo "Cleaning GCP private CA resources..."
+echo "Cleaning GCP private CA resources (${CASE})..."
 
 # Certificate authorities first: a pool holding one cannot be deleted. The "-"
 # wildcard asks across every pool at once.
