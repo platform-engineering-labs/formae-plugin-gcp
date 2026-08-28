@@ -27,6 +27,16 @@ formae agent.
 
 ### Added
 
+- `iamConfiguration` on `GCP::Storage::Bucket`, so a forma can say whether a
+  bucket uses uniform bucket-level access. A UBLA bucket is controlled by IAM
+  alone and rejects ACLs outright, so without this field a bucket meant to carry
+  a `BucketAccessControl` depended on a project or organisation default.
+
+- Conformance cases for `GCP::Storage::BucketAccessControl` and
+  `GCP::Storage::DefaultObjectAccessControl`. Both shipped without one.
+  `GCP::Storage::ObjectAccessControl` still has none: it needs an object to
+  attach to, and there is no `GCP::Storage::Object` type.
+
 - Conformance cases for `GCP::Compute::Address`, `GCP::Compute::TargetPool`,
   `GCP::Compute::BackendBucket`, `GCP::Compute::TargetHttpsProxy`,
   `GCP::Compute::TargetSslProxy`, `GCP::Compute::RouterNat` and
