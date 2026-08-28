@@ -158,6 +158,10 @@ func init() {
 				CreateIDParam:      "appProfileId",
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true,
+				// Bigtable refuses to delete an app profile without this, and
+				// refuses to update one that changes routing without it either.
+				UpdateQueryParams: map[string]string{"ignoreWarnings": "true"},
+				DeleteQueryParams: map[string]string{"ignoreWarnings": "true"},
 			},
 			RequestTransformer: &base.CompositeRequestTransformer{Transformers: []base.RequestTransformer{
 				base.DropFields("instance"),
