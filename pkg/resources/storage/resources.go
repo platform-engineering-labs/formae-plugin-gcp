@@ -215,6 +215,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	registerBucketWalkingLists()
 }
 
 // bucketScopedResponseTransformer puts back the bucket a folder belongs to and
