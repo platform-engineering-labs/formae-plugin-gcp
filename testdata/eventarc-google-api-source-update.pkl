@@ -12,12 +12,12 @@ import "./config/vars.pkl" as v
 
 // A googleApiSource needs only the bus it feeds.
 //
-// Pins europe-west4. Eventarc Advanced rejects GCP_LOCATION's europe-central2,
+// Pins europe-west3. Eventarc Advanced rejects GCP_LOCATION's europe-central2,
 // and only ONE message bus is allowed per project per region — europe-west1,
-// us-central1 and us-east1 are already claimed by the eventarc-message-bus,
+// us-central1 and us-east4 are already claimed by the eventarc-message-bus,
 // eventarc-pipeline and eventarc-enrollment cases. Only one googleApiSource is
 // allowed per project per region too, so the region has to be its own either way.
-local region = "europe-west4"
+local region = "europe-west3"
 
 local bus = new messageBus.MessageBus {
   label = "plugin-sdk-test-gas-bus"

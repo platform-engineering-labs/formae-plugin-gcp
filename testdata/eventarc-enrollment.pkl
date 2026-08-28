@@ -14,11 +14,11 @@ import "./config/vars.pkl" as v
 // An enrollment needs both halves of an Advanced setup: the bus its CEL matches
 // against, and the pipeline matching events are handed to.
 //
-// Pins us-east1. Eventarc Advanced rejects GCP_LOCATION's europe-central2, and
+// Pins us-east4. Eventarc Advanced rejects GCP_LOCATION's europe-central2, and
 // only ONE message bus is allowed per project per region — europe-west1 and
 // us-central1 are already claimed by the eventarc-message-bus and
 // eventarc-pipeline cases, so this one needs a third Advanced region.
-local region = "us-east1"
+local region = "us-east4"
 
 local bus = new messageBus.MessageBus {
   label = "plugin-sdk-test-en-bus"
