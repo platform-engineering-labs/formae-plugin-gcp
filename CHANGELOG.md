@@ -12,6 +12,13 @@ formae agent.
 
 ### Added
 
+- `GCP::PubSub::TopicIamMember` and `GCP::PubSub::SubscriptionIamMember` - a
+  single (role, member) binding on a topic's or subscription's IAM policy,
+  managed read-modify-write so sibling bindings survive. A binding is modelled
+  rather than the whole policy because a policy is shared with principals
+  outside the forma - GCP's own service agents write to it - and declaring the
+  whole policy would delete their bindings on every apply.
+
 - `GCP::Compute::RegionSnapshot` - a regional incremental disk backup. Distinct
   from the global `Snapshot` already shipped: that one lives at
   `/global/snapshots`, this one at `/regions/{region}/snapshots` and stays in

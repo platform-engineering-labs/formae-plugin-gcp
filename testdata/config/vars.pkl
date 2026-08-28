@@ -11,6 +11,9 @@ local stackName = "plugin-sdk-test-stack"
 
 // Read GCP config from environment variables
 gcpProject = read("env:GCP_PROJECT_ID")
+// Some GCP principals are named by project number rather than id - notably the
+// service agents, e.g. service-{number}@gs-project-accounts.iam.gserviceaccount.com.
+gcpProjectNumber = read("env:GCP_PROJECT_NUMBER")
 gcpRegion = read("env:GCP_REGION")
 gcpZone = read("env:GCP_ZONE")
 gcpLocation = read("env:GCP_LOCATION")
