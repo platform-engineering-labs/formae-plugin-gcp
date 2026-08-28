@@ -114,18 +114,12 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=15"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;
-  filestore-instance|filestore-snapshot)
+  filestore-instance)
     # Filestore BASIC/BASIC_HDD is zonal: its location must be a zone, not a
     # region. The shared GCP_LOCATION secret is a region, so override it with
     # the zone for these tests only.
     #
-    # The snapshot case builds an instance first, which takes minutes, so it
-    # also needs more than the 5m default.
     export GCP_LOCATION="$GCP_ZONE"
-    if [ "$TEST_CASE" = "filestore-snapshot" ]; then
-      TIMEOUT_ARG="TIMEOUT=30"
-      export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
-    fi
     ;;
   filestore-backup)
     # Deliberately NOT the zone override above. A backup is regional and the

@@ -50,7 +50,11 @@ formae agent.
   `/global/snapshots`, this one at `/regions/{region}/snapshots` and stays in
   its region.
 
-- `GCP::Filestore::Backup` and `GCP::Filestore::Snapshot`. A backup copies one
+- `GCP::Filestore::Backup` and `GCP::Filestore::Snapshot`. `Snapshot` ships
+  without a conformance case: every tier that supports snapshots is
+  enterprise-class, and `EnterpriseStorageGibPerRegion` is 0 in the shared test
+  project, so a create cannot succeed there at all. Raising that quota is what
+  would let the case exist. A backup copies one
   file share and outlives the instance it came from; a snapshot lives inside the
   instance and goes when it does.
 

@@ -14,6 +14,14 @@
 /// the BASIC tiers do not, and answer "The service tier of the specified
 /// instance doesn't support snapshots" at create. `Backup` is what a BASIC
 /// instance uses instead.
+///
+/// **This type has no conformance case, and cannot have one in the shared test
+/// project.** Every tier that supports snapshots is enterprise-class, and those
+/// count against `EnterpriseStorageGibPerRegion`, which is 0 there - a create
+/// answers "Quota limit 'EnterpriseStorageGibPerRegion' has been exceeded.
+/// Limit: 0". Raising that quota (1024 GiB is the tier minimum) is what would
+/// let the case exist; until then this type ships unverified against the live
+/// API.
 module gcp.filestore.filestoreSnapshot
 
 import "../gcp.pkl"
