@@ -850,6 +850,8 @@ fi
 # silent no-op: the missing subcommand went to /dev/null and every leftover
 # survived. clean-eventarc-case.sh already talks REST for exactly this reason,
 # so reuse it rather than keeping a second, dead copy.
+"$(dirname "$0")/clean-analyticshub.sh"
+
 echo "Cleaning GCP eventarc Advanced resources..."
 "$(dirname "$0")/clean-eventarc-case.sh" all
 

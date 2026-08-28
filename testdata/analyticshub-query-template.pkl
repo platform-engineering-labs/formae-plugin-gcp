@@ -1,0 +1,40 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/analyticshub/dataExchange.pkl"
+import "@gcp/analyticshub/queryTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// Query templates only exist inside a data clean room, so the exchange declares
+// dcrExchangeConfig rather than the default sharing environment. A default
+// exchange rejects them.
+local cleanRoom = new dataExchange.DataExchange {
+  label = "plugin-sdk-test-ah-clean-room"
+  name = "formae_plugin_sdk_test_cr_\(v.testRunID)"
+  location = v.gcpLocation
+  displayName = "formae plugin sdk test clean room"
+  sharingEnvironmentConfig = new dataExchange.SharingEnvironmentConfig {
+    dcrExchangeConfig = new dataExchange.DcrExchangeConfig {}
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  cleanRoom
+
+  new queryTemplate.QueryTemplate {
+    label = "plugin-sdk-test-analyticshub-query-template"
+    name = "formae_plugin_sdk_test_qt_\(v.testRunID)"
+    location = v.gcpLocation
+    dataExchange = cleanRoom.res.name
+    displayName = "formae plugin sdk test query template"
+    description = "Created by the formae GCP plugin conformance suite."
+  }
+}

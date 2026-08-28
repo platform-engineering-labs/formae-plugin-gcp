@@ -1,0 +1,91 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Analytics Hub DataExchange
+///
+/// The container a publisher shares data through: listings are published into
+/// an exchange, and subscribers browse it. An exchange is metadata only - it
+/// holds no data itself and costs nothing.
+module gcp.analyticshub.dataExchange
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AnalyticsHub::DataExchange"
+
+/// A default exchange shares whole datasets. A data clean room (`dcrExchangeConfig`)
+/// shares only query results, and is what `QueryTemplate` attaches to.
+@gcp.SubResourceHint
+open class DcrExchangeConfig extends formae.SubResource {
+}
+
+@gcp.SubResourceHint
+open class DefaultExchangeConfig extends formae.SubResource {
+}
+
+@gcp.SubResourceHint
+open class SharingEnvironmentConfig extends formae.SubResource {
+    @gcp.FieldHint
+    defaultExchangeConfig: DefaultExchangeConfig?
+
+    @gcp.FieldHint
+    dcrExchangeConfig: DcrExchangeConfig?
+}
+
+open class DataExchangeResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DataExchangeResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class DataExchange extends formae.Resource {
+    hidden parent = this
+
+    /// Short exchange id. Immutable. Letters, digits and underscores only -
+    /// Analytics Hub rejects hyphens.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the exchange. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// Human-readable name. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    documentation: String?
+
+    @gcp.FieldHint
+    primaryContact: String?
+
+    /// DISCOVERY_TYPE_PRIVATE (the default) or DISCOVERY_TYPE_PUBLIC.
+    @gcp.FieldHint { hasProviderDefault = true }
+    discoveryType: String?
+
+    /// Fixed at creation: a default exchange cannot become a clean room.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    sharingEnvironmentConfig: SharingEnvironmentConfig?
+
+    /// How many listings the exchange holds. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    listingCount: Int?
+
+    hidden res: DataExchangeResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/analyticshub/dataExchange.pkl"
+import "./config/vars.pkl" as v
+
+// An exchange stands on its own - it is metadata, holds no data and costs
+// nothing.
+//
+// Analytics Hub ids allow only letters, digits and underscores, so unlike every
+// other fixture here the name is underscore-separated: a hyphen is rejected at
+// create.
+forma {
+  v.stack
+  v.target
+
+  new dataExchange.DataExchange {
+    label = "plugin-sdk-test-analyticshub-data-exchange"
+    name = "formae_plugin_sdk_test_de_\(v.testRunID)"
+    location = v.gcpLocation
+    displayName = "formae plugin sdk test exchange"
+    description = "Updated by the formae GCP plugin conformance suite."
+    primaryContact = "conformance@example.com"
+  }
+}

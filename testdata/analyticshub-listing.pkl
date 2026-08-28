@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/analyticshub/dataExchange.pkl"
+import "@gcp/analyticshub/listing.pkl"
+import "@gcp/bigquery/dataset.pkl"
+import "./config/vars.pkl" as v
+
+// A listing publishes a BigQuery dataset into an exchange, so it needs both.
+// The dataset must live in the same region as the exchange.
+//
+// Analytics Hub and BigQuery ids both allow only letters, digits and
+// underscores, so these names are underscore-separated.
+local ds = new dataset.Dataset {
+  label = "plugin-sdk-test-ah-dataset"
+  project = v.gcpProject
+  datasetId = "formae_plugin_sdk_test_ah_ds_\(v.testRunID)"
+  location = v.gcpLocation
+}
+
+local exchange = new dataExchange.DataExchange {
+  label = "plugin-sdk-test-ah-listing-exchange"
+  name = "formae_plugin_sdk_test_le_\(v.testRunID)"
+  location = v.gcpLocation
+  displayName = "formae plugin sdk test listing exchange"
+}
+
+forma {
+  v.stack
+  v.target
+
+  ds
+  exchange
+
+  new listing.Listing {
+    label = "plugin-sdk-test-analyticshub-listing"
+    name = "formae_plugin_sdk_test_li_\(v.testRunID)"
+    location = v.gcpLocation
+    // Resolvables -> the dataset and the exchange exist first, and the plugin
+    // expands the bare dataset id into the full path Analytics Hub wants.
+    dataExchange = exchange.res.name
+    displayName = "formae plugin sdk test listing"
+    bigqueryDataset = new listing.BigQueryDatasetSource {
+      dataset = ds.res.datasetId
+    }
+    description = "Created by the formae GCP plugin conformance suite."
+  }
+}

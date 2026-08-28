@@ -12,6 +12,21 @@ formae agent.
 
 ### Added
 
+- `GCP::AnalyticsHub::DataExchange`, `GCP::AnalyticsHub::Listing` and
+  `GCP::AnalyticsHub::QueryTemplate` - the whole creatable surface of Analytics
+  Hub. An exchange is the container a publisher shares through, a listing
+  publishes one BigQuery dataset into an exchange, and a query template is the
+  data-clean-room construct that lets a subscriber run a routine against shared
+  data without seeing the rows.
+
+  Neither listings nor query templates have a URL spanning exchanges, and there
+  is no wildcard in the parent position, so discovery - which lists with no
+  parent to name - walks the exchanges and asks each one.
+
+  Analytics Hub ids allow only letters, digits and underscores, so its test
+  fixtures are underscore-named where every other fixture here is
+  hyphen-named - and its cleanup sweep greps accordingly.
+
 - `GCP::Eventarc::Enrollment` - the routing rule of an Eventarc Advanced setup:
   a CEL expression matched against the events on a `MessageBus`, and the
   `Pipeline` matching events are handed to. A bus without an enrollment routes
