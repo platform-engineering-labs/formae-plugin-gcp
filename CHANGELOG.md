@@ -10,6 +10,15 @@ formae agent.
 
 ## [Unreleased]
 
+### Added
+
+- `GCP::PubSub::Snapshot` - captures a subscription's acknowledgement state so
+  the subscription can later be seeked back to it. Pub/Sub creates a snapshot by
+  `PUT`ting to its resource path, and the create body is not the resource: it
+  takes the `subscription` to snapshot, while the snapshot itself reports only
+  the `topic` that subscription was attached to. `subscription` is therefore
+  write-only, so it is sent on create and left out of drift detection.
+
 ### Fixed
 
 - A `GCP::Compute::DiskAsyncReplication` no longer plans a replacement of itself.
