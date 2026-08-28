@@ -214,6 +214,8 @@ func init() {
 
 	// Override registrations with BigtableProvisioner for proper Create handling
 	// BigtableProvisioner adds the required instance_id/cluster_id/table_id query parameters
+	registerInstanceWalkingLists()
+
 	bigtableResourceTypes := []string{InstanceResourceType, ClusterResourceType, TableResourceType}
 	for _, rt := range bigtableResourceTypes {
 		resourceType := rt // capture by value for closure
