@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- Six server-populated Compute fields are marked as provider defaults, so a
+  forma that does not declare them no longer reports drift the moment the
+  resource is created: `Address.labelFingerprint`, `effectiveLabels`,
+  `terraformLabels`, `users` and `selfLink`; `TargetHttpsProxy.fingerprint` and
+  `RegionTargetHttpsProxy.fingerprint`; `TargetSslProxy.proxyHeader`; and
+  `ForwardingRule.labelFingerprint`. Each was reported as "not expected and not
+  a provider default" the first time a conformance case exercised the type.
+
 - A successful long-running operation is no longer reported as a failure. The
   status checker treated the mere presence of an `error` key as a failure, but a
   finished operation may carry `"error": {}` - present and empty, which is an

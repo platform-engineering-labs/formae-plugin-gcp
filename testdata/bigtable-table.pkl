@@ -42,6 +42,7 @@ forma {
     name = "formae-test-table-\(v.testRunID)"
     columnFamilies = new Mapping {
       ["cf1"] = new table.ColumnFamily {
+        name = "cf1"
         gcRule = new table.GCRule {
           maxNumVersions = 1
         }

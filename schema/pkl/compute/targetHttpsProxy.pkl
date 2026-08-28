@@ -84,7 +84,10 @@ open class TargetHttpsProxy extends formae.Resource {
     }
     tlsEarlyData: TlsEarlyData?
 
+    /// Hash of the proxy's contents, used for optimistic locking. Set by the
+    /// API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     fingerprint: String?
 
