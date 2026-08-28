@@ -1,0 +1,58 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Bigtable Logical View
+///
+/// A named SQL query over Bigtable data, evaluated on read. Where a
+/// materialized view precomputes its answer, a logical view is resolved each
+/// time it is queried — so it costs nothing to keep and always reflects the
+/// current table.
+///
+/// Views live under their instance (`.../instances/{instance}/logicalViews/{name}`).
+module gcp.bigtable.logical_view
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Bigtable::LogicalView"
+
+open class LogicalViewResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: LogicalViewResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class LogicalView extends formae.Resource {
+    hidden parent = this
+
+    /// Short view id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning instance. A path component, not a body field —
+    /// pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// The SQL query defining the view. Patchable.
+    @gcp.FieldHint
+    query: String
+
+    /// Refuses deletion while set.
+    @gcp.FieldHint { hasProviderDefault = true }
+    deletionProtection: Boolean?
+
+    hidden res: LogicalViewResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -244,10 +244,15 @@ func parseBigtableNativeID(nativeID string) (base.PathContext, error) {
 				}
 				i++
 			}
-		case "materializedViews":
-			// Materialized views are directly under instances
-			if i+1 < len(parts) {
-				ctx.ResourceType = "materializedViews"
+		default:
+			// Every other Bigtable collection - materializedViews, appProfiles,
+			// logicalViews, authorizedViews - sits directly under its instance
+			// and needs no special handling. This used to be a per-collection
+			// case, which meant an unlisted collection parsed to an empty
+			// resource type and read nothing, silently. Only "projects" and the
+			// cluster-scoped backups above are genuinely special.
+			if i > 0 && i+1 < len(parts) && parts[i-1] == instanceName {
+				ctx.ResourceType = parts[i]
 				ctx.ResourceName = parts[i+1]
 				ctx.ParentResource = instanceName
 				i++

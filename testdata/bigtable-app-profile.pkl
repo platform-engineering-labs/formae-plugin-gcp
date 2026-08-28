@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/app_profile.pkl" as appProfile
+import "./config/vars.pkl" as v
+
+// The instance whose clusters the profile routes across. Same shape as the
+// bigtable-instance case: DEVELOPMENT is the cheapest instance type.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-btap-instance"
+  project = v.gcpProject
+  name = "formae-test-btap-\(v.testRunID)"
+  displayName = "Plugin SDK App Profile Host"
+  type = "DEVELOPMENT"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  // Multi-cluster routing with the defaults: an empty mapping is how the API
+  // takes "route anywhere, fail over as needed".
+  new appProfile.AppProfile {
+    label = "plugin-sdk-test-bigtable-app-profile"
+    name = "formae-test-btap-profile-\(v.testRunID)"
+    instance = inst.res.name
+    description = "Test app profile for plugin SDK conformance tests"
+    multiClusterRoutingUseAny = new Mapping {}
+  }
+}

@@ -12,6 +12,28 @@ formae agent.
 
 ### Added
 
+- `GCP::Bigtable::AppProfile` — decides how an application's requests are routed
+  across an instance's clusters. Every instance has a default profile; this is
+  how a workload gets its own routing without affecting the rest.
+- `GCP::Bigtable::LogicalView` — a named SQL query over Bigtable data, resolved
+  on read.
+- `GCP::Bigtable::MaterializedView` — the precomputed counterpart, whose query
+  is fixed at creation. Its schema module already existed but described a
+  resource the API does not have: it demanded a `cluster` (materialized views
+  are instance-scoped) and omitted `query`, which is required. Rewritten to
+  match the API, and its `knownParityGaps` entry is gone.
+
+### Fixed
+
+- `GCP::Bigtable::Table` accepts a resolvable for `instance`. As a plain
+  `String` a table could only ever name an instance that already existed, so it
+  could not be declared in the same forma as its instance — which is why the
+  type has no conformance case to this day.
+- The Bigtable native-ID parser no longer switches on each collection by name.
+  An unlisted collection parsed to an empty resource type and read nothing,
+  silently; every instance-scoped collection now falls through one branch, with
+  cluster-scoped backups the only special case.
+
 - `GCP::DNS::Policy` — governs resolution for the VPC networks attached to it:
   inbound forwarding from an on-premises resolver, alternative name servers,
   and query logging. A policy attached to no network is valid and applies to

@@ -1,0 +1,49 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/table.pkl" as table
+import "@gcp/bigtable/logical_view.pkl" as logicalView
+import "./config/vars.pkl" as v
+
+// A logical view is a SQL query over a table, so both have to exist first.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-btlv-instance"
+  project = v.gcpProject
+  name = "formae-test-btlv-\(v.testRunID)"
+  displayName = "Plugin SDK Logical View Host"
+  type = "DEVELOPMENT"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+    }
+  }
+}
+
+local tbl = new table.Table {
+  label = "plugin-sdk-test-btlv-table"
+  project = v.gcpProject
+  instance = inst.res.name
+  name = "formae-test-btlv-table-\(v.testRunID)"
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+  tbl
+
+  new logicalView.LogicalView {
+    label = "plugin-sdk-test-bigtable-logical-view"
+    name = "formae-test-btlv-view-\(v.testRunID)"
+    instance = inst.res.name
+    query = "SELECT _key FROM `formae-test-btlv-table-\(v.testRunID)`"
+  }
+}

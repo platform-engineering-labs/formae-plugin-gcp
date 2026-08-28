@@ -6,6 +6,7 @@ package bigtable
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -19,6 +20,10 @@ const (
 	InstanceResourceType = "GCP::Bigtable::Instance"
 	ClusterResourceType  = "GCP::Bigtable::Cluster"
 	TableResourceType    = "GCP::Bigtable::Table"
+
+	AppProfileResourceType       = "GCP::Bigtable::AppProfile"
+	LogicalViewResourceType      = "GCP::Bigtable::LogicalView"
+	MaterializedViewResourceType = "GCP::Bigtable::MaterializedView"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -131,6 +136,67 @@ func init() {
 			RequestTransformer:  base.RequestTransformerFunc(wrapTableBodyBuilder),
 			ResponseTransformer: base.AddProjectResponseTransformer,
 		},
+		// The three types below take their create id as a camelCase query
+		// parameter (?appProfileId=), which CreateIDParam sends verbatim. They
+		// deliberately do NOT go through BigtableProvisioner: that derives the
+		// parameter by trimming a trailing "s" and appending "_id", which gives
+		// "appProfile_id" and is not what the API asks for.
+		{
+			ResourceType: AppProfileResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "appProfiles",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				CreateIDParam:      "appProfileId",
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true,
+			},
+			RequestTransformer: &base.CompositeRequestTransformer{Transformers: []base.RequestTransformer{
+				base.DropFields("instance"),
+				base.DropFieldsOnUpdate("name"),
+			}},
+			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
+		},
+		{
+			ResourceType: LogicalViewResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "logicalViews",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				CreateIDParam:      "logicalViewId",
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true,
+			},
+			RequestTransformer: &base.CompositeRequestTransformer{Transformers: []base.RequestTransformer{
+				base.DropFields("instance"),
+				base.DropFieldsOnUpdate("name"),
+			}},
+			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
+		},
+		{
+			// ponytail: no update. A materialized view's query is fixed at
+			// creation - the API cannot redefine one in place - and
+			// deletionProtection is the only other field, so a change replaces.
+			ResourceType: MaterializedViewResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "materializedViews",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				CreateIDParam:  "materializedViewId",
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.DropFields("instance"),
+			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
+		},
 	})
 
 	if err != nil {
@@ -158,4 +224,28 @@ func init() {
 			},
 		)
 	}
+}
+
+// instanceScopedResponseTransformer puts back what the API leaves in the
+// resource path. Bigtable reports only a full name
+// ("projects/{p}/instances/{i}/appProfiles/{a}"), so the instance a forma
+// declares would otherwise look absent and every sync would plan a change.
+func instanceScopedResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	out := make(map[string]interface{}, len(props)+1)
+	for k, v := range props {
+		if k == "etag" {
+			continue
+		}
+		out[k] = v
+	}
+	name, _ := props["name"].(string)
+	parts := strings.Split(name, "/")
+	// projects/{p}/instances/{i}/{collection}/{name}
+	if len(parts) == 6 && parts[0] == "projects" && parts[2] == "instances" {
+		out["instance"] = parts[3]
+		out["name"] = parts[5]
+	}
+	return out
 }
