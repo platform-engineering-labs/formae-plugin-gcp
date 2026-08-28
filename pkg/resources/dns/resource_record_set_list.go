@@ -6,6 +6,7 @@ package dns
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -37,6 +38,13 @@ func registerResourceRecordSetList() {
 			return &resourceRecordSetListProvisioner{
 				Provisioner: dnsRegistry.CreateProvisioner(cfg, ResourceRecordSetResourceType),
 				cfg:         cfg,
+			}
+		})
+	registry.Register(ResourceRecordSetResourceType,
+		[]resource.Operation{resource.OperationRead},
+		func(cfg *config.Config) prov.Provisioner {
+			return &resourceRecordSetReadProvisioner{
+				Provisioner: dnsRegistry.CreateProvisioner(cfg, ResourceRecordSetResourceType),
 			}
 		})
 }
@@ -100,4 +108,49 @@ func (p *resourceRecordSetListProvisioner) List(
 		}
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
+
+// resourceRecordSetReadProvisioner adds back the zone a record set belongs to.
+//
+// Cloud DNS answers a record-set read with name, type, ttl and rrdatas, and
+// nothing naming the managed zone - that lives only in the URL. So a discovered
+// record set arrived without `managedZone`, a required createOnly property, and
+// was dropped instead of entering inventory: the walk found it on every pass
+// while Discover timed out.
+//
+// This is the same defect the response policy rule had, for the same reason,
+// and it needs the same shape of fix: TransformContext carries no parent, so
+// the zone has to come from the native ID.
+type resourceRecordSetReadProvisioner struct {
+	prov.Provisioner
+}
+
+func (p *resourceRecordSetReadProvisioner) Read(
+	ctx context.Context, request *resource.ReadRequest,
+) (*resource.ReadResult, error) {
+	result, err := p.Provisioner.Read(ctx, request)
+	if err != nil || result == nil || result.ErrorCode != "" || result.Properties == "" {
+		return result, err
+	}
+
+	pathCtx, parseErr := parseDNSNativeID(request.NativeID)
+	if parseErr != nil || pathCtx.ParentResource == "" {
+		return result, nil
+	}
+
+	var props map[string]interface{}
+	if unmarshalErr := json.Unmarshal([]byte(result.Properties), &props); unmarshalErr != nil {
+		return result, nil
+	}
+	if _, present := props["managedZone"]; present {
+		return result, nil
+	}
+	props["managedZone"] = pathCtx.ParentResource
+
+	enriched, marshalErr := json.Marshal(props)
+	if marshalErr != nil {
+		return result, nil
+	}
+	result.Properties = string(enriched)
+	return result, nil
 }
