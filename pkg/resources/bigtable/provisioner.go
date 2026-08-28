@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -70,8 +71,14 @@ func (p *BigtableProvisioner) Create(
 		}
 		parent := utils.GetString(props, parentProp)
 		if parent == "" && p.ResourceConfig.ParentResource.RequiresParent {
+			// Say what was actually received. "instance is required" on its own
+			// is unfalsifiable from a CI log - the property may be absent, may
+			// be present under another name, or may be a type this code cannot
+			// read - and a plugin-side create failure carries no other
+			// diagnostic out of an apply.
 			return createBigtableFailureResult(resource.OperationErrorCodeInvalidRequest,
-				fmt.Sprintf("%s is required for nested resources", parentProp)), nil
+				fmt.Sprintf("%s is required for nested resources; got %s from properties %s",
+					parentProp, describeValue(props[parentProp]), sortedKeys(props))), nil
 		}
 		pathCtx.ParentResource = parent
 		pathCtx.ParentType = p.ResourceConfig.ParentResource.ParentType
@@ -208,4 +215,23 @@ func newBigtableProvisionerWithBase(baseResource *base.BaseResource, resourceTyp
 		BaseResource:    baseResource,
 		resourceTypeAPI: resourceTypeAPI,
 	}
+}
+
+// describeValue renders a property's Go type and value for an error message,
+// so "missing" can be told apart from "present but unreadable".
+func describeValue(v interface{}) string {
+	if v == nil {
+		return "<absent>"
+	}
+	return fmt.Sprintf("%T(%v)", v, v)
+}
+
+// sortedKeys lists the property names a request actually carried.
+func sortedKeys(props map[string]interface{}) string {
+	keys := make([]string, 0, len(props))
+	for k := range props {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
 }
