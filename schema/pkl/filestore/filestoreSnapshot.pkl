@@ -9,6 +9,11 @@
 /// A point-in-time copy of an `Instance`'s file shares, stored inside the
 /// instance itself. Unlike a `Backup`, a snapshot does not outlive its
 /// instance - deleting the instance deletes its snapshots.
+///
+/// **Not every tier supports snapshots.** ZONAL, REGIONAL and ENTERPRISE do;
+/// the BASIC tiers do not, and answer "The service tier of the specified
+/// instance doesn't support snapshots" at create. `Backup` is what a BASIC
+/// instance uses instead.
 module gcp.filestore.filestoreSnapshot
 
 import "../gcp.pkl"

@@ -11,12 +11,19 @@ import "@gcp/filestore/filestoreSnapshot.pkl" as snapshot
 import "./config/vars.pkl" as v
 
 // A snapshot lives inside its instance, in the same zone, so the instance comes
-// first. Filestore BASIC tiers are zonal, and run-conformance-case.sh points
-// GCP_LOCATION at GCP_ZONE for this case - so both inherit the zone.
+// first. run-conformance-case.sh points GCP_LOCATION at GCP_ZONE for this case,
+// so both inherit the zone.
+//
+// The instance is ZONAL, not the BASIC_HDD the other Filestore cases use:
+// "The service tier of the specified instance doesn't support snapshots".
+// Snapshots need ZONAL, REGIONAL or ENTERPRISE; the BASIC tiers only support
+// backups. ZONAL has a 1 TiB minimum and costs more per GiB than BASIC_HDD, so
+// this case is the more expensive of the two - a reason to keep it short and to
+// make sure the instance is swept afterwards (clean-filestore-case.sh).
 local sourceFs = new filestoreInstance.Instance {
   label = "plugin-sdk-test-snapshot-instance"
   name = "formae-test-snap-fs-\(v.testRunID)"
-  tier = "BASIC_HDD"
+  tier = "ZONAL"
   fileShares {
     new {
       name = "share1"
