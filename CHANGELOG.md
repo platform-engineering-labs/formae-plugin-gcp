@@ -22,6 +22,9 @@ formae agent.
   read never returns a field, and the agent keeps the last-applied value in
   state on that promise; echoing the two URLs back replaced it, and the agent
   compared them against the unresolved references an extracted forma writes.
+  The read reports absent properties rather than an empty object: the agent
+  validates required fields before it persists a resource, and both of these
+  are required, so an empty object kept a discovered pair out of the inventory.
 
 ### Fixed
 

@@ -230,6 +230,12 @@ func (p *DiskAsyncReplicationProvisioner) Create(
 // disks, then diffs against that URL on a createOnly path and plans a
 // replacement of the pair already in place. Existence is what a Read of a
 // relationship has to establish, and the checks above establish it.
+//
+// It reports absent properties rather than an empty object, because the agent
+// validates required fields on a resource it is about to persist and both of
+// these are required: an empty object fails that validation and a discovered
+// pair never reaches the inventory, while absent properties skip it. What a
+// discovered pair is, is still in its native ID.
 func (p *DiskAsyncReplicationProvisioner) Read(
 	ctx context.Context, request *resource.ReadRequest,
 ) (*resource.ReadResult, error) {
@@ -258,7 +264,7 @@ func (p *DiskAsyncReplicationProvisioner) Read(
 		}
 	}
 
-	return &resource.ReadResult{Properties: "{}"}, nil
+	return &resource.ReadResult{}, nil
 }
 
 func (p *DiskAsyncReplicationProvisioner) Update(
