@@ -1,0 +1,48 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Manager Certificate Map
+///
+/// Groups the certificates a load balancer serves, picking one per hostname
+/// through its entries. A target HTTPS proxy points at a map instead of at a
+/// single certificate, which is how one proxy serves many domains.
+module gcp.certificatemanager.certificateMap
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateManager::CertificateMap"
+
+open class CertificateMapResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CertificateMapResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class CertificateMap extends formae.Resource {
+    hidden parent = this
+
+    /// Short map id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: CertificateMapResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

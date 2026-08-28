@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Manager Trust Config
+///
+/// The set of certificate authorities a load balancer will accept client
+/// certificates from — the anchor set for mutual TLS. Without one a load
+/// balancer has nothing to validate a client certificate against.
+module gcp.certificatemanager.trustConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateManager::TrustConfig"
+
+/// A PEM-encoded certificate, used as a trust anchor or an intermediate.
+@gcp.SubResourceHint
+open class TrustCertificate extends formae.SubResource {
+    @gcp.FieldHint
+    pemCertificate: String
+}
+
+/// One store: the roots to trust, plus any intermediates needed to chain to
+/// them.
+@gcp.SubResourceHint
+open class TrustStore extends formae.SubResource {
+    @gcp.FieldHint
+    trustAnchors: Listing<TrustCertificate>?
+
+    @gcp.FieldHint
+    intermediateCas: Listing<TrustCertificate>?
+}
+
+open class TrustConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: TrustConfigResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class TrustConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Short config id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// The trust stores this config offers. A config with none is valid and
+    /// trusts nothing.
+    @gcp.FieldHint
+    trustStores: Listing<TrustStore>?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: TrustConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

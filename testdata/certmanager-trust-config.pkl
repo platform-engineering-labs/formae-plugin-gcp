@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificatemanager/trustConfig.pkl" as trustConfig
+import "./config/vars.pkl" as v
+
+// A trust config with no stores is valid and trusts nothing, which avoids
+// committing a PEM certificate to the repository just to have a fixture.
+forma {
+  v.stack
+  v.target
+
+  new trustConfig.TrustConfig {
+    label = "plugin-sdk-test-certmanager-trust-config"
+    name = "formae-test-trustcfg-\(v.testRunID)"
+    description = "Test trust config for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}
