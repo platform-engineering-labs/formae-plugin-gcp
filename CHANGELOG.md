@@ -12,6 +12,21 @@ formae agent.
 
 ### Added
 
+### Fixed
+
+- `GCP::Compute::TargetPool` no longer claims to support updates. The compute
+  API has no `patch` and no `update` for `targetPools` - only `addHealthCheck`,
+  `addInstance`, `removeHealthCheck`, `removeInstance`, `setBackup` and
+  `setSecurityPolicy` - so an update planned a PATCH to a URL the API does not
+  serve. A change now replaces. Found by writing the type's first conformance
+  case: it had shipped without one.
+
+### Added
+
+- Conformance cases for `GCP::Compute::Address`, `GCP::Compute::TargetPool` and
+  `GCP::Compute::BackendBucket`. All three shipped without one, so nothing ever
+  exercised them against the live API.
+
 - `GCP::Storage::Notification` - publishes a bucket's object change events to a
   Pub/Sub topic. Cloud Storage publishes as the project's own service agent, so
   the topic must already grant that principal `roles/pubsub.publisher`; the new

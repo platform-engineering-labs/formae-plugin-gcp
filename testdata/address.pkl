@@ -1,0 +1,54 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/address.pkl"
+import "./config/vars.pkl" as v
+
+// An INTERNAL address reserved out of a subnetwork, so the network and
+// subnetwork come first.
+//
+// Internal rather than external on purpose: a reserved external IP is billed
+// for every hour it is not attached to anything, and a conformance address is
+// never attached to anything.
+local net = new network.Network {
+  label = "plugin-sdk-test-address-network"
+  name = "formae-plugin-sdk-test-addr-net-\(v.testRunID)"
+  description = "Test network for the address conformance test"
+  autoCreateSubnetworks = false
+}
+
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-address-subnet"
+  name = "formae-plugin-sdk-test-addr-subnet-\(v.testRunID)"
+  description = "Test subnetwork for the address conformance test"
+  network = net.res.selfLink
+  ipCidrRange = "10.24.0.0/24"
+  region = v.gcpRegion
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  new address.Address {
+    label = "plugin-sdk-test-address"
+    name = "formae-plugin-sdk-test-addr-\(v.testRunID)"
+    description = "Test address for plugin SDK conformance tests"
+    region = v.gcpRegion
+    addressType = "INTERNAL"
+    // Resolvable -> the subnetwork exists before the address is reserved out
+    // of it.
+    subnetwork = subnet.res.selfLink
+    address = "10.24.0.7"
+  }
+}

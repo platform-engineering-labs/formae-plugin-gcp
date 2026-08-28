@@ -1242,7 +1242,13 @@ func init() {
 			ResponseTransformer: base.RegionResponseTransformer,
 		},
 
-		// Target Pool - Classic target pool for network load balancers
+		// Target Pool - Classic target pool for network load balancers.
+		//
+		// ponytail: update is off. targetPools has no patch and no update in the
+		// compute API - only addHealthCheck, addInstance, removeHealthCheck,
+		// removeInstance, setBackup and setSecurityPolicy - so a PATCH would go
+		// to a URL the API does not serve. It was registered as updatable, and
+		// no conformance case ever exercised it.
 		{
 			ResourceType: TargetPoolResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1250,7 +1256,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
