@@ -1,0 +1,80 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Storage Notification
+///
+/// Publishes object change events from a `Bucket` to a Pub/Sub topic.
+///
+/// **The topic must already allow it.** Cloud Storage publishes as the
+/// project's own service agent, so that principal needs `roles/pubsub.publisher`
+/// on the topic before the notification can be created - declare a
+/// `GCP::PubSub::TopicIamMember` for
+/// `serviceAccount:service-{projectNumber}@gs-project-accounts.iam.gserviceaccount.com`
+/// and reference it, or the create fails.
+///
+/// The id is assigned by GCP, so a forma does not name a notification. Every
+/// field is immutable: a change replaces.
+module gcp.storage.notification
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::Notification"
+
+/// JSON_API_V1 sends the object metadata; NONE sends an empty payload.
+typealias PayloadFormat = "JSON_API_V1"|"NONE"
+
+open class NotificationResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: NotificationResolvable = (this) {
+        property = "id"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "id"
+}
+open class Notification extends formae.Resource {
+    hidden parent = this
+
+    /// Bucket whose changes are published. A short bucket name or a Bucket
+    /// resolvable. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    bucket: (String|formae.Resolvable)
+
+    /// Topic to publish to. A short topic name or a Topic resolvable - the
+    /// plugin expands it to the `//pubsub.googleapis.com/projects/{p}/topics/{t}`
+    /// form this API wants, which is used nowhere else in GCP.
+    @gcp.FieldHint { createOnly = true }
+    topic: (String|formae.Resolvable)
+
+    @gcp.FieldHint { createOnly = true }
+    payload_format: PayloadFormat
+
+    /// Which events to publish, e.g. "OBJECT_FINALIZE", "OBJECT_DELETE". All
+    /// event types when omitted.
+    @gcp.FieldHint { createOnly = true }
+    event_types: Listing<String>?
+
+    /// Only publish for objects whose name starts with this.
+    @gcp.FieldHint { createOnly = true }
+    object_name_prefix: String?
+
+    /// Extra attributes attached to every published message.
+    @gcp.FieldHint { createOnly = true }
+    custom_attributes: Mapping<String, String>?
+
+    /// Server-assigned notification id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    id: String?
+
+    hidden res: NotificationResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

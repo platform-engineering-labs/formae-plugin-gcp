@@ -22,11 +22,26 @@ import "@formae/formae.pkl"
 
 const type = "GCP::PubSub::SubscriptionIamMember"
 
+/// Resolves to the bound subscription, so a resource that needs the binding in place
+/// before it is created can reference `binding.res.subscription` instead of the
+/// subscription itself. That is the only way to order against a binding: formae
+/// derives ordering from resolvable references, and nothing else references an
+/// IAM member.
+open class SubscriptionIamMemberResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden subscription: SubscriptionIamMemberResolvable = (this) {
+        property = "subscription"
+    }
+}
+
 @gcp.ResourceHint {
     type = module.type
     identifier = "subscription"
 }
 open class SubscriptionIamMember extends formae.Resource {
+    hidden parent = this
+
     /// Target subscription: its short name (resolved against the target's project) or
     /// a full "projects/{p}/subscriptions/{name}" path. Reference a Subscription resource's
     /// resolvable to order creation.
@@ -44,4 +59,9 @@ open class SubscriptionIamMember extends formae.Resource {
     /// IAM member, e.g. "serviceAccount:x@y.iam.gserviceaccount.com".
     @gcp.FieldHint { createOnly = true }
     member: String
+
+    hidden res: SubscriptionIamMemberResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
 }

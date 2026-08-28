@@ -12,6 +12,12 @@ formae agent.
 
 ### Added
 
+- `GCP::Storage::Notification` - publishes a bucket's object change events to a
+  Pub/Sub topic. Cloud Storage publishes as the project's own service agent, so
+  the topic must already grant that principal `roles/pubsub.publisher`; the new
+  `GCP::PubSub::TopicIamMember` is what expresses that, and the conformance case
+  declares it rather than relying on a grant made by hand.
+
 - `GCP::PubSub::TopicIamMember` and `GCP::PubSub::SubscriptionIamMember` - a
   single (role, member) binding on a topic's or subscription's IAM policy,
   managed read-modify-write so sibling bindings survive. A binding is modelled

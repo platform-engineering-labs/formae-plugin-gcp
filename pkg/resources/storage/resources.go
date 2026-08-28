@@ -10,6 +10,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // Resource type constants
@@ -19,6 +20,7 @@ const (
 	BucketAccessControlResourceType        = "GCP::Storage::BucketAccessControl"
 	DefaultObjectAccessControlResourceType = "GCP::Storage::DefaultObjectAccessControl"
 	ObjectAccessControlResourceType        = "GCP::Storage::ObjectAccessControl"
+	NotificationResourceType               = "GCP::Storage::Notification"
 )
 
 // storageRegistry is the unified registry for all Storage resources
@@ -103,6 +105,30 @@ func init() {
 			},
 			RequestTransformer:  wrapBodyBuilder(bucketScopedBodyBuilder),
 			ResponseTransformer: nil,
+		},
+		{
+			// Bucket notification - publishes object change events to a Pub/Sub
+			// topic. The id is server-assigned, so a forma does not name one.
+			ResourceType: NotificationResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "notificationConfigs",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:         "bucket", // property name in props
+					RequiresParent:     true,
+					ParentPathSegments: []string{"b"},
+				},
+				SupportsUpdate: false, // immutable: a change replaces
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(notificationRequest),
+			ResponseTransformer: base.ResponseTransformerFunc(notificationResponse),
 		},
 		{
 			ResourceType: BucketAccessControlResourceType,
