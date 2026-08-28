@@ -12,6 +12,22 @@ formae agent.
 
 ### Added
 
+- `GCP::Eventarc::Enrollment` - the routing rule of an Eventarc Advanced setup:
+  a CEL expression matched against the events on a `MessageBus`, and the
+  `Pipeline` matching events are handed to. A bus without an enrollment routes
+  nothing, so this is what makes the existing `MessageBus` and `Pipeline` types
+  useful together.
+
+- `GCP::Eventarc::GoogleApiSource` - routes this project's own Google API events
+  onto a `MessageBus`. Only one is allowed per project per region, the same
+  constraint `MessageBus` already carries.
+
+  Both name other Advanced resources through a scalar path field, so both get
+  the expand-on-write / shorten-on-read pair a forma needs to pass a resolvable
+  (`bus.res.name`) instead of hand-writing a full path - the scalar counterpart
+  of what `pipelineRequestTransformer` already does for a pipeline's nested
+  destinations.
+
 - `GCP::PubSub::Snapshot` - captures a subscription's acknowledgement state so
   the subscription can later be seeked back to it. Pub/Sub creates a snapshot by
   `PUT`ting to its resource path, and the create body is not the resource: it

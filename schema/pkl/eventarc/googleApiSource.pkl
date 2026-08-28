@@ -1,0 +1,88 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Eventarc GoogleApiSource
+///
+/// Routes this project's own Google API events onto a `MessageBus`, so an
+/// Eventarc Advanced setup can react to activity in the project itself rather
+/// than only to events published to the bus directly.
+///
+/// **Only one is allowed per project per region.** A second in the same region
+/// fails at create, so two stacks in one project need two regions - the same
+/// constraint `MessageBus` carries.
+///
+/// **Eventarc Advanced runs in a subset of regions**, so this normally declares
+/// its own `location` rather than inheriting the target's.
+module gcp.eventarc.googleApiSource
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Eventarc::GoogleApiSource"
+
+/// How much is logged about the events passing through.
+@gcp.SubResourceHint
+open class LoggingConfig extends formae.SubResource {
+    /// NONE (the GCP default), DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL,
+    /// ALERT or EMERGENCY.
+    @gcp.FieldHint
+    logSeverity: String?
+}
+
+open class GoogleApiSourceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: GoogleApiSourceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class GoogleApiSource extends formae.Resource {
+    hidden parent = this
+
+    /// Short source id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the source. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The bus events are delivered to. A short bus name or a MessageBus
+    /// resolvable; the plugin expands it to the full path.
+    @gcp.FieldHint
+    destination: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    /// Customer-managed encryption key for events at rest.
+    @gcp.FieldHint
+    cryptoKeyName: (String|formae.Resolvable)?
+
+    /// GCP fills this in with logSeverity NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    loggingConfig: LoggingConfig?
+
+    /// Server-assigned unique id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    uid: String?
+
+    hidden res: GoogleApiSourceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

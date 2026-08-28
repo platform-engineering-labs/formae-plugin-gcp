@@ -155,7 +155,10 @@ func locationResponseTransformer(collection string) base.ResponseTransformerFunc
 // a specific region, because Advanced runs in a subset of regions and rarely the
 // target's. Discovery would otherwise look only in the target's location and
 // never find them; Eventarc accepts "locations/-" on list, so use it.
-var advancedCollections = map[string]bool{"messageBuses": true, "pipelines": true}
+var advancedCollections = map[string]bool{
+	"messageBuses": true, "pipelines": true,
+	"enrollments": true, "googleApiSources": true,
+}
 
 func eventarcPathBuilder(ctx base.PathContext) string {
 	if ctx.IsList && advancedCollections[ctx.ResourceType] {
