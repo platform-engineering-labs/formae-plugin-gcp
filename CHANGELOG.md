@@ -28,9 +28,13 @@ formae agent.
 ### Added
 
 - Conformance cases for `GCP::Compute::Address`, `GCP::Compute::TargetPool`,
-  `GCP::Compute::BackendBucket`, `GCP::Compute::TargetHttpsProxy` and
-  `GCP::Compute::TargetSslProxy`. All five shipped without one, so nothing ever
-  exercised them against the live API.
+  `GCP::Compute::BackendBucket`, `GCP::Compute::TargetHttpsProxy`,
+  `GCP::Compute::TargetSslProxy`, `GCP::Compute::RouterNat` and
+  `GCP::Compute::RegionTargetTcpProxy`. All seven shipped without one, so
+  nothing ever exercised them against the live API. That leaves
+  `GCP::Compute::RegionTargetHttpsProxy` as the only untested Compute type: it
+  needs a regional SSL certificate, and a regional MANAGED certificate is not
+  supported, so the case would have to commit a self-managed key pair.
 
 - `GCP::Storage::Notification` - publishes a bucket's object change events to a
   Pub/Sub topic. Cloud Storage publishes as the project's own service agent, so

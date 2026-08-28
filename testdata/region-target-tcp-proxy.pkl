@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionHealthCheck.pkl"
+import "@gcp/compute/regionBackendService.pkl"
+import "@gcp/compute/regionTargetTcpProxy.pkl"
+import "./config/vars.pkl" as v
+
+// Regional internal TCP proxy LB: RegionHealthCheck -> RegionBackendService ->
+// RegionTargetTcpProxy. A TCP proxy fronts the backend service directly - there
+// is no url map in this chain, unlike the region-http-lb case.
+//
+// The backend service protocol is TCP, which is what a TCP proxy requires, and
+// the scheme is INTERNAL_MANAGED, matching the regional LB the rest of this
+// suite builds. Nothing here boots a VM.
+forma {
+  local hc = new regionHealthCheck.RegionHealthCheck {
+    label = "plugin-sdk-test-rttp-healthcheck"
+    name = "formae-plugin-sdk-test-rttp-hc-\(v.testRunID)"
+    region = v.gcpRegion
+    type = "TCP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
+      port = 80
+      proxyHeader = "NONE"
+    }
+  }
+
+  local bs = new regionBackendService.RegionBackendService {
+    label = "plugin-sdk-test-rttp-backend-service"
+    name = "formae-plugin-sdk-test-rttp-bs-\(v.testRunID)"
+    region = v.gcpRegion
+    loadBalancingScheme = "INTERNAL_MANAGED"
+    protocol = "TCP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+
+  new regionTargetTcpProxy.RegionTargetTcpProxy {
+    label = "plugin-sdk-test-region-target-tcp-proxy"
+    name = "formae-plugin-sdk-test-rttp-\(v.testRunID)"
+    description = "Test regional target TCP proxy for plugin SDK conformance tests"
+    region = v.gcpRegion
+    // Resolvable -> the backend service exists before the proxy fronts it.
+    service = bs.res.selfLink
+  }
+}
