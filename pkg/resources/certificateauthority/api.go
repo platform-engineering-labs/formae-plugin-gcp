@@ -71,14 +71,24 @@ func parsePrivateCANativeID(nativeID string) (base.PathContext, error) {
 	}
 }
 
+// nestedInPool are the collections that only exist underneath a caPool.
+var nestedInPool = map[string]bool{"certificateAuthorities": true}
+
 // certificateAuthorityPathBuilder builds
 //
 //	/projects/{p}/locations/{l}/{resourceType}[/{name}]
 //	/projects/{p}/locations/{l}/caPools/{pool}/{resourceType}[/{name}]
 func certificateAuthorityPathBuilder(ctx base.PathContext) string {
 	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
-	if ctx.ParentType != "" && ctx.ParentResource != "" {
+	switch {
+	case ctx.ParentType != "" && ctx.ParentResource != "":
 		path = fmt.Sprintf("%s/%s/%s", path, ctx.ParentType, ctx.ParentResource)
+	case ctx.IsList && nestedInPool[ctx.ResourceType]:
+		// Discovery lists with no parent to name. privateca accepts "-" in the
+		// pool position, so ask across every pool rather than building a URL
+		// with an empty segment - which 404s, and made certificate authorities
+		// undiscoverable.
+		path += "/caPools/-"
 	}
 	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {

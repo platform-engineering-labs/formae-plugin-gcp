@@ -850,10 +850,14 @@ fi
 # silent no-op: the missing subcommand went to /dev/null and every leftover
 # survived. clean-eventarc-case.sh already talks REST for exactly this reason,
 # so reuse it rather than keeping a second, dead copy.
-"$(dirname "$0")/clean-analyticshub.sh"
-
 echo "Cleaning GCP eventarc Advanced resources..."
 "$(dirname "$0")/clean-eventarc-case.sh" all
+
+# Analytics Hub and private CA get their own scripts for the same reason:
+# gcloud cannot see those resources either, and private CA leaks cost money.
+"$(dirname "$0")/clean-analyticshub.sh"
+
+"$(dirname "$0")/clean-privateca.sh"
 
 echo "Cleaning GCP artifact registry repositories..."
 AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)

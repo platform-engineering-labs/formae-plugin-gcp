@@ -204,3 +204,34 @@ func TestCAReadTreatsDeletedAsNotFound(t *testing.T) {
 		})
 	}
 }
+
+// Discovery lists with no parent. privateca accepts "-" in the pool position,
+// so a parentless list must use it rather than emitting an empty segment.
+func TestPathBuilderUsesPoolWildcardOnList(t *testing.T) {
+	got := certificateAuthorityPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ResourceType: "certificateAuthorities", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/caPools/-/certificateAuthorities"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// A named parent still wins.
+	got = certificateAuthorityPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ParentType: "caPools", ParentResource: "pool1",
+		ResourceType: "certificateAuthorities", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/caPools/pool1/certificateAuthorities"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// A collection that is not pool-nested must not grow a wildcard.
+	got = certificateAuthorityPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ResourceType: "certificateTemplates", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/certificateTemplates"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
