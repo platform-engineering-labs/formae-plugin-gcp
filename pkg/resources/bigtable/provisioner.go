@@ -24,6 +24,26 @@ type BigtableProvisioner struct {
 	resourceTypeAPI string // "instances", "clusters", "tables"
 }
 
+// Status routes through base.StatusWithRead so a completed async create comes
+// back carrying the resource's properties.
+//
+// BigtableProvisioner embeds *base.BaseResource and overrode only Create, so it
+// inherited the raw BaseResource.Status - which reports success and nothing
+// else. UnifiedProvisioner wraps that with a Read for exactly this reason; a
+// hand-written provisioner has to do the same or the resource has no properties
+// after it is created.
+//
+// The visible symptom was a reference to a Bigtable instance never resolving:
+// with no properties on the instance there is no ".name" to read, so a table
+// declared alongside its instance reached the plugin with an unresolved
+// reference and failed with "instance is required for nested resources".
+func (p *BigtableProvisioner) Status(
+	ctx context.Context,
+	request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
+}
+
 // Create overrides the base Create to add Bigtable-specific query parameters
 func (p *BigtableProvisioner) Create(
 	ctx context.Context,
