@@ -84,6 +84,7 @@ func init() {
 		panic(err)
 	}
 
+	registerResponsePolicyList()
 	registerResponsePolicyRuleList()
 }
 

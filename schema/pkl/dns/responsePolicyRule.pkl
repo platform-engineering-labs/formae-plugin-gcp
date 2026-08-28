@@ -41,6 +41,12 @@ open class LocalDataRecordSet extends formae.SubResource {
     /// The record data, e.g. ["10.0.0.1"].
     @gcp.FieldHint
     rrdatas: Listing<String>?
+
+    /// Cloud DNS stamps every local-data record with "dns#resourceRecordSet".
+    /// Declared as a provider default so a rule does not read back with a field
+    /// no forma wrote.
+    @gcp.FieldHint { hasProviderDefault = true }
+    kind: String?
 }
 
 @gcp.SubResourceHint
