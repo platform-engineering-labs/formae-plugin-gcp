@@ -67,11 +67,13 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
-  eventarc-pipeline|eventarc-message-bus)
+  eventarc-pipeline|eventarc-message-bus|eventarc-enrollment|eventarc-google-api-source)
     # An Eventarc message bus takes ~5-6 min to create and the pipeline case
     # builds one first, so a single apply runs past the 5m default (6m20s
     # locally for the re-apply, 22m for the whole lifecycle). 15m still was not
-    # enough for Update under CI load.
+    # enough for Update under CI load. The enrollment case is the slowest of
+    # the family: it builds a bus AND a pipeline before its own resource, and
+    # timed out on Create at the 5m default.
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;

@@ -845,27 +845,13 @@ else
     echo "  No workflows found"
 fi
 
-echo "Cleaning GCP eventarc pipelines..."
-for pl_loc in europe-west1 us-central1; do
-    PLS=$(gcloud eventarc pipelines list --location="$pl_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
-    [ -z "$PLS" ] && continue
-    echo "$PLS" | while read -r pl; do
-        [ -z "$pl" ] && continue
-        echo "  Deleting pipeline: $pl ($pl_loc)"
-        gcloud eventarc pipelines delete "$pl" --location="$pl_loc" --quiet 2>/dev/null || true
-    done
-done
-
-echo "Cleaning GCP eventarc message buses..."
-for mb_loc in europe-west1 us-central1; do
-    MBS=$(gcloud eventarc message-buses list --location="$mb_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
-    [ -z "$MBS" ] && continue
-    echo "$MBS" | while read -r mb; do
-        [ -z "$mb" ] && continue
-        echo "  Deleting message bus: $mb ($mb_loc)"
-        gcloud eventarc message-buses delete "$mb" --location="$mb_loc" --quiet 2>/dev/null || true
-    done
-done
+# This gcloud has no eventarc message-buses/pipelines/enrollments/
+# google-api-sources surface at all, so the sweep that used to live here was a
+# silent no-op: the missing subcommand went to /dev/null and every leftover
+# survived. clean-eventarc-case.sh already talks REST for exactly this reason,
+# so reuse it rather than keeping a second, dead copy.
+echo "Cleaning GCP eventarc Advanced resources..."
+"$(dirname "$0")/clean-eventarc-case.sh" all
 
 echo "Cleaning GCP artifact registry repositories..."
 AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)

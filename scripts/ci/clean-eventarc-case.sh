@@ -3,7 +3,9 @@
 #
 # SPDX-License-Identifier: FSL-1.1-ALv2
 #
-# Delete the Eventarc Advanced resources one conformance case leaves behind.
+# Delete the Eventarc Advanced resources one conformance case leaves behind,
+# or - with the argument "all" - every one this project has anywhere, which is
+# what the whole-environment sweep calls.
 #
 # MessageBusesPerProjectPerRegion is 1. The pipeline case builds a bus as a
 # prerequisite and the harness spares prerequisites on Destroy, so the bus
@@ -13,11 +15,19 @@
 # gcloud has no eventarc message-buses/pipelines surface, so this talks REST.
 set -uo pipefail
 
+# Every fixture pins its location: Eventarc Advanced is not available in every
+# region, so none of them inherit the target's. And because the bus quota is 1
+# per region, each case needs a region of its own - which is why this is a map
+# and not a single default.
 case "${1:-}" in
-    # Both fixtures pin their location: Eventarc Advanced is not available in
-    # every region, so they do not inherit the target's.
-    eventarc-pipeline)    LOCATIONS="us-central1" ;;
-    eventarc-message-bus) LOCATIONS="europe-west1" ;;
+    eventarc-pipeline)           LOCATIONS="us-central1" ;;
+    eventarc-message-bus)        LOCATIONS="europe-west1" ;;
+    eventarc-enrollment)         LOCATIONS="us-east4" ;;
+    eventarc-google-api-source)  LOCATIONS="europe-west3" ;;
+    # Every region Eventarc Advanced supports (probed 2026-08-28 by POSTing
+    # messageBuses?validateOnly=true to each candidate). Listing them all means
+    # a new case's region is swept even before anyone adds it above.
+    all) LOCATIONS="us-central1 us-east4 europe-west1 europe-west3 europe-north1 asia-southeast1 australia-southeast1" ;;
     *)
         echo "clean-eventarc-case: nothing to do for '${1:-}'"
         exit 0
@@ -41,9 +51,10 @@ names_in() { # collection location -> full resource names of test leftovers
 }
 
 for loc in $LOCATIONS; do
-    # Pipelines first: a pipeline references its bus, and a referenced bus
-    # cannot be deleted.
-    for coll in pipelines messageBuses; do
+    # Referrers first, in dependency order: an enrollment names both a bus and
+    # a pipeline, a googleApiSource names a bus, and a pipeline names a bus.
+    # A referenced resource cannot be deleted.
+    for coll in enrollments googleApiSources pipelines messageBuses; do
         for name in $(names_in "$coll" "$loc"); do
             echo "  Deleting $(basename "$name") ($coll in $loc)"
             curl -s -X DELETE -H "Authorization: Bearer ${TOKEN}" \
