@@ -102,12 +102,47 @@ Workload Identity Federation (see
 [docs/gcp-github-actions-setup.md](docs/gcp-github-actions-setup.md) and the
 secrets below):
 
-- **`ci.yml`** runs the whole matrix on push to `main` and on manual dispatch.
-  It does **not** run on pull requests: a full matrix takes 80-100 minutes, and
-  every conformance workflow here shares the `gcp-conformance-tests`
-  serialization group, so a run queued behind another is usually evicted before
-  it starts. Pull requests are gated on the fast checks (build, lint, unit
-  tests, manifest, schema).
+- **`ci.yml`** resolves its conformance scope from the event:
+
+  | Event | Scope |
+  |---|---|
+  | push to `main`, `workflow_dispatch` | every case in `testdata/` |
+  | pull request | only the cases the PR touched |
+  | pull request + `full-conformance` label | every case in `testdata/` |
+
+  A pull request that touches no fixture resolves to zero cases and skips
+  `conformance-tests` and both cleanup jobs entirely, so a plumbing or refactor
+  PR does not pay for ~117 live GCP lifecycles.
+
+  Scope is computed by `scripts/ci/conformance-scope.sh`:
+
+  - Added, copied, modified or renamed `testdata/*.pkl` are in scope.
+    **Deletions are ignored** - a removed fixture has nothing left to run.
+  - An `-update` / `-replace` companion maps back to its case, since one matrix
+    entry drives the whole lifecycle. Editing only `bucket-update.pkl` still
+    runs `bucket`.
+  - `testdata/config/` is shared Pkl, not fixtures, and never becomes a case.
+  - A changed companion with no base fixture **fails the run** rather than
+    filtering to nothing and passing green.
+  - Names in `.github/conformance-pr-skip.txt` (optional; absent today) are
+    subtracted from a PR's scope. Use it for cases that cannot pass in CI
+    regardless of the diff. It does not affect push or nightly. A name in it
+    that matches no fixture fails the run, so the two cannot drift.
+
+  **Known gap:** a change under `pkg/` or `testdata/config/vars.pkl` affects
+  every resource but touches no fixture, so it resolves to an empty scope. Two
+  backstops: label the PR `full-conformance`, or rely on push-to-`main`, which
+  still runs everything. Auto-escalating a one-line `vars.pkl` edit to 117 live
+  cases costs more than it catches.
+
+  **Rough edge:** every conformance workflow here shares the
+  `gcp-conformance-tests` serialization group because they target one project,
+  and GitHub keeps only *one* run queued per group. A third concurrent run
+  evicts the waiting one, which then reports `cancelled` rather than failed.
+  PR-triggered conformance makes that more likely.
+
+  `scripts/ci/conformance-scope_test.sh` covers the mapping rules against
+  throwaway git repos - no cloud credentials - and runs in the `test-unit` job.
 - **`debug-conformance.yml`** runs only the test cases you name, against the ref
   you dispatch it on. This is how you validate a resource change on your branch
   before opening the pull request:
