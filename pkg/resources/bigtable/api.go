@@ -30,6 +30,17 @@ var BigtableOperations = base.OperationConfig{
 	OperationStatusChecker: checkBigtableOperationStatus,
 }
 
+// BigtableSyncOperations - for the collections whose create answers with the
+// resource itself rather than an Operation. appProfiles and tables do; clusters,
+// logicalViews and materializedViews return an Operation to poll.
+var BigtableSyncOperations = base.OperationConfig{
+	Synchronous:            true,
+	OperationIDExtractor:   func(map[string]interface{}) string { return "" },
+	OperationURLBuilder:    func(base.PathContext, string) string { return "" },
+	NativeIDExtractor:      extractBigtableNativeID,
+	OperationStatusChecker: func(map[string]interface{}) (bool, error) { return true, nil },
+}
+
 // BigtableNativeID configuration for Bigtable native IDs
 var BigtableNativeID = base.NativeIDConfig{
 	Format:       base.FullPathFormat,

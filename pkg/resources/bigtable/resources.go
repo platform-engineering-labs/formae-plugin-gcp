@@ -142,7 +142,12 @@ func init() {
 		// parameter by trimming a trailing "s" and appending "_id", which gives
 		// "appProfile_id" and is not what the API asks for.
 		{
-			ResourceType: AppProfileResourceType,
+			// An app profile is one of the two Bigtable creates that answer with
+			// the resource itself rather than an Operation (a table is the
+			// other). Treating it as async made base poll an operation id that
+			// was never there, against BaseURL + "/" - which answers 404.
+			ResourceType:    AppProfileResourceType,
+			OperationConfig: BigtableSyncOperations,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "appProfiles",
 				ParentResource: &base.ParentResourceConfig{
