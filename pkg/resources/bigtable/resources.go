@@ -21,9 +21,7 @@ const (
 	ClusterResourceType  = "GCP::Bigtable::Cluster"
 	TableResourceType    = "GCP::Bigtable::Table"
 
-	AppProfileResourceType       = "GCP::Bigtable::AppProfile"
-	LogicalViewResourceType      = "GCP::Bigtable::LogicalView"
-	MaterializedViewResourceType = "GCP::Bigtable::MaterializedView"
+	AppProfileResourceType = "GCP::Bigtable::AppProfile"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -167,43 +165,6 @@ func init() {
 				base.DropFields("instance"),
 				base.DropFieldsOnUpdate("name"),
 			}},
-			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
-		},
-		{
-			ResourceType: LogicalViewResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType: "logicalViews",
-				ParentResource: &base.ParentResourceConfig{
-					ParentType:     "instances",
-					PropertyName:   "instance",
-					RequiresParent: true,
-				},
-				CreateIDParam:      "logicalViewId",
-				SupportsUpdate:     true,
-				UpdateMaskFromBody: true,
-			},
-			RequestTransformer: &base.CompositeRequestTransformer{Transformers: []base.RequestTransformer{
-				base.DropFields("instance"),
-				base.DropFieldsOnUpdate("name"),
-			}},
-			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
-		},
-		{
-			// ponytail: no update. A materialized view's query is fixed at
-			// creation - the API cannot redefine one in place - and
-			// deletionProtection is the only other field, so a change replaces.
-			ResourceType: MaterializedViewResourceType,
-			ResourceConfig: base.ResourceConfig{
-				ResourceType: "materializedViews",
-				ParentResource: &base.ParentResourceConfig{
-					ParentType:     "instances",
-					PropertyName:   "instance",
-					RequiresParent: true,
-				},
-				CreateIDParam:  "materializedViewId",
-				SupportsUpdate: false,
-			},
-			RequestTransformer:  base.DropFields("instance"),
 			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
 		},
 	})

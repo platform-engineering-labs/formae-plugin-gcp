@@ -35,8 +35,6 @@ func registerInstanceWalkingLists() {
 		collection   string
 	}{
 		{AppProfileResourceType, "appProfiles"},
-		{LogicalViewResourceType, "logicalViews"},
-		{MaterializedViewResourceType, "materializedViews"},
 	} {
 		spec := spec
 		registry.Register(spec.resourceType,

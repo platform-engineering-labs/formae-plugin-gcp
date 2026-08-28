@@ -15,16 +15,27 @@ formae agent.
 - `GCP::Bigtable::AppProfile` — decides how an application's requests are routed
   across an instance's clusters. Every instance has a default profile; this is
   how a workload gets its own routing without affecting the rest.
-- `GCP::Bigtable::LogicalView` — a named SQL query over Bigtable data, resolved
-  on read.
-- `GCP::Bigtable::MaterializedView` — the precomputed counterpart, whose query
-  is fixed at creation. Its schema module already existed but described a
-  resource the API does not have: it demanded a `cluster` (materialized views
-  are instance-scoped) and omitted `query`, which is required. Rewritten to
-  match the API, and its `knownParityGaps` entry is gone.
 
 ### Fixed
 
+- `schema/pkl/bigtable/materialized_view.pkl` describes the real API. It
+  demanded a `cluster` — materialized views are instance-scoped — and omitted
+  `query`, which is required, so the module was declarable and broken on
+  contact. It still has no provisioner and remains a recorded parity gap: the
+  create query needs Bigtable SQL semantics that could not be settled from CI
+  logs.
+- `BigtableProvisioner` routes `Status` through `base.StatusWithRead`. It
+  embedded `*base.BaseResource` and overrode only `Create`, so it inherited the
+  raw `Status`, which reports success and no properties. A completed async
+  create therefore left the resource with nothing to read, and a reference to a
+  Bigtable instance never resolved — a table declared alongside its instance
+  failed with "instance is required for nested resources". Affects `Instance`,
+  `Cluster` and `Table`.
+- `BigtableProvisioner.Create` unwraps wrapped property values, as `base.Create`
+  already did. Without it any property carrying a reference read as empty.
+- An app-profile create is treated as synchronous. `appProfiles.create` answers
+  with the resource, not an Operation, so polling looked for an operation id
+  that was never there and asked the bare base URL, which answers 404.
 - `GCP::Bigtable::Table` accepts a resolvable for `instance`. As a plain
   `String` a table could only ever name an instance that already existed, so it
   could not be declared in the same forma as its instance — which is why the
