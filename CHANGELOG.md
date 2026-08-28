@@ -12,6 +12,19 @@ formae agent.
 
 ### Fixed
 
+- A successful long-running operation is no longer reported as a failure. The
+  status checker treated the mere presence of an `error` key as a failure, but a
+  finished operation may carry `"error": {}` - present and empty, which is an
+  absent status, not an error. Every affected create was reported failed after
+  it had already succeeded; formae then retried it, and the retry answered
+  "Resource ... already exists", which masked the original operation entirely.
+  An error now counts only when it carries a message or a non-zero
+  `google.rpc.Code`.
+
+  Affected Datastream, Eventarc, Certificate Authority Service and Filestore -
+  every package with an asynchronous create. All four had an identical copy of
+  the checker; they now share one in `base`.
+
 - `GCP::Datastream::Route` is discoverable. A route only exists underneath a
   private connection, and discovery lists with no parent to name, so the plugin
   asked for `/projects/{p}/locations/{l}/routes` - a 404 - and no route was ever

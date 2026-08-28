@@ -138,18 +138,7 @@ func extractCaPoolNativeID(response map[string]interface{}, ctx base.PathContext
 // checkOperationStatus reports whether a polled Operation is done, mapping a
 // present "error" to a terminal failure.
 func checkOperationStatus(op map[string]interface{}) (bool, error) {
-	done, _ := op["done"].(bool)
-	if !done {
-		return false, nil
-	}
-	if errObj, ok := op["error"].(map[string]interface{}); ok {
-		msg, _ := errObj["message"].(string)
-		if msg == "" {
-			msg = "operation failed"
-		}
-		return true, fmt.Errorf("%s", msg)
-	}
-	return true, nil
+	return base.CheckLROStatus(op)
 }
 
 // dropCAPathFields removes the fields that address the resource in the URL and

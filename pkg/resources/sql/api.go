@@ -75,7 +75,8 @@ var SQLNativeID = base.NativeIDConfig{
 // sqlPathBuilder builds SQL API paths.
 // Top-level:  /projects/{project}/{resourceType}/{name}          (e.g. instances)
 // Nested:     /projects/{project}/{parentType}/{parent}/{resourceType}/{name}
-//             (e.g. databases under an instance)
+//
+//	(e.g. databases under an instance)
 func sqlPathBuilder(ctx base.PathContext) string {
 	prefix := fmt.Sprintf("/projects/%s", ctx.Project)
 	if ctx.ParentType != "" && ctx.ParentResource != "" {
