@@ -10,6 +10,23 @@ formae agent.
 
 ## [Unreleased]
 
+### Added
+
+- `GCP::Logging::LogBucket` — where log entries are actually retained. A sink
+  routes entries into a bucket and a view is a window onto one, so this is what
+  decides how long logs live and where.
+
+  Deleting a bucket does not remove it: it enters `DELETE_REQUESTED` and stays
+  for seven days so it can be undeleted, and a get answers 200 with that state
+  rather than 404. The plugin reports a bucket in that state as gone, so an
+  out-of-band delete leaves inventory and discovery does not offer buckets on
+  their way out.
+
+  `locked` is modelled so an existing locked bucket reads correctly, but note a
+  locked bucket can never be deleted and locking cannot be undone. Every project
+  also has `_Default` and `_Required` buckets created by GCP, so discovery
+  reports two per project that nobody declared.
+
 ### Fixed
 
 - A `GCP::Compute::DiskAsyncReplication` no longer plans a replacement of itself.
