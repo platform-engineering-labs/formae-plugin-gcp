@@ -12,6 +12,13 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Datastream::Route` is discoverable. A route only exists underneath a
+  private connection, and discovery lists with no parent to name, so the plugin
+  asked for `/projects/{p}/locations/{l}/routes` - a 404 - and no route was ever
+  found. Datastream accepts `-` in the private-connection position, so a
+  parentless list now asks across every one. No parent-walking List needed,
+  unlike Analytics Hub, which has no such wildcard.
+
 - Bigtable's nested types can now reference their parent. `Table.instance`,
   `Cluster.instance`, `Backup.instance`/`cluster`/`sourceTable` and the same
   three on `MaterializedView` were plain `String`, so a forma could name a

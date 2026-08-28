@@ -184,3 +184,42 @@ func TestRouteResponseRecoversParent(t *testing.T) {
 		t.Errorf("got %+v", out)
 	}
 }
+
+// Discovery lists with no parent. Datastream accepts "-" in the
+// private-connection position, so a parentless list of routes must use it
+// rather than emitting a path with no parent - which 404s, and left routes
+// undiscoverable.
+func TestRouteListUsesPrivateConnectionWildcard(t *testing.T) {
+	got := datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "routes", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/privateConnections/-/routes"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// A named parent still wins.
+	got = datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ParentType: "privateConnections", ParentResource: "pc1",
+		ResourceType: "routes", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/privateConnections/pc1/routes"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// A top-level collection must not grow a wildcard.
+	got = datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "privateConnections", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/privateConnections"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// And the wildcard is a list-only concern: a create must not get one.
+	got = datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "routes",
+	})
+	if want := "/projects/p/locations/eu/routes"; got != want {
+		t.Errorf("create path = %q, want %q", got, want)
+	}
+}

@@ -81,8 +81,15 @@ func parseDatastreamNativeID(nativeID string) (base.PathContext, error) {
 // create: CollectionURL is also what List builds, and IsList tells them apart.
 func datastreamPathBuilder(ctx base.PathContext) string {
 	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
-	if ctx.ParentType != "" && ctx.ParentResource != "" {
+	switch {
+	case ctx.ParentType != "" && ctx.ParentResource != "":
 		path = fmt.Sprintf("%s/%s/%s", path, ctx.ParentType, ctx.ParentResource)
+	case ctx.IsList && nestedInPrivateConnection[ctx.ResourceType]:
+		// Discovery lists with no parent to name. Datastream accepts "-" in the
+		// private-connection position (verified live), so ask across every one
+		// rather than emitting a path with no parent at all - which is a 404,
+		// and made routes undiscoverable.
+		path += "/privateConnections/-"
 	}
 	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {
@@ -97,6 +104,10 @@ func datastreamPathBuilder(ctx base.PathContext) string {
 // forceOnCreate are the collections whose create must skip Datastream's
 // connectivity validation.
 var forceOnCreate = map[string]bool{"streams": true}
+
+// nestedInPrivateConnection are the collections that only exist underneath a
+// private connection.
+var nestedInPrivateConnection = map[string]bool{"routes": true}
 
 // extractOperationName returns the LRO operation name from a create/delete
 // response ("projects/{p}/locations/{l}/operations/{op}"). base.Status GETs
