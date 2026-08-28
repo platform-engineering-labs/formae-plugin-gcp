@@ -31,6 +31,12 @@ local tbl = new table.Table {
   project = v.gcpProject
   instance = inst.res.name
   name = "formae-test-btlv-table-\(v.testRunID)"
+  // A view's query reads a column family, so the table needs one.
+  columnFamilies = new Mapping {
+    ["cf"] = new table.ColumnFamily {
+      name = "cf"
+    }
+  }
 }
 
 forma {

@@ -32,13 +32,15 @@ forma {
 
   inst
 
-  // Multi-cluster routing with the defaults: an empty mapping is how the API
-  // takes "route anywhere, fail over as needed".
+  // The host instance has one cluster, so the profile pins traffic to it.
+  // multiClusterRoutingUseAny needs an instance with more than one cluster.
   new appProfile.AppProfile {
     label = "plugin-sdk-test-bigtable-app-profile"
     name = "formae-test-btap-profile-\(v.testRunID)"
     instance = inst.res.name
     description = "Updated app profile description"
-    multiClusterRoutingUseAny = new Mapping {}
+    singleClusterRouting = new appProfile.SingleClusterRouting {
+      clusterId = "cluster1"
+    }
   }
 }
