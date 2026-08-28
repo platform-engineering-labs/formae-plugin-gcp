@@ -12,11 +12,6 @@ formae agent.
 
 ### Added
 
-- `GCP::Storage::HmacKey` — the credential a service account presents to the
-  S3-compatible XML API. GCS assigns the `accessId` and returns the secret
-  exactly once; the plugin drops it rather than persisting a live credential in
-  stored state. Deleting a key requires deactivating it first, which the
-  provisioner does — GCS refuses to delete an active key.
 - `GCP::Storage::ManagedFolder` — an IAM boundary inside a bucket, letting a
   policy be attached to a prefix without granting it over the whole bucket.
   Requires uniform bucket-level access.

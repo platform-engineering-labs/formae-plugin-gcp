@@ -11,9 +11,6 @@ local stackName = "plugin-sdk-test-stack"
 
 // Read GCP config from environment variables
 gcpProject = read("env:GCP_PROJECT_ID")
-// Some resources are named after the project *number* rather than its id - an
-// HMAC key belongs to a service account whose email carries it.
-gcpProjectNumber = read("env:GCP_PROJECT_NUMBER")
 gcpRegion = read("env:GCP_REGION")
 gcpZone = read("env:GCP_ZONE")
 gcpLocation = read("env:GCP_LOCATION")
