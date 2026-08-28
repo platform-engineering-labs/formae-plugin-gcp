@@ -1,0 +1,42 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/folder.pkl" as folder
+import "./config/vars.pkl" as v
+
+// A folder is a real directory node, so its bucket must be created with a
+// hierarchical namespace - which also requires uniform bucket-level access, and
+// cannot be turned on afterwards.
+local bkt = new bucket.Bucket {
+  label = "plugin-sdk-test-folder-bucket"
+  name = "formae-plugin-sdk-test-fld-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+  iamConfiguration = new bucket.IamConfiguration {
+    uniformBucketLevelAccess = new bucket.UniformBucketLevelAccess {
+      enabled = true
+    }
+  }
+  hierarchicalNamespace = new bucket.HierarchicalNamespace {
+    enabled = true
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  bkt
+
+  new folder.Folder {
+    label = "plugin-sdk-test-storage-folder"
+    name = "formae-data/"
+    bucket = bkt.res.name
+  }
+}

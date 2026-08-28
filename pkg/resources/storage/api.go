@@ -6,6 +6,7 @@ package storage
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -77,7 +78,10 @@ func storagePathBuilder(ctx base.PathContext) string {
 	// Bucket-scoped
 	bucketName := bucketInfo
 	if ctx.ResourceName != "" {
-		return fmt.Sprintf("/b/%s/%s/%s", bucketName, ctx.ResourceType, ctx.ResourceName)
+		// A name containing a slash - a managed folder or a folder - has to be
+		// escaped, or the slash reads as another path segment. PathEscape is a
+		// no-op for every other storage name, which contains no slash.
+		return fmt.Sprintf("/b/%s/%s/%s", bucketName, ctx.ResourceType, url.PathEscape(ctx.ResourceName))
 	}
 	return fmt.Sprintf("/b/%s/%s", bucketName, ctx.ResourceType)
 }
@@ -153,7 +157,12 @@ func parseStorageNativeID(nativeID string) (base.PathContext, error) {
 	if len(parts) >= 4 && parts[0] == "b" && parts[2] != "o" {
 		ctx.ParentResource = parts[1] // bucket name
 		ctx.ResourceType = parts[2]
-		ctx.ResourceName = parts[3]
+		// Everything after the collection is the name. For an ACL entity or an
+		// anywhere cache that is a single segment and this is exactly parts[3];
+		// a managed folder or a folder is named with a trailing slash that is
+		// part of its identity ("reports/" is not "reports"), and taking one
+		// segment would silently truncate it.
+		ctx.ResourceName = strings.Join(parts[3:], "/")
 		return ctx, nil
 	}
 
