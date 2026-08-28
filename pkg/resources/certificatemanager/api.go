@@ -40,10 +40,19 @@ var CertificateManagerNativeID = base.NativeIDConfig{
 	Parser: parseCertificateManagerNativeID,
 }
 
+// certificateManagerLocation is where these resources live.
+//
+// Certificate maps, DNS authorizations and trust configs are global. Addressing
+// them at the target's region answers "Malformed name: ... [Invalid location in
+// resource URL path]", so the location is pinned rather than inherited - which
+// also keeps create and discovery pointed at the same place, unlike a fixture
+// that pins a region the discovery pass then fails to look in.
+const certificateManagerLocation = "global"
+
 // certificateManagerPathBuilder builds
-// /projects/{p}/locations/{l}[/{parentType}/{parent}]/{resourceType}[/{name}].
+// /projects/{p}/locations/global[/{parentType}/{parent}]/{resourceType}[/{name}].
 func certificateManagerPathBuilder(ctx base.PathContext) string {
-	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
+	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, certificateManagerLocation)
 	if ctx.ParentType != "" && ctx.ParentResource != "" {
 		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
 	}
@@ -63,7 +72,9 @@ func parseCertificateManagerNativeID(nativeID string) (base.PathContext, error) 
 		return base.PathContext{}, fmt.Errorf("invalid certificate manager native ID: %s", nativeID)
 	}
 	ctx := base.PathContext{
-		Project:      parts[1],
+		Project: parts[1],
+		// Always "global" for this API; kept from the id so a native ID round
+		// trips unchanged.
 		Location:     parts[3],
 		ResourceType: parts[4],
 		ResourceName: parts[5],
@@ -107,7 +118,7 @@ func extractCertificateManagerNativeID(response map[string]interface{}, ctx base
 		parent = fmt.Sprintf("%s/%s/", ctx.ParentType, ctx.ParentResource)
 	}
 	return fmt.Sprintf("projects/%s/locations/%s/%s%s/%s",
-		ctx.Project, ctx.Location, parent, ctx.ResourceType, ctx.ResourceName)
+		ctx.Project, certificateManagerLocation, parent, ctx.ResourceType, ctx.ResourceName)
 }
 
 // checkOperationStatus reports whether a polled Operation is done, mapping a

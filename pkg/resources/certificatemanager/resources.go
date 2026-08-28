@@ -20,9 +20,11 @@ func init() {
 	certificateManagerRegistry = base.NewResourceRegistry(
 		CertificateManagerAPI, CertificateManagerOperations, CertificateManagerNativeID)
 
-	// All three are location-scoped, take their id as a create-time query
-	// parameter, and patch with a query-string field mask - so the generic
-	// engine covers them without a custom provisioner.
+	// All three are global, take their id as a create-time query parameter, and
+	// patch with a query-string field mask - so the generic engine covers them
+	// without a custom provisioner. They carry no Scope: ScopeLocationBased
+	// would make List return nothing whenever the target declares no location,
+	// and the path builder pins "global" regardless.
 	err := certificateManagerRegistry.RegisterAll([]base.ResourceDefinition{
 		{
 			// A certificate map groups the certificates a load balancer serves,
@@ -30,7 +32,6 @@ func init() {
 			ResourceType: CertificateMapResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:       "certificateMaps",
-				Scope:              &base.ScopeConfig{Type: base.ScopeLocationBased},
 				CreateIDParam:      "certificateMapId",
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true,
@@ -45,7 +46,6 @@ func init() {
 			ResourceType: DnsAuthorizationResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:       "dnsAuthorizations",
-				Scope:              &base.ScopeConfig{Type: base.ScopeLocationBased},
 				CreateIDParam:      "dnsAuthorizationId",
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true,
@@ -59,7 +59,6 @@ func init() {
 			ResourceType: TrustConfigResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:       "trustConfigs",
-				Scope:              &base.ScopeConfig{Type: base.ScopeLocationBased},
 				CreateIDParam:      "trustConfigId",
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true,
