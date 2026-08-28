@@ -88,3 +88,96 @@ func TestCaPoolRegistered(t *testing.T) {
 		}
 	}
 }
+
+// A CA is addressed inside its pool; a pool and a template are not.
+func TestPrivateCAPathBuilderNesting(t *testing.T) {
+	got := certificateAuthorityPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ParentType: "caPools", ParentResource: "pool1",
+		ResourceType: "certificateAuthorities", ResourceName: "ca1",
+	})
+	if want := "/projects/p/locations/eu/caPools/pool1/certificateAuthorities/ca1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	got = certificateAuthorityPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ResourceType: "certificateTemplates", ResourceName: "t1",
+	})
+	if want := "/projects/p/locations/eu/certificateTemplates/t1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestPrivateCANativeIDParser(t *testing.T) {
+	ctx, err := parsePrivateCANativeID("projects/p/locations/eu/caPools/pool1/certificateAuthorities/ca1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ctx.ParentType != "caPools" || ctx.ParentResource != "pool1" ||
+		ctx.ResourceType != "certificateAuthorities" || ctx.ResourceName != "ca1" {
+		t.Errorf("nested parse wrong: %+v", ctx)
+	}
+
+	ctx, err = parsePrivateCANativeID("projects/p/locations/eu/certificateTemplates/t1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ctx.ResourceType != "certificateTemplates" || ctx.ResourceName != "t1" || ctx.Location != "eu" {
+		t.Errorf("top-level parse wrong: %+v", ctx)
+	}
+
+	if _, err := parsePrivateCANativeID("projects/p/locations/eu/caPools"); err == nil {
+		t.Error("a collection path is not a resource and must be rejected")
+	}
+}
+
+// The API reports a full path and never reports location or caPool as fields,
+// but a forma declares all three.
+func TestCAResponseTransformer(t *testing.T) {
+	out := caResponseTransformer(map[string]interface{}{
+		"name": "projects/p/locations/eu/caPools/pool1/certificateAuthorities/ca1",
+	}, base.TransformContext{})
+	if out["name"] != "ca1" || out["location"] != "eu" || out["caPool"] != "pool1" {
+		t.Errorf("got %+v", out)
+	}
+
+	// A pool's path must not be read as a CA's.
+	out = caResponseTransformer(map[string]interface{}{
+		"name": "projects/p/locations/eu/caPools/pool1",
+	}, base.TransformContext{})
+	if out["name"] != "projects/p/locations/eu/caPools/pool1" {
+		t.Errorf("foreign collection must be left alone: %+v", out)
+	}
+}
+
+// location and caPool address the resource in the URL; name must survive
+// because base.Create reads the create id out of it.
+func TestDropCAPathFields(t *testing.T) {
+	body, err := dropCAPathFields(map[string]interface{}{
+		"name": "ca1", "location": "eu", "caPool": "pool1", "lifetime": "1s",
+	}, base.TransformContext{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, k := range []string{"location", "caPool"} {
+		if _, ok := body[k]; ok {
+			t.Errorf("%q must not be a body field", k)
+		}
+	}
+	if body["name"] != "ca1" || body["lifetime"] != "1s" {
+		t.Errorf("got %+v", body)
+	}
+}
+
+// A CA that is merely DELETE-d sits tombstoned for 30 days, still billed.
+func TestCADeleteSkipsGracePeriod(t *testing.T) {
+	if caDeleteParams["skipGracePeriod"] != "true" {
+		t.Error("skipGracePeriod must be set or a destroy leaves the CA billed for 30 days")
+	}
+	for _, k := range []string{"ignoreActiveCertificates", "ignoreDependentResources"} {
+		if caDeleteParams[k] != "true" {
+			t.Errorf("%s must be set so a CA that issued something still tears down", k)
+		}
+	}
+}

@@ -12,6 +12,19 @@ formae agent.
 
 ### Added
 
+- `GCP::CertificateAuthority::CertificateAuthority` and
+  `GCP::CertificateAuthority::CertificateTemplate`. A CA is what actually signs;
+  a `CaPool` with no CA in it issues nothing. A template is a reusable issuance
+  policy, location-scoped rather than pool-scoped.
+
+  A CA is deleted with `skipGracePeriod`, because a plain DELETE does not delete
+  it: it moves to state DELETED and sits there for 30 days, still holding its id
+  and still billed. `ignoreActiveCertificates` and `ignoreDependentResources` go
+  along so a CA that did issue something still tears down.
+
+  Not implemented: `certificates`. The API has no delete for them - a
+  certificate can only be revoked - so they are not a CRUD resource.
+
 - `GCP::AnalyticsHub::DataExchange`, `GCP::AnalyticsHub::Listing` and
   `GCP::AnalyticsHub::QueryTemplate` - the whole creatable surface of Analytics
   Hub. An exchange is the container a publisher shares through, a listing

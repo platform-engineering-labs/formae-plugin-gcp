@@ -1,0 +1,115 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Authority Service CertificateTemplate
+///
+/// A reusable issuance policy: what a certificate requested against it may ask
+/// for, and what values are forced. A template is location-scoped rather than
+/// pool-scoped, issues nothing on its own, and costs nothing.
+module gcp.certificateauthority.certificateTemplate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateAuthority::CertificateTemplate"
+
+@gcp.SubResourceHint
+open class CaOptions extends formae.SubResource {
+    @gcp.FieldHint
+    isCa: Boolean?
+
+    @gcp.FieldHint
+    maxIssuerPathLength: Int?
+}
+
+@gcp.SubResourceHint
+open class KeyUsageOptions extends formae.SubResource {
+    @gcp.FieldHint
+    digitalSignature: Boolean?
+
+    @gcp.FieldHint
+    keyEncipherment: Boolean?
+
+    @gcp.FieldHint
+    certSign: Boolean?
+
+    @gcp.FieldHint
+    crlSign: Boolean?
+}
+
+@gcp.SubResourceHint
+open class KeyUsage extends formae.SubResource {
+    @gcp.FieldHint
+    baseKeyUsage: KeyUsageOptions?
+}
+
+/// Values a certificate issued against this template is forced to carry.
+@gcp.SubResourceHint
+open class X509Parameters extends formae.SubResource {
+    @gcp.FieldHint
+    caOptions: CaOptions?
+
+    @gcp.FieldHint
+    keyUsage: KeyUsage?
+}
+
+/// Limits on the identity a requester may ask for.
+@gcp.SubResourceHint
+open class CertificateIdentityConstraints extends formae.SubResource {
+    /// Whether the requester may set the subject.
+    @gcp.FieldHint
+    allowSubjectPassthrough: Boolean?
+
+    /// Whether the requester may set subject alternative names.
+    @gcp.FieldHint
+    allowSubjectAltNamesPassthrough: Boolean?
+}
+
+open class CertificateTemplateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CertificateTemplateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class CertificateTemplate extends formae.Resource {
+    hidden parent = this
+
+    /// Short template id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the template. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Longest lifetime a certificate issued against this template may have,
+    /// as a duration, e.g. "86400s".
+    @gcp.FieldHint
+    maximumLifetime: String?
+
+    @gcp.FieldHint
+    identityConstraints: CertificateIdentityConstraints?
+
+    @gcp.FieldHint
+    predefinedValues: X509Parameters?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: CertificateTemplateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

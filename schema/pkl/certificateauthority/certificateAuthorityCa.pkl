@@ -1,0 +1,185 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Authority Service CertificateAuthority
+///
+/// The CA that actually signs certificates. It lives inside a `CaPool`, which
+/// is what callers request certificates from; a pool with no CA in it issues
+/// nothing.
+///
+/// **A CA is billed for as long as it exists**, at a rate set by its pool's
+/// tier - DEVOPS is the cheap one, ENTERPRISE is not. Deleting a CA normally
+/// leaves it in state DELETED for a 30 day grace period; this plugin deletes
+/// with `skipGracePeriod`, so a destroy really destroys it.
+module gcp.certificateauthority.certificateAuthorityCa
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateAuthority::CertificateAuthority"
+
+/// SELF_SIGNED (a root CA) or SUBORDINATE (signed by another CA).
+typealias CaType = "SELF_SIGNED"|"SUBORDINATE"
+
+@gcp.SubResourceHint
+open class Subject extends formae.SubResource {
+    @gcp.FieldHint
+    commonName: String?
+
+    @gcp.FieldHint
+    organization: String?
+
+    @gcp.FieldHint
+    organizationalUnit: String?
+
+    @gcp.FieldHint
+    countryCode: String?
+
+    @gcp.FieldHint
+    locality: String?
+
+    @gcp.FieldHint
+    province: String?
+}
+
+@gcp.SubResourceHint
+open class SubjectConfig extends formae.SubResource {
+    @gcp.FieldHint
+    subject: Subject?
+}
+
+@gcp.SubResourceHint
+open class CaOptions extends formae.SubResource {
+    /// Must be true for a CA certificate.
+    @gcp.FieldHint
+    isCa: Boolean?
+
+    @gcp.FieldHint
+    maxIssuerPathLength: Int?
+}
+
+@gcp.SubResourceHint
+open class KeyUsageOptions extends formae.SubResource {
+    @gcp.FieldHint
+    digitalSignature: Boolean?
+
+    @gcp.FieldHint
+    contentCommitment: Boolean?
+
+    @gcp.FieldHint
+    keyEncipherment: Boolean?
+
+    @gcp.FieldHint
+    certSign: Boolean?
+
+    @gcp.FieldHint
+    crlSign: Boolean?
+}
+
+@gcp.SubResourceHint
+open class KeyUsage extends formae.SubResource {
+    @gcp.FieldHint
+    baseKeyUsage: KeyUsageOptions?
+}
+
+@gcp.SubResourceHint
+open class X509Config extends formae.SubResource {
+    @gcp.FieldHint
+    caOptions: CaOptions?
+
+    @gcp.FieldHint
+    keyUsage: KeyUsage?
+}
+
+@gcp.SubResourceHint
+open class CertificateConfig extends formae.SubResource {
+    @gcp.FieldHint
+    subjectConfig: SubjectConfig?
+
+    @gcp.FieldHint
+    x509Config: X509Config?
+}
+
+/// Which key the CA signs with. `algorithm` picks a Google-managed key;
+/// `cloudKmsKeyVersion` points at one you manage yourself.
+@gcp.SubResourceHint
+open class KeyVersionSpec extends formae.SubResource {
+    /// E.g. "RSA_PKCS1_4096_SHA256" or "EC_P256_SHA256".
+    @gcp.FieldHint
+    algorithm: String?
+
+    @gcp.FieldHint
+    cloudKmsKeyVersion: (String|formae.Resolvable)?
+}
+
+open class CertificateAuthorityResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CertificateAuthorityResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class CertificateAuthority extends formae.Resource {
+    hidden parent = this
+
+    /// Short CA id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the CA. A path component, not a body field. Must match the
+    /// pool's.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The pool this CA belongs to. A short pool name or a CaPool resolvable.
+    /// A path component, not a body field, and a CA cannot move between pools.
+    @gcp.FieldHint { createOnly = true }
+    caPool: (String|formae.Resolvable)
+
+    /// SELF_SIGNED or SUBORDINATE. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    type: CaType
+
+    /// Subject and X.509 options of the CA's own certificate. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    config: CertificateConfig
+
+    /// The signing key. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    keySpec: KeyVersionSpec
+
+    /// How long the CA certificate is valid, as a duration, e.g. "315360000s"
+    /// (10 years). Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    lifetime: String
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Bucket holding the CA's CRLs and certificates. GCP creates one when
+    /// unset.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    gcsBucket: String?
+
+    /// ENABLED, DISABLED, STAGED, AWAITING_USER_ACTIVATION or DELETED. A new CA
+    /// starts STAGED and is enabled separately. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// Billing tier, inherited from the pool. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    tier: String?
+
+    hidden res: CertificateAuthorityResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
