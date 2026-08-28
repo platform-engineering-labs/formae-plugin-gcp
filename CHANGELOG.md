@@ -12,6 +12,11 @@ formae agent.
 
 ### Added
 
+- `GCP::Compute::RegionSnapshot` - a regional incremental disk backup. Distinct
+  from the global `Snapshot` already shipped: that one lives at
+  `/global/snapshots`, this one at `/regions/{region}/snapshots` and stays in
+  its region.
+
 - `GCP::Filestore::Backup` and `GCP::Filestore::Snapshot`. A backup copies one
   file share and outlives the instance it came from; a snapshot lives inside the
   instance and goes when it does.

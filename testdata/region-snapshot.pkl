@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/regionDisk.pkl"
+import "@gcp/compute/regionSnapshot.pkl"
+import "./config/vars.pkl" as v
+
+// A regional snapshot needs a regional disk. Blank (no sourceImage) and small
+// keeps the create quick; pd-balanced is the cheap default.
+local src = new regionDisk.RegionDisk {
+  label = "plugin-sdk-test-rsnap-disk"
+  project = v.gcpProject
+  region = v.gcpRegion
+  name = "formae-plugin-sdk-test-rsnap-disk-\(v.testRunID)"
+  description = "Source regional disk for the regional snapshot test"
+  sizeGb = 10
+  type = "pd-balanced"
+  replicaZones = new Listing {
+    "\(v.gcpRegion)-a"
+    "\(v.gcpRegion)-b"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  src
+
+  new regionSnapshot.RegionSnapshot {
+    label = "plugin-sdk-test-region-snapshot"
+    name = "formae-plugin-sdk-test-rsnap-\(v.testRunID)"
+    description = "Test regional snapshot for plugin SDK conformance tests"
+    region = v.gcpRegion
+    // Resolvable -> establishes disk-before-snapshot create ordering.
+    sourceDisk = src.res.selfLink
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

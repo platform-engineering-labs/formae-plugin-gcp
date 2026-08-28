@@ -73,6 +73,7 @@ const (
 	SnapshotResourceType                           = "GCP::Compute::Snapshot"
 	InstantSnapshotResourceType                    = "GCP::Compute::InstantSnapshot"
 	RegionInstantSnapshotResourceType              = "GCP::Compute::RegionInstantSnapshot"
+	RegionSnapshotResourceType                     = "GCP::Compute::RegionSnapshot"
 	NodeTemplateResourceType                       = "GCP::Compute::NodeTemplate"
 	RegionDiskResourceType                         = "GCP::Compute::RegionDisk"
 
@@ -707,6 +708,25 @@ func init() {
 
 		// Region Instant Snapshot - the regional twin, taken from a regional
 		// disk, so it survives losing a zone. Same SSD-class source requirement.
+		// Region Snapshot - a regional incremental backup, stored in the same
+		// region as its source. Distinct from the global Snapshot above: that
+		// one lives at /global/snapshots, this one at /regions/{r}/snapshots.
+		// ponytail: as with the global snapshot, only setLabels mutates one, so
+		// update replaces.
+		{
+			ResourceType: RegionSnapshotResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "snapshots",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    false,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
 		{
 			ResourceType: RegionInstantSnapshotResourceType,
 			ResourceConfig: base.ResourceConfig{

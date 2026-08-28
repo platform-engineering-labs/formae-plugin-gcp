@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionSnapshot
+///
+/// A point-in-time incremental backup of a regional persistent disk, stored in
+/// the same region as its source.
+///
+/// This is not the global `Snapshot`: that one lives at `/global/snapshots` and
+/// can be restored anywhere, while this lives at `/regions/{region}/snapshots`
+/// and stays regional. Both exist; pick by where the backup has to live.
+///
+/// ponytail: update is off - `setLabels` needs a labelFingerprint round-trip,
+/// and nothing else on a snapshot is mutable, so a change replaces.
+module gcp.compute.regionSnapshot
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionSnapshot"
+
+typealias RegionSnapshotType = "STANDARD"|"ARCHIVE"
+
+open class RegionSnapshotResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionSnapshotResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionSnapshotResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionSnapshotResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionSnapshot extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region holding the snapshot. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    region: String
+
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// Self-link of the regional disk to snapshot. Pass `disk.res.selfLink` so
+    /// formae creates the disk first.
+    @gcp.FieldHint { createOnly = true }
+    sourceDisk: (String|formae.Resolvable)?
+
+    @gcp.FieldHint { createOnly = true }
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    snapshotType: RegionSnapshotType?
+
+    /// Size of the source disk in GB, server-populated.
+    @gcp.FieldHint { hasProviderDefault = true }
+    diskSizeGb: String?
+
+    hidden res: RegionSnapshotResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
