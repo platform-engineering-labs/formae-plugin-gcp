@@ -69,12 +69,16 @@ open class AnywhereCache extends formae.Resource {
     anywhereCacheId: String?
 
     /// The creation time of the cache instance in RFC 3339 format (output only)
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     createTime: String?
 
     /// The modification time of the cache instance metadata in RFC 3339 format (output only)
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     updateTime: String?
 
@@ -84,7 +88,9 @@ open class AnywhereCache extends formae.Resource {
     pendingUpdate: Boolean?
 
     /// The current state of the cache instance (output only)
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     state: String?
 

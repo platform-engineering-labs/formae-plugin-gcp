@@ -34,7 +34,8 @@ open class HttpHealthCheck extends formae.SubResource {
     @gcp.FieldHint
     requestPath: String?
 
-    @gcp.FieldHint
+    /// GCP fills this in with NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     proxyHeader: ProxyHeader?
 
     @gcp.FieldHint
@@ -58,7 +59,8 @@ open class HttpsHealthCheck extends formae.SubResource {
     @gcp.FieldHint
     requestPath: String?
 
-    @gcp.FieldHint
+    /// GCP fills this in with NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     proxyHeader: ProxyHeader?
 
     @gcp.FieldHint
@@ -82,7 +84,8 @@ open class Http2HealthCheck extends formae.SubResource {
     @gcp.FieldHint
     requestPath: String?
 
-    @gcp.FieldHint
+    /// GCP fills this in with NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     proxyHeader: ProxyHeader?
 
     @gcp.FieldHint
@@ -100,7 +103,8 @@ open class TcpHealthCheck extends formae.SubResource {
     @gcp.FieldHint
     portSpecification: PortSpecification?
 
-    @gcp.FieldHint
+    /// GCP fills this in with NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     proxyHeader: ProxyHeader?
 
     @gcp.FieldHint
@@ -121,7 +125,8 @@ open class SslHealthCheck extends formae.SubResource {
     @gcp.FieldHint
     portSpecification: PortSpecification?
 
-    @gcp.FieldHint
+    /// GCP fills this in with NONE when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     proxyHeader: ProxyHeader?
 
     @gcp.FieldHint

@@ -46,7 +46,8 @@ open class Argument extends formae.SubResource {
     @gcp.FieldHint
     name: String?
 
-    @gcp.FieldHint
+    /// Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
     kind: String?
 
     @gcp.FieldHint

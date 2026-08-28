@@ -12,6 +12,17 @@ formae agent.
 
 ### Fixed
 
+- Server-populated fields across nine services are marked as provider defaults,
+  so a forma that does not declare them no longer reports drift the moment the
+  resource is created. Twenty-four fields in all: every `proxyHeader` (GCP fills
+  it in with NONE), the `fingerprint` and `labelFingerprint` hashes, and the
+  `state`, `status`, `selfLink`, `kind`, `uid`, `createTime` and `updateTime`
+  fields on Container, Storage, CloudRun, BigQuery and Compute types.
+
+  Two lookalikes are deliberately left alone: `WorkflowTemplate.id` is the
+  identifier a forma chooses, and `ExternalVpnGatewayInterface.id` is a
+  caller-supplied 0-based index that `VpnTunnel` references.
+
 - Six server-populated Compute fields are marked as provider defaults, so a
   forma that does not declare them no longer reports drift the moment the
   resource is created: `Address.labelFingerprint`, `effectiveLabels`,

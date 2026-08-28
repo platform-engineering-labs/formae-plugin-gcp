@@ -54,8 +54,10 @@ open class RegionTargetTcpProxy extends formae.Resource {
     @gcp.FieldHint
     service: (String|formae.Resolvable)
 
+    /// GCP fills this in with NONE when unset.
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     proxyHeader: ProxyHeader?
 
