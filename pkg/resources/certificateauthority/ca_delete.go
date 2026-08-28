@@ -6,6 +6,7 @@ package certificateauthority
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -109,4 +110,41 @@ func (c *caProvisioner) deleteFailure(
 			ErrorCode:       code,
 		},
 	}
+}
+
+// Read reports a certificate authority in state DELETED as gone.
+//
+// skipGracePeriod asks for immediate destruction, but the CA does not vanish
+// from the API the moment the delete operation finishes: it first moves to
+// state DELETED, and a GET keeps answering with the resource. To formae that
+// reads as "still there", so a destroy never settles and an out-of-band delete
+// is never noticed - the resource sits in inventory until the check times out.
+//
+// The same tombstone shows up on Cloud SQL backup runs (status DELETED) and
+// Logging buckets (lifecycleState DELETE_REQUESTED). A deleted thing is not
+// found, so say so.
+func (c *caProvisioner) Read(
+	ctx context.Context,
+	request *resource.ReadRequest,
+) (*resource.ReadResult, error) {
+	result, err := c.BaseResource.Read(ctx, request)
+	if err != nil || result == nil || result.Properties == "" {
+		return result, err
+	}
+
+	var props map[string]interface{}
+	if unmarshalErr := json.Unmarshal([]byte(result.Properties), &props); unmarshalErr != nil {
+		return result, nil
+	}
+	if isDeletedTombstone(props) {
+		return &resource.ReadResult{ErrorCode: resource.OperationErrorCodeNotFound}, nil
+	}
+	return result, nil
+}
+
+// isDeletedTombstone reports whether these properties describe a CA that has
+// already been deleted and is only still answering GETs.
+func isDeletedTombstone(props map[string]interface{}) bool {
+	state, ok := props["state"].(string)
+	return ok && state == "DELETED"
 }

@@ -181,3 +181,26 @@ func TestCADeleteSkipsGracePeriod(t *testing.T) {
 		}
 	}
 }
+
+// A CA in state DELETED is a tombstone, not a resource: skipGracePeriod asks
+// for immediate destruction but a GET keeps answering until it is really gone.
+func TestCAReadTreatsDeletedAsNotFound(t *testing.T) {
+	tests := []struct {
+		state      string
+		wantAbsent bool
+	}{
+		{"ENABLED", false},
+		{"STAGED", false},
+		{"DISABLED", false},
+		{"DELETED", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.state, func(t *testing.T) {
+			props := map[string]interface{}{"name": "ca1", "state": tt.state}
+			absent := isDeletedTombstone(props)
+			if absent != tt.wantAbsent {
+				t.Errorf("state %q: absent = %v, want %v", tt.state, absent, tt.wantAbsent)
+			}
+		})
+	}
+}
