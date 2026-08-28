@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Storage HMAC Key
+///
+/// The credential a service account presents to the S3-compatible XML API.
+/// Without one, a tool that only speaks S3 has no way to authenticate against
+/// Cloud Storage.
+///
+/// The secret is returned by the create call and never again. The plugin drops
+/// it rather than persisting it: keeping it would put a live credential in
+/// stored state and guarantee drift on the next read. Take it from the create
+/// output if you need it.
+///
+/// GCS assigns the `accessId`, and refuses to delete a key that is still
+/// active — the plugin deactivates it first.
+module gcp.storage.hmac_key
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::HmacKey"
+
+open class HmacKeyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden accessId: HmacKeyResolvable = (this) {
+        property = "accessId"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "accessId"
+}
+open class HmacKey extends formae.Resource {
+    hidden parent = this
+
+    /// Email of the service account the key authenticates as. Immutable — a key
+    /// belongs to the account it was created for.
+    @gcp.FieldHint { createOnly = true }
+    serviceAccountEmail: String
+
+    /// Server-assigned key id, and what the key is addressed by.
+    @gcp.FieldHint { hasProviderDefault = true }
+    accessId: String?
+
+    /// "ACTIVE" or "INACTIVE". GCS creates keys active; the plugin deactivates
+    /// a key before deleting it, because GCS refuses to delete an active one.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// The project the key belongs to, as GCS reports it.
+    @gcp.FieldHint { hasProviderDefault = true }
+    projectId: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    timeCreated: String?
+
+    @gcp.FieldHint { hasProviderDefault = true }
+    updated: String?
+
+    hidden res: HmacKeyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

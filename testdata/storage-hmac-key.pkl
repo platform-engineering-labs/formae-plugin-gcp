@@ -1,0 +1,24 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/hmac_key.pkl" as hmacKey
+import "./config/vars.pkl" as v
+
+// A key belongs to a service account, and the default compute account is the
+// one every project has - its email is built from the project *number*, not the
+// project id. No bucket or other prerequisite is involved: an HMAC key is
+// project-scoped and free.
+forma {
+  v.stack
+  v.target
+
+  new hmacKey.HmacKey {
+    label = "plugin-sdk-test-storage-hmac-key"
+    serviceAccountEmail = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+  }
+}

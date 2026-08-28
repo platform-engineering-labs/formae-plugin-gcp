@@ -20,6 +20,7 @@ const (
 	DefaultObjectAccessControlResourceType = "GCP::Storage::DefaultObjectAccessControl"
 	ManagedFolderResourceType              = "GCP::Storage::ManagedFolder"
 	FolderResourceType                     = "GCP::Storage::Folder"
+	HmacKeyResourceType                    = "GCP::Storage::HmacKey"
 	ObjectAccessControlResourceType        = "GCP::Storage::ObjectAccessControl"
 )
 
@@ -187,6 +188,21 @@ func init() {
 			RequestTransformer:  base.DropFields("bucket"),
 			ResponseTransformer: base.ResponseTransformerFunc(bucketScopedResponseTransformer),
 		},
+		{
+			// An HMAC key is the credential a service account uses against the
+			// S3-compatible XML API. It is project-scoped, its id is assigned by
+			// GCS, and hmac_key.go overrides create and delete: the create names
+			// its service account in a query parameter and answers with the
+			// secret wrapped alongside the metadata, and a key must be
+			// deactivated before GCS will delete it.
+			ResourceType: HmacKeyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "hmacKeys",
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(hmacKeyRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(hmacKeyResponseTransformer),
+		},
 		// NOTE: ObjectAccessControlResourceType requires special handling for object-scoped resources
 		// The base package currently doesn't support resources that need TWO parent properties (bucket + object).
 		// This resource type is commented out pending enhancement to base package's parent extraction mechanism.
@@ -217,6 +233,7 @@ func init() {
 	}
 
 	registerBucketWalkingLists()
+	registerHmacKeyOverrides()
 }
 
 // bucketScopedResponseTransformer puts back the bucket a folder belongs to and
