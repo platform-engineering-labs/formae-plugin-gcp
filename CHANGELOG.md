@@ -18,6 +18,10 @@ formae agent.
   already in state read as a change to an immutable field. Which disks a pair
   joins is fixed at creation and is what its native ID is made of, so the two
   fields are now write-only - excluded from drift detection, unchanged on create.
+  Its `Read` no longer reports the pair either. Write-only promises the agent a
+  read never returns a field, and the agent keeps the last-applied value in
+  state on that promise; echoing the two URLs back replaced it, and the agent
+  compared them against the unresolved references an extracted forma writes.
 
 ### Fixed
 
