@@ -20,6 +20,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 case "${1:-}" in
     alloydb-*)  exec "$here/clean-alloydb-case.sh"  "$1" ;;
     eventarc-*) exec "$here/clean-eventarc-case.sh" "$1" ;;
+    datastream-*) exec "$here/clean-datastream-case.sh" "$1" ;;
     security-policy-rule)        PREFIX="formae-plugin-sdk-test-spr-"  KIND=armor ;;
     region-security-policy-rule) PREFIX="formae-plugin-sdk-test-rspr-" KIND=armor ;;
     network-firewall-policy-association)        PREFIX="formae-plugin-sdk-test-nfpa-pol-"  KIND=firewall ;;

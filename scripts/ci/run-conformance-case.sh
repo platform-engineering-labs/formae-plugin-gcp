@@ -61,9 +61,11 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
-  datastream-private-connection|datastream-route)
+  datastream-stream|datastream-private-connection|datastream-route)
     # A Datastream private connection is a VPC peering: minutes to create, and
     # the route case builds one first. Same shape as the PSA connection below.
+    # The stream case is here too: it builds two connection profiles before its
+    # own resource and timed out on Create at the 5m default.
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
@@ -127,7 +129,7 @@ esac
 # quota (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
 needs_prereq_cleanup() {
   case "$TEST_CASE" in
-    alloydb-*|eventarc-*|security-policy-rule|region-security-policy-rule|\
+    alloydb-*|eventarc-*|datastream-*|security-policy-rule|region-security-policy-rule|\
     network-firewall-policy-association|region-network-firewall-policy-association|\
     network-firewall-policy-rule|machine-image)
       return 0 ;;

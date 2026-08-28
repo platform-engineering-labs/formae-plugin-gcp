@@ -859,6 +859,10 @@ echo "Cleaning GCP eventarc Advanced resources..."
 
 "$(dirname "$0")/clean-privateca.sh"
 
+# Datastream private connections hold a reserved /29 until they are really
+# gone, so a leak blocks the next run's peering, not just tidiness.
+"$(dirname "$0")/clean-datastream-case.sh" all
+
 echo "Cleaning GCP artifact registry repositories..."
 AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)
 if [ -n "$AR_REPOS" ]; then
