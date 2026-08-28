@@ -39,6 +39,13 @@ func (p *BigtableProvisioner) Create(
 		return createBigtableFailureResult(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
+	// base.Create does this and this provisioner did not, so any property whose
+	// value arrived wrapped - which is what a reference to another resource
+	// produces - read as empty. A table declared alongside its instance failed
+	// with "instance is required for nested resources" even though the instance
+	// was right there, which is why bigtable's table schema typed `instance` as
+	// a plain String and why the type still has no conformance case.
+	props = base.UnwrapValues(props)
 
 	// Extract resource name for query parameter
 	resourceName := utils.GetString(props, "name")
