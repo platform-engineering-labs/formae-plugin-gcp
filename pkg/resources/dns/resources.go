@@ -13,6 +13,7 @@ const (
 	PolicyResourceType             = "GCP::DNS::Policy"
 	ResponsePolicyResourceType     = "GCP::DNS::ResponsePolicy"
 	ResponsePolicyRuleResourceType = "GCP::DNS::ResponsePolicyRule"
+	ResourceRecordSetResourceType  = "GCP::DNS::ResourceRecordSet"
 )
 
 var dnsRegistry *base.ResourceRegistry
@@ -79,11 +80,32 @@ func init() {
 			RequestTransformer:  base.RequestTransformerFunc(responsePolicyRuleRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(responsePolicyRuleResponseTransformer),
 		},
+		{
+			// A record set is what a managed zone actually serves. It is the one
+			// resource here addressed by two path segments - .../rrsets/{name}/{type}
+			// - which the native ID carries joined by a slash; create posts to
+			// the collection and needs no id parameter at all.
+			ResourceType: ResourceRecordSetResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "rrsets",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "managedZones",
+					PropertyName:   "managedZone",
+					RequiresParent: true,
+				},
+				ListItemsKey:   "rrsets",
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPatch,
+			},
+			RequestTransformer:  base.DropFields("managedZone"),
+			ResponseTransformer: base.ResponseTransformerFunc(resourceRecordSetResponseTransformer),
+		},
 	})
 	if err != nil {
 		panic(err)
 	}
 
+	registerResourceRecordSetList()
 	registerResponsePolicyList()
 	registerResponsePolicyRuleList()
 }
@@ -129,6 +151,23 @@ func renameKey(props map[string]interface{}, from, to string) map[string]interfa
 	for k, v := range props {
 		if k == from {
 			out[to] = v
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// resourceRecordSetResponseTransformer puts back the zone a record set belongs
+// to. A record set reports its name, type, ttl and rrdatas and nothing naming
+// its managed zone - that lives only in the URL - so a forma's `managedZone`
+// would otherwise read as absent on every sync.
+func resourceRecordSetResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "kind" || k == "signatureRrdatas" {
 			continue
 		}
 		out[k] = v

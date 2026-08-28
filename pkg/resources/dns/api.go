@@ -67,6 +67,13 @@ func extractDNSNativeID(response map[string]interface{}, ctx base.PathContext) s
 		return ""
 	}
 	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		// A record set is identified by name *and* type; the type is a path
+		// segment of its own rather than part of the name.
+		if ctx.ResourceType == "rrsets" && !strings.Contains(name, "/") {
+			if recordType, ok := response["type"].(string); ok && recordType != "" {
+				name += "/" + recordType
+			}
+		}
 		return fmt.Sprintf("projects/%s/%s/%s/%s/%s",
 			ctx.Project, ctx.ParentType, ctx.ParentResource, ctx.ResourceType, name)
 	}
@@ -88,6 +95,21 @@ func parseDNSNativeID(nativeID string) (base.PathContext, error) {
 			Project:      parts[1],
 			ResourceType: parts[2],
 			ResourceName: parts[3],
+		}, nil
+	case 7:
+		// A record set is the one resource here addressed by two path segments:
+		// .../rrsets/{name}/{type}. Both are carried in ResourceName joined by a
+		// slash, which the path builder appends verbatim - a DNS name may
+		// contain dots but never a slash, so the join is unambiguous.
+		if parts[2] != "managedZones" || parts[4] != "rrsets" {
+			return base.PathContext{}, fmt.Errorf("invalid DNS native ID: %s", nativeID)
+		}
+		return base.PathContext{
+			Project:        parts[1],
+			ParentType:     parts[2],
+			ParentResource: parts[3],
+			ResourceType:   parts[4],
+			ResourceName:   parts[5] + "/" + parts[6],
 		}, nil
 	case 6:
 		return base.PathContext{

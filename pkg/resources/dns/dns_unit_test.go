@@ -169,3 +169,52 @@ func TestRuleListWalksTheResponsePolicies(t *testing.T) {
 		t.Errorf("rule List is %T, want *responsePolicyRuleListProvisioner", p)
 	}
 }
+
+// A record set is the one resource here addressed by two path segments,
+// .../rrsets/{name}/{type}. Both travel in ResourceName joined by a slash: a
+// DNS name may contain dots but never a slash, so the join is unambiguous.
+func TestRecordSetNativeIDCarriesNameAndType(t *testing.T) {
+	ctx, err := parseDNSNativeID("projects/p/managedZones/z/rrsets/www.example.com./A")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if ctx.ParentType != "managedZones" || ctx.ParentResource != "z" {
+		t.Errorf("parent = %s/%s", ctx.ParentType, ctx.ParentResource)
+	}
+	if ctx.ResourceType != "rrsets" || ctx.ResourceName != "www.example.com./A" {
+		t.Errorf("resource = %s/%s", ctx.ResourceType, ctx.ResourceName)
+	}
+	// The path builder appends ResourceName verbatim, which is what makes the
+	// two-segment address work.
+	want := "/projects/p/managedZones/z/rrsets/www.example.com./A"
+	if got := dnsPathBuilder(ctx); got != want {
+		t.Errorf("path = %q, want %q", got, want)
+	}
+
+	for _, bad := range []string{
+		"projects/p/responsePolicies/rp/rules/r/extra",
+		"projects/p/managedZones/z/records/www./A",
+	} {
+		if _, err := parseDNSNativeID(bad); err == nil {
+			t.Errorf("expected an error for %q", bad)
+		}
+	}
+}
+
+// A created record set reports its name and type separately; the native ID has
+// to join them or a read would address a name with no type and 404.
+func TestRecordSetNativeIDAppendsTheType(t *testing.T) {
+	got := extractDNSNativeID(
+		map[string]interface{}{"name": "www.example.com.", "type": "A"},
+		base.PathContext{Project: "p", ParentType: "managedZones", ParentResource: "z", ResourceType: "rrsets"})
+	if got != "projects/p/managedZones/z/rrsets/www.example.com./A" {
+		t.Errorf("native id = %q", got)
+	}
+	// An id that already carries the type must not gain a second one.
+	got = extractDNSNativeID(
+		map[string]interface{}{"name": "www.example.com./A", "type": "A"},
+		base.PathContext{Project: "p", ParentType: "managedZones", ParentResource: "z", ResourceType: "rrsets"})
+	if got != "projects/p/managedZones/z/rrsets/www.example.com./A" {
+		t.Errorf("double-appended type: %q", got)
+	}
+}

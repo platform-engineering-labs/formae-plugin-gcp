@@ -12,6 +12,18 @@ formae agent.
 
 ### Added
 
+- `GCP::DNS::ResourceRecordSet` — what a managed zone actually serves: one name,
+  one record type, and the data behind it. This completes Cloud DNS.
+
+  It is the only resource in the plugin addressed by **two** path segments
+  (`.../rrsets/{name}/{type}`). Both travel in the native ID joined by a slash,
+  which is unambiguous because a DNS name may contain dots but never a slash,
+  and both are fixed at creation — changing either is a different record set,
+  not an edit.
+
+  Every zone is born with an SOA and an NS record set nobody declared, so
+  discovery reports two per zone as unmanaged.
+
 - `GCP::Bigtable::AppProfile` — decides how an application's requests are routed
   across an instance's clusters. Every instance has a default profile; this is
   how a workload gets its own routing without affecting the rest.
