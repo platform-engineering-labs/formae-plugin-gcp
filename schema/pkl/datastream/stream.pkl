@@ -1,0 +1,139 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Datastream Stream
+///
+/// What actually moves data: a source `ConnectionProfile`, a destination
+/// `ConnectionProfile`, and the config joining them. A connection profile on
+/// its own moves nothing.
+///
+/// Datastream validates a stream against its source when it is created, so the
+/// plugin creates with `force=true` - otherwise a stream whose source is not
+/// reachable at apply time fails on validation rather than on anything wrong
+/// with the declaration.
+module gcp.datastream.stream
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Datastream::Stream"
+
+/// Which tables to include. An empty MysqlRdbms means "everything".
+@gcp.SubResourceHint
+open class MysqlRdbms extends formae.SubResource {
+}
+
+@gcp.SubResourceHint
+open class MysqlSourceConfig extends formae.SubResource {
+    @gcp.FieldHint
+    includeObjects: MysqlRdbms?
+
+    @gcp.FieldHint
+    excludeObjects: MysqlRdbms?
+
+    @gcp.FieldHint
+    maxConcurrentBackfillTasks: Int?
+}
+
+@gcp.SubResourceHint
+open class SourceConfig extends formae.SubResource {
+    /// The source profile. A short profile name or a ConnectionProfile
+    /// resolvable; the plugin expands it to the full path.
+    @gcp.FieldHint
+    sourceConnectionProfile: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    mysqlSourceConfig: MysqlSourceConfig?
+}
+
+@gcp.SubResourceHint
+open class JsonFileFormat extends formae.SubResource {
+    /// NO_COMPRESSION or GZIP.
+    @gcp.FieldHint
+    compression: String?
+
+    /// NO_SCHEMA_FILE or AVRO_SCHEMA_FILE.
+    @gcp.FieldHint
+    schemaFileFormat: String?
+}
+
+@gcp.SubResourceHint
+open class GcsDestinationConfig extends formae.SubResource {
+    @gcp.FieldHint
+    path: String?
+
+    @gcp.FieldHint
+    fileRotationMb: Int?
+
+    @gcp.FieldHint
+    fileRotationInterval: String?
+
+    @gcp.FieldHint
+    jsonFileFormat: JsonFileFormat?
+}
+
+@gcp.SubResourceHint
+open class DestinationConfig extends formae.SubResource {
+    /// The destination profile. A short profile name or a ConnectionProfile
+    /// resolvable; the plugin expands it to the full path.
+    @gcp.FieldHint
+    destinationConnectionProfile: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    gcsDestinationConfig: GcsDestinationConfig?
+}
+
+/// Do not backfill existing data; stream only new changes.
+@gcp.SubResourceHint
+open class BackfillNoneStrategy extends formae.SubResource {
+}
+
+open class StreamResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: StreamResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Stream extends formae.Resource {
+    hidden parent = this
+
+    /// Short stream id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Human-readable name. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint { createOnly = true }
+    sourceConfig: SourceConfig
+
+    @gcp.FieldHint { createOnly = true }
+    destinationConfig: DestinationConfig
+
+    /// Exactly one backfill strategy must be set.
+    @gcp.FieldHint
+    backfillNone: BackfillNoneStrategy?
+
+    /// NOT_STARTED, RUNNING, PAUSED, FAILED... A stream is created
+    /// NOT_STARTED and started separately.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: StreamResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

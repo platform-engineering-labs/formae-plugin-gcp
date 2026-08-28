@@ -1,0 +1,32 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/datastream/privateConnection.pkl" as privateConnection
+import "./config/vars.pkl" as v
+
+// Peers the project's default VPC with Datastream's. The default network always
+// exists, so this is written as a path rather than a resolvable - the same way
+// the AlloyDB fixtures reference it.
+//
+// The /29 is reserved for Datastream and must not overlap anything in the VPC.
+// The default network's auto subnets are 10.128.0.0/9, so 172.30.0.0/29 sits
+// clear of them.
+forma {
+  v.stack
+  v.target
+
+  new privateConnection.PrivateConnection {
+    label = "plugin-sdk-test-datastream-private-connection"
+    name = "formae-test-pc-\(v.testRunID)"
+    displayName = "Plugin SDK Test Private Connection"
+    vpcPeeringConfig = new privateConnection.VpcPeeringConfig {
+      vpc = "projects/\(v.gcpProject)/global/networks/default"
+      subnet = "172.30.0.0/29"
+    }
+  }
+}

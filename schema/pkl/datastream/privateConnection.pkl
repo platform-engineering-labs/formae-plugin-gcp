@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Datastream PrivateConnection
+///
+/// Private connectivity to a source that is not reachable over the public
+/// internet: a VPC peering between a network in this project and Datastream's.
+///
+/// Creating one takes several minutes, and the `/29` subnet it is given is
+/// reserved for Datastream and cannot overlap anything else in the VPC.
+module gcp.datastream.privateConnection
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Datastream::PrivateConnection"
+
+@gcp.SubResourceHint
+open class VpcPeeringConfig extends formae.SubResource {
+    /// The VPC to peer with, as "projects/{project}/global/networks/{network}"
+    /// or a Network resolvable's self link.
+    @gcp.FieldHint
+    vpc: (String|formae.Resolvable)
+
+    /// A /29 CIDR reserved for Datastream, e.g. "10.98.0.0/29".
+    @gcp.FieldHint
+    subnet: String
+}
+
+open class PrivateConnectionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PrivateConnectionResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class PrivateConnection extends formae.Resource {
+    hidden parent = this
+
+    /// Short connection id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Human-readable name. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    /// Fixed at creation: the peering cannot be moved.
+    @gcp.FieldHint { createOnly = true }
+    vpcPeeringConfig: VpcPeeringConfig?
+
+    /// CREATING, CREATED, FAILED... Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: PrivateConnectionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

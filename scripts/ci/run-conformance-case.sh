@@ -61,6 +61,12 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
+  datastream-private-connection|datastream-route)
+    # A Datastream private connection is a VPC peering: minutes to create, and
+    # the route case builds one first. Same shape as the PSA connection below.
+    TIMEOUT_ARG="TIMEOUT=30"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
+    ;;
   servicenetworking-connection)
     # PSA connections are async and global (VPC peering); create and especially
     # discovery take longer to surface in inventory than any other resource.

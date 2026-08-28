@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/datastream/privateConnection.pkl" as privateConnection
+import "@gcp/datastream/datastreamRoute.pkl" as route
+import "./config/vars.pkl" as v
+
+// A route only exists inside a private connection, so the connection comes
+// first - and creating one is a VPC peering, which takes minutes.
+//
+// A different /29 from the datastream-private-connection case: both may exist
+// at once and the reserved ranges must not overlap.
+local connection = new privateConnection.PrivateConnection {
+  label = "plugin-sdk-test-route-connection"
+  name = "formae-test-rt-pc-\(v.testRunID)"
+  displayName = "Plugin SDK Test Route Connection"
+  vpcPeeringConfig = new privateConnection.VpcPeeringConfig {
+    vpc = "projects/\(v.gcpProject)/global/networks/default"
+    subnet = "172.30.0.8/29"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  connection
+
+  new route.Route {
+    label = "plugin-sdk-test-datastream-route"
+    name = "formae-test-route-\(v.testRunID)"
+    // Resolvable -> the private connection exists before the route is created.
+    privateConnection = connection.res.name
+    displayName = "Plugin SDK Test Route"
+    destinationAddress = "10.255.255.1"
+    destinationPort = 3306
+  }
+}

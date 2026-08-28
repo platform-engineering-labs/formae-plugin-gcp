@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Datastream Route
+///
+/// Tells a `PrivateConnection` which address to reach the source on. A route
+/// only exists inside one.
+module gcp.datastream.datastreamRoute
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Datastream::Route"
+
+open class RouteResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RouteResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Route extends formae.Resource {
+    hidden parent = this
+
+    /// Short route id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The private connection this route belongs to. A short connection name or
+    /// a PrivateConnection resolvable. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    privateConnection: (String|formae.Resolvable)
+
+    /// Human-readable name. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    /// Address of the source, reachable through the peering.
+    @gcp.FieldHint { createOnly = true }
+    destinationAddress: String
+
+    @gcp.FieldHint { createOnly = true }
+    destinationPort: Int?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: RouteResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

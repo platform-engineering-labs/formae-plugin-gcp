@@ -12,6 +12,18 @@ formae agent.
 
 ### Added
 
+- `GCP::Datastream::Stream`, `GCP::Datastream::PrivateConnection` and
+  `GCP::Datastream::Route` - the rest of the creatable Datastream surface. A
+  stream is what actually moves data; a connection profile on its own moves
+  nothing. A private connection peers a VPC with Datastream's network for
+  sources that are not publicly reachable, and a route tells it which address to
+  reach the source on.
+
+  Creating a stream sends `force=true`. Datastream validates a stream against
+  its source at create time, so without it a stream whose source is not
+  reachable at apply time fails on validation rather than on anything wrong with
+  the declaration.
+
 - `GCP::CertificateAuthority::CertificateAuthority` and
   `GCP::CertificateAuthority::CertificateTemplate`. A CA is what actually signs;
   a `CaPool` with no CA in it issues nothing. A template is a reusable issuance

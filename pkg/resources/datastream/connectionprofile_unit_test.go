@@ -88,3 +88,99 @@ func TestConnectionProfileRegistered(t *testing.T) {
 		}
 	}
 }
+
+// Datastream validates a stream against its source on create; a conformance
+// source points at a host that does not answer, so create must send force.
+func TestStreamCreateForcesPastValidation(t *testing.T) {
+	create := datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "streams",
+	})
+	if want := "/projects/p/locations/eu/streams?force=true"; create != want {
+		t.Errorf("create = %q, want %q", create, want)
+	}
+
+	// force is only correct on create. List builds the same collection URL.
+	list := datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "streams", IsList: true,
+	})
+	if want := "/projects/p/locations/eu/streams"; list != want {
+		t.Errorf("list = %q, want %q", list, want)
+	}
+
+	// Other collections must not grow it.
+	other := datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "connectionProfiles",
+	})
+	if want := "/projects/p/locations/eu/connectionProfiles"; other != want {
+		t.Errorf("connectionProfiles = %q, want %q", other, want)
+	}
+}
+
+func TestDatastreamNestedPathAndNativeID(t *testing.T) {
+	got := datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu",
+		ParentType: "privateConnections", ParentResource: "pc1",
+		ResourceType: "routes", ResourceName: "r1",
+	})
+	if want := "/projects/p/locations/eu/privateConnections/pc1/routes/r1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	ctx, err := parseDatastreamNativeID("projects/p/locations/eu/privateConnections/pc1/routes/r1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ctx.ParentResource != "pc1" || ctx.ResourceType != "routes" || ctx.ResourceName != "r1" {
+		t.Errorf("nested parse wrong: %+v", ctx)
+	}
+	if _, err := parseDatastreamNativeID("projects/p/locations/eu/streams"); err == nil {
+		t.Error("a collection path is not a resource and must be rejected")
+	}
+}
+
+// A forma passes resolvables that resolve to bare profile names; the API wants
+// full paths. Expand on write, shorten on read.
+func TestStreamProfileRoundTrip(t *testing.T) {
+	body, err := streamRequest(map[string]interface{}{
+		"name": "s1",
+		"sourceConfig": map[string]interface{}{
+			"sourceConnectionProfile": "src",
+		},
+		"destinationConfig": map[string]interface{}{
+			"destinationConnectionProfile": "dst",
+		},
+	}, base.TransformContext{Project: "p", Location: "eu"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	src := body["sourceConfig"].(map[string]interface{})
+	if got, want := src["sourceConnectionProfile"], "projects/p/locations/eu/connectionProfiles/src"; got != want {
+		t.Errorf("source = %v, want %v", got, want)
+	}
+	dst := body["destinationConfig"].(map[string]interface{})
+	if got, want := dst["destinationConnectionProfile"], "projects/p/locations/eu/connectionProfiles/dst"; got != want {
+		t.Errorf("destination = %v, want %v", got, want)
+	}
+
+	out := streamResponse(map[string]interface{}{
+		"name":              "projects/p/locations/eu/streams/s1",
+		"sourceConfig":      map[string]interface{}{"sourceConnectionProfile": src["sourceConnectionProfile"]},
+		"destinationConfig": map[string]interface{}{"destinationConnectionProfile": dst["destinationConnectionProfile"]},
+	}, base.TransformContext{})
+	if got := out["sourceConfig"].(map[string]interface{})["sourceConnectionProfile"]; got != "src" {
+		t.Errorf("source = %v, want src", got)
+	}
+	if got := out["destinationConfig"].(map[string]interface{})["destinationConnectionProfile"]; got != "dst" {
+		t.Errorf("destination = %v, want dst", got)
+	}
+}
+
+// privateConnection lives only in the path, but a forma declares it.
+func TestRouteResponseRecoversParent(t *testing.T) {
+	out := routeResponse(map[string]interface{}{
+		"name": "projects/p/locations/eu/privateConnections/pc1/routes/r1",
+	}, base.TransformContext{})
+	if out["privateConnection"] != "pc1" {
+		t.Errorf("got %+v", out)
+	}
+}
