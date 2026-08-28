@@ -11,12 +11,17 @@ import "@gcp/filestore/filestoreBackup.pkl" as backup
 import "./config/vars.pkl" as v
 
 // A backup copies one file share of an instance, so the instance comes first.
-// run-conformance-case.sh points GCP_LOCATION at GCP_ZONE for Filestore cases,
-// so both the instance and the backup take the zone - and discovery finds the
-// backup where it looks.
-local instance = new filestoreInstance.Instance {
+//
+// A backup is REGIONAL and a BASIC_HDD instance is ZONAL - creating a backup at
+// a zone answers "is not a valid location for backup creation, it should be a
+// valid GCP region" - so the two cannot share a location. This case therefore
+// does NOT get the GCP_LOCATION-to-zone override the other Filestore cases use:
+// the target stays regional, which is where the backup lives and where
+// discovery looks for it, and the instance pins its zone itself.
+local sourceFs = new filestoreInstance.Instance {
   label = "plugin-sdk-test-backup-instance"
   name = "formae-test-bkp-fs-\(v.testRunID)"
+  location = v.gcpZone
   tier = "BASIC_HDD"
   fileShares {
     new {
@@ -38,16 +43,19 @@ forma {
   v.stack
   v.target
 
-  instance
+  sourceFs
 
   new backup.Backup {
     label = "plugin-sdk-test-filestore-backup"
     name = "formae-test-bkp-\(v.testRunID)"
-    location = v.gcpZone
+    location = v.gcpRegion
     // Resolvable -> the instance exists before the backup is taken, and the
     // plugin expands the bare name into the full path. Interpolating the path
     // by hand would stringify the resolvable and lose the ordering edge.
-    sourceInstance = instance.res.name
+    sourceInstance = sourceFs.res.name
+    // The instance is zonal; this backup is not. Without this the expansion
+    // would look for the instance in the region.
+    sourceInstanceLocation = v.gcpZone
     sourceFileShare = "share1"
     description = "Created by the formae GCP plugin conformance suite."
   }

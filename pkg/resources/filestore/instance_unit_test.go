@@ -135,16 +135,23 @@ func TestFilestoreNativeIDParser(t *testing.T) {
 // wants a full path. Expand on write, shorten on read - otherwise every
 // comparison step reports drift on a backup that is in fact correct.
 func TestBackupSourceInstanceRoundTrip(t *testing.T) {
+	// A backup is regional; the instance it copies is zonal. The expansion must
+	// use the instance's zone, not the backup's region, or it builds a path to
+	// an instance that is not there.
 	body, err := backupRequest(map[string]interface{}{
-		"name":           "b1",
-		"location":       "z",
-		"sourceInstance": "fs1",
-	}, base.TransformContext{Project: "p", Location: "z"})
+		"name":                   "b1",
+		"location":               "europe-central2",
+		"sourceInstance":         "fs1",
+		"sourceInstanceLocation": "europe-central2-b",
+	}, base.TransformContext{Project: "p", Location: "europe-central2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got, want := body["sourceInstance"], "projects/p/locations/z/instances/fs1"; got != want {
+	if got, want := body["sourceInstance"], "projects/p/locations/europe-central2-b/instances/fs1"; got != want {
 		t.Errorf("sourceInstance = %v, want %v", got, want)
+	}
+	if _, ok := body["sourceInstanceLocation"]; ok {
+		t.Error("sourceInstanceLocation is write-only and must not reach the API")
 	}
 	if _, ok := body["location"]; ok {
 		t.Error("location addresses the resource in the URL and must not be a body field")
@@ -154,10 +161,10 @@ func TestBackupSourceInstanceRoundTrip(t *testing.T) {
 	}
 
 	out := backupResponse(map[string]interface{}{
-		"name":           "projects/p/locations/z/backups/b1",
-		"sourceInstance": "projects/p/locations/z/instances/fs1",
+		"name":           "projects/p/locations/europe-central2/backups/b1",
+		"sourceInstance": "projects/p/locations/europe-central2-b/instances/fs1",
 	}, base.TransformContext{})
-	if out["name"] != "b1" || out["location"] != "z" || out["sourceInstance"] != "fs1" {
+	if out["name"] != "b1" || out["location"] != "europe-central2" || out["sourceInstance"] != "fs1" {
 		t.Errorf("got %+v", out)
 	}
 }

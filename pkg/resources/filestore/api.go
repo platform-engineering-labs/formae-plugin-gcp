@@ -115,10 +115,17 @@ func backupRequest(props map[string]interface{}, ctx base.TransformContext) (map
 	if err != nil {
 		return nil, err
 	}
-	location, _ := props["location"].(string)
+	// A backup is regional and its instance is zonal, so the instance is NOT in
+	// the backup's location. sourceInstanceLocation says where it is; without
+	// it the expansion would build a path into the region and find nothing.
+	location, _ := props["sourceInstanceLocation"].(string)
+	if location == "" {
+		location, _ = props["location"].(string)
+	}
 	if location == "" {
 		location = ctx.Location
 	}
+	delete(body, "sourceInstanceLocation")
 	if name, ok := body["sourceInstance"].(string); ok && name != "" && !strings.Contains(name, "/") {
 		body["sourceInstance"] = fmt.Sprintf("projects/%s/locations/%s/instances/%s",
 			ctx.Project, location, name)

@@ -10,11 +10,11 @@
 /// backup outlives the instance it was taken from and can restore into a new
 /// one.
 ///
-/// `location` and the source instance's location are declared as the same
-/// value: the conformance case runs with `GCP_LOCATION` pointed at the zone,
-/// as every Filestore case does, and the plugin expands `sourceInstance` in
-/// that same location. A backup kept in a different region from its instance
-/// needs the full instance path written out instead of a bare name.
+/// **A backup is regional while a Filestore BASIC instance is zonal**, and the
+/// API is explicit about it: creating one at a zone answers "is not a valid
+/// location for backup creation, it should be a valid GCP region". So
+/// `location` is a region, and the instance named by `sourceInstance` lives in
+/// a zone inside it - a different value, given as `sourceInstanceLocation`.
 module gcp.filestore.filestoreBackup
 
 import "../gcp.pkl"
@@ -46,11 +46,18 @@ open class Backup extends formae.Resource {
     location: String
 
     /// The instance being backed up. A short instance name or an Instance
-    /// resolvable - the plugin expands it to the full path in this backup's
-    /// location - or a full "projects/{p}/locations/{l}/instances/{i}" path
-    /// when the instance lives elsewhere. Fixed at creation.
+    /// resolvable - expanded using `sourceInstanceLocation` - or a full
+    /// "projects/{p}/locations/{zone}/instances/{i}" path. Fixed at creation.
     @gcp.FieldHint { createOnly = true }
     sourceInstance: (String|formae.Resolvable)?
+
+    /// Zone of the instance named by `sourceInstance`, when it is given as a
+    /// bare name. Defaults to this backup's `location`, which is only right if
+    /// the instance is regional too. Not sent to the API - it exists so a forma
+    /// can pass a resolvable instead of hand-writing a path, which would
+    /// stringify the resolvable and lose the ordering edge.
+    @gcp.FieldHint { createOnly = true; writeOnly = true }
+    sourceInstanceLocation: String?
 
     /// Which file share of that instance. Fixed at creation.
     @gcp.FieldHint { createOnly = true }

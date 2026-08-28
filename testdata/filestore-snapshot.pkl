@@ -13,7 +13,7 @@ import "./config/vars.pkl" as v
 // A snapshot lives inside its instance, in the same zone, so the instance comes
 // first. Filestore BASIC tiers are zonal, and run-conformance-case.sh points
 // GCP_LOCATION at GCP_ZONE for this case - so both inherit the zone.
-local instance = new filestoreInstance.Instance {
+local sourceFs = new filestoreInstance.Instance {
   label = "plugin-sdk-test-snapshot-instance"
   name = "formae-test-snap-fs-\(v.testRunID)"
   tier = "BASIC_HDD"
@@ -37,14 +37,17 @@ forma {
   v.stack
   v.target
 
-  instance
+  sourceFs
 
   new snapshot.Snapshot {
     label = "plugin-sdk-test-filestore-snapshot"
     name = "formae-test-snap-\(v.testRunID)"
     location = v.gcpZone
-    // Resolvable -> the instance exists before the snapshot is taken.
-    instance = instance.res.name
+    // Resolvable -> the instance exists before the snapshot is taken. The
+    // local is not called "instance": inside the Snapshot body that name is the
+    // property being defined, and "instance = instance.res.name" resolves to
+    // itself until Pkl overflows its stack.
+    instance = sourceFs.res.name
     description = "Created by the formae GCP plugin conformance suite."
   }
 }

@@ -53,12 +53,14 @@ func init() {
 				resource.OperationList,
 				resource.OperationCheckStatus,
 			},
-			ResponseTransformer: base.ShortNameResponseTransformer,
+			RequestTransformer:  base.RequestTransformerFunc(dropFilestorePathFields),
+			ResponseTransformer: locationResponseTransformer("instances"),
 		},
 		{
-			// A backup is a copy of an instance's file share, and
-			// outlives the instance it came from. Its location is a region even
-			// though the instance it names is zonal, so it declares its own.
+			// A backup is a regional copy of an instance's file share, and
+			// outlives the instance it came from. "is not a valid location for
+			// backup creation, it should be a valid GCP region" - so its
+			// location is a region even when the instance it names is zonal.
 			ResourceType: BackupResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:  "backups",
