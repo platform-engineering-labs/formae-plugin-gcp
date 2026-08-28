@@ -10,21 +10,26 @@ formae agent.
 
 ## [Unreleased]
 
-### Added
-
 ### Fixed
 
-- `GCP::Compute::TargetPool` no longer claims to support updates. The compute
-  API has no `patch` and no `update` for `targetPools` - only `addHealthCheck`,
-  `addInstance`, `removeHealthCheck`, `removeInstance`, `setBackup` and
-  `setSecurityPolicy` - so an update planned a PATCH to a URL the API does not
-  serve. A change now replaces. Found by writing the type's first conformance
-  case: it had shipped without one.
+- Four Compute types no longer claim to support updates their API cannot
+  perform: `TargetPool`, `TargetSslProxy`, `TargetTcpProxy` and
+  `RegionTargetTcpProxy`. None of `targetPools`, `targetSslProxies`,
+  `targetTcpProxies` or `regionTargetTcpProxies` has a `patch` or an `update`
+  method - they offer only setters such as `setBackendService` and
+  `setSslCertificates` - so an update planned a PATCH to a URL the API does not
+  serve. A change now replaces.
+
+  Found by writing the first conformance case for `TargetPool`, then checking
+  every Compute definition against the discovery document: 62 scanned, 4 wrong.
+  Three of the four had no conformance case at all, and the fourth
+  (`TargetTcpProxy`) had one with no update fixture.
 
 ### Added
 
-- Conformance cases for `GCP::Compute::Address`, `GCP::Compute::TargetPool` and
-  `GCP::Compute::BackendBucket`. All three shipped without one, so nothing ever
+- Conformance cases for `GCP::Compute::Address`, `GCP::Compute::TargetPool`,
+  `GCP::Compute::BackendBucket`, `GCP::Compute::TargetHttpsProxy` and
+  `GCP::Compute::TargetSslProxy`. All five shipped without one, so nothing ever
   exercised them against the live API.
 
 - `GCP::Storage::Notification` - publishes a bucket's object change events to a

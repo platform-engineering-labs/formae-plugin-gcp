@@ -1075,6 +1075,9 @@ func init() {
 		},
 
 		// Target TCP Proxy - Global TCP proxy for load balancers
+		// ponytail: update is off. targetTcpProxies has no patch and no update - only setBackendService
+		// and setProxyHeader, so a PATCH would go to a URL the
+		// API does not serve. A change replaces.
 		{
 			ResourceType: TargetTcpProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1082,7 +1085,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeGlobal,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1090,6 +1093,9 @@ func init() {
 		},
 
 		// Target SSL Proxy - Global SSL proxy for load balancers
+		// ponytail: update is off. targetSslProxies has no patch and no update - only setBackendService,
+		// setCertificateMap, setProxyHeader, setSslCertificates and setSslPolicy, so a PATCH would go to a URL the
+		// API does not serve. A change replaces.
 		{
 			ResourceType: TargetSslProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1097,7 +1103,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeGlobal,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1209,6 +1215,8 @@ func init() {
 		},
 
 		// Region Target TCP Proxy - Regional TCP proxy for internal proxy load balancers
+		// ponytail: update is off. regionTargetTcpProxies has only delete, get, insert and list, so a PATCH would go to a URL the
+		// API does not serve. A change replaces.
 		{
 			ResourceType: RegionTargetTcpProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1216,7 +1224,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
