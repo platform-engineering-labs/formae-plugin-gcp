@@ -6,11 +6,28 @@
 package filestore
 
 import (
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
-const InstanceResourceType = "GCP::Filestore::Instance"
+const (
+	InstanceResourceType = "GCP::Filestore::Instance"
+	BackupResourceType   = "GCP::Filestore::Backup"
+	SnapshotResourceType = "GCP::Filestore::Snapshot"
+)
+
+func lifecycleOps() []resource.Operation {
+	return []resource.Operation{
+		resource.OperationCreate,
+		resource.OperationRead,
+		resource.OperationDelete,
+		resource.OperationList,
+		resource.OperationCheckStatus,
+	}
+}
 
 var filestoreRegistry *base.ResourceRegistry
 
@@ -38,8 +55,57 @@ func init() {
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
+		{
+			// A backup is a copy of an instance's file share, and
+			// outlives the instance it came from. Its location is a region even
+			// though the instance it names is zonal, so it declares its own.
+			ResourceType: BackupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:  "backups",
+				Scope:         &base.ScopeConfig{Type: base.ScopeLocationBased},
+				CreateIDParam: "backupId",
+			},
+			Operations:          lifecycleOps(),
+			RequestTransformer:  base.RequestTransformerFunc(backupRequest),
+			ResponseTransformer: base.ResponseTransformerFunc(backupResponse),
+		},
+		{
+			// A snapshot lives inside its instance, in the same zone.
+			ResourceType: SnapshotResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "snapshots",
+				Scope:        &base.ScopeConfig{Type: base.ScopeLocationBased},
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				CreateIDParam: "snapshotId",
+			},
+			Operations:          lifecycleOps(),
+			RequestTransformer:  base.RequestTransformerFunc(dropFilestorePathFields),
+			ResponseTransformer: base.ResponseTransformerFunc(snapshotResponseTransformer),
+		},
 	})
 	if err != nil {
 		panic(err)
 	}
+
+	// Re-register the snapshot behind a provisioner that walks the instances on
+	// List. Everything else stays config-driven; only List has to differ,
+	// because Filestore has no wildcard in the instance position.
+	registry.Register(SnapshotResourceType, lifecycleOps(), func(cfg *config.Config) prov.Provisioner {
+		def := filestoreRegistry.Definitions[SnapshotResourceType]
+		return &snapshotProvisioner{
+			BaseResource: &base.BaseResource{
+				Config:              cfg,
+				APIConfig:           FilestoreAPI,
+				OperationConfig:     FilestoreOperations,
+				ResourceConfig:      def.ResourceConfig,
+				NativeIDConfig:      FilestoreNativeID,
+				RequestTransformer:  def.RequestTransformer,
+				ResponseTransformer: def.ResponseTransformer,
+			},
+		}
+	})
 }

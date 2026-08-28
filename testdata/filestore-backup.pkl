@@ -1,0 +1,54 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/filestore/filestoreInstance.pkl"
+import "@gcp/filestore/filestoreBackup.pkl" as backup
+import "./config/vars.pkl" as v
+
+// A backup copies one file share of an instance, so the instance comes first.
+// run-conformance-case.sh points GCP_LOCATION at GCP_ZONE for Filestore cases,
+// so both the instance and the backup take the zone - and discovery finds the
+// backup where it looks.
+local instance = new filestoreInstance.Instance {
+  label = "plugin-sdk-test-backup-instance"
+  name = "formae-test-bkp-fs-\(v.testRunID)"
+  tier = "BASIC_HDD"
+  fileShares {
+    new {
+      name = "share1"
+      capacityGb = 1024
+    }
+  }
+  networks {
+    new {
+      network = "default"
+      modes {
+        "MODE_IPV4"
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  instance
+
+  new backup.Backup {
+    label = "plugin-sdk-test-filestore-backup"
+    name = "formae-test-bkp-\(v.testRunID)"
+    location = v.gcpZone
+    // Resolvable -> the instance exists before the backup is taken, and the
+    // plugin expands the bare name into the full path. Interpolating the path
+    // by hand would stringify the resolvable and lose the ordering edge.
+    sourceInstance = instance.res.name
+    sourceFileShare = "share1"
+    description = "Created by the formae GCP plugin conformance suite."
+  }
+}

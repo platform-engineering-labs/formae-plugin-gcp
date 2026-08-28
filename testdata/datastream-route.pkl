@@ -13,15 +13,44 @@ import "./config/vars.pkl" as v
 // A route only exists inside a private connection, so the connection comes
 // first - and creating one is a VPC peering, which takes minutes.
 //
-// A different /29 from the datastream-private-connection case: both may exist
-// at once and the reserved ranges must not overlap.
+// The /29 is derived from the test run id rather than fixed. A private
+// connection holds its range until it is really gone, and the harness re-applies
+// this forma with a rotated run id during the out-of-band delete check - so a
+// fixed range collides with the connection the previous apply is still tearing
+// down ("The IP range specified overlaps with a reserved IP range"). A rotated
+// id yields a different octet, so the two never overlap.
+//
+// 172.31 keeps this clear of the datastream-private-connection case, which
+// holds 172.30.0.0/29 and may run at the same time.
+local hexVal = new Mapping<String, Int> {
+  ["0"] = 0
+  ["1"] = 1
+  ["2"] = 2
+  ["3"] = 3
+  ["4"] = 4
+  ["5"] = 5
+  ["6"] = 6
+  ["7"] = 7
+  ["8"] = 8
+  ["9"] = 9
+  ["a"] = 10
+  ["b"] = 11
+  ["c"] = 12
+  ["d"] = 13
+  ["e"] = 14
+  ["f"] = 15
+}
+
+local octet = (hexVal.getOrNull(v.testRunID.substring(0, 1)) ?? 0) * 16
+            + (hexVal.getOrNull(v.testRunID.substring(1, 2)) ?? 0)
+
 local connection = new privateConnection.PrivateConnection {
   label = "plugin-sdk-test-route-connection"
   name = "formae-test-rt-pc-\(v.testRunID)"
   displayName = "Plugin SDK Test Route Connection"
   vpcPeeringConfig = new privateConnection.VpcPeeringConfig {
     vpc = "projects/\(v.gcpProject)/global/networks/default"
-    subnet = "172.30.0.8/29"
+    subnet = "172.31.\(octet).0/29"
   }
 }
 

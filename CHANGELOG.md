@@ -12,6 +12,14 @@ formae agent.
 
 ### Added
 
+- `GCP::Filestore::Backup` and `GCP::Filestore::Snapshot`. A backup copies one
+  file share and outlives the instance it came from; a snapshot lives inside the
+  instance and goes when it does.
+
+  Snapshots are nested under an instance and Filestore has no wildcard in that
+  position, so discovery walks the instances rather than asking for a URL with
+  an empty segment.
+
 - `GCP::Datastream::Stream`, `GCP::Datastream::PrivateConnection` and
   `GCP::Datastream::Route` - the rest of the creatable Datastream surface. A
   stream is what actually moves data; a connection profile on its own moves

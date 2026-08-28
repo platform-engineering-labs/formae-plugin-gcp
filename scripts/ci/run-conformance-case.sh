@@ -114,11 +114,20 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=15"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;
-  filestore-instance)
+  filestore-instance|filestore-backup|filestore-snapshot)
     # Filestore BASIC/BASIC_HDD is zonal: its location must be a zone, not a
     # region. The shared GCP_LOCATION secret is a region, so override it with
-    # the zone for this test only.
+    # the zone for these tests only.
+    #
+    # The backup and snapshot cases build an instance first, which takes
+    # minutes, so they also need more than the 5m default.
     export GCP_LOCATION="$GCP_ZONE"
+    case "$TEST_CASE" in
+      filestore-backup|filestore-snapshot)
+        TIMEOUT_ARG="TIMEOUT=30"
+        export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
+        ;;
+    esac
     ;;
 esac
 
@@ -129,7 +138,8 @@ esac
 # quota (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
 needs_prereq_cleanup() {
   case "$TEST_CASE" in
-    alloydb-*|eventarc-*|datastream-*|security-policy-rule|region-security-policy-rule|\
+    alloydb-*|eventarc-*|datastream-*|filestore-backup|filestore-snapshot|\
+    security-policy-rule|region-security-policy-rule|\
     network-firewall-policy-association|region-network-firewall-policy-association|\
     network-firewall-policy-rule|machine-image)
       return 0 ;;

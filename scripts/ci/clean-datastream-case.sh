@@ -59,4 +59,11 @@ for cp in $(names_in "${base}/connectionProfiles"); do
     echo "  Deleting connection profile: $(basename "$cp")"
     curl -s -X DELETE -H "Authorization: Bearer ${TOKEN}" "${api}/${cp}" >/dev/null || true
 done
+
+# These deletes are long-running too. The discovery phase recreates profiles
+# under the same names, and got "Resource ... already exists" when this raced.
+for _ in $(seq 1 30); do
+    [ -z "$(names_in "${base}/connectionProfiles")" ] && break
+    sleep 10
+done
 echo "clean-datastream-case: done"

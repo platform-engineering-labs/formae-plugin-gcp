@@ -863,6 +863,10 @@ echo "Cleaning GCP eventarc Advanced resources..."
 # gone, so a leak blocks the next run's peering, not just tidiness.
 "$(dirname "$0")/clean-datastream-case.sh" all
 
+# A leaked Filestore instance is the most expensive leak in the suite: a
+# BASIC_HDD instance has a 1 TiB minimum and is billed per GiB-month.
+"$(dirname "$0")/clean-filestore-case.sh" all
+
 echo "Cleaning GCP artifact registry repositories..."
 AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)
 if [ -n "$AR_REPOS" ]; then

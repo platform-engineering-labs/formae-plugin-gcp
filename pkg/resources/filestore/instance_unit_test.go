@@ -88,3 +88,108 @@ func TestInstanceRegistered(t *testing.T) {
 		}
 	}
 }
+
+// A snapshot is addressed inside its instance; instances and backups are not.
+func TestFilestorePathBuilderNesting(t *testing.T) {
+	got := filestorePathBuilder(base.PathContext{
+		Project: "p", Location: "z",
+		ParentType: "instances", ParentResource: "fs1",
+		ResourceType: "snapshots", ResourceName: "s1",
+	})
+	if want := "/projects/p/locations/z/instances/fs1/snapshots/s1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	got = filestorePathBuilder(base.PathContext{
+		Project: "p", Location: "r", ResourceType: "backups", ResourceName: "b1",
+	})
+	if want := "/projects/p/locations/r/backups/b1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFilestoreNativeIDParser(t *testing.T) {
+	ctx, err := parseFilestoreNativeID("projects/p/locations/z/instances/fs1/snapshots/s1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ctx.ParentType != "instances" || ctx.ParentResource != "fs1" ||
+		ctx.ResourceType != "snapshots" || ctx.ResourceName != "s1" {
+		t.Errorf("nested parse wrong: %+v", ctx)
+	}
+
+	ctx, err = parseFilestoreNativeID("projects/p/locations/r/backups/b1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ctx.ResourceType != "backups" || ctx.ResourceName != "b1" || ctx.Location != "r" {
+		t.Errorf("top-level parse wrong: %+v", ctx)
+	}
+
+	if _, err := parseFilestoreNativeID("projects/p/locations/z/instances"); err == nil {
+		t.Error("a collection path is not a resource and must be rejected")
+	}
+}
+
+// A forma passes a resolvable that resolves to a bare instance name; the API
+// wants a full path. Expand on write, shorten on read - otherwise every
+// comparison step reports drift on a backup that is in fact correct.
+func TestBackupSourceInstanceRoundTrip(t *testing.T) {
+	body, err := backupRequest(map[string]interface{}{
+		"name":           "b1",
+		"location":       "z",
+		"sourceInstance": "fs1",
+	}, base.TransformContext{Project: "p", Location: "z"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := body["sourceInstance"], "projects/p/locations/z/instances/fs1"; got != want {
+		t.Errorf("sourceInstance = %v, want %v", got, want)
+	}
+	if _, ok := body["location"]; ok {
+		t.Error("location addresses the resource in the URL and must not be a body field")
+	}
+	if _, ok := body["name"]; !ok {
+		t.Error("name must survive: base.Create reads the create id out of it")
+	}
+
+	out := backupResponse(map[string]interface{}{
+		"name":           "projects/p/locations/z/backups/b1",
+		"sourceInstance": "projects/p/locations/z/instances/fs1",
+	}, base.TransformContext{})
+	if out["name"] != "b1" || out["location"] != "z" || out["sourceInstance"] != "fs1" {
+		t.Errorf("got %+v", out)
+	}
+}
+
+// A full instance path written by hand must not be expanded a second time.
+func TestBackupKeepsFullSourcePath(t *testing.T) {
+	body, err := backupRequest(map[string]interface{}{
+		"location":       "r",
+		"sourceInstance": "projects/other/locations/z/instances/fs9",
+	}, base.TransformContext{Project: "p"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got, want := body["sourceInstance"], "projects/other/locations/z/instances/fs9"; got != want {
+		t.Errorf("sourceInstance = %v, want %v", got, want)
+	}
+}
+
+// instance and location live only in the path, but a forma declares both.
+func TestSnapshotResponseRecoversParent(t *testing.T) {
+	out := snapshotResponseTransformer(map[string]interface{}{
+		"name": "projects/p/locations/z/instances/fs1/snapshots/s1",
+	}, base.TransformContext{})
+	if out["name"] != "s1" || out["location"] != "z" || out["instance"] != "fs1" {
+		t.Errorf("got %+v", out)
+	}
+
+	// An instance's path must not be read as a snapshot's.
+	out = snapshotResponseTransformer(map[string]interface{}{
+		"name": "projects/p/locations/z/instances/fs1",
+	}, base.TransformContext{})
+	if out["name"] != "projects/p/locations/z/instances/fs1" {
+		t.Errorf("foreign collection must be left alone: %+v", out)
+	}
+}

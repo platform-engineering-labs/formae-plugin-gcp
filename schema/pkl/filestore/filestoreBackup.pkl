@@ -1,0 +1,85 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Filestore Backup
+///
+/// A copy of one file share of an `Instance`, kept independently of it: a
+/// backup outlives the instance it was taken from and can restore into a new
+/// one.
+///
+/// `location` and the source instance's location are declared as the same
+/// value: the conformance case runs with `GCP_LOCATION` pointed at the zone,
+/// as every Filestore case does, and the plugin expands `sourceInstance` in
+/// that same location. A backup kept in a different region from its instance
+/// needs the full instance path written out instead of a bare name.
+module gcp.filestore.filestoreBackup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Filestore::Backup"
+
+open class BackupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BackupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Backup extends formae.Resource {
+    hidden parent = this
+
+    /// Short backup id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region the backup is stored in. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The instance being backed up. A short instance name or an Instance
+    /// resolvable - the plugin expands it to the full path in this backup's
+    /// location - or a full "projects/{p}/locations/{l}/instances/{i}" path
+    /// when the instance lives elsewhere. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    sourceInstance: (String|formae.Resolvable)?
+
+    /// Which file share of that instance. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    sourceFileShare: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// CREATING, FINALIZING, READY or DELETING. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// Capacity of the source instance, as a string. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    capacityGb: String?
+
+    /// Tier of the source instance. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    sourceInstanceTier: String?
+
+    /// Bytes the backup occupies, as a string. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    storageBytes: String?
+
+    hidden res: BackupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
