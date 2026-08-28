@@ -81,7 +81,12 @@ jobs:
     # if-clause this job would skip too, because a needed job did not succeed.
     if: ${{ !cancelled() && needs.parse-input.result == 'success' && (needs.pre-cleanup.result == 'success' || needs.pre-cleanup.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    # 75 was not enough for the slowest case. datastream-route runs ~24m of
+    # crud, waits for a VPC peering teardown between phases, then ~40m of
+    # discovery - each phase building a private connection - and was killed
+    # mid-discovery at the cap. Raised with headroom rather than to the
+    # observed figure, so the next slow case does not need another bump.
+    timeout-minutes: 120
     strategy:
       matrix:
         test-case: ${{ fromJson(needs.parse-input.outputs.test-cases) }}
