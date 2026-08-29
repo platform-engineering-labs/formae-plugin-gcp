@@ -60,13 +60,13 @@ forma {
   new materializedView.MaterializedView {
     label = "plugin-sdk-test-bigtable-materialized-view"
     project = v.gcpProject
-    // Resolvable -> the instance exists before the view is created in it. The
-    // view also needs the table to exist, and that edge cannot be expressed:
-    // the query names the table as text, and a resolvable interpolated into a
-    // string is emitted as its encoded envelope rather than resolved, while a
-    // resolvable pointing at a property other than the identifier does not
-    // survive extract. The table is declared before the view instead.
-    instance = inst.res.name
+    // The instance is read off the table, not the instance: it carries the same
+    // value and it is the one reference the view can make to the table, which
+    // must exist first. The query names the table as text, and text creates no
+    // ordering edge - a resolvable interpolated into a string is emitted as its
+    // encoded envelope rather than resolved, because an interpolated reference
+    // creates no edge and so the value is not known yet.
+    instance = tbl.res.instance
     name = "formae_test_mv_\(v.testRunID)"
     // Bigtable refuses a view whose query is a plain projection: "queries must
     // contain a GROUP BY or ORDER BY clause".
