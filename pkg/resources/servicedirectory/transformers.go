@@ -8,17 +8,33 @@ import (
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // requestTransformer drops the fields that address a resource rather than
-// describe it. The id travels as a create-time query parameter and the rest of
-// the address is in the URL, so a body carrying them is rejected.
-func requestTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+// describe it: the parents and the project are all in the URL, so a body
+// carrying them is rejected.
+//
+// "name" is deliberately left in. The id does travel as a create-time query
+// parameter rather than in the body, but base is what moves it: it reads
+// body["name"] after this transformer runs and deletes it itself. Dropping it
+// here left the parameter empty and the API answered "Invalid namespace name:".
+func requestTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
 	body := make(map[string]interface{}, len(props))
 	for k, v := range props {
 		switch k {
-		case "name", "project", "namespace", "service":
+		case "project", "namespace", "service":
 			continue
+		case "uid":
+			// Server-set concurrency token; sending it back puts it in the
+			// update mask, which the API will not accept.
+			continue
+		case "name":
+			// The update mask is built from the body, and the id is immutable:
+			// "Invalid update_mask. Cannot update the name of a namespace."
+			if ctx.Operation == resource.OperationUpdate {
+				continue
+			}
 		}
 		body[k] = v
 	}

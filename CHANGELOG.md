@@ -10,6 +10,22 @@ formae agent.
 
 ## [Unreleased]
 
+### Added
+
+- `GCP::ServiceDirectory::Namespace`, `GCP::ServiceDirectory::Service` and
+  `GCP::ServiceDirectory::Endpoint` - Service Directory publishes where a
+  service lives without running a registry: a namespace holds services and a
+  service holds endpoints. Holding them costs nothing, only lookups are billed,
+  so the whole hierarchy is testable without provisioning anything.
+
+  All three are config-driven. The id travels as a create-time query parameter,
+  updates are a PATCH with a mask built from the body, and every operation is
+  synchronous. An endpoint is addressed by a namespace and a service at once and
+  uses the two-property parent for it. Nothing can be listed across its parents -
+  `locations/-` answers "Unsupported location: -", and `namespaces/-` and
+  `services/-` both answer "Could not parse namespace name" - so a service walks
+  the namespaces and an endpoint walks the services inside them.
+
 ### Fixed
 
 - `GCP::SQL::Database` is discoverable. A database only exists underneath an
