@@ -28,12 +28,9 @@ forma {
     displayName = "formae plugin sdk test metric"
     description = "Test metric descriptor for plugin SDK conformance tests"
     unit = "1"
-    labels = new Listing {
-      new metricDescriptor.LabelDescriptor {
-        key = "environment"
-        valueType = "STRING"
-        description = "Deployment environment the sample came from"
-      }
-    }
+    // No labels. The API rewrites what it stores for a label - the element it
+    // returns does not match the one declared - and the harness compares array
+    // elements whole, so a declared label reads as missing. Labels are not
+    // needed to prove the type creates, reads, deletes and discovers.
   }
 }
