@@ -79,8 +79,10 @@ open class TargetHttpsProxy extends formae.Resource {
     }
     httpKeepAliveTimeoutSec: Int?
 
+    /// GCP fills this in with DISABLED when unset.
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     tlsEarlyData: TlsEarlyData?
 
