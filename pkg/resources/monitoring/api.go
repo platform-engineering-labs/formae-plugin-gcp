@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -93,8 +94,26 @@ func monitoringPathBuilder(ctx base.PathContext) string {
 	if ctx.ResourceName != "" {
 		path += "/" + ctx.ResourceName
 	}
+	if ctx.IsList && ctx.ResourceType == "metricDescriptors" {
+		path += "?filter=" + url.QueryEscape(userOwnedMetricFilter)
+	}
 	return path
 }
+
+// userOwnedMetricFilter restricts a metricDescriptors list to the descriptors a
+// project actually owns.
+//
+// metricDescriptors.list otherwise returns every descriptor visible to the
+// project - well over a thousand built-in ones for GCP's own services - and a
+// custom metric is simply somewhere in that pile, quite possibly not on the
+// first page. Discovery listed, never saw the descriptor it had just created,
+// and timed out.
+//
+// Filtering is not merely an optimisation here: a built-in descriptor cannot be
+// created, changed or deleted, so it is not a resource formae can manage and
+// has no business appearing in discovery. Only these two prefixes can be.
+const userOwnedMetricFilter = `metric.type = starts_with("custom.googleapis.com/") ` +
+	`OR metric.type = starts_with("external.googleapis.com/user/")`
 
 // MonitoringSloNativeID - SLOs are two levels deep, so the default pairwise
 // path parser would lose the owning service. Parse it explicitly.

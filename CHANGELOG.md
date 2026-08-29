@@ -12,6 +12,15 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Monitoring::MetricDescriptor` is discoverable. `metricDescriptors.list`
+  returns every descriptor a project can see - well over a thousand built-in
+  ones for GCP's own services - so a custom metric was somewhere in that pile
+  and not necessarily on the first page: discovery listed, never saw the
+  descriptor it had just created, and timed out. The list is now filtered to the
+  two prefixes a project can own. That is not only an optimisation: a built-in
+  descriptor cannot be created, changed or deleted, so it is not a resource
+  formae can manage and does not belong in discovery.
+
 - A `GCP::Eventarc::Trigger` can reference the `Workflow` it delivers to.
   `destination.workflow` was a plain `String`, so a forma could name a workflow
   but not reference it - and ordering comes only from resolvable references, so
