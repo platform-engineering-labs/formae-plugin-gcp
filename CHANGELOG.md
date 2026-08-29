@@ -26,6 +26,10 @@ formae agent.
   `ParentResourceConfig.SecondPropertyName` now joins them as
   `{bucket}/{object}`, the form the Storage path builder and native ID already
   expected. Every type the schema declares now has a provisioner behind it.
+  Discovery needs more than that: it lists with neither parent to name, so an
+  object ACL is found by walking the buckets and then their objects. Listing a
+  bucket's objects with `projection=full` carries every object's `acl` inline,
+  which keeps that to one request per bucket rather than one per object.
 
 - `GCP::Bigtable::MaterializedView` matches its API and has a provisioner. The
   schema declared `sourceTable` and `cluster`; the API has neither. A
@@ -33,16 +37,29 @@ formae agent.
   `query`, alongside `deletionProtection`, `clusterStates` and `etag`. Nothing
   had noticed because the type had no provisioner either, so a forma declaring
   one failed at apply before any field could be rejected. Both are fixed, and
-  `knownParityGaps` is down to one.
+  `knownParityGaps` is down to one. Like a backup, it has to be bound to
+  Bigtable's own provisioner: the generic one sends no id query parameter, and
+  the API answered `Invalid id for collection materializedViews : Length should
+  be between [1,128], but found 0`. The parameter is snake_case while the
+  collection is camelCase, so trimming the plural alone produced
+  `materializedView_id`, which the API ignored before rejecting the create for
+  the empty id it had never been given. It is listed by walking the instances,
+  for the same reason a backup is.
 
 - `GCP::Bigtable::Backup` works. Its schema shipped with no provisioner behind
   it, so declaring a backup failed at apply - one of three types in
-  `knownParityGaps` that were declarable and unusable. Everything it needed was
-  already there: the three-level path builder, the native ID handling and the
-  cluster extraction in Create all handled backups; the type was simply never
-  registered. It now is, with the transformers that expand `sourceTable` to the
-  full path on the way out and recover the instance and cluster from the path on
-  the way back. Two known parity gaps remain.
+  `knownParityGaps` that were declarable and unusable. Much of what it needed
+  was already there: the three-level path builder, the native ID handling and
+  the cluster extraction in Create all handled backups. Registering the type was
+  not enough, though - it also has to be bound to Bigtable's own provisioner,
+  and being left out of that list sent it to the generic one instead, which
+  knows nothing of the cluster a backup lives under and so addressed
+  `/instances/{i}/backups`, a route that does not exist. It is now bound, with
+  the transformers that expand `sourceTable` to the full path on the way out and
+  recover the instance and cluster from the path on the way back, and with a
+  list that walks the project's instances and uses the `clusters/-` wildcard
+  within each - discovery lists with no parent to name, and no route spans
+  instances. Two known parity gaps remain.
 
 - `GCP::Eventarc::Trigger` can be created at all. Eventarc requires the short id
   in `?triggerId=` and the full resource path in the body's `name` - which its
