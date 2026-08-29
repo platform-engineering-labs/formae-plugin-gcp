@@ -509,6 +509,36 @@ else
     echo "  No SSL policies found"
 fi
 
+# --- 1h. SSL certificates (must delete after the proxies that reference them) ---
+# A project holds at most 10 SSL certificates globally, and every leaked one
+# counts. Once the cap is reached, any case that creates a certificate fails with
+# "Quota 'SSL_CERTIFICATES' exceeded. Limit: 10.0 globally." rather than anything
+# resembling a plugin bug - which is exactly how target-https-proxy failed on
+# 2026-08-29, against eight certificates left behind since July. The sweep knew
+# about ssl-policies but never about the certificates themselves.
+echo "Cleaning GCP regional SSL certificates..."
+REGION_CERTS=$(gcloud compute ssl-certificates list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
+if [ -n "$REGION_CERTS" ]; then
+    echo "$REGION_CERTS" | while read -r cert region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional SSL certificate: $cert (region: $region)"
+        gcloud compute ssl-certificates delete "$cert" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional SSL certificates found"
+fi
+
+echo "Cleaning GCP SSL certificates..."
+SSL_CERTS=$(gcloud compute ssl-certificates list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SSL_CERTS" ]; then
+    echo "$SSL_CERTS" | while read -r cert; do
+        echo "  Deleting SSL certificate: $cert"
+        gcloud compute ssl-certificates delete "$cert" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No SSL certificates found"
+fi
+
 # --- 1h. Network attachments (hold a subnet reference, so delete before subnets) ---
 # Service attachments hold forwarding-rule and PSC-subnet references, so they
 # must go before the forwarding rules and subnets below.
