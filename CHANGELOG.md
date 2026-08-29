@@ -12,6 +12,24 @@ formae agent.
 
 ### Fixed
 
+- Resolvables that pointed at a property name the schema does not have. A
+  `GCP::Storage::Bucket` resolvable's `name` targeted `"Name"`, so every forma
+  referencing `bucket.res.name` failed to apply with `source resource ... has no
+  property "Name"` - which is what a bucket ACL case hit. GCP's JSON is
+  camelCase, and 17 resolvable targets across `Bucket`, `AnywhereCache`, the
+  three ACL types, `Container::Cluster` and `Container::NodePool` were
+  capitalised. Corrected wherever the lowercase field is declared in the same
+  file, which makes each one provable rather than guessed.
+
+  `Bucket`'s `selfLink` resolvable is removed outright: the type has no
+  `selfLink` property at all, so it could never resolve.
+
+- `GCP::Bigtable` creates unwrap wrapped property values. The hand-written
+  provisioner read properties directly while `base.Create` unwraps them first,
+  so a wrapped value read as a plain string came back empty - surfacing as
+  "instance is required for nested resources" on a table whose instance was
+  declared.
+
 - `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
   are discoverable. An ACL entry lives at `/b/{bucket}/acl`, and Cloud Storage
   has no endpoint spanning buckets - no `-` wildcard in the bucket position, as

@@ -40,6 +40,13 @@ func (p *BigtableProvisioner) Create(
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
 
+	// A forma can wrap a property so it is stored or displayed differently, and
+	// base.Create unwraps those before reading anything. This provisioner is
+	// hand-written and did not, so a wrapped value read as a plain string came
+	// back empty - which surfaced as "instance is required for nested
+	// resources" on a table whose instance was in fact declared.
+	props = base.UnwrapValues(props)
+
 	// Extract resource name for query parameter
 	resourceName := utils.GetString(props, "name")
 	if resourceName == "" {

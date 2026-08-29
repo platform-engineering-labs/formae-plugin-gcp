@@ -111,15 +111,11 @@ open class BucketResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden id: BucketResolvable = (this) {
-        property = "Id"
-    }
-
-    hidden selfLink: BucketResolvable = (this) {
-        property = "SelfLink"
+        property = "id"
     }
 
     hidden name: BucketResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
 }
 

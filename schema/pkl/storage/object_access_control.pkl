@@ -27,15 +27,15 @@ open class ObjectAccessControlResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden entity: ObjectAccessControlResolvable = (this) {
-        property = "Entity"
+        property = "entity"
     }
 
     hidden role: ObjectAccessControlResolvable = (this) {
-        property = "Role"
+        property = "role"
     }
 
     hidden entityId: ObjectAccessControlResolvable = (this) {
-        property = "EntityId"
+        property = "entityId"
     }
 }
 

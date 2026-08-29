@@ -616,11 +616,11 @@ open class NodePoolResolvable extends formae.Resolvable {
     }
 
     hidden selfLink: NodePoolResolvable = (this) {
-        property = "SelfLink"
+        property = "selfLink"
     }
 
     hidden name: NodePoolResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
 }
 

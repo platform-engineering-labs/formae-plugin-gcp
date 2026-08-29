@@ -17,15 +17,15 @@ open class AnywhereCacheResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden anywhereCacheId: AnywhereCacheResolvable = (this) {
-        property = "AnywhereCacheId"
+        property = "anywhereCacheId"
     }
 
     hidden bucket: AnywhereCacheResolvable = (this) {
-        property = "Bucket"
+        property = "bucket"
     }
 
     hidden state: AnywhereCacheResolvable = (this) {
-        property = "State"
+        property = "state"
     }
 }
 
