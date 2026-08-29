@@ -32,14 +32,6 @@ func (w *walkingListProvisioner) List(
 	ctx context.Context,
 	request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	// A caller that names its instance wants only that one; the base path
-	// builder already handles it.
-	if request.AdditionalProperties != nil {
-		if parent := request.AdditionalProperties["instance"]; parent != "" {
-			return w.BigtableProvisioner.List(ctx, request)
-		}
-	}
-
 	cfg := config.FromTargetConfig(request.TargetConfig, w.Config.Deps())
 	if cfg.Project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
@@ -50,10 +42,24 @@ func (w *walkingListProvisioner) List(
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
 
-	instances, err := w.listNames(ctx, client,
-		fmt.Sprintf("%s/projects/%s/instances", w.APIConfig.BaseURL, cfg.Project), "instances")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list Bigtable instances: %w", err)
+	// A caller that names its instance wants only that one, but it still cannot
+	// be handed to the base list: a backup needs the cluster segment too, which
+	// only this walk supplies. So narrow the walk rather than delegating it.
+	var instances []string
+	if request.AdditionalProperties != nil && request.AdditionalProperties["instance"] != "" {
+		// The hint carries the bare instance id, but a full path is a valid way
+		// to name one and must not be prefixed a second time.
+		instance := request.AdditionalProperties["instance"]
+		if !strings.HasPrefix(instance, "projects/") {
+			instance = fmt.Sprintf("projects/%s/instances/%s", cfg.Project, instance)
+		}
+		instances = []string{instance}
+	} else {
+		instances, err = w.listNames(ctx, client,
+			fmt.Sprintf("%s/projects/%s/instances", w.APIConfig.BaseURL, cfg.Project), "instances")
+		if err != nil {
+			return nil, fmt.Errorf("failed to list Bigtable instances: %w", err)
+		}
 	}
 
 	// A backup is addressed through its cluster, so the collection needs the
