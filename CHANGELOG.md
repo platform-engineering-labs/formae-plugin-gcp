@@ -183,6 +183,12 @@ formae agent.
 
 ### Added
 
+- A conformance case for `GCP::Bigtable::Cluster`, the first to use the
+  on-demand list. A cluster is an additional replica of an instance and the
+  instance must be PRODUCTION - a DEVELOPMENT instance cannot have a second
+  cluster - so the forma holds two billed nodes while it runs. It is excluded
+  from the automatic matrix and run by naming it in debug-conformance.
+
 - `testdata/on-demand-cases.txt`, a list of conformance cases excluded from the
   automatic CI and nightly matrix. Every other case runs on every push to main
   and every night; a case named here runs only when dispatched explicitly

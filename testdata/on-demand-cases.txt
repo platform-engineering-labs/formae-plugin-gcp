@@ -16,3 +16,8 @@
 # reason; that is what the per-case timeouts are for.
 #
 # One case name per line. Blank lines and # comments are ignored.
+
+# A PRODUCTION Bigtable instance with two clusters bills per node per hour, and
+# a DEVELOPMENT instance - which the other Bigtable cases use - cannot have a
+# second cluster at all, so there is no cheap way to exercise this type.
+bigtable-cluster

@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/cluster_bigtable.pkl" as cluster
+import "./config/vars.pkl" as v
+
+// A cluster is an additional replica of an instance, so the instance comes
+// first - and it must be PRODUCTION: a DEVELOPMENT instance cannot have a
+// second cluster, which is why this case cannot use the cheap tier the
+// bigtable-instance and bigtable-table cases do.
+//
+// That is what puts this case in testdata/on-demand-cases.txt. A PRODUCTION
+// instance bills per node per hour and this forma holds two of them, so it runs
+// when someone names it in debug-conformance rather than on every push and
+// every night.
+//
+// The two clusters sit in different zones of the same region, which is what
+// Bigtable replication requires.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-cluster-instance"
+  project = v.gcpProject
+  name = "formae-test-instance-cl-\(v.testRunID)"
+  displayName = "Plugin SDK Test Cluster Instance"
+  type = "PRODUCTION"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+      serveNodes = 1
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  new cluster.Cluster {
+    label = "plugin-sdk-test-bigtable-cluster"
+    project = v.gcpProject
+    // Resolvable -> the instance exists before a cluster is added to it.
+    instance = inst.res.name
+    name = "cluster2"
+    location = "\(v.gcpRegion)-b"
+    defaultStorageType = "SSD"
+    serveNodes = 1
+  }
+}
