@@ -12,6 +12,15 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
+  are discoverable. An ACL entry lives at `/b/{bucket}/acl`, and Cloud Storage
+  has no endpoint spanning buckets - no `-` wildcard in the bucket position, as
+  privateca and Datastream offer - so discovery, which lists with no parent,
+  asked for a URL with an empty bucket segment and found nothing. Both types now
+  walk the project's buckets, skipping any whose ACLs cannot be read: a bucket
+  with uniform bucket-level access rejects the read outright, and a shared
+  project holds buckets a target does not own.
+
 - Creating a `GCP::Datastream::ConnectionProfile` no longer half-succeeds. The
   API validates a profile against the source it describes, and does so inside
   the long-running operation - after the profile has been created. A profile

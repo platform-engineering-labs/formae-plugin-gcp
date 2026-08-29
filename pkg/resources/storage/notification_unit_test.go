@@ -85,3 +85,24 @@ func TestBucketFromSelfLink(t *testing.T) {
 		t.Errorf("nil -> %q, want empty", got)
 	}
 }
+
+// An ACL's native ID is b/{bucket}/{collection}/{entity}, which
+// parseStorageNativeID must round-trip - the walking List builds these by hand.
+func TestAclNativeIDRoundTrip(t *testing.T) {
+	for _, collection := range []string{"acl", "defaultObjectAcl"} {
+		id := "b/my-bucket/" + collection + "/project-editors-123"
+		ctx, err := parseStorageNativeID(id)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", collection, err)
+		}
+		if ctx.ParentResource != "my-bucket" {
+			t.Errorf("%s: bucket = %q", collection, ctx.ParentResource)
+		}
+		if ctx.ResourceType != collection {
+			t.Errorf("%s: resourceType = %q", collection, ctx.ResourceType)
+		}
+		if ctx.ResourceName != "project-editors-123" {
+			t.Errorf("%s: entity = %q", collection, ctx.ResourceName)
+		}
+	}
+}

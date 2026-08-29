@@ -10,6 +10,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -197,5 +198,30 @@ func init() {
 
 	if err != nil {
 		panic(err)
+	}
+
+	// Re-register the two ACL types behind a provisioner that walks the buckets
+	// on List. Everything else stays config-driven; only List has to differ,
+	// because Cloud Storage has no endpoint spanning buckets. See
+	// acl_walking_list.go.
+	for _, resourceType := range []string{
+		BucketAccessControlResourceType,
+		DefaultObjectAccessControlResourceType,
+	} {
+		rt := resourceType
+		def := storageRegistry.Definitions[rt]
+		registry.Register(rt, def.Operations, func(cfg *config.Config) prov.Provisioner {
+			return &aclProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           StorageAPI,
+					OperationConfig:     StorageOperations,
+					ResourceConfig:      def.ResourceConfig,
+					NativeIDConfig:      StorageNativeID,
+					RequestTransformer:  def.RequestTransformer,
+					ResponseTransformer: def.ResponseTransformer,
+				},
+			}
+		})
 	}
 }
