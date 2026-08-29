@@ -76,6 +76,18 @@ func (c *configWalkingProvisioner) List(
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
+// Status reads the config back once the operation finishes. A create is a
+// long-running operation whose response carries the config in its basic form,
+// without the OpenAPI documents that define it - only a read under the full
+// view returns those, so reporting the operation's own answer left the
+// documents missing from the stored state.
+func (c *configWalkingProvisioner) Status(
+	ctx context.Context,
+	request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	return base.StatusWithRead(ctx, c.BaseResource, c.Read, request)
+}
+
 func (c *configWalkingProvisioner) listNames(
 	ctx context.Context, client *transport.Client, url, itemsKey string,
 ) ([]string, error) {
