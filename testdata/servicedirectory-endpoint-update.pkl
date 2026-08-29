@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/servicedirectory/namespace.pkl"
+import "@gcp/servicedirectory/serviceDirectoryService.pkl" as service
+import "@gcp/servicedirectory/endpoint.pkl"
+import "./config/vars.pkl" as v
+
+// An endpoint is addressed by a namespace and a service at once, so both come
+// first.
+local ns = new namespace.Namespace {
+  label = "plugin-sdk-test-sd-ep-namespace"
+  project = v.gcpProject
+  name = "formae-plugin-sdk-test-sd-ens-\(v.testRunID)"
+}
+
+local svc = new service.Service {
+  label = "plugin-sdk-test-sd-ep-service"
+  project = v.gcpProject
+  namespace = ns.res.name
+  name = "formae-plugin-sdk-test-sd-esvc-\(v.testRunID)"
+}
+
+forma {
+  v.stack
+  v.target
+
+  ns
+  svc
+
+  new endpoint.Endpoint {
+    label = "plugin-sdk-test-sd-endpoint"
+    project = v.gcpProject
+    // Both parents are read off the service: the namespace it belongs to
+    // carries the same value the endpoint needs, and taking it from there makes
+    // the endpoint wait for the service rather than only for the namespace.
+    namespace = svc.res.namespace
+    service = svc.res.name
+    name = "formae-plugin-sdk-test-sd-ep-\(v.testRunID)"
+    // Documentation range, so the address is guaranteed not to route anywhere.
+    address = "192.0.2.10"
+    port = 8080
+    annotations = new Mapping {
+      ["purpose"] = "conformance"
+      ["updated"] = "true"
+    }
+  }
+}

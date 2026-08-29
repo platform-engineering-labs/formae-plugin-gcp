@@ -1,0 +1,83 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Service Directory Endpoint
+///
+/// Where a service actually answers: an address and a port inside a service,
+/// inside a namespace. An endpoint is addressed by both its namespace and its
+/// service, so it names both.
+module gcp.servicedirectory.endpoint
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ServiceDirectory::Endpoint"
+
+open class EndpointResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: EndpointResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::ServiceDirectory::Service"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "namespace" listParameter = "namespace"
+        }
+        new formae.ListProperty { parentProperty = "name" listParameter = "service"
+        }
+    }.toList()
+}
+open class Endpoint extends formae.Resource {
+    hidden parent = this
+
+    /// Short endpoint id, unique within the service. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The namespace holding the service. A short namespace name or a Namespace
+    /// reference.
+    @gcp.FieldHint { createOnly = true }
+    namespace: (String|formae.Resolvable)
+
+    /// The service holding the endpoint. A short service name or a Service
+    /// reference.
+    @gcp.FieldHint { createOnly = true }
+    service: (String|formae.Resolvable)
+
+    /// The project holding the endpoint.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    /// IPv4 or IPv6 address the service answers on.
+    @gcp.FieldHint
+    address: String?
+
+    /// Port the service answers on, 0 to 65535.
+    @gcp.FieldHint
+    port: Int?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    /// VPC network the address belongs to, as
+    /// "projects/{projectNumber}/locations/global/networks/{network}".
+    @gcp.FieldHint { createOnly = true }
+    network: (String|formae.Resolvable)?
+
+    /// Server-set concurrency token.
+    @gcp.FieldHint { hasProviderDefault = true }
+    uid: String?
+
+    hidden res: EndpointResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

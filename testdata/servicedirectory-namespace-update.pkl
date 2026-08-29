@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/servicedirectory/namespace.pkl"
+import "./config/vars.pkl" as v
+
+// A namespace has no prerequisites and costs nothing to hold — Service
+// Directory bills lookups, and nothing looks this up.
+forma {
+  v.stack
+  v.target
+
+  new namespace.Namespace {
+    label = "plugin-sdk-test-sd-namespace"
+    project = v.gcpProject
+    name = "formae-plugin-sdk-test-sd-ns-\(v.testRunID)"
+    labels = new Mapping {
+      ["purpose"] = "conformance"
+      ["updated"] = "true"
+    }
+  }
+}

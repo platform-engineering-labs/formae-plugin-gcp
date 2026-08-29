@@ -1,0 +1,54 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Service Directory Namespace
+///
+/// The top of the Service Directory hierarchy: a namespace holds services, and
+/// a service holds endpoints. A namespace is regional and costs nothing to
+/// hold — only lookups are billed — so it is a cheap way to publish where a
+/// service lives without running a registry.
+module gcp.servicedirectory.namespace
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ServiceDirectory::Namespace"
+
+open class NamespaceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: NamespaceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Namespace extends formae.Resource {
+    hidden parent = this
+
+    /// Short namespace id, unique within the location. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The project holding the namespace.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Server-set concurrency token.
+    @gcp.FieldHint { hasProviderDefault = true }
+    uid: String?
+
+    hidden res: NamespaceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
