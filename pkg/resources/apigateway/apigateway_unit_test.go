@@ -5,6 +5,7 @@
 package apigateway
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -77,5 +78,24 @@ func TestResponseTransformerPrefersConfiguredProject(t *testing.T) {
 	}
 	if out["path"] != full {
 		t.Errorf("path = %v, want %q", out["path"], full)
+	}
+}
+
+// A destroy removes a config before its api, but both deletes are long-running
+// and the api's can reach the API while the config is still releasing it. The
+// refusal is retryable rather than fatal.
+func TestNestedResourceDeleteIsRetryable(t *testing.T) {
+	retry := APIGatewayOperations.RetryableError
+	if retry == nil {
+		t.Fatal("no retryable-error predicate configured")
+	}
+	if !retry(errors.New("Resource '...apis/a' has nested resources. If the API supports cascading delete, set 'force' to true")) {
+		t.Error("a nested-resources refusal should be retried")
+	}
+	if retry(errors.New("Permission denied")) {
+		t.Error("an unrelated failure must not be retried")
+	}
+	if retry(nil) {
+		t.Error("nil must not be retried")
 	}
 }

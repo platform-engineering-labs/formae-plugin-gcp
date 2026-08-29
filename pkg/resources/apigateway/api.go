@@ -28,6 +28,17 @@ var APIGatewayOperations = base.OperationConfig{
 	OperationURLBuilder:    func(_ base.PathContext, operationID string) string { return operationID },
 	NativeIDExtractor:      extractAPIGatewayNativeID,
 	OperationStatusChecker: base.CheckLROStatus,
+
+	// Deleting an api while it still holds a config is refused outright:
+	// "has nested resources. If the API supports cascading delete, set 'force'
+	// to true". A destroy removes the config first, but both deletes are
+	// long-running and the api's can reach the API before the config's has
+	// finished releasing it. Treat it as retryable so the destroy re-issues the
+	// api delete until the config is gone, rather than forcing a cascade that
+	// would take resources the forma never asked to remove.
+	RetryableError: func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "has nested resources")
+	},
 }
 
 // APIGatewayNativeID - the full resource path, which is what the API reports as
