@@ -509,6 +509,45 @@ else
     echo "  No SSL policies found"
 fi
 
+# --- API Gateway (gateways, then configs, then apis) ---
+# A config cannot be deleted while a gateway serves it, and an api cannot be
+# deleted while it holds configs, so the hierarchy is torn down from the bottom.
+# Every delete is a long-running operation; --async would leave the next delete
+# racing the previous one, so these wait.
+echo "Cleaning GCP API Gateway gateways..."
+for agw_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
+    [ -z "$agw_loc" ] && continue
+    AGW_GW=$(gcloud api-gateway gateways list --location="$agw_loc" \
+        --filter="name~formae-plugin-sdk|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$AGW_GW" ]; then
+        echo "$AGW_GW" | while read -r gw; do
+            echo "  Deleting API Gateway gateway: $gw (location: $agw_loc)"
+            gcloud api-gateway gateways delete "$gw" --location="$agw_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No API Gateway gateways found in $agw_loc"
+    fi
+done
+
+echo "Cleaning GCP API Gateway apis and their configs..."
+AGW_APIS=$(gcloud api-gateway apis list --filter="name~formae-plugin-sdk|name~formae-test" \
+    --format="value(name)" 2>/dev/null || true)
+if [ -n "$AGW_APIS" ]; then
+    echo "$AGW_APIS" | while read -r agw_api; do
+        AGW_CFGS=$(gcloud api-gateway api-configs list --api="$agw_api" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$AGW_CFGS" ]; then
+            echo "$AGW_CFGS" | while read -r cfg; do
+                echo "  Deleting API Gateway config: $cfg (api: $agw_api)"
+                gcloud api-gateway api-configs delete "$cfg" --api="$agw_api" --quiet 2>/dev/null || true
+            done
+        fi
+        echo "  Deleting API Gateway api: $agw_api"
+        gcloud api-gateway apis delete "$agw_api" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No API Gateway apis found"
+fi
+
 # --- Service Directory (endpoints, then services, then namespaces) ---
 # Deleting a namespace takes its services and endpoints with it, so only the
 # namespaces need sweeping. goog-psc-default is Google-managed and does not

@@ -12,6 +12,25 @@ formae agent.
 
 ### Added
 
+- `GCP::ApiGateway::Api`, `GCP::ApiGateway::ApiConfig` and
+  `GCP::ApiGateway::Gateway` - API Gateway serves an api from a regional
+  gateway: an api holds immutable configs, and a gateway names the config it
+  serves rather than the api, because a change to a config produces a new one.
+  Holding an api or a config costs nothing; API Gateway bills the calls a
+  gateway serves.
+
+  Apis and configs are always global while gateways are regional, so the path
+  builder supplies the location for the first two rather than requiring one to
+  be named. Every write is a long-running operation, and a fresh operation does
+  not carry the resource - its metadata names the target it is building, which
+  is where the native ID comes from. A config only exists underneath an api and
+  there is no wildcard in the api position, so a parentless list walks the apis.
+
+  A config also reports its own full resource path. A gateway names the config
+  it serves that way, while `name` holds the short id a forma declares, and a
+  reference interpolated into a string is emitted as its envelope rather than
+  resolved - so without it the reference could not be expressed at all.
+
 - `GCP::ServiceDirectory::Namespace`, `GCP::ServiceDirectory::Service` and
   `GCP::ServiceDirectory::Endpoint` - Service Directory publishes where a
   service lives without running a registry: a namespace holds services and a
