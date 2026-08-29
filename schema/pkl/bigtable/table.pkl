@@ -85,7 +85,8 @@ open class Table extends formae.Resource {
     @gcp.FieldHint
     columnFamilies: Mapping<String, ColumnFamily>?
 
-    @gcp.FieldHint
+    /// GCP fills this in with MILLIS when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     granularity: String?
 
     @gcp.FieldHint

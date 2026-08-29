@@ -129,7 +129,7 @@ func init() {
 				RequestWrapper: "table", // Bigtable API expects payload wrapped in "table"
 			},
 			RequestTransformer:  base.RequestTransformerFunc(wrapTableBodyBuilder),
-			ResponseTransformer: base.AddProjectResponseTransformer,
+			ResponseTransformer: base.ResponseTransformerFunc(tableResponseTransformer),
 		},
 	})
 

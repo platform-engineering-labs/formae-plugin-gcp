@@ -12,6 +12,18 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Bigtable::Table` no longer reports drift the moment it is created. The
+  API reports a table's `name` as the full path
+  `projects/{p}/instances/{i}/tables/{t}` while a forma declares the short id
+  and the instance separately, and Table was registered with the generic
+  response transformer, which only fills in the project. Instance and Cluster
+  each had one of their own; Table now does too, and recovers the instance from
+  the path as well - it lives nowhere else in the response.
+
+- `GCP::Compute::Address.networkTier` and `purpose`, and
+  `GCP::Bigtable::Table.granularity`, are marked as provider defaults. GCP fills
+  all three in when unset.
+
 - `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
   can be created at all. Their `role` field carried no `@gcp.FieldHint`, so the
   plugin never treated it as a resource property and never sent it - and the API
