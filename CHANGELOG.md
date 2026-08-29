@@ -158,6 +158,10 @@ formae agent.
 
 ### Added
 
+- A conformance case for `GCP::SQL::Database`, which shipped without one. It
+  builds a `db-f1-micro` instance to hold the database, mirroring the
+  cloudsql-instance case's private-IP settings.
+
 - A conformance case for `GCP::Eventarc::Trigger`, the last Eventarc type
   without one. It delivers to a `Workflow`, which is free to define and needs no
   container image or network attachment.
