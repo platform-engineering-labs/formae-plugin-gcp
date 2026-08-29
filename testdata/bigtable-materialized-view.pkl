@@ -29,11 +29,17 @@ local inst = new instance.Instance {
   }
 }
 
+// The query has to name the table as plain text: interpolating a resolvable
+// into a string emits its serialized form, and the API answered
+// "Table not found: <base64 of the resolvable>". The name is declared once and
+// used in both places instead.
+local tblName = "formae_test_mv_table_\(v.testRunID)"
+
 local tbl = new table.Table {
   label = "plugin-sdk-test-mv-table"
   project = v.gcpProject
   instance = inst.res.name
-  name = "formae_test_mv_table_\(v.testRunID)"
+  name = tblName
   columnFamilies = new Mapping {
     ["cf1"] = new table.ColumnFamily {
       name = "cf1"
@@ -54,11 +60,12 @@ forma {
   new materializedView.MaterializedView {
     label = "plugin-sdk-test-bigtable-materialized-view"
     project = v.gcpProject
-    // Resolvable -> the instance exists before the view is created in it. The
-    // query names the table, which the fixture also declares, so the table is
-    // referenced too and formae creates it first.
-    instance = inst.res.name
+    // The instance is read off the table rather than the instance itself: it
+    // carries the same value, and it is the only resolvable reference the view
+    // can make to the table, which the query needs to exist first. Naming the
+    // table in the query text creates no ordering edge.
+    instance = tbl.res.instance
     name = "formae_test_mv_\(v.testRunID)"
-    query = "SELECT _key, cf1 FROM `\(tbl.res.name)`"
+    query = "SELECT _key, cf1 FROM `\(tblName)`"
   }
 }
