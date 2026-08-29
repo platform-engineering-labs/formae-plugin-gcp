@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/table.pkl" as table
+import "@gcp/bigtable/materialized_view.pkl" as materializedView
+import "./config/vars.pkl" as v
+
+// A materialized view is defined by a GoogleSQL query over the instance's data,
+// so the instance and the table the query reads both come first. DEVELOPMENT is
+// the cheap single-node instance type the other Bigtable cases use.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-mv-instance"
+  project = v.gcpProject
+  name = "formae-test-instance-mv-\(v.testRunID)"
+  displayName = "Plugin SDK Test MaterializedView Instance"
+  type = "DEVELOPMENT"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+    }
+  }
+}
+
+local tbl = new table.Table {
+  label = "plugin-sdk-test-mv-table"
+  project = v.gcpProject
+  instance = inst.res.name
+  name = "formae_test_mv_table_\(v.testRunID)"
+  columnFamilies = new Mapping {
+    ["cf1"] = new table.ColumnFamily {
+      name = "cf1"
+      gcRule = new table.GCRule {
+        maxNumVersions = 1
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+  tbl
+
+  new materializedView.MaterializedView {
+    label = "plugin-sdk-test-bigtable-materialized-view"
+    project = v.gcpProject
+    // Resolvable -> the instance exists before the view is created in it. The
+    // query names the table, which the fixture also declares, so the table is
+    // referenced too and formae creates it first.
+    instance = inst.res.name
+    name = "formae_test_mv_\(v.testRunID)"
+    query = "SELECT _key, cf1 FROM `\(tbl.res.name)`"
+  }
+}

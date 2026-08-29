@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Bigtable::MaterializedView` matches its API and has a provisioner. The
+  schema declared `sourceTable` and `cluster`; the API has neither. A
+  materialized view belongs to an instance and is defined by a GoogleSQL
+  `query`, alongside `deletionProtection`, `clusterStates` and `etag`. Nothing
+  had noticed because the type had no provisioner either, so a forma declaring
+  one failed at apply before any field could be rejected. Both are fixed, and
+  `knownParityGaps` is down to one.
+
 - `GCP::Bigtable::Backup` works. Its schema shipped with no provisioner behind
   it, so declaring a backup failed at apply - one of three types in
   `knownParityGaps` that were declarable and unusable. Everything it needed was
@@ -191,6 +199,8 @@ formae agent.
   (`TargetTcpProxy`) had one with no update fixture.
 
 ### Added
+
+- A conformance case for `GCP::Bigtable::MaterializedView`.
 
 - A conformance case for `GCP::Bigtable::Backup`, and `FORMAE_TEST_FUTURE_TIMESTAMP`
   in the environment conformance cases run with. A backup's `expireTime` must be

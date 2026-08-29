@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-// © 2025 Platform Engineering Labs Inc.
-//
-// SPDX-License-Identifier: FSL-1.1-ALv2
-
 /// GCP Bigtable MaterializedView
 ///
-/// A materialized view of a Bigtable table.
+/// A continuously updated view over Bigtable data, defined by a GoogleSQL
+/// query. It belongs to an instance, not to a cluster or a single table - the
+/// query names whatever it reads.
 module gcp.bigtable.materialized_view
 
 import "../gcp.pkl"
@@ -18,25 +16,14 @@ import "@formae/formae.pkl"
 
 const type = "GCP::Bigtable::MaterializedView"
 
-@gcp.SubResourceHint
-open class DeletionProtection extends formae.SubResource {
-  @gcp.FieldHint
-  enabled: Boolean
-}
-
 open class MaterializedViewResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden name: MaterializedViewResolvable = (this) {
         property = "name"
     }
-
-    hidden sourceTable: MaterializedViewResolvable = (this) {
-        property = "sourceTable"
-    }
 }
 
-/// GCP Bigtable MaterializedView resource
 @gcp.ResourceHint {
     type = module.type
     identifier = "name"
@@ -44,33 +31,42 @@ open class MaterializedViewResolvable extends formae.Resolvable {
 open class MaterializedView extends formae.Resource {
     hidden parent = this
 
+    /// GCP project ID.
     @gcp.FieldHint {
         createOnly = true
     }
     project: String
 
+    /// The instance holding the view. A short instance name or an Instance
+    /// resolvable. A path component, not a body field.
     @gcp.FieldHint {
         createOnly = true
     }
     instance: (String|formae.Resolvable)
 
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    cluster: (String|formae.Resolvable)
-
+    /// Short view id. Immutable.
     @gcp.FieldHint {
         createOnly = true
     }
     name: String
 
+    /// The GoogleSQL query defining the view. Immutable.
     @gcp.FieldHint {
         createOnly = true
     }
-    sourceTable: (String|formae.Resolvable)
+    query: String
 
+    /// Refuse deletion while set.
     @gcp.FieldHint
     deletionProtection: Boolean?
+
+    /// Per-cluster state of the view. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    clusterStates: Mapping<String, String>?
+
+    /// Optimistic locking token. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    etag: String?
 
     hidden res: MaterializedViewResolvable = new {
         label = parent.label

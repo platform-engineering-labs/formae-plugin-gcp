@@ -63,3 +63,36 @@ func backupResponseTransformer(apiResponse map[string]interface{}, ctx base.Tran
 	}
 	return out
 }
+
+// materializedViewRequestTransformer drops the fields that address the view in
+// the URL. The rest of the body is what the API takes: a name, a query and
+// deletionProtection.
+func materializedViewRequestTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		switch k {
+		case "project", "instance":
+			continue
+		}
+		body[k] = v
+	}
+	return body, nil
+}
+
+// materializedViewResponseTransformer shortens the name and recovers the
+// instance, which lives only in the path.
+func materializedViewResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	out := base.AddProjectResponseTransformer.Transform(apiResponse, ctx)
+
+	name, ok := out["name"].(string)
+	if !ok {
+		return out
+	}
+	parts := strings.Split(name, "/")
+	// projects/{p}/instances/{i}/materializedViews/{v}
+	if len(parts) == 6 && parts[2] == "instances" && parts[4] == "materializedViews" {
+		out["instance"] = parts[3]
+		out["name"] = parts[5]
+	}
+	return out
+}

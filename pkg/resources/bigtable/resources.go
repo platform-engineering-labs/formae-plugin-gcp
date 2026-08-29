@@ -16,10 +16,11 @@ import (
 
 // Resource type constants
 const (
-	InstanceResourceType = "GCP::Bigtable::Instance"
-	ClusterResourceType  = "GCP::Bigtable::Cluster"
-	TableResourceType    = "GCP::Bigtable::Table"
-	BackupResourceType   = "GCP::Bigtable::Backup"
+	InstanceResourceType         = "GCP::Bigtable::Instance"
+	ClusterResourceType          = "GCP::Bigtable::Cluster"
+	TableResourceType            = "GCP::Bigtable::Table"
+	BackupResourceType           = "GCP::Bigtable::Backup"
+	MaterializedViewResourceType = "GCP::Bigtable::MaterializedView"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -158,6 +159,31 @@ func init() {
 			},
 			RequestTransformer:  base.RequestTransformerFunc(backupRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(backupResponseTransformer),
+		},
+		{
+			// A view over an instance's data, defined by a GoogleSQL query. It
+			// hangs off the instance, not a cluster - the schema previously said
+			// otherwise and had no provisioner, so nothing ever sent it.
+			ResourceType: MaterializedViewResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "materializedViews",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(materializedViewRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(materializedViewResponseTransformer),
 		},
 	})
 

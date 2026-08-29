@@ -20,7 +20,6 @@ import (
 // and a provisioner without a schema cannot be declared at all. The test locks
 // in today's state so new drift fails loudly; shrink this list, never grow it.
 var knownParityGaps = map[string]string{
-	"GCP::Bigtable::MaterializedView":   "schema/pkl/bigtable/materialized_view.pkl has no provisioner",
 	"GCP::Storage::ObjectAccessControl": "registration is commented out in pkg/resources/storage/resources.go (object-scoped ACLs need both bucket and object in the path)",
 }
 
