@@ -29,18 +29,17 @@ func init() {
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "contacts",
 				Scope:        &base.ScopeConfig{Type: base.ScopeProjectLevel},
-				// contacts.patch takes an updateMask naming the fields to
-				// change. Enabled now that a conformance case exercises it;
-				// email is immutable in practice, so the case changes
-				// languageTag.
-				SupportsUpdate:     true,
-				UpdateMaskFromBody: true,
+				// contacts.patch exists and takes an updateMask, but nothing
+				// exercises it: the shared test project carries an Allowed
+				// Contact Domains org policy, so a conformance case cannot
+				// create a contact at all - "doesn't have a domain that matches
+				// the Allowed Contact Domains org policy". Still deferred.
+				SupportsUpdate: false,
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
-				resource.OperationUpdate,
 				resource.OperationDelete,
 				resource.OperationList,
 				resource.OperationCheckStatus,
