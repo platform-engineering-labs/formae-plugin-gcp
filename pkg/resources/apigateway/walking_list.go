@@ -174,3 +174,34 @@ func (c *configWalkingProvisioner) listNames(
 	}
 	return out, nil
 }
+
+// gatewayListProvisioner lists gateways across every region API Gateway serves.
+//
+// A gateway's region is not the target's - API Gateway serves eleven regions and
+// a target's is often not among them - so listing the target's location finds
+// nothing. The API accepts the location wildcard, which spans them all.
+type gatewayListProvisioner struct {
+	*base.BaseResource
+}
+
+func (g *gatewayListProvisioner) List(
+	ctx context.Context,
+	request *resource.ListRequest,
+) (*resource.ListResult, error) {
+	cfg := config.FromTargetConfig(request.TargetConfig, g.Config.Deps())
+	if cfg.Project == "" {
+		return &resource.ListResult{NativeIDs: []string{}}, nil
+	}
+
+	client, err := transport.NewClient(ctx, g.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+
+	names, err := (&configWalkingProvisioner{BaseResource: g.BaseResource}).listNames(ctx, client,
+		fmt.Sprintf("%s/projects/%s/locations/-/gateways", g.APIConfig.BaseURL, cfg.Project), "gateways")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list api gateway gateways: %w", err)
+	}
+	return &resource.ListResult{NativeIDs: names}, nil
+}

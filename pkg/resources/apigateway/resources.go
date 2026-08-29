@@ -75,12 +75,16 @@ func init() {
 			ResourceType: GatewayResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "gateways",
-				// A gateway is the only regional resource here, but its region
-				// is not the target's: API Gateway serves eleven regions, so a
-				// gateway names its own and a parentless list spans them all
-				// with the location wildcard. Binding it to the target's
-				// location instead would hide every gateway outside it.
-				Scope:              &base.ScopeConfig{Type: base.ScopeGlobal},
+				// No scope at all. A gateway is regional, but its region is not
+				// the target's - API Gateway serves eleven regions - so it names
+				// its own, and every scope base offers would overwrite that:
+				// the global one clears the location outright, which sent a read
+				// and a delete to the wildcard path instead of the gateway, and
+				// the location-based one substitutes the target's. The location
+				// comes from the properties on create and from the native ID
+				// afterwards. Listing across regions is gatewayListProvisioner's
+				// job.
+				Scope:              nil,
 				CreateIDParam:      "gatewayId",
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true,
@@ -94,6 +98,23 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Discovery lists with no location to name and a gateway can be in any
+	// region API Gateway serves, so its list spans them with the wildcard.
+	gwDef := apiGatewayRegistry.Definitions[GatewayResourceType]
+	registry.Register(GatewayResourceType, gwDef.Operations, func(cfg *config.Config) prov.Provisioner {
+		return &gatewayListProvisioner{
+			BaseResource: &base.BaseResource{
+				Config:              cfg,
+				APIConfig:           APIGatewayAPI,
+				OperationConfig:     APIGatewayOperations,
+				ResourceConfig:      gwDef.ResourceConfig,
+				NativeIDConfig:      APIGatewayNativeID,
+				RequestTransformer:  gwDef.RequestTransformer,
+				ResponseTransformer: gwDef.ResponseTransformer,
+			},
+		}
+	})
 
 	// A config only exists underneath an api and there is no wildcard in the api
 	// position, while discovery lists with no parent to name. Walk the apis.
