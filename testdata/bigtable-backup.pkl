@@ -21,7 +21,8 @@ local inst = new instance.Instance {
   label = "plugin-sdk-test-backup-instance"
   project = v.gcpProject
   name = "formae-test-instance-bk-\(v.testRunID)"
-  displayName = "Plugin SDK Test Backup Instance"
+  // Bigtable caps displayName at 30 characters.
+  displayName = "Plugin SDK backup instance"
   type = "DEVELOPMENT"
   clusters = new Mapping {
     ["cluster1"] = new instance.ClusterConfig {

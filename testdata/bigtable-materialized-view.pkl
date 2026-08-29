@@ -18,7 +18,8 @@ local inst = new instance.Instance {
   label = "plugin-sdk-test-mv-instance"
   project = v.gcpProject
   name = "formae-test-instance-mv-\(v.testRunID)"
-  displayName = "Plugin SDK Test MaterializedView Instance"
+  // Bigtable caps displayName at 30 characters.
+  displayName = "Plugin SDK MV instance"
   type = "DEVELOPMENT"
   clusters = new Mapping {
     ["cluster1"] = new instance.ClusterConfig {
