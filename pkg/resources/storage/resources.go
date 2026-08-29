@@ -171,29 +171,28 @@ func init() {
 			RequestTransformer:  wrapBodyBuilder(aclBodyBuilder),
 			ResponseTransformer: nil,
 		},
-		// NOTE: ObjectAccessControlResourceType requires special handling for object-scoped resources
-		// The base package currently doesn't support resources that need TWO parent properties (bucket + object).
-		// This resource type is commented out pending enhancement to base package's parent extraction mechanism.
-		// {
-		// 	ResourceType: ObjectAccessControlResourceType,
-		// 	ResourceConfig: base.ResourceConfig{
-		// 		ResourceType: "acl",
-		// 		Scope:        nil,
-		// 		ParentResource: &base.ParentResourceConfig{
-		// 			ParentType:         "bucket", // Need both bucket AND object
-		// 			RequiresParent:     true,
-		// 			ParentPathSegments: []string{"b", "o"},
-		// 		},
-		// 		SupportsUpdate: true,
-		// 		OptimisticLocking: &base.OptimisticLockingConfig{
-		// 			Enabled:       false,
-		// 			FieldName:     "",
-		// 			LocationInURL: false,
-		// 		},
-		// 	},
-		// 	RequestTransformer:  base.RequestTransformerFunc(objectScopedRequestTransformer),
-		// 	ResponseTransformer: nil,
-		// },
+		{
+			// An ACL entry on one object. It hangs off a bucket AND an object,
+			// which is why this was commented out: nothing could carry two
+			// parent properties. ParentResourceConfig.SecondPropertyName now
+			// can, joining them as "{bucket}/{object}" - the form the Storage
+			// path builder and native ID already expected.
+			ResourceType: ObjectAccessControlResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "acl",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:         "bucket",
+					PropertyName:       "bucket",
+					SecondPropertyName: "object",
+					RequiresParent:     true,
+					ParentPathSegments: []string{"b", "o"},
+				},
+				SupportsUpdate: true,
+			},
+			RequestTransformer:  wrapBodyBuilder(objectAclBodyBuilder),
+			ResponseTransformer: nil,
+		},
 	})
 
 	if err != nil {

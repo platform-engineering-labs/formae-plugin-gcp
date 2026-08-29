@@ -12,6 +12,13 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Storage::ObjectAccessControl` is registered, and `knownParityGaps` is
+  empty. It hangs off a bucket *and* an object, and nothing could carry two
+  parent properties - which is why its registration had been commented out.
+  `ParentResourceConfig.SecondPropertyName` now joins them as
+  `{bucket}/{object}`, the form the Storage path builder and native ID already
+  expected. Every type the schema declares now has a provisioner behind it.
+
 - `GCP::Bigtable::MaterializedView` matches its API and has a provisioner. The
   schema declared `sourceTable` and `cluster`; the API has neither. A
   materialized view belongs to an instance and is defined by a GoogleSQL

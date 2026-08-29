@@ -400,6 +400,12 @@ func (b *BaseResource) List(
 		}
 		if request.AdditionalProperties != nil {
 			if parent, ok := request.AdditionalProperties[propName]; ok && parent != "" {
+				// Same two-property parent as buildPathContext handles.
+				if second := b.ResourceConfig.ParentResource.SecondPropertyName; second != "" {
+					if secondValue := request.AdditionalProperties[second]; secondValue != "" {
+						parent = parent + "/" + secondValue
+					}
+				}
 				pathCtx.ParentResource = parent
 				pathCtx.ParentType = b.ResourceConfig.ParentResource.ParentType
 			}

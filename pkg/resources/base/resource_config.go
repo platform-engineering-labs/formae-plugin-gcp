@@ -112,6 +112,15 @@ type ParentResourceConfig struct {
 	// ParentPathSegments for hierarchical APIs like Storage
 	// e.g., ["b"] for bucket, ["b", "o"] for object
 	ParentPathSegments []string
+
+	// SecondPropertyName names a second property that, with PropertyName,
+	// identifies the parent. A Cloud Storage object ACL hangs off a bucket AND
+	// an object, and neither alone addresses it. When set, PathContext's
+	// ParentResource carries the two joined by "/" - "{bucket}/{object}" -
+	// which is the form the Storage path builder and native ID already expect.
+	//
+	// Leave empty for the usual single-property parent.
+	SecondPropertyName string
 }
 
 // OptimisticLockingConfig defines optimistic locking behavior

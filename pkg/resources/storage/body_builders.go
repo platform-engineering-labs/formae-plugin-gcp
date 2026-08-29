@@ -30,3 +30,17 @@ func aclBodyBuilder(props map[string]interface{}) (map[string]interface{}, error
 	}
 	return body, nil
 }
+
+// objectAclBodyBuilder keeps entity and role, dropping the two properties that
+// address the entry in the URL. An object ACL is the only resource here with
+// two of them.
+func objectAclBodyBuilder(props map[string]interface{}) (map[string]interface{}, error) {
+	body := make(map[string]interface{})
+	for k, v := range props {
+		if k == "bucket" || k == "object" {
+			continue
+		}
+		body[k] = v
+	}
+	return body, nil
+}

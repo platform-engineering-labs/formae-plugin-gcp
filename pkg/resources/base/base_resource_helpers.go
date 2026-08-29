@@ -73,6 +73,14 @@ func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[
 			propName = b.ResourceConfig.ParentResource.ParentType
 		}
 		if parent, ok := props[propName].(string); ok {
+			// A parent identified by two properties - a Storage object ACL hangs
+			// off a bucket AND an object - is carried as "{first}/{second}",
+			// which is the form the Storage path builder and native ID expect.
+			if second := b.ResourceConfig.ParentResource.SecondPropertyName; second != "" {
+				if secondValue, ok := props[second].(string); ok && secondValue != "" {
+					parent = parent + "/" + secondValue
+				}
+			}
 			ctx.ParentResource = parent
 			ctx.ParentType = b.ResourceConfig.ParentResource.ParentType
 		}
