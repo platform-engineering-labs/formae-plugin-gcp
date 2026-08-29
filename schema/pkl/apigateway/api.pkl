@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP API Gateway Api
+///
+/// The top of the API Gateway hierarchy: an api holds api configs, and a
+/// gateway serves one config. An api is always global, and holding one costs
+/// nothing — API Gateway bills the calls a gateway serves.
+module gcp.apigateway.api
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ApiGateway::Api"
+
+open class ApiResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ApiResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Api extends formae.Resource {
+    hidden parent = this
+
+    /// Short api id, unique in the project. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The project holding the api.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// The Service Management service backing this api, named by the server.
+    @gcp.FieldHint { hasProviderDefault = true }
+    managedService: String?
+
+    /// CREATING, ACTIVE, FAILED, DELETING or UPDATING - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    hidden res: ApiResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

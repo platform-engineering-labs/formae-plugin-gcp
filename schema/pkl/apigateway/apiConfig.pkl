@@ -1,0 +1,103 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP API Gateway ApiConfig
+///
+/// A versioned snapshot of an api: the OpenAPI document describing it, plus the
+/// identity a gateway serving it runs as. Configs are immutable once created —
+/// a change means a new config, which is why a gateway names the config it
+/// serves rather than the api.
+module gcp.apigateway.apiConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ApiGateway::ApiConfig"
+
+/// One document of an OpenAPI definition.
+class ApiDocument {
+    /// File name, e.g. "openapi.yaml".
+    @gcp.FieldHint
+    path: String?
+
+    /// The file's bytes, base64 encoded.
+    @gcp.FieldHint
+    contents: String?
+}
+
+/// An OpenAPI definition attached to the config.
+class OpenApiDocument {
+    @gcp.FieldHint
+    document: ApiDocument?
+}
+
+open class ApiConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ApiConfigResolvable = (this) {
+        property = "name"
+    }
+
+    /// A reference to the config's api. A gateway names the config it serves,
+    /// and reads the api from here so that one reference orders it after the
+    /// config too.
+    hidden api: ApiConfigResolvable = (this) {
+        property = "api"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::ApiGateway::Api"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "name" listParameter = "api"
+        }
+    }.toList()
+}
+open class ApiConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Short config id, unique within the api. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The api this config belongs to. A short api name or an Api reference.
+    @gcp.FieldHint { createOnly = true }
+    api: (String|formae.Resolvable)
+
+    /// The project holding the config.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// The OpenAPI documents defining the api. Immutable, and write-only: the
+    /// API does not report the contents back.
+    @gcp.FieldHint { createOnly = true; writeOnly = true }
+    openapiDocuments: Listing<OpenApiDocument>?
+
+    /// Identity the gateway serving this config runs as.
+    @gcp.FieldHint { createOnly = true }
+    gatewayServiceAccount: (String|formae.Resolvable)?
+
+    /// The Service Management config id the server assigned.
+    @gcp.FieldHint { hasProviderDefault = true }
+    serviceConfigId: String?
+
+    /// CREATING, ACTIVE, FAILED, DELETING or UPDATING - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    hidden res: ApiConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

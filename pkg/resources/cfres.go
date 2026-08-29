@@ -8,6 +8,7 @@ import (
 	// Import all provisioners to trigger their init() functions
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/alloydb"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/analyticshub"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/apigateway"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/artifactregistry"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigquery"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigtable"

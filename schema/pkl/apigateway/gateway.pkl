@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP API Gateway Gateway
+///
+/// The regional endpoint that serves one api config. A gateway names the config
+/// it serves rather than the api, because a config is immutable and a change
+/// produces a new one.
+module gcp.apigateway.gateway
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ApiGateway::Gateway"
+
+open class GatewayResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: GatewayResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Gateway extends formae.Resource {
+    hidden parent = this
+
+    /// Short gateway id, unique within the location. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The project holding the gateway.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    /// The api config this gateway serves, as the full path
+    /// "projects/{p}/locations/global/apis/{api}/configs/{config}".
+    @gcp.FieldHint
+    apiConfig: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// The hostname the gateway answers on, assigned by the server.
+    @gcp.FieldHint { hasProviderDefault = true }
+    defaultHostname: String?
+
+    /// CREATING, ACTIVE, FAILED, DELETING or UPDATING - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    hidden res: GatewayResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/apigateway/api.pkl"
+import "./config/vars.pkl" as v
+
+// An api has no prerequisites and costs nothing to hold — API Gateway bills the
+// calls a gateway serves, and this api has no gateway.
+forma {
+  v.stack
+  v.target
+
+  new api.Api {
+    label = "plugin-sdk-test-apigateway-api"
+    project = v.gcpProject
+    name = "formae-plugin-sdk-test-agw-\(v.testRunID)"
+    displayName = "Plugin SDK conformance api"
+    labels = new Mapping {
+      ["purpose"] = "conformance"
+    }
+  }
+}
