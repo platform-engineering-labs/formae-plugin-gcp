@@ -142,7 +142,14 @@ func (o *objectProvisioner) Update(
 	if err != nil {
 		return nil, err
 	}
-	return &resource.UpdateResult{ProgressResult: created.ProgressResult}, nil
+	// Report it as the update it is. Handing back the create's ProgressResult
+	// verbatim reported Operation: create, which formae rejects for an update.
+	progress := created.ProgressResult
+	progress.Operation = resource.OperationUpdate
+	if progress.StatusMessage == "object uploaded" {
+		progress.StatusMessage = "object replaced"
+	}
+	return &resource.UpdateResult{ProgressResult: progress}, nil
 }
 
 // Read fetches the metadata and then the bytes. The bytes are a declared
