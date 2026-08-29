@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- `GCP::SQL::Database` is discoverable. A database only exists underneath an
+  instance and Cloud SQL cannot be asked across instances -
+  `/projects/{p}/databases` answers 404 and `/projects/{p}/instances/-/databases`
+  answers 400, so there is no wildcard to substitute - while discovery lists
+  with no parent to name. A parentless list now walks the project's instances,
+  skipping any it cannot read but reporting an error rather than an empty list
+  if every one fails.
+
 - `GCP::Storage::ObjectAccessControl` is registered, and `knownParityGaps` is
   empty. It hangs off a bucket *and* an object, and nothing could carry two
   parent properties - which is why its registration had been commented out.
