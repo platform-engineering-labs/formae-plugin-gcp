@@ -78,6 +78,7 @@ open class ObjectAccessControl extends formae.Resource {
     entity: String
 
     /// The access permission for the entity
+    @gcp.FieldHint
     role: Role
 
     /// The domain associated with the entity (output only)

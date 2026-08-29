@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
+  can be created at all. Their `role` field carried no `@gcp.FieldHint`, so the
+  plugin never treated it as a resource property and never sent it - and the API
+  rejects an ACL without one: "Access control must contain a role". Both types
+  had shipped in this state, with no conformance case to reveal it.
+  `ObjectAccessControl` has the same omission and is fixed alongside, though it
+  still has no provisioner.
+
 - Server-populated fields across nine services are marked as provider defaults,
   so a forma that does not declare them no longer reports drift the moment the
   resource is created. Twenty-four fields in all: every `proxyHeader` (GCP fills
