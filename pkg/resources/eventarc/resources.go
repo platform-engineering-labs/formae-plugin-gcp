@@ -6,7 +6,10 @@
 package eventarc
 
 import (
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -148,4 +151,27 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// Trigger needs a Create of its own: Eventarc wants the short id in
+	// ?triggerId= and the full resource path in the body's "name" at the same
+	// time, and the generic engine can only put it in one. See
+	// trigger_create.go.
+	registry.Register(
+		TriggerResourceType,
+		eventarcRegistry.Definitions[TriggerResourceType].Operations,
+		func(cfg *config.Config) prov.Provisioner {
+			def := eventarcRegistry.Definitions[TriggerResourceType]
+			return &triggerProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           EventarcAPI,
+					OperationConfig:     EventarcOperations,
+					ResourceConfig:      def.ResourceConfig,
+					NativeIDConfig:      EventarcNativeID,
+					RequestTransformer:  def.RequestTransformer,
+					ResponseTransformer: def.ResponseTransformer,
+				},
+			}
+		},
+	)
 }

@@ -122,6 +122,12 @@ case "$TEST_CASE" in
     #
     export GCP_LOCATION="$GCP_ZONE"
     ;;
+  monitoring-metric-descriptor)
+    # A deleted custom metric descriptor keeps answering a GET for a while, so
+    # the out-of-band delete check needs longer than the 2m default to see it
+    # leave inventory. Nothing else about the case is slow.
+    export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   filestore-backup)
     # Deliberately NOT the zone override above. A backup is regional and the
     # instance it copies is zonal, so the target stays regional - that is where

@@ -12,6 +12,13 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Eventarc::Trigger` can be created at all. Eventarc requires the short id
+  in `?triggerId=` and the full resource path in the body's `name` - which its
+  own schema marks Required - at the same time. `base.Create` reads the id out
+  of `name` and deletes it, so the body reached the API without one and every
+  create failed with "The request was invalid: trigger.name is empty". Trigger
+  now has a Create that supplies both.
+
 - `GCP::BigQuery::Routine` is discoverable. Its `List` refused to run without a
   `datasetId` in AdditionalProperties, and discovery lists with no properties at
   all - it cannot know a routine's parent, because the provisioner is
