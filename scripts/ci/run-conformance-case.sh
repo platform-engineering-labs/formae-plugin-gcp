@@ -17,6 +17,17 @@ PHASES="${2:-both}"
 
 CLEAN_PREREQS="$(dirname "$0")/clean-case-prereqs.sh"
 
+# A Bigtable backup takes an absolute expiry between 6 hours and 90 days out,
+# and Pkl has no clock, so a fixture cannot compute one. Anything read() from
+# the environment can be, so provide it here. Seven days sits inside that window
+# with room either side.
+#
+# A fixture reading this must run through this script; a bare
+# "make conformance-test-crud-run" will not have it set.
+FORMAE_TEST_FUTURE_TIMESTAMP="$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -v+7d +%Y-%m-%dT%H:%M:%SZ)"
+export FORMAE_TEST_FUTURE_TIMESTAMP
+
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
 # "no available packages for: formae" when the package channel is unreachable,

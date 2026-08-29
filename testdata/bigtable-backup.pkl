@@ -1,0 +1,68 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/table.pkl" as table
+import "@gcp/bigtable/backup.pkl" as backup
+import "./config/vars.pkl" as v
+
+// A backup copies a table and is held by one cluster of the instance, so both
+// come first. DEVELOPMENT is the cheap single-node instance type the other
+// Bigtable cases use; a backup does not need PRODUCTION.
+//
+// expireTime must be an absolute timestamp between 6 hours and 90 days out.
+// Pkl has no clock, so run-conformance-case.sh puts one in the environment.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-backup-instance"
+  project = v.gcpProject
+  name = "formae-test-instance-bk-\(v.testRunID)"
+  displayName = "Plugin SDK Test Backup Instance"
+  type = "DEVELOPMENT"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+    }
+  }
+}
+
+local tbl = new table.Table {
+  label = "plugin-sdk-test-backup-table"
+  project = v.gcpProject
+  instance = inst.res.name
+  name = "formae-test-bk-table-\(v.testRunID)"
+  columnFamilies = new Mapping {
+    ["cf1"] = new table.ColumnFamily {
+      name = "cf1"
+      gcRule = new table.GCRule {
+        maxNumVersions = 1
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+  tbl
+
+  new backup.Backup {
+    label = "plugin-sdk-test-bigtable-backup"
+    project = v.gcpProject
+    // Resolvables -> the instance and table exist before the backup is taken,
+    // and the plugin expands the bare table name into the full path the API
+    // wants.
+    instance = inst.res.name
+    cluster = "cluster1"
+    sourceTable = tbl.res.name
+    name = "formae_test_backup_\(v.testRunID)"
+    expireTime = read("env:FORMAE_TEST_FUTURE_TIMESTAMP")
+  }
+}

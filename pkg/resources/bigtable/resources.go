@@ -19,6 +19,7 @@ const (
 	InstanceResourceType = "GCP::Bigtable::Instance"
 	ClusterResourceType  = "GCP::Bigtable::Cluster"
 	TableResourceType    = "GCP::Bigtable::Table"
+	BackupResourceType   = "GCP::Bigtable::Backup"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -130,6 +131,33 @@ func init() {
 			},
 			RequestTransformer:  base.RequestTransformerFunc(wrapTableBodyBuilder),
 			ResponseTransformer: base.ResponseTransformerFunc(tableResponseTransformer),
+		},
+		{
+			// A backup of a table, held by one cluster of the instance - the
+			// only three-level resource here, which the path builder and
+			// Create already handled. It was simply never registered, so the
+			// schema shipped with nothing behind it and any forma declaring a
+			// backup failed at apply.
+			ResourceType: BackupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "backups",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(backupRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(backupResponseTransformer),
 		},
 	})
 

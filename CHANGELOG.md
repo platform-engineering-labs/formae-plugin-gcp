@@ -12,6 +12,15 @@ formae agent.
 
 ### Fixed
 
+- `GCP::Bigtable::Backup` works. Its schema shipped with no provisioner behind
+  it, so declaring a backup failed at apply - one of three types in
+  `knownParityGaps` that were declarable and unusable. Everything it needed was
+  already there: the three-level path builder, the native ID handling and the
+  cluster extraction in Create all handled backups; the type was simply never
+  registered. It now is, with the transformers that expand `sourceTable` to the
+  full path on the way out and recover the instance and cluster from the path on
+  the way back. Two known parity gaps remain.
+
 - `GCP::Eventarc::Trigger` can be created at all. Eventarc requires the short id
   in `?triggerId=` and the full resource path in the body's `name` - which its
   own schema marks Required - at the same time. `base.Create` reads the id out
@@ -182,6 +191,11 @@ formae agent.
   (`TargetTcpProxy`) had one with no update fixture.
 
 ### Added
+
+- A conformance case for `GCP::Bigtable::Backup`, and `FORMAE_TEST_FUTURE_TIMESTAMP`
+  in the environment conformance cases run with. A backup's `expireTime` must be
+  an absolute timestamp between 6 hours and 90 days out, and Pkl has no clock, so
+  a fixture cannot compute one.
 
 - A conformance case for `GCP::Bigtable::Cluster`, the first to use the
   on-demand list. A cluster is an additional replica of an instance and the
