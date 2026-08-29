@@ -158,6 +158,13 @@ formae agent.
 
 ### Added
 
+- `testdata/on-demand-cases.txt`, a list of conformance cases excluded from the
+  automatic CI and nightly matrix. Every other case runs on every push to main
+  and every night; a case named here runs only when dispatched explicitly
+  through debug-conformance. It exists so a resource that cannot be covered for
+  free can still be covered at all, rather than being left with no conformance
+  case because covering it would add spend to every run.
+
 - A conformance case for `GCP::SQL::Database`, which shipped without one. It
   builds a `db-f1-micro` instance to hold the database, mirroring the
   cloudsql-instance case's private-IP settings.

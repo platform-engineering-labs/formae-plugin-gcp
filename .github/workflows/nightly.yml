@@ -62,11 +62,16 @@ jobs:
         run: |
           # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
           # and extract the base test case name
+          # Cases listed in testdata/on-demand-cases.txt are excluded: they cost
+          # money to hold or mutate something shared, so they are run by naming
+          # them in debug-conformance rather than on every push and every night.
+          ON_DEMAND=$(grep -vE '^\s*(#|$)' testdata/on-demand-cases.txt 2>/dev/null || true)
           TEST_CASES=$(ls testdata/*.pkl 2>/dev/null \
             | xargs -n1 basename \
             | grep -v '\-update\.pkl$' \
             | grep -v '\-replace\.pkl$' \
             | sed 's/\.pkl$//' \
+            | { if [ -n "$ON_DEMAND" ]; then grep -vxF "$ON_DEMAND"; else cat; fi } \
             | jq -R -s -c 'split("\n") | map(select(length > 0))')
           if [ -n "${TEST_CASE_FILTER}" ]; then
             TEST_CASES=$(jq -c --arg f "${TEST_CASE_FILTER}" \
