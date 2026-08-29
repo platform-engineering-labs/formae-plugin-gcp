@@ -103,7 +103,21 @@ func datastreamPathBuilder(ctx base.PathContext) string {
 
 // forceOnCreate are the collections whose create must skip Datastream's
 // connectivity validation.
-var forceOnCreate = map[string]bool{"streams": true}
+//
+// A connection profile is validated against the source it describes when it is
+// created, and the validation runs inside the long-running operation - after
+// the profile itself has been created. So a profile naming a host that does not
+// answer is created AND reported as failed, formae retries the create, and the
+// retry collides with the profile the first attempt made:
+// "Resource ... already exists". The original validation error never surfaces.
+//
+// force says "create it without validating", which is what a declarative apply
+// wants anyway: whether the source is reachable right now is not a property of
+// the declaration, and a half-created resource is worse than an unvalidated one.
+var forceOnCreate = map[string]bool{
+	"streams":            true,
+	"connectionProfiles": true,
+}
 
 // nestedInPrivateConnection are the collections that only exist underneath a
 // private connection.

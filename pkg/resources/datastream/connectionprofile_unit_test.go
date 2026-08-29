@@ -16,8 +16,17 @@ import (
 
 func TestPathBuilder(t *testing.T) {
 	ctx := base.PathContext{Project: "p", Location: "us-central1", ResourceType: "connectionProfiles"}
-	if got := datastreamPathBuilder(ctx); got != "/projects/p/locations/us-central1/connectionProfiles" {
+	// A create carries force=true: the profile is validated against its source
+	// inside the create operation, and a failed validation leaves the profile
+	// created but reported as failed.
+	if got := datastreamPathBuilder(ctx); got != "/projects/p/locations/us-central1/connectionProfiles?force=true" {
 		t.Errorf("collection path = %q", got)
+	}
+	// Listing takes no force.
+	listCtx := ctx
+	listCtx.IsList = true
+	if got := datastreamPathBuilder(listCtx); got != "/projects/p/locations/us-central1/connectionProfiles" {
+		t.Errorf("list path = %q", got)
 	}
 	ctx.ResourceName = "cp1"
 	if got := datastreamPathBuilder(ctx); got != "/projects/p/locations/us-central1/connectionProfiles/cp1" {
@@ -107,12 +116,21 @@ func TestStreamCreateForcesPastValidation(t *testing.T) {
 		t.Errorf("list = %q, want %q", list, want)
 	}
 
-	// Other collections must not grow it.
-	other := datastreamPathBuilder(base.PathContext{
+	// A connection profile is validated against its source inside the create
+	// operation, so it needs force too.
+	cp := datastreamPathBuilder(base.PathContext{
 		Project: "p", Location: "eu", ResourceType: "connectionProfiles",
 	})
-	if want := "/projects/p/locations/eu/connectionProfiles"; other != want {
-		t.Errorf("connectionProfiles = %q, want %q", other, want)
+	if want := "/projects/p/locations/eu/connectionProfiles?force=true"; cp != want {
+		t.Errorf("connectionProfiles = %q, want %q", cp, want)
+	}
+
+	// A collection with no validation step must not grow it.
+	other := datastreamPathBuilder(base.PathContext{
+		Project: "p", Location: "eu", ResourceType: "privateConnections",
+	})
+	if want := "/projects/p/locations/eu/privateConnections"; other != want {
+		t.Errorf("privateConnections = %q, want %q", other, want)
 	}
 }
 

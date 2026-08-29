@@ -12,6 +12,15 @@ formae agent.
 
 ### Fixed
 
+- Creating a `GCP::Datastream::ConnectionProfile` no longer half-succeeds. The
+  API validates a profile against the source it describes, and does so inside
+  the long-running operation - after the profile has been created. A profile
+  naming a host that does not answer was therefore created *and* reported as
+  failed; formae retried, and the retry collided with the profile the first
+  attempt had made ("Resource ... already exists"), so the validation error
+  never surfaced at all. Creates now send `force=true`, as stream creates
+  already did.
+
 - `GCP::Bigtable::Table` no longer reports drift the moment it is created. The
   API reports a table's `name` as the full path
   `projects/{p}/instances/{i}/tables/{t}` while a forma declares the short id
