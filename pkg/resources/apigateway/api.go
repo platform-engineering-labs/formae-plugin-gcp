@@ -57,6 +57,12 @@ func apiGatewayPathBuilder(ctx base.PathContext) string {
 	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {
 		path += "/" + ctx.ResourceName
+		// A config's OpenAPI documents are only returned under the full view.
+		// Without them a read reports a config missing the very thing that
+		// defines it, and the documents cannot be recovered from anywhere else.
+		if ctx.ResourceType == "configs" {
+			path += "?view=FULL"
+		}
 	}
 	return path
 }

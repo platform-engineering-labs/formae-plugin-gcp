@@ -91,8 +91,12 @@ open class ApiConfig extends formae.Resource {
     @gcp.FieldHint { createOnly = true; writeOnly = true }
     openapiDocuments: Listing<OpenApiDocument>?
 
-    /// Identity the gateway serving this config runs as.
-    @gcp.FieldHint { createOnly = true }
+    /// Identity the gateway serving this config runs as. The server assigns one
+    /// when the forma does not name it.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
     gatewayServiceAccount: (String|formae.Resolvable)?
 
     /// The Service Management config id the server assigned.

@@ -65,7 +65,12 @@ func responseTransformer(apiResponse map[string]interface{}, ctx base.TransformC
 		return out
 	}
 
+	// The API answers with the project *number* in the path it reports, while a
+	// forma names the project by id. Prefer the configured id so the two agree.
 	out["project"] = parts[1]
+	if ctx.Project != "" {
+		out["project"] = ctx.Project
+	}
 	switch {
 	case len(parts) == 6:
 		out["name"] = parts[5]
