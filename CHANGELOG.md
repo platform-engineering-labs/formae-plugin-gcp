@@ -12,6 +12,14 @@ formae agent.
 
 ### Fixed
 
+- Bigtable creates hand their properties back. `BaseResource.Status` does not
+  read the resource once an asynchronous operation completes, and an async
+  create returns no properties either - so nothing that referenced a Bigtable
+  resource could resolve. A table declaring `instance.res.name` failed with
+  "instance is required for nested resources" on an instance that was plainly
+  declared, because the create it referenced handed back nothing to resolve
+  from. Status now routes through `base.StatusWithRead`.
+
 - Resolvables that pointed at a property name the schema does not have. A
   `GCP::Storage::Bucket` resolvable's `name` targeted `"Name"`, so every forma
   referencing `bucket.res.name` failed to apply with `source resource ... has no

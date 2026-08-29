@@ -55,6 +55,8 @@ func (a *aclProvisioner) List(
 
 	collection := a.ResourceConfig.ResourceType
 	nativeIDs := make([]string, 0, len(buckets))
+	var lastErr error
+	failed := 0
 	for _, bucket := range buckets {
 		entities, err := a.listEntities(ctx, client, bucket, collection)
 		if err != nil {
@@ -62,11 +64,22 @@ func (a *aclProvisioner) List(
 			// outright, and a shared project holds buckets this target does not
 			// own. Skip it rather than letting one hide every other bucket's
 			// entries.
+			lastErr = err
+			failed++
 			continue
 		}
 		for _, entity := range entities {
 			nativeIDs = append(nativeIDs, fmt.Sprintf("b/%s/%s/%s", bucket, collection, entity))
 		}
+	}
+
+	// Skipping an unreadable bucket is right; skipping every one of them and
+	// reporting an empty list is not. That turns a broken walk into "nothing
+	// exists", which is indistinguishable from success and impossible to
+	// diagnose - so say what went wrong instead.
+	if len(nativeIDs) == 0 && failed > 0 && failed == len(buckets) {
+		return nil, fmt.Errorf("could not read %s on any of %d buckets: %w",
+			collection, failed, lastErr)
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }

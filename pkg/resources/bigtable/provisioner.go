@@ -209,3 +209,23 @@ func newBigtableProvisionerWithBase(baseResource *base.BaseResource, resourceTyp
 		resourceTypeAPI: resourceTypeAPI,
 	}
 }
+
+// Status polls the operation and, once it has succeeded, reads the resource
+// back so its properties travel with the result.
+//
+// BaseResource.Status does not read. That is invisible for a resource nothing
+// refers to, but it breaks anything that does: the conformance harness resolves
+// a reference like `instance.res.name` from the properties a create hands back,
+// and with none it reported "could not extract property name from created
+// resource ... empty properties" and then failed the dependent table with
+// "instance is required for nested resources" - on a table whose instance was
+// plainly declared.
+//
+// A create that completes asynchronously returns no properties either, so the
+// read on completion is the only place they can come from.
+func (p *BigtableProvisioner) Status(
+	ctx context.Context,
+	request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
+}
