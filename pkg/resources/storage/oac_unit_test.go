@@ -41,3 +41,39 @@ func TestObjectAclNativeIDKeepsObject(t *testing.T) {
 		t.Errorf("native ID = %q, want %q", got, want)
 	}
 }
+
+// An object name may contain slashes. The native ID keeps them raw, so the
+// object is everything between the object marker and the trailing type and
+// name - reading it as one segment put the resource type on "acl-target.txt".
+func TestObjectAclNativeIDRoundTripWithSlashes(t *testing.T) {
+	nativeID := "b/bkt/o/conformance/acl-target.txt/acl/user-someone@example.com"
+	ctx, err := parseStorageNativeID(nativeID)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if ctx.ParentResource != "bkt/conformance/acl-target.txt" {
+		t.Errorf("parent = %q, want bkt/conformance/acl-target.txt", ctx.ParentResource)
+	}
+	if ctx.ResourceType != "acl" {
+		t.Errorf("resource type = %q, want acl", ctx.ResourceType)
+	}
+	if ctx.ResourceName != "user-someone@example.com" {
+		t.Errorf("name = %q, want user-someone@example.com", ctx.ResourceName)
+	}
+	if got := buildStorageNativeID(ctx.ResourceName, ctx); got != nativeID {
+		t.Errorf("round trip = %q, want %q", got, nativeID)
+	}
+}
+
+// Cloud Storage wants the object percent-encoded in the path; unescaped, the
+// slash makes it a path that does not exist and the API answers 404.
+func TestObjectAclPathEscapesObject(t *testing.T) {
+	got := storagePathBuilder(base.PathContext{
+		ResourceType:   "acl",
+		ParentResource: "bkt/conformance/acl-target.txt",
+	})
+	want := "/b/bkt/o/conformance%2Facl-target.txt/acl"
+	if got != want {
+		t.Errorf("path = %q, want %q", got, want)
+	}
+}

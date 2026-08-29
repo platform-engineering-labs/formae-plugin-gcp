@@ -66,6 +66,8 @@ forma {
     // table in the query text creates no ordering edge.
     instance = (tbl.res) { property = "instance" }
     name = "formae_test_mv_\(v.testRunID)"
-    query = "SELECT _key, cf1 FROM `\(tblName)`"
+    // Bigtable refuses a view whose query is a plain projection: "queries must
+    // contain a GROUP BY or ORDER BY clause".
+    query = "SELECT _key, COUNT(*) AS entries FROM `\(tblName)` GROUP BY _key"
   }
 }

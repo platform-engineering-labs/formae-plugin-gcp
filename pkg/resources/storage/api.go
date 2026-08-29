@@ -6,6 +6,7 @@ package storage
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -66,7 +67,11 @@ func storagePathBuilder(ctx base.PathContext) string {
 		parts := strings.SplitN(bucketInfo, "/", 2)
 		if len(parts) == 2 {
 			bucketName := parts[0]
-			objectName := parts[1]
+			// An object name may contain slashes - "conformance/acl-target.txt"
+			// is one object, not a folder and a file - and Cloud Storage wants
+			// it percent-encoded in the path. Unescaped, the request addresses a
+			// path that does not exist and answers 404.
+			objectName := url.PathEscape(parts[1])
 			if ctx.ResourceName != "" {
 				return fmt.Sprintf("/b/%s/o/%s/%s/%s", bucketName, objectName, ctx.ResourceType, ctx.ResourceName)
 			}
@@ -158,10 +163,14 @@ func parseStorageNativeID(nativeID string) (base.PathContext, error) {
 	}
 
 	// Object-scoped: b/{bucket}/o/{object}/{resourceType}/{name}
+	// The object name may itself contain slashes, so it is read as everything
+	// between the object marker and the trailing type and name rather than as a
+	// single segment.
 	if len(parts) >= 6 && parts[0] == "b" && parts[2] == "o" {
-		ctx.ParentResource = fmt.Sprintf("%s/%s", parts[1], parts[3]) // bucket/object
-		ctx.ResourceType = parts[4]
-		ctx.ResourceName = parts[5]
+		object := strings.Join(parts[3:len(parts)-2], "/")
+		ctx.ParentResource = fmt.Sprintf("%s/%s", parts[1], object) // bucket/object
+		ctx.ResourceType = parts[len(parts)-2]
+		ctx.ResourceName = parts[len(parts)-1]
 		return ctx, nil
 	}
 
