@@ -94,6 +94,19 @@ formae agent.
   was really there. `external.googleapis.com/user/` descriptors are not listed
   as a result; they are written by the Cloud Monitoring agent, not by a forma.
 
+- Conformance setup retries back off instead of going again immediately. The
+  harness fetches the formae binary and starts an agent before it touches any
+  cloud infrastructure, and a single instant retry only survives a blip shorter
+  than the retry itself: in a 151-case matrix the package channel went away for
+  long enough that both attempts hit it seconds apart, and two unrelated cases
+  failed having run no test at all. Three attempts now, 10s then 30s apart. A
+  failure that is not setup still fails on the first attempt.
+
+- Leaked SSL certificates are swept. A project holds at most 10 globally, so
+  once the cap is reached any case creating one fails with
+  "Quota 'SSL_CERTIFICATES' exceeded" rather than anything resembling a plugin
+  bug. The sweep knew about `ssl-policies` but never about the certificates.
+
 - A `GCP::Storage::Object` reports its properties when created. Create returned
   a native ID and nothing else, so a freshly created object had no stored state
   and anything referencing one resolved against nothing and stayed an unresolved

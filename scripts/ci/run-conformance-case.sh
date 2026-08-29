@@ -35,15 +35,25 @@ export FORMAE_TEST_FUTURE_TIMESTAMP
 # to boot. Neither has touched cloud infrastructure yet, so retrying the phase
 # is safe and costs seconds; any other failure is reported as-is on the first
 # attempt.
+#
+# The retry backs off rather than going again immediately. A single instant
+# retry only survives a blip shorter than the retry itself: in a 151-case matrix
+# the package channel went away for long enough that both attempts hit it
+# seconds apart, and two unrelated cases failed having run no test at all.
+SETUP_RETRY_DELAYS="10 30"
 run_make() {
-  local log rc attempt
+  local log rc attempt delay attempts
   log="$(mktemp)"
-  for attempt in 1 2; do
+  attempts=$(( $(printf '%s\n' $SETUP_RETRY_DELAYS | wc -l) + 1 ))
+  attempt=0
+  for delay in $SETUP_RETRY_DELAYS ""; do
+    attempt=$((attempt + 1))
     make "$@" 2>&1 | tee "$log"
     rc=${PIPESTATUS[0]}
     [ "$rc" -eq 0 ] && return 0
-    if [ "$attempt" -lt 2 ] && grep -qE "no available packages for: formae|timeout waiting for agent to become ready" "$log"; then
-      echo "::warning::harness setup failed before any test ran, retrying ${TEST_CASE}"
+    if [ -n "$delay" ] && grep -qE "no available packages for: formae|timeout waiting for agent to become ready" "$log"; then
+      echo "::warning::harness setup failed before any test ran (attempt ${attempt}/${attempts}), retrying ${TEST_CASE} in ${delay}s"
+      sleep "$delay"
       continue
     fi
     return "$rc"
