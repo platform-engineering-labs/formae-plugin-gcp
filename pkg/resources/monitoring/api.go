@@ -111,9 +111,16 @@ func monitoringPathBuilder(ctx base.PathContext) string {
 //
 // Filtering is not merely an optimisation here: a built-in descriptor cannot be
 // created, changed or deleted, so it is not a resource formae can manage and
-// has no business appearing in discovery. Only these two prefixes can be.
-const userOwnedMetricFilter = `metric.type = starts_with("custom.googleapis.com/") ` +
-	`OR metric.type = starts_with("external.googleapis.com/user/")`
+// has no business appearing in discovery.
+//
+// It is one prefix and not two because the API rejects the obvious form:
+// "metric.type = starts_with(...) OR metric.type = starts_with(...)" answers
+// HTTP 400, "Within the 'metric' prefix, OR can only be used to connect a list
+// of 'labels'". A rejected filter fails the whole list, which reads downstream
+// as "the resource is gone" and had sync tombstone a descriptor that existed.
+// external.googleapis.com/user/ descriptors are therefore not listed; they are
+// written by the Cloud Monitoring agent rather than by a forma.
+const userOwnedMetricFilter = `metric.type = starts_with("custom.googleapis.com/")`
 
 // MonitoringSloNativeID - SLOs are two levels deep, so the default pairwise
 // path parser would lose the owning service. Parse it explicitly.
