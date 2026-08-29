@@ -509,6 +509,25 @@ else
     echo "  No SSL policies found"
 fi
 
+# --- Service Directory (endpoints, then services, then namespaces) ---
+# Deleting a namespace takes its services and endpoints with it, so only the
+# namespaces need sweeping. goog-psc-default is Google-managed and does not
+# match the test prefix.
+echo "Cleaning GCP Service Directory namespaces..."
+for sd_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
+    [ -z "$sd_loc" ] && continue
+    SD_NS=$(gcloud service-directory namespaces list --location="$sd_loc" \
+        --filter="name~formae-plugin-sdk|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$SD_NS" ]; then
+        echo "$SD_NS" | while read -r ns; do
+            echo "  Deleting Service Directory namespace: $ns (location: $sd_loc)"
+            gcloud service-directory namespaces delete "$ns" --location="$sd_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Service Directory namespaces found in $sd_loc"
+    fi
+done
+
 # --- 1h. SSL certificates (must delete after the proxies that reference them) ---
 # A project holds at most 10 SSL certificates globally, and every leaked one
 # counts. Once the cap is reached, any case that creates a certificate fails with
