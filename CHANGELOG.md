@@ -151,6 +151,10 @@ formae agent.
 
 ### Added
 
+- A conformance case for `GCP::Monitoring::MetricDescriptor`, which shipped
+  without one. A custom metric descriptor stands on its own and costs nothing,
+  so the case declares one and nothing else.
+
 - `iamConfiguration` on `GCP::Storage::Bucket`, so a forma can say whether a
   bucket uses uniform bucket-level access. A UBLA bucket is controlled by IAM
   alone and rejects ACLs outright, so without this field a bucket meant to carry
