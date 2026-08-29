@@ -54,7 +54,14 @@ forma {
     // short name into the full path Datastream wants.
     sourceConfig = new stream.SourceConfig {
       sourceConnectionProfile = source.res.name
-      mysqlSourceConfig = new stream.MysqlSourceConfig {}
+      // Must carry something: an empty MysqlSourceConfig serialises away, and
+      // the API then answers "field 'source_config.source_stream_config':
+      // Source Stream Config is not specified" - the oneof was never set.
+      // includeObjects with no tables means every table.
+      mysqlSourceConfig = new stream.MysqlSourceConfig {
+        maxConcurrentBackfillTasks = 4
+        includeObjects = new stream.MysqlRdbms {}
+      }
     }
     destinationConfig = new stream.DestinationConfig {
       destinationConnectionProfile = destination.res.name
