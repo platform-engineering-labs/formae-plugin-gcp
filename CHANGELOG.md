@@ -12,6 +12,12 @@ formae agent.
 
 ### Fixed
 
+- Fourteen Storage fields the schema itself documents as "(output only)" are
+  marked as provider defaults, across the three ACL types and `AnywhereCache`:
+  `projectTeam`, `entityId`, `generation`, `domain` and `email`. A
+  `DefaultObjectAccessControl` reported drift on `projectTeam` the moment it was
+  created, because the comment said output-only and the hint did not.
+
 - Bigtable creates hand their properties back. `BaseResource.Status` does not
   read the resource once an asynchronous operation completes, and an async
   create returns no properties either - so nothing that referenced a Bigtable

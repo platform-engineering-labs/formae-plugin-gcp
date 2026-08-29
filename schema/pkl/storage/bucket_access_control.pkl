@@ -64,11 +64,13 @@ open class BucketAccessControl extends formae.Resource {
 
     /// The domain associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     domain: String?
 
     /// The email address associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     email: String?
 

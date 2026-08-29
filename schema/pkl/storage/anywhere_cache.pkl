@@ -65,6 +65,7 @@ open class AnywhereCache extends formae.Resource {
 
     /// The ID of the Anywhere cache instance (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     anywhereCacheId: String?
 
@@ -84,6 +85,7 @@ open class AnywhereCache extends formae.Resource {
 
     /// True if the cache instance has an active Update long-running operation (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     pendingUpdate: Boolean?
 
