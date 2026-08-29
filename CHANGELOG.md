@@ -12,6 +12,13 @@ formae agent.
 
 ### Fixed
 
+- A resource identified by anything other than `name` can be discovered. The
+  generic list path required every listed item to carry a `name` before it would
+  consult the API's own native-ID extractor, so a Cloud Storage ACL entry -
+  identified by `entity`, with no name at all - produced nothing, and the list
+  came back empty with no error. The extractor is now asked first, and the
+  name-shaped path is the fallback.
+
 - Fourteen Storage fields the schema itself documents as "(output only)" are
   marked as provider defaults, across the three ACL types and `AnywhereCache`:
   `projectTeam`, `entityId`, `generation`, `domain` and `email`. A

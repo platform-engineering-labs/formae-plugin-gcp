@@ -480,24 +480,26 @@ func (b *BaseResource) parseListResponse(
 
 // extractNativeIDFromItem extracts the native ID from a list item
 func (b *BaseResource) extractNativeIDFromItem(itemMap map[string]interface{}, pathCtx PathContext) string {
+	// Ask the API's own extractor first. Requiring a "name" before doing so
+	// made every resource identified by something else undiscoverable: a Cloud
+	// Storage ACL entry is identified by "entity" and has no name at all, so
+	// each listed item yielded nothing and the list came back empty - with no
+	// error, which is indistinguishable from "none exist".
+	var nativeID string
+	if b.OperationConfig.NativeIDExtractor != nil {
+		// Handles selfLink/targetLink and API-specific identity fields.
+		nativeID = b.OperationConfig.NativeIDExtractor(itemMap, pathCtx)
+	}
+	if nativeID != "" {
+		return nativeID
+	}
+
+	// Fall back to the name-shaped path, which needs a name to build one.
 	name, _ := itemMap["name"].(string)
 	if name == "" {
 		return ""
 	}
-
-	// Build native ID - try NativeIDExtractor first if available
-	var nativeID string
-	if b.OperationConfig.NativeIDExtractor != nil {
-		// Use the extractor function which can handle selfLink/targetLink extraction
-		nativeID = b.OperationConfig.NativeIDExtractor(itemMap, pathCtx)
-	}
-
-	// Fallback to BuildNativeID if extractor didn't return a value
-	if nativeID == "" {
-		nativeID = BuildNativeID(b.NativeIDConfig, name, pathCtx)
-	}
-
-	return nativeID
+	return BuildNativeID(b.NativeIDConfig, name, pathCtx)
 }
 
 // Failure result helpers
