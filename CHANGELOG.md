@@ -82,9 +82,39 @@ formae agent.
   ones for GCP's own services - so a custom metric was somewhere in that pile
   and not necessarily on the first page: discovery listed, never saw the
   descriptor it had just created, and timed out. The list is now filtered to the
-  two prefixes a project can own. That is not only an optimisation: a built-in
+  prefix a project can own. That is not only an optimisation: a built-in
   descriptor cannot be created, changed or deleted, so it is not a resource
   formae can manage and does not belong in discovery.
+
+  It is one prefix and not two because Cloud Monitoring rejects the obvious
+  form: `metric.type = starts_with(...) OR metric.type = starts_with(...)`
+  answers HTTP 400, "Within the 'metric' prefix, OR can only be used to connect
+  a list of 'labels'". A rejected filter fails the whole list, and an empty list
+  reads downstream as "the resource is gone" - sync tombstoned a descriptor that
+  was really there. `external.googleapis.com/user/` descriptors are not listed
+  as a result; they are written by the Cloud Monitoring agent, not by a forma.
+
+- A `GCP::Storage::Object` reports its properties when created. Create returned
+  a native ID and nothing else, so a freshly created object had no stored state
+  and anything referencing one resolved against nothing and stayed an unresolved
+  reference. That is how an object ACL reached the plugin with its object still
+  a reference and addressed the bucket alone.
+
+- An object name is percent-encoded in bucket-scoped paths.
+  `conformance/acl-target.txt` is one object, not a folder and a file. The
+  object provisioner escaped it in its own URLs but the shared path builder did
+  not, so an object ACL addressed a path that does not exist and the API
+  answered 404. The native ID keeps the name raw, and the parser now reads the
+  object as everything between the object marker and the trailing type and name
+  rather than as a single segment.
+
+- A resource addressed by two parents is refused rather than silently collapsed.
+  When the second parent was missing, the path context kept only the first and
+  both the request URL and the native ID became the one-parent form - which the
+  API accepts as a perfectly valid *different* resource. An object ACL created
+  without its object became a bucket ACL: create reported one native ID,
+  discovery reported another, and nothing downstream could tell them apart. A
+  wrong resource created successfully is worse than a failed create.
 
 - A `GCP::Eventarc::Trigger` can reference the `Workflow` it delivers to.
   `destination.workflow` was a plain `String`, so a forma could name a workflow
