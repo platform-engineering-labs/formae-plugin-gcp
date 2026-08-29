@@ -106,3 +106,32 @@ func TestAclNativeIDRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+// An object name may contain slashes - Cloud Storage has no directories, only
+// names that look like paths - so everything after "/o/" is the name.
+func TestObjectNativeIDRoundTrip(t *testing.T) {
+	for _, name := range []string{"file.txt", "a/b/c.json", "deep/nested/path/x"} {
+		id := objectNativeID("my-bucket", name)
+		bucket, got, err := parseObjectNativeID(id)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", name, err)
+		}
+		if bucket != "my-bucket" || got != name {
+			t.Errorf("%s -> bucket %q name %q", id, bucket, got)
+		}
+	}
+	for _, bad := range []string{"my-bucket", "b/my-bucket", "b//o/x", "b/my-bucket/o/"} {
+		if _, _, err := parseObjectNativeID(bad); err == nil {
+			t.Errorf("%q should be rejected", bad)
+		}
+	}
+}
+
+// The upload endpoint differs from the JSON one only in the segment before
+// /storage/v1, and getting it wrong answers 404 rather than naming the problem.
+func TestUploadBase(t *testing.T) {
+	got := uploadBase("https://storage.googleapis.com/storage/v1")
+	if want := "https://storage.googleapis.com/upload/storage/v1"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

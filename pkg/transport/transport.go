@@ -65,6 +65,14 @@ type RequestOptions struct {
 	Body    map[string]interface{}
 	Headers http.Header
 	Timeout time.Duration
+
+	// RawBody sends bytes verbatim instead of marshalling Body as JSON, for the
+	// APIs that take content rather than a resource description - a Cloud
+	// Storage object upload is the only one so far. Set ContentType alongside
+	// it; without one the request would claim to be JSON and the upload would
+	// be stored with the wrong type. Body is ignored when RawBody is set.
+	RawBody     []byte
+	ContentType string
 }
 
 // Response represents a REST API response
@@ -88,7 +96,11 @@ func (c *Client) SendRequest(ctx context.Context, opts RequestOptions) (*Respons
 		headers = make(http.Header)
 	}
 	headers.Set("User-Agent", c.userAgent)
-	headers.Set("Content-Type", "application/json")
+	if opts.ContentType != "" {
+		headers.Set("Content-Type", opts.ContentType)
+	} else {
+		headers.Set("Content-Type", "application/json")
+	}
 
 	// Add project header for billing
 	if c.config.Project != "" {
@@ -97,7 +109,9 @@ func (c *Client) SendRequest(ctx context.Context, opts RequestOptions) (*Respons
 
 	// Encode body
 	var bodyReader io.Reader
-	if opts.Body != nil {
+	if opts.RawBody != nil {
+		bodyReader = bytes.NewReader(opts.RawBody)
+	} else if opts.Body != nil {
 		bodyBytes, err := json.Marshal(opts.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal body: %w", err)
@@ -166,6 +180,42 @@ func (c *Client) SendRequest(ctx context.Context, opts RequestOptions) (*Respons
 		Body:       responseBody,
 		Headers:    response.Header,
 	}, nil
+}
+
+// SendRaw makes a request and returns the response body verbatim, for the
+// endpoints that answer with content rather than JSON - reading a Cloud Storage
+// object's bytes with alt=media is the only one so far. SendRequest would try
+// to decode those bytes as JSON and fail on anything that is not.
+func (c *Client) SendRaw(ctx context.Context, opts RequestOptions) ([]byte, error) {
+	if opts.Timeout == 0 {
+		opts.Timeout = DefaultRequestTimeout
+	}
+	headers := opts.Headers
+	if headers == nil {
+		headers = make(http.Header)
+	}
+	headers.Set("User-Agent", c.userAgent)
+	if c.config.Project != "" {
+		headers.Set("X-Goog-User-Project", c.config.Project)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, opts.Method, opts.URL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header = headers
+
+	response, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	if err := googleapi.CheckResponse(response); err != nil {
+		googleapi.CloseBody(response)
+		return nil, err
+	}
+	defer googleapi.CloseBody(response)
+
+	return io.ReadAll(response.Body)
 }
 
 // isReauthError detects the `invalid_rapt` / reauth-required OAuth response

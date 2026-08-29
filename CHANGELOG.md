@@ -200,6 +200,17 @@ formae agent.
 
 ### Added
 
+- `GCP::Storage::Object` - a single object in a bucket with its content declared
+  inline, for the small files infrastructure is made of: a config document, a
+  startup script, a static index page. The content is part of the forma, so it
+  is part of the plan and the state; wrap it with `formae.value(...).opaque` to
+  keep it out of both.
+
+  Uploading needed two additions to the transport, which until now sent only
+  JSON: `RawBody`/`ContentType` for sending bytes verbatim, and `SendRaw` for
+  reading them back - an object's bytes are a declared property, so without
+  reading them a changed object would never read as changed.
+
 - A conformance case for `GCP::Bigtable::MaterializedView`.
 
 - A conformance case for `GCP::Bigtable::Backup`, and `FORMAE_TEST_FUTURE_TIMESTAMP`
