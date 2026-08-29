@@ -151,6 +151,10 @@ formae agent.
 
 ### Added
 
+- A conformance case for `GCP::EssentialContacts::Contact`, and `Update` support
+  for it. `contacts.patch` exists and takes an `updateMask`; the registration had
+  deferred update "until verified", and the case now verifies it.
+
 - A conformance case for `GCP::Monitoring::MetricDescriptor`, which shipped
   without one. A custom metric descriptor stands on its own and costs nothing,
   so the case declares one and nothing else.

@@ -70,13 +70,12 @@ func TestContactRegistered(t *testing.T) {
 		resource.OperationCreate, resource.OperationRead,
 		resource.OperationDelete, resource.OperationList,
 		resource.OperationCheckStatus,
+		// contacts.patch takes an updateMask; update was deferred until
+		// something exercised it, and the conformance case now does.
+		resource.OperationUpdate,
 	} {
 		if !registry.HasProvisioner(ContactResourceType, op) {
 			t.Errorf("%s not registered for %v", ContactResourceType, op)
 		}
-	}
-	// Update is intentionally unsupported.
-	if registry.HasProvisioner(ContactResourceType, resource.OperationUpdate) {
-		t.Errorf("%s should not be registered for Update", ContactResourceType)
 	}
 }

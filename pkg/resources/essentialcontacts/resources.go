@@ -27,14 +27,20 @@ func init() {
 		{
 			ResourceType: ContactResourceType,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "contacts",
-				Scope:          &base.ScopeConfig{Type: base.ScopeProjectLevel},
-				SupportsUpdate: false, // patch exists; defer until verified
+				ResourceType: "contacts",
+				Scope:        &base.ScopeConfig{Type: base.ScopeProjectLevel},
+				// contacts.patch takes an updateMask naming the fields to
+				// change. Enabled now that a conformance case exercises it;
+				// email is immutable in practice, so the case changes
+				// languageTag.
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true,
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
 			Operations: []resource.Operation{
 				resource.OperationCreate,
 				resource.OperationRead,
+				resource.OperationUpdate,
 				resource.OperationDelete,
 				resource.OperationList,
 				resource.OperationCheckStatus,
