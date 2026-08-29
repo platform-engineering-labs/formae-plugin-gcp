@@ -146,3 +146,29 @@ func TestCreateBodyKeepsDocumentsAndName(t *testing.T) {
 		t.Errorf("create body is missing what it needs: %v", body)
 	}
 }
+
+// A gateway's region is not the target's: API Gateway serves a much smaller set
+// of regions. A parentless list spans them with the location wildcard, and a
+// named gateway keeps whatever region it lives in.
+func TestGatewayListSpansLocations(t *testing.T) {
+	got := apiGatewayPathBuilder(base.PathContext{Project: "p", ResourceType: "gateways"})
+	if got != "/projects/p/locations/-/gateways" {
+		t.Errorf("list path = %q, want the location wildcard", got)
+	}
+	named := apiGatewayPathBuilder(base.PathContext{
+		Project: "p", ResourceType: "gateways", Location: "europe-west1", ResourceName: "g",
+	})
+	if named != "/projects/p/locations/europe-west1/gateways/g" {
+		t.Errorf("named path = %q", named)
+	}
+}
+
+// A gateway reports the region it lives in inside its path.
+func TestGatewayResponseRecoversLocation(t *testing.T) {
+	out := responseTransformer(map[string]interface{}{
+		"name": "projects/p/locations/europe-west1/gateways/g",
+	}, base.TransformContext{Project: "p"})
+	if out["location"] != "europe-west1" || out["name"] != "g" {
+		t.Errorf("location/name = %v/%v", out["location"], out["name"])
+	}
+}

@@ -60,6 +60,11 @@ func apiGatewayPathBuilder(ctx base.PathContext) string {
 	location := globalLocation
 	if ctx.ResourceType == "gateways" {
 		location = ctx.Location
+		// Discovery lists with no location to name, and a gateway can be in any
+		// of the regions API Gateway serves. The wildcard spans them.
+		if location == "" {
+			location = "-"
+		}
 	}
 	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, location)
 	if ctx.ParentResource != "" {

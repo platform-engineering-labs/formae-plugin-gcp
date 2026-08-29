@@ -39,6 +39,16 @@ open class Gateway extends formae.Resource {
     @gcp.FieldHint { createOnly = true }
     project: (String|formae.Resolvable)?
 
+    /// The region the gateway runs in. API Gateway serves a much smaller set of
+    /// regions than GCP as a whole - eleven at the time of writing - so a
+    /// gateway often cannot live in the region the rest of a target uses, and
+    /// names its own. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    location: String?
+
     /// The api config this gateway serves, as the full path
     /// "projects/{p}/locations/global/apis/{api}/configs/{config}".
     @gcp.FieldHint

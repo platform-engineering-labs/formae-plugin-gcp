@@ -72,6 +72,10 @@ forma {
     label = "plugin-sdk-test-apigateway-gateway"
     project = v.gcpProject
     name = "formae-plugin-sdk-test-agwgw-\(v.testRunID)"
+    // API Gateway serves eleven regions and the target's is not one of them:
+    // creating there answers "Location europe-central2 is not found or access
+    // is unauthorized".
+    location = "europe-west1"
     displayName = "Plugin SDK conformance gateway"
     // The config is named as a full path, which is what its `path` property
     // holds - `name` is the short id. Referencing it here is also what orders

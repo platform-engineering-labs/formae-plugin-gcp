@@ -75,8 +75,12 @@ func init() {
 			ResourceType: GatewayResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "gateways",
-				// A gateway is the only regional resource here.
-				Scope:              &base.ScopeConfig{Type: base.ScopeLocationBased},
+				// A gateway is the only regional resource here, but its region
+				// is not the target's: API Gateway serves eleven regions, so a
+				// gateway names its own and a parentless list spans them all
+				// with the location wildcard. Binding it to the target's
+				// location instead would hide every gateway outside it.
+				Scope:              &base.ScopeConfig{Type: base.ScopeGlobal},
 				CreateIDParam:      "gatewayId",
 				SupportsUpdate:     true,
 				UpdateMaskFromBody: true,
