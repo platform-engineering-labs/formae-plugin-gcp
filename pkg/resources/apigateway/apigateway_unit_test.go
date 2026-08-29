@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // Apis and their configs are global; only gateways are regional.
@@ -97,5 +98,45 @@ func TestNestedResourceDeleteIsRetryable(t *testing.T) {
 	}
 	if retry(nil) {
 		t.Error("nil must not be retried")
+	}
+}
+
+// The update mask is built from the body, so an immutable field left in it is
+// refused. A config's documents and its gateway identity are both create-only.
+func TestUpdateBodyDropsImmutableFields(t *testing.T) {
+	body, err := requestTransformer(map[string]interface{}{
+		"name":                  "c",
+		"api":                   "a",
+		"project":               "p",
+		"openapiDocuments":      []interface{}{"doc"},
+		"gatewayServiceAccount": "sa@example.com",
+		"state":                 "ACTIVE",
+		"displayName":           "new name",
+		"labels":                map[string]interface{}{"a": "b"},
+	}, base.TransformContext{Operation: resource.OperationUpdate})
+	if err != nil {
+		t.Fatalf("transform failed: %v", err)
+	}
+	for _, dropped := range []string{"name", "api", "project", "openapiDocuments", "gatewayServiceAccount", "state"} {
+		if _, ok := body[dropped]; ok {
+			t.Errorf("%s must not be in an update body", dropped)
+		}
+	}
+	if body["displayName"] != "new name" || body["labels"] == nil {
+		t.Errorf("mutable fields were dropped: %v", body)
+	}
+}
+
+// A create still needs the documents and the id.
+func TestCreateBodyKeepsDocumentsAndName(t *testing.T) {
+	body, err := requestTransformer(map[string]interface{}{
+		"name":             "c",
+		"openapiDocuments": []interface{}{"doc"},
+	}, base.TransformContext{Operation: resource.OperationCreate})
+	if err != nil {
+		t.Fatalf("transform failed: %v", err)
+	}
+	if body["name"] != "c" || body["openapiDocuments"] == nil {
+		t.Errorf("create body is missing what it needs: %v", body)
 	}
 }

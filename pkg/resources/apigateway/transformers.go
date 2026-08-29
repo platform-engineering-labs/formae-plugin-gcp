@@ -23,6 +23,14 @@ var serverSetFields = map[string]bool{
 	"updateTime":      true,
 }
 
+// createOnlyFields are immutable once set. The update mask is built from the
+// body, and a mask naming an immutable field is refused outright - the same way
+// the API refuses one naming the id.
+var createOnlyFields = map[string]bool{
+	"openapiDocuments":      true,
+	"gatewayServiceAccount": true,
+}
+
 // requestTransformer drops the fields that address a resource rather than
 // describe it, and the ones only the server sets.
 //
@@ -33,6 +41,9 @@ func requestTransformer(props map[string]interface{}, ctx base.TransformContext)
 	body := make(map[string]interface{}, len(props))
 	for k, v := range props {
 		if serverSetFields[k] {
+			continue
+		}
+		if ctx.Operation == resource.OperationUpdate && createOnlyFields[k] {
 			continue
 		}
 		switch k {
