@@ -73,3 +73,52 @@ func advancedRefTransformers(collection string, refs map[string]string) (base.Re
 
 	return request, response
 }
+
+// triggerRequest expands the workflow a trigger delivers to. The field sits
+// inside "destination" rather than at the top level, so it needs its own
+// walk rather than advancedRefTransformers, which handles scalar fields on the
+// body itself.
+func triggerRequest(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body, err := eventarcRequestTransformer(props, ctx)
+	if err != nil {
+		return nil, err
+	}
+	destination, ok := body["destination"].(map[string]interface{})
+	if !ok {
+		return body, nil
+	}
+	copied := make(map[string]interface{}, len(destination))
+	for k, v := range destination {
+		copied[k] = v
+	}
+	location, _ := props["location"].(string)
+	if location == "" {
+		location = ctx.Location
+	}
+	if workflow, ok := copied["workflow"].(string); ok && workflow != "" && !strings.Contains(workflow, "/") {
+		copied["workflow"] = fmt.Sprintf("projects/%s/locations/%s/workflows/%s",
+			ctx.Project, location, workflow)
+	}
+	body["destination"] = copied
+	return body, nil
+}
+
+// triggerResponse is the mirror of triggerRequest.
+func triggerResponse(props map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	out := base.ShortNameResponseTransformer.Transform(props, ctx)
+	destination, ok := out["destination"].(map[string]interface{})
+	if !ok {
+		return out
+	}
+	copied := make(map[string]interface{}, len(destination))
+	for k, v := range destination {
+		copied[k] = v
+	}
+	if workflow, ok := copied["workflow"].(string); ok {
+		if i := strings.LastIndex(workflow, "/workflows/"); i >= 0 {
+			copied["workflow"] = workflow[i+len("/workflows/"):]
+		}
+	}
+	out["destination"] = copied
+	return out
+}

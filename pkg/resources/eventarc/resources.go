@@ -52,7 +52,8 @@ func init() {
 				resource.OperationList,
 				resource.OperationCheckStatus,
 			},
-			ResponseTransformer: base.ShortNameResponseTransformer,
+			RequestTransformer:  base.RequestTransformerFunc(triggerRequest),
+			ResponseTransformer: base.ResponseTransformerFunc(triggerResponse),
 		},
 		{
 			// The Eventarc Advanced hub that pipelines and enrollments attach

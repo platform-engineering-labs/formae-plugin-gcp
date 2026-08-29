@@ -12,6 +12,13 @@ formae agent.
 
 ### Fixed
 
+- A `GCP::Eventarc::Trigger` can reference the `Workflow` it delivers to.
+  `destination.workflow` was a plain `String`, so a forma could name a workflow
+  but not reference it - and ordering comes only from resolvable references, so
+  formae was free to create the trigger before the workflow it targets. It now
+  accepts a resolvable, and the request expands the bare name into the full path
+  Eventarc wants while the response shortens it back.
+
 - A resource identified by anything other than `name` can be discovered. The
   generic list path required every listed item to carry a `name` before it would
   consult the API's own native-ID extractor, so a Cloud Storage ACL entry -
@@ -150,6 +157,10 @@ formae agent.
   (`TargetTcpProxy`) had one with no update fixture.
 
 ### Added
+
+- A conformance case for `GCP::Eventarc::Trigger`, the last Eventarc type
+  without one. It delivers to a `Workflow`, which is free to define and needs no
+  container image or network attachment.
 
 - A conformance case for `GCP::BigQuery::Routine`. It is the first case to
   exercise any BigQuery type: `Dataset` and `Table` also shipped without one,

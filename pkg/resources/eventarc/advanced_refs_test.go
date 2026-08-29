@@ -110,3 +110,61 @@ func TestResponseIgnoresForeignCollection(t *testing.T) {
 		t.Error("location must not be inferred from a foreign collection's path")
 	}
 }
+
+// A trigger's workflow destination is nested inside "destination", so it needs
+// its own expansion rather than the top-level scalar one.
+func TestTriggerWorkflowRoundTrip(t *testing.T) {
+	body, err := triggerRequest(map[string]interface{}{
+		"name":     "trig-1",
+		"location": "europe-west1",
+		"destination": map[string]interface{}{
+			"workflow": "wf-1",
+		},
+	}, base.TransformContext{Project: "proj", Location: "europe-west1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	dest := body["destination"].(map[string]interface{})
+	if got, want := dest["workflow"], "projects/proj/locations/europe-west1/workflows/wf-1"; got != want {
+		t.Errorf("workflow = %v, want %v", got, want)
+	}
+	if _, ok := body["location"]; ok {
+		t.Error("location addresses the resource in the URL and must not be a body field")
+	}
+
+	out := triggerResponse(map[string]interface{}{
+		"name":        "projects/proj/locations/europe-west1/triggers/trig-1",
+		"destination": map[string]interface{}{"workflow": dest["workflow"]},
+	}, base.TransformContext{})
+	if got, want := out["name"], "trig-1"; got != want {
+		t.Errorf("name = %v, want %v", got, want)
+	}
+	if got := out["destination"].(map[string]interface{})["workflow"]; got != "wf-1" {
+		t.Errorf("workflow = %v, want wf-1", got)
+	}
+}
+
+// A full path written by hand must not be expanded again, and a destination
+// with no workflow at all must survive untouched.
+func TestTriggerWorkflowLeavesOtherDestinationsAlone(t *testing.T) {
+	full := "projects/other/locations/us-central1/workflows/wf-9"
+	body, err := triggerRequest(map[string]interface{}{
+		"destination": map[string]interface{}{"workflow": full},
+	}, base.TransformContext{Project: "proj", Location: "europe-west1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := body["destination"].(map[string]interface{})["workflow"]; got != full {
+		t.Errorf("workflow = %v, want %v", got, full)
+	}
+
+	body, err = triggerRequest(map[string]interface{}{
+		"destination": map[string]interface{}{"cloudRun": map[string]interface{}{"service": "svc"}},
+	}, base.TransformContext{Project: "proj"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := body["destination"].(map[string]interface{})["cloudRun"]; !ok {
+		t.Error("a cloudRun destination must survive untouched")
+	}
+}
