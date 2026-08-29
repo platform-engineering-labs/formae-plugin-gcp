@@ -212,4 +212,26 @@ func init() {
 			},
 		)
 	}
+
+	// Backups and materialized views need the same Create handling, and were
+	// left out of the list above: they fell through to the generic provisioner,
+	// which sends no *_id query parameter and knows nothing of the cluster a
+	// backup lives under. A backup create went to /instances/{i}/backups and
+	// 404ed, and a materialized view create was refused for an empty id. They
+	// also need a List that walks the instances - see walking_list.go.
+	for _, rt := range []string{BackupResourceType, MaterializedViewResourceType} {
+		resourceType := rt // capture by value for closure
+		registry.Register(
+			resourceType,
+			bigtableRegistry.Definitions[resourceType].Operations,
+			func(cfg *config.Config) prov.Provisioner {
+				provisioner, _ := NewBigtableProvisioner(cfg, resourceType)
+				bigtableProvisioner, ok := provisioner.(*BigtableProvisioner)
+				if !ok {
+					return provisioner
+				}
+				return &walkingListProvisioner{BigtableProvisioner: bigtableProvisioner}
+			},
+		)
+	}
 }

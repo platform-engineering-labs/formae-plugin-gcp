@@ -223,4 +223,23 @@ func init() {
 			}
 		})
 	}
+
+	// An object ACL needs a walk of its own: it hangs off a bucket *and* an
+	// object, so the bucket walk above stops one level short of it. See
+	// object_acl_walking_list.go.
+	oacDef := storageRegistry.Definitions[ObjectAccessControlResourceType]
+	registry.Register(ObjectAccessControlResourceType, oacDef.Operations,
+		func(cfg *config.Config) prov.Provisioner {
+			return &objectAclProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           StorageAPI,
+					OperationConfig:     StorageOperations,
+					ResourceConfig:      oacDef.ResourceConfig,
+					NativeIDConfig:      StorageNativeID,
+					RequestTransformer:  oacDef.RequestTransformer,
+					ResponseTransformer: oacDef.ResponseTransformer,
+				},
+			}
+		})
 }

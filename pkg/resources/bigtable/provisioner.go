@@ -116,10 +116,8 @@ func (p *BigtableProvisioner) Create(
 	// Add Bigtable-specific query parameter for resource ID
 	// Format: ?instance_id={name} or ?cluster_id={name} or ?table_id={name}
 	// Note: Bigtable Admin API uses snake_case for query parameters
-	resourceIDSuffix := strings.TrimSuffix(p.resourceTypeAPI, "s")
-	resourceIDParam := resourceIDSuffix + "_id"
 	url, err = transport.AddQueryParams(url, map[string]string{
-		resourceIDParam: resourceName,
+		bigtableIDParam(p.resourceTypeAPI): resourceName,
 	})
 	if err != nil {
 		return createBigtableFailureResult(resource.OperationErrorCodeInvalidRequest,
@@ -228,4 +226,25 @@ func (p *BigtableProvisioner) Status(
 	request *resource.StatusRequest,
 ) (*resource.StatusResult, error) {
 	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
+}
+
+// bigtableIDParam names the query parameter that carries a new resource's id.
+// The API collection is camelCase while the parameter is snake_case, so
+// "materializedViews" has to become "materialized_view_id" - trimming the
+// plural alone yielded "materializedView_id", which the API ignored and then
+// rejected the create for an empty id.
+func bigtableIDParam(resourceTypeAPI string) string {
+	var b strings.Builder
+	for i, r := range strings.TrimSuffix(resourceTypeAPI, "s") {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r - 'A' + 'a')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	b.WriteString("_id")
+	return b.String()
 }
