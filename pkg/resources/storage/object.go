@@ -119,14 +119,32 @@ func (o *objectProvisioner) Create(
 			transport.ToResourceErrorCode(wrapped.Code), wrapped.Message), nil
 	}
 
-	return &resource.CreateResult{
+	nativeID := objectNativeID(bucket, name)
+	result := &resource.CreateResult{
 		ProgressResult: &resource.ProgressResult{
 			Operation:       resource.OperationCreate,
 			OperationStatus: resource.OperationStatusSuccess,
-			NativeID:        objectNativeID(bucket, name),
+			NativeID:        nativeID,
 			StatusMessage:   "object uploaded",
 		},
-	}, nil
+	}
+
+	// Report the created state. Storage is synchronous, so nothing else fills
+	// it in before another resource asks for it, and a reference to this
+	// object - a Storage object ACL names one - resolves against these
+	// properties. Reporting none left the reference unresolved, and the ACL
+	// create then addressed the bucket alone.
+	read, err := o.Read(ctx, &resource.ReadRequest{
+		NativeID:     nativeID,
+		ResourceType: request.ResourceType,
+		TargetConfig: request.TargetConfig,
+	})
+	// A failed read-back is not a failed create: the object is uploaded, and the
+	// next sync will fill the properties in.
+	if err == nil && read != nil && read.ErrorCode == "" && read.Properties != "" {
+		result.ProgressResult.ResourceProperties = []byte(read.Properties)
+	}
+	return result, nil
 }
 
 // Update re-uploads. Cloud Storage has no partial write for an object's bytes,

@@ -64,7 +64,7 @@ forma {
     // carries the same value, and it is the only resolvable reference the view
     // can make to the table, which the query needs to exist first. Naming the
     // table in the query text creates no ordering edge.
-    instance = tbl.res.instance
+    instance = (tbl.res) { property = "instance" }
     name = "formae_test_mv_\(v.testRunID)"
     query = "SELECT _key, cf1 FROM `\(tblName)`"
   }
