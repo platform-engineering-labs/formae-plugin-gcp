@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigquery/dataset.pkl"
+import "@gcp/bigquery/routine.pkl"
+import "./config/vars.pkl" as v
+
+// A routine lives in a dataset, so the dataset comes first. Both are metadata:
+// an empty dataset and a SQL scalar function store no rows and cost nothing.
+//
+// BigQuery ids allow letters, digits and underscores only, so these names are
+// underscore-separated where most fixtures here are hyphenated.
+local ds = new dataset.Dataset {
+  label = "plugin-sdk-test-routine-dataset"
+  project = v.gcpProject
+  datasetId = "formae_plugin_sdk_test_rt_\(v.testRunID)"
+  location = v.gcpRegion
+}
+
+forma {
+  v.stack
+  v.target
+
+  ds
+
+  new routine.Routine {
+    label = "plugin-sdk-test-bigquery-routine"
+    project = v.gcpProject
+    // Resolvable -> the dataset exists before the routine is created in it.
+    datasetId = ds.res.datasetId
+    routineId = "formae_plugin_sdk_test_fn_\(v.testRunID)"
+    type = "SCALAR_FUNCTION"
+    language = "SQL"
+    description = "Test routine for plugin SDK conformance tests"
+    arguments = new Listing {
+      new routine.Argument {
+        name = "x"
+        dataType = new routine.DataType {
+          typeKind = "INT64"
+        }
+      }
+    }
+    returnType = new routine.DataType {
+      typeKind = "INT64"
+    }
+    body = "x + 1"
+  }
+}

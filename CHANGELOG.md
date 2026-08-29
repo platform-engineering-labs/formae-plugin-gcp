@@ -151,6 +151,10 @@ formae agent.
 
 ### Added
 
+- A conformance case for `GCP::BigQuery::Routine`. It is the first case to
+  exercise any BigQuery type: `Dataset` and `Table` also shipped without one,
+  and this case builds a dataset to hold the routine.
+
 - A conformance case for `GCP::EssentialContacts::Contact`, and `Update` support
   for it. `contacts.patch` exists and takes an `updateMask`; the registration had
   deferred update "until verified", and the case now verifies it.
