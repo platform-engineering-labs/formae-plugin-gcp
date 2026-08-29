@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/apigateway/api.pkl"
+import "@gcp/apigateway/apiConfig.pkl"
+import "@gcp/apigateway/gateway.pkl"
+import "./config/vars.pkl" as v
+
+// A gateway serves one config, which belongs to one api, so both come first.
+// A gateway is the only part of API Gateway that deploys anything, and it is
+// still billed per call rather than per hour.
+local parentApi = new api.Api {
+  label = "plugin-sdk-test-agw-gw-api"
+  project = v.gcpProject
+  name = "formae-plugin-sdk-test-agwg-\(v.testRunID)"
+  displayName = "Plugin SDK gateway api"
+}
+
+// x-google-backend names where a request would be sent; example.com is reserved
+// for documentation, so nothing is actually reachable.
+local openapi = """
+  swagger: '2.0'
+  info:
+    title: formae-conformance-gateway
+    description: Plugin SDK conformance gateway config
+    version: 1.0.0
+  schemes:
+    - https
+  produces:
+    - application/json
+  paths:
+    /hello:
+      get:
+        summary: Greet
+        operationId: hello
+        x-google-backend:
+          address: https://example.com/hello
+        responses:
+          '200':
+            description: ok
+
+  """
+
+local cfg = new apiConfig.ApiConfig {
+  label = "plugin-sdk-test-agw-gw-config"
+  project = v.gcpProject
+  api = parentApi.res.name
+  name = "formae-plugin-sdk-test-agwgc-\(v.testRunID)"
+  openapiDocuments = new Listing {
+    new apiConfig.OpenApiDocument {
+      document = new apiConfig.ApiDocument {
+        path = "openapi.yaml"
+        contents = openapi.base64
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  parentApi
+  cfg
+
+  new gateway.Gateway {
+    label = "plugin-sdk-test-apigateway-gateway"
+    project = v.gcpProject
+    name = "formae-plugin-sdk-test-agwgw-\(v.testRunID)"
+    displayName = "Plugin SDK conformance gateway"
+    // The config is named as a full path, which is what its `path` property
+    // holds - `name` is the short id. Referencing it here is also what orders
+    // the gateway after the config it serves.
+    apiConfig = cfg.res.path
+  }
+}

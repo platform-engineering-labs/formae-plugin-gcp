@@ -47,6 +47,13 @@ open class ApiConfigResolvable extends formae.Resolvable {
     hidden api: ApiConfigResolvable = (this) {
         property = "api"
     }
+
+    /// A reference to the config's full resource path. A gateway names the
+    /// config it serves as a full path, which is not what `name` holds - a
+    /// forma declares the short id - so the path is referenced from here.
+    hidden path: ApiConfigResolvable = (this) {
+        property = "path"
+    }
 }
 
 @gcp.ResourceHint {
@@ -91,6 +98,12 @@ open class ApiConfig extends formae.Resource {
     /// The Service Management config id the server assigned.
     @gcp.FieldHint { hasProviderDefault = true }
     serviceConfigId: String?
+
+    /// The config's full resource path,
+    /// "projects/{p}/locations/global/apis/{api}/configs/{config}". A gateway
+    /// names the config it serves this way, and `name` holds only the short id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    path: String?
 
     /// CREATING, ACTIVE, FAILED, DELETING or UPDATING - server-reported.
     @gcp.FieldHint { hasProviderDefault = true }

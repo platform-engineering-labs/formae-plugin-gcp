@@ -91,6 +91,16 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
+  apigateway-api|apigateway-api-config|apigateway-gateway)
+    # Every API Gateway write is a long-running operation: an api takes minutes,
+    # a config triggers a Service Management rollout on top of that, and a
+    # gateway deploys the config. Discovery also sweeps every registered type
+    # before it reaches these - over a hundred of them - so the 2m default
+    # expired while the sweep was still elsewhere and reported the resource as
+    # undiscovered when it was really there.
+    TIMEOUT_ARG="TIMEOUT=20"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=20 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   servicenetworking-connection)
     # PSA connections are async and global (VPC peering); create and especially
     # discovery take longer to surface in inventory than any other resource.

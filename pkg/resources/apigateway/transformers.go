@@ -14,6 +14,7 @@ import (
 // serverSetFields are reported by the API and never sent back. Putting one in an
 // update body would put it in the update mask, which the API refuses.
 var serverSetFields = map[string]bool{
+	"path":            true,
 	"managedService":  true,
 	"serviceConfigId": true,
 	"defaultHostname": true,
@@ -71,6 +72,9 @@ func responseTransformer(apiResponse map[string]interface{}, ctx base.TransformC
 	case len(parts) == 8 && parts[4] == "apis" && parts[6] == "configs":
 		out["api"] = parts[5]
 		out["name"] = parts[7]
+		// A gateway names the config it serves as a full path, and name now
+		// holds only the short id, so keep the path a resource can refer to.
+		out["path"] = name
 	}
 	return out
 }
