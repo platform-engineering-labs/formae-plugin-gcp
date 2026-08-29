@@ -65,10 +65,12 @@ open class GcsDestinationConfig extends formae.SubResource {
     @gcp.FieldHint
     path: String?
 
-    @gcp.FieldHint
+    /// GCP fills this in when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     fileRotationMb: Int?
 
-    @gcp.FieldHint
+    /// GCP fills this in when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     fileRotationInterval: String?
 
     @gcp.FieldHint
