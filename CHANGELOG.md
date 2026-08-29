@@ -12,6 +12,15 @@ formae agent.
 
 ### Fixed
 
+- `GCP::BigQuery::Routine` is discoverable. Its `List` refused to run without a
+  `datasetId` in AdditionalProperties, and discovery lists with no properties at
+  all - it cannot know a routine's parent, because the provisioner is
+  hand-written and declares no `ParentResource`. A parentless list now walks
+  every dataset in the project; a caller that names one still gets just that one.
+  `GCP::BigQuery::Table` has the same shape and is left as it is for now, with a
+  comment saying so: it has no conformance case, and an unverified fix is easily
+  mistaken for a verified one.
+
 - `GCP::Monitoring::MetricDescriptor` is discoverable. `metricDescriptors.list`
   returns every descriptor a project can see - well over a thousand built-in
   ones for GCP's own services - so a custom metric was somewhere in that pile

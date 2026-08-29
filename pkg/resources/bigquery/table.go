@@ -238,6 +238,11 @@ func (t *Table) List(ctx context.Context, req *resource.ListRequest) (*resource.
 	}
 
 	if datasetID == "" {
+		// Same shape as Routine.List had: discovery lists with no properties,
+		// so refusing here makes tables undiscoverable. Routine walks every
+		// dataset instead; this should too, but GCP::BigQuery::Table has no
+		// conformance case yet, and changing it blind is how an unverified fix
+		// gets mistaken for a verified one.
 		return nil, fmt.Errorf("datasetId must be provided in AdditionalProperties for listing tables")
 	}
 

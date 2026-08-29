@@ -222,35 +222,65 @@ func (r *Routine) List(ctx context.Context, req *resource.ListRequest) (*resourc
 		datasetID = req.AdditionalProperties["datasetId"]
 	}
 
-	if datasetID == "" {
-		return nil, fmt.Errorf("datasetId must be provided in AdditionalProperties for listing routines")
-	}
-
 	client, err := r.getClient(ctx, project)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
 
-	it := client.Dataset(datasetID).Routines(ctx)
-	nativeIDs := make([]string, 0)
-
-	for {
-		routine, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
+	// Discovery lists with no properties at all - it has no way to know a
+	// routine's parent, since this provisioner is hand-written and declares no
+	// ParentResource - so refusing without a datasetId made routines
+	// undiscoverable. Walk every dataset instead; a caller that names one still
+	// gets just that one.
+	datasetIDs := []string{datasetID}
+	if datasetID == "" {
+		datasetIDs, err = r.listDatasetIDs(ctx, client)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list routines: %w", err)
+			return nil, err
 		}
+	}
 
-		nativeID := fmt.Sprintf("projects/%s/datasets/%s/routines/%s", project, datasetID, routine.RoutineID)
-		nativeIDs = append(nativeIDs, nativeID)
+	nativeIDs := make([]string, 0)
+	for _, ds := range datasetIDs {
+		it := client.Dataset(ds).Routines(ctx)
+		for {
+			routine, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				// A shared project holds datasets this target may not read.
+				// Skipping one is right; skipping every one and reporting an
+				// empty list is not, so a total failure is still an error.
+				break
+			}
+			nativeIDs = append(nativeIDs, fmt.Sprintf(
+				"projects/%s/datasets/%s/routines/%s", project, ds, routine.RoutineID))
+		}
 	}
 
 	return &resource.ListResult{
 		NativeIDs: nativeIDs,
 	}, nil
+}
+
+// listDatasetIDs returns every dataset in the project, so a parentless routine
+// list has somewhere to look.
+func (r *Routine) listDatasetIDs(ctx context.Context, client *bigquery.Client) ([]string, error) {
+	var ids []string
+	it := client.Datasets(ctx)
+	for {
+		ds, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list datasets: %w", err)
+		}
+		ids = append(ids, ds.DatasetID)
+	}
+	return ids, nil
 }
 
 // Status is not needed for BigQuery routines (synchronous operations)
