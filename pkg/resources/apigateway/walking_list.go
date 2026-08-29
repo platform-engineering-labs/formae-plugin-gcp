@@ -6,6 +6,7 @@ package apigateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -74,6 +75,71 @@ func (c *configWalkingProvisioner) List(
 		return nil, fmt.Errorf("could not list configs on any of %d apis: %w", failed, lastErr)
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
+
+// Read asks for the full view, which is the only way a config's OpenAPI
+// documents come back - the basic view omits them, and they cannot be recovered
+// from anywhere else.
+//
+// The view belongs here and not in the path builder: that path is also what a
+// delete and a patch address, and a delete carrying ?view=FULL is rejected
+// outright, which failed every destroy of a config.
+func (c *configWalkingProvisioner) Read(
+	ctx context.Context,
+	request *resource.ReadRequest,
+) (*resource.ReadResult, error) {
+	result, err := c.BaseResource.Read(ctx, request)
+	if err != nil || result == nil || result.ErrorCode != "" {
+		return result, err
+	}
+
+	full, ferr := c.readFullView(ctx, request)
+	// The basic view already succeeded; a failure to enrich it is not a failed
+	// read, and the next sync will try again.
+	if ferr == nil && full != "" {
+		result.Properties = full
+	}
+	return result, nil
+}
+
+// readFullView GETs the config with view=FULL and returns its transformed
+// properties.
+func (c *configWalkingProvisioner) readFullView(
+	ctx context.Context, request *resource.ReadRequest,
+) (string, error) {
+	client, err := transport.NewClient(ctx, c.Config)
+	if err != nil {
+		return "", err
+	}
+	pathCtx, err := base.ParseNativeID(c.NativeIDConfig, request.NativeID)
+	if err != nil {
+		return "", err
+	}
+	pathCtx.ResourceType = c.ResourceConfig.ResourceType
+
+	url, err := transport.AddQueryParam(
+		fmt.Sprintf("%s%s", c.APIConfig.BaseURL, c.APIConfig.PathBuilder(pathCtx)), "view", "FULL")
+	if err != nil {
+		return "", err
+	}
+	response, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
+	if err != nil {
+		return "", err
+	}
+
+	body := response.Body
+	if c.ResponseTransformer != nil {
+		body = c.ResponseTransformer.Transform(body, base.TransformContext{
+			Project:      pathCtx.Project,
+			ResourceType: pathCtx.ResourceType,
+			Operation:    resource.OperationRead,
+		})
+	}
+	propsJSON, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+	return string(propsJSON), nil
 }
 
 // Status reads the config back once the operation finishes. A create is a

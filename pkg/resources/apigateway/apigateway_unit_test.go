@@ -6,6 +6,7 @@ package apigateway
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -28,15 +29,20 @@ func TestPathBuilderLocations(t *testing.T) {
 	}
 }
 
-// A config's OpenAPI documents come back only under the full view, and every
-// property a forma declares has to round-trip.
-func TestConfigReadAsksForTheFullView(t *testing.T) {
+// A config's OpenAPI documents come back only under the full view, but the view
+// must not live in the shared path: the same path addresses a delete and a
+// patch, and a delete carrying ?view=FULL is rejected outright, which failed
+// every destroy of a config. Read adds it for itself.
+func TestConfigPathCarriesNoViewParameter(t *testing.T) {
 	got := apiGatewayPathBuilder(base.PathContext{
 		Project: "p", ResourceType: "configs", ParentResource: "a", ResourceName: "c",
 	})
-	want := "/projects/p/locations/global/apis/a/configs/c?view=FULL"
+	want := "/projects/p/locations/global/apis/a/configs/c"
 	if got != want {
 		t.Errorf("path = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "view=") {
+		t.Error("the shared path must not carry a read-only query parameter")
 	}
 }
 
