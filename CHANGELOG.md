@@ -26,6 +26,29 @@ formae agent.
   IAM service account. Each changes an immutable name, which is what makes the
   operation a replace rather than an update.
 
+- `GCP::DNS::Policy`, `GCP::DNS::ResponsePolicy` and
+  `GCP::DNS::ResponsePolicyRule` - a policy decides how DNS behaves for the
+  networks it is attached to; a response policy overrides what DNS answers for
+  them, one rule at a time. None costs anything to hold: Cloud DNS bills zones
+  and queries, and Cloud DNS had shipped with a single type until now.
+
+  Three shapes the generic engine did not expect. A response policy's id field
+  is `responsePolicyName` and a rule's is `ruleName`, not `name` - a listed item
+  carries no path context to fall back on, so without handling them every
+  response policy and rule would have listed with an empty native ID and never
+  been discovered. Cloud DNS also stamps a `kind` discriminator on nested
+  objects, not just the resource itself, and each survivor reads as a property
+  the forma never declared.
+
+  A rule hangs off its response policy, so the DNS path builder and native ID
+  handle a parent now; both previously assumed a flat
+  `/projects/{p}/{collection}/{name}`.
+
+  Deleting a policy detaches its networks first. Cloud DNS refuses to delete one
+  while a network is still attached, and nothing in the forma is holding it - the
+  network is a prerequisite that outlives the policy - so the deletion looks
+  unblocked and simply fails.
+
 - `GCP::ApiGateway::Api`, `GCP::ApiGateway::ApiConfig` and
   `GCP::ApiGateway::Gateway` - API Gateway serves an api from a regional
   gateway: an api holds immutable configs, and a gateway names the config it
