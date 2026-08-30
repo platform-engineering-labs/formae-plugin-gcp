@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	ManagedZoneResourceType = "GCP::DNS::ManagedZone"
-	PolicyResourceType      = "GCP::DNS::Policy"
+	ManagedZoneResourceType    = "GCP::DNS::ManagedZone"
+	PolicyResourceType         = "GCP::DNS::Policy"
+	ResponsePolicyResourceType = "GCP::DNS::ResponsePolicy"
 )
 
 var dnsRegistry *base.ResourceRegistry
@@ -40,6 +41,19 @@ func init() {
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPatch,
 				ListItemsKey:   "policies",
+			},
+			RequestTransformer:  base.RequestTransformerFunc(policyRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(policyResponseTransformer),
+		},
+		{
+			// A response policy is the same shape as a policy, except that its
+			// id field is responsePolicyName rather than name.
+			ResourceType: ResponsePolicyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "responsePolicies",
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPatch,
+				ListItemsKey:   "responsePolicies",
 			},
 			RequestTransformer:  base.RequestTransformerFunc(policyRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(policyResponseTransformer),

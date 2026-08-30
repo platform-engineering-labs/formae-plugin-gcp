@@ -1,0 +1,40 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/responsePolicy.pkl"
+import "@gcp/compute/network.pkl"
+import "./config/vars.pkl" as v
+
+// A response policy applies to networks, so one comes first. Neither costs
+// anything to hold - Cloud DNS bills zones and queries.
+local net = new network.Network {
+  label = "plugin-sdk-test-dnsrp-network"
+  name = "formae-plugin-sdk-test-dnsrp-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new responsePolicy.ResponsePolicy {
+    label = "plugin-sdk-test-dns-response-policy"
+    project = v.gcpProject
+    // The id field is responsePolicyName, not name.
+    responsePolicyName = "formae-plugin-sdk-test-dnsrp-\(v.testRunID)"
+    description = "Plugin SDK conformance response policy (updated)"
+    networks = new Listing {
+      new responsePolicy.ResponsePolicyNetwork {
+        // Resolvable -> the network exists before the policy attaches to it.
+        networkUrl = net.res.selfLink
+      }
+    }
+  }
+}

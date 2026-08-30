@@ -1,0 +1,64 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS ResponsePolicy
+///
+/// A set of rules that override what DNS would otherwise answer for the
+/// networks it is attached to — the private equivalent of a DNS "response
+/// policy zone". Holding one costs nothing; Cloud DNS bills zones and queries.
+///
+/// Its id field is `responsePolicyName`, not `name`.
+module gcp.dns.responsePolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::ResponsePolicy"
+
+/// A network the response policy applies to.
+class ResponsePolicyNetwork {
+    @gcp.FieldHint
+    networkUrl: (String|formae.Resolvable)?
+}
+
+open class ResponsePolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden responsePolicyName: ResponsePolicyResolvable = (this) {
+        property = "responsePolicyName"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "responsePolicyName"
+}
+open class ResponsePolicy extends formae.Resource {
+    hidden parent = this
+
+    /// User-assigned response policy id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    responsePolicyName: String
+
+    /// The project holding the response policy.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    networks: Listing<ResponsePolicyNetwork>?
+
+    /// Server-assigned numeric id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    id: String?
+
+    hidden res: ResponsePolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

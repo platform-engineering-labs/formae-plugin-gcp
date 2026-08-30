@@ -44,10 +44,19 @@ func dnsPathBuilder(ctx base.PathContext) string {
 
 // extractDNSNativeID builds the full resource path. Cloud DNS responses carry
 // the short name in "name"; the path is project + resourceType + name.
+//
+// A response policy is the exception: its id field is "responsePolicyName". A
+// listed item carries no path context to fall back on, so without this every
+// response policy would list with an empty native ID and never be discovered.
 func extractDNSNativeID(response map[string]interface{}, ctx base.PathContext) string {
 	name := ctx.ResourceName
 	if name == "" {
 		if n, ok := response["name"].(string); ok {
+			name = n
+		}
+	}
+	if name == "" {
+		if n, ok := response["responsePolicyName"].(string); ok {
 			name = n
 		}
 	}

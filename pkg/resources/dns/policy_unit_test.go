@@ -55,3 +55,24 @@ func TestPolicyResponseStripsNestedKind(t *testing.T) {
 		t.Errorf("project = %v, want p", out["project"])
 	}
 }
+
+// A response policy's id field is responsePolicyName, not name. A listed item
+// carries no path context, so without that fallback every response policy would
+// list with an empty native ID and never be discovered.
+func TestNativeIDHandlesResponsePolicyName(t *testing.T) {
+	got := extractDNSNativeID(
+		map[string]interface{}{"responsePolicyName": "rp1"},
+		base.PathContext{Project: "p", ResourceType: "responsePolicies"},
+	)
+	if got != "projects/p/responsePolicies/rp1" {
+		t.Errorf("native ID = %q", got)
+	}
+	// A policy still uses name.
+	got = extractDNSNativeID(
+		map[string]interface{}{"name": "p1"},
+		base.PathContext{Project: "p", ResourceType: "policies"},
+	)
+	if got != "projects/p/policies/p1" {
+		t.Errorf("native ID = %q", got)
+	}
+}
