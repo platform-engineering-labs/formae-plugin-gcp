@@ -1164,8 +1164,12 @@ else
 fi
 
 # --- 8. Storage buckets ---
+# formae-probe- covers resources created by hand while investigating a failure.
+# Those are as disposable as a test's own, but they carry neither test prefix, so
+# nothing swept them and they outlived every run - and the credentials used to
+# create one often cannot delete it.
 echo "Cleaning GCP storage buckets..."
-BUCKETS=$(gcloud storage buckets list --filter="name~^formae-plugin-sdk-test" --format="value(name)" 2>/dev/null || true)
+BUCKETS=$(gcloud storage buckets list --filter="name~^formae-plugin-sdk-test OR name~^formae-probe-" --format="value(name)" 2>/dev/null || true)
 if [ -n "$BUCKETS" ]; then
     echo "$BUCKETS" | while read -r bucket; do
         echo "  Deleting bucket: $bucket"
