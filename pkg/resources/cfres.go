@@ -11,6 +11,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/apigateway"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/artifactregistry"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigquery"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigqueryconnection"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigtable"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/certificateauthority"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/cloudrun"
