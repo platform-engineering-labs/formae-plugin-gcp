@@ -24,11 +24,17 @@ func TestMetricDescriptorListIsFilteredToUserOwnedMetrics(t *testing.T) {
 	if !strings.HasPrefix(got, "/projects/p/metricDescriptors?filter=") {
 		t.Fatalf("list path = %q", got)
 	}
-	for _, want := range []string{"custom.googleapis.com", "external.googleapis.com"} {
-		if !strings.Contains(got, strings.ReplaceAll(want, ".", ".")) &&
-			!strings.Contains(got, strings.ReplaceAll(want, ".", "%2E")) {
-			t.Errorf("filter should mention %s, got %q", want, got)
-		}
+	// One prefix, not two. Cloud Monitoring rejects
+	// "metric.type = starts_with(...) OR metric.type = starts_with(...)" with
+	// HTTP 400, "Within the 'metric' prefix, OR can only be used to connect a
+	// list of 'labels'", and a rejected filter fails the whole list - which read
+	// downstream as "the resource is gone" and had sync tombstone a descriptor
+	// that was really there.
+	if !strings.Contains(got, "custom.googleapis.com") && !strings.Contains(got, "custom%2Egoogleapis%2Ecom") {
+		t.Errorf("filter should keep user-owned descriptors, got %q", got)
+	}
+	if strings.Contains(strings.ToUpper(got), "+OR+") || strings.Contains(strings.ToUpper(got), "%20OR%20") {
+		t.Errorf("filter must stay a single predicate, got %q", got)
 	}
 }
 
