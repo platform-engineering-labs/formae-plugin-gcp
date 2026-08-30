@@ -91,6 +91,13 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
+  monitoring-metric-descriptor)
+    # Cloud Monitoring reflects a deleted descriptor in metricDescriptors.list
+    # slowly, and the OOB-delete step waits for sync to tombstone it - which it
+    # cannot do while the descriptor is still being listed. The 2m default
+    # expires first, so the case failed on a deletion that had already happened.
+    export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   apigateway-api|apigateway-api-config|apigateway-gateway)
     # Every API Gateway write is a long-running operation: an api takes minutes,
     # a config triggers a Service Management rollout on top of that, and a
