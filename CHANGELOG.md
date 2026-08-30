@@ -12,6 +12,14 @@ formae agent.
 
 ### Added
 
+- The Replace phase is exercised for the first time. Every conformance case in
+  this plugin reported replace as skipped, because a case only tests it when a
+  `-replace.pkl` accompanies it and none existed - so a run reporting "8/8" was
+  really seven steps and a skip, and nothing had ever checked that replacing a
+  resource works. The three Service Directory cases now carry one: each changes
+  the immutable id, which is what forces a replace, and the harness verifies the
+  native ID actually changed rather than the resource being updated in place.
+
 - `GCP::ApiGateway::Api`, `GCP::ApiGateway::ApiConfig` and
   `GCP::ApiGateway::Gateway` - API Gateway serves an api from a regional
   gateway: an api holds immutable configs, and a gateway names the config it
