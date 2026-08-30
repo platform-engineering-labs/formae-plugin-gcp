@@ -26,6 +26,16 @@ formae agent.
   is where the native ID comes from. A config only exists underneath an api and
   there is no wildcard in the api position, so a parentless list walks the apis.
 
+  A gateway names the region it runs in. API Gateway serves eleven regions and a
+  target's is often not among them - creating a gateway in one it does not serve
+  answers "Location ... is not found or access is unauthorized" - so the region
+  cannot be taken from the target. It is not scoped either: every scope
+  available overwrites the location, one by clearing it and one by substituting
+  the target's, and a read that lost it addressed a wildcard path rather than
+  the gateway. A parentless list spans every region with the location wildcard,
+  which the API accepts, rather than looking only where the target happens to
+  be.
+
   A config also reports its own full resource path. A gateway names the config
   it serves that way, while `name` holds the short id a forma declares, and a
   reference interpolated into a string is emitted as its envelope rather than
