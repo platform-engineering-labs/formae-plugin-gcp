@@ -548,6 +548,23 @@ else
     echo "  No API Gateway apis found"
 fi
 
+# --- Spanner (databases go with their instance) ---
+# Unlike almost everything else swept here, a Spanner instance is billed for as
+# long as it exists - the smallest regional one is 100 processing units - so a
+# leaked instance is a standing cost rather than a tidiness problem. Deleting an
+# instance takes its databases with it.
+echo "Cleaning GCP Spanner instances..."
+SPANNER=$(gcloud spanner instances list --filter="name~formae-plugin-sdk|name~formae-test" \
+    --format="value(name)" 2>/dev/null || true)
+if [ -n "$SPANNER" ]; then
+    echo "$SPANNER" | while read -r inst; do
+        echo "  Deleting Spanner instance: $inst"
+        gcloud spanner instances delete "$inst" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Spanner instances found"
+fi
+
 # --- Service Directory (endpoints, then services, then namespaces) ---
 # Deleting a namespace takes its services and endpoints with it, so only the
 # namespaces need sweeping. goog-psc-default is Google-managed and does not
