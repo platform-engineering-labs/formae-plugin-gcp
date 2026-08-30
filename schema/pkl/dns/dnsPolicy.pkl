@@ -1,0 +1,94 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS Policy
+///
+/// How DNS behaves for the networks it is attached to: whether they accept
+/// inbound forwarding, whether queries are logged, and which name servers
+/// answer instead of Google's. A policy costs nothing to hold — Cloud DNS bills
+/// zones and queries.
+module gcp.dns.dnsPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::Policy"
+
+/// A network the policy applies to.
+class PolicyNetwork {
+    /// The network's self link or full URL.
+    @gcp.FieldHint
+    networkUrl: (String|formae.Resolvable)?
+}
+
+/// A name server that answers instead of Google's.
+class PolicyNameServer {
+    @gcp.FieldHint
+    ipv4Address: String?
+
+    @gcp.FieldHint
+    ipv6Address: String?
+
+    /// Whether the address is reached over the private VPC or the internet.
+    @gcp.FieldHint { hasProviderDefault = true }
+    forwardingPath: ("default"|"private")?
+}
+
+/// The name servers that replace Google's for this policy.
+class AlternativeNameServerConfig {
+    @gcp.FieldHint
+    targetNameServers: Listing<PolicyNameServer>?
+}
+
+open class PolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Policy extends formae.Resource {
+    hidden parent = this
+
+    /// User-assigned policy name. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The project holding the policy.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Whether the networks accept DNS queries forwarded in from on-premises.
+    @gcp.FieldHint { hasProviderDefault = true }
+    enableInboundForwarding: Boolean?
+
+    /// Whether queries against the networks are logged.
+    @gcp.FieldHint { hasProviderDefault = true }
+    enableLogging: Boolean?
+
+    @gcp.FieldHint
+    networks: Listing<PolicyNetwork>?
+
+    @gcp.FieldHint
+    alternativeNameServerConfig: AlternativeNameServerConfig?
+
+    /// Server-assigned numeric id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    id: String?
+
+    hidden res: PolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

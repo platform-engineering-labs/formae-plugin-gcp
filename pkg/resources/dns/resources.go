@@ -8,7 +8,10 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 )
 
-const ManagedZoneResourceType = "GCP::DNS::ManagedZone"
+const (
+	ManagedZoneResourceType = "GCP::DNS::ManagedZone"
+	PolicyResourceType      = "GCP::DNS::Policy"
+)
 
 var dnsRegistry *base.ResourceRegistry
 
@@ -26,6 +29,20 @@ func init() {
 				SupportsUpdate: false, // ponytail: description/labels are patchable; defer until verified
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
+		},
+		{
+			// A policy fits the same engine: the name travels in the body, and
+			// the path is the generic /projects/{p}/policies[/{name}]. Cloud DNS
+			// patches a policy with the whole object rather than a field mask.
+			ResourceType: PolicyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "policies",
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPatch,
+				ListItemsKey:   "policies",
+			},
+			RequestTransformer:  base.RequestTransformerFunc(policyRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(policyResponseTransformer),
 		},
 	})
 	if err != nil {
