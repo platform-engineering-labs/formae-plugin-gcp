@@ -5,7 +5,10 @@
 package dns
 
 import (
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 )
 
 const (
@@ -80,5 +83,26 @@ func init() {
 	})
 	if err != nil {
 		panic(err)
+	}
+
+	// Cloud DNS refuses to delete a policy while a network is attached to it, so
+	// both policy types delete behind a provisioner that detaches first. See
+	// policy_delete.go.
+	for _, rt := range []string{PolicyResourceType, ResponsePolicyResourceType} {
+		resourceType := rt // capture by value for closure
+		def := dnsRegistry.Definitions[resourceType]
+		registry.Register(resourceType, def.Operations, func(cfg *config.Config) prov.Provisioner {
+			return &policyProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           DNSAPI,
+					OperationConfig:     DNSOperations,
+					ResourceConfig:      def.ResourceConfig,
+					NativeIDConfig:      DNSNativeID,
+					RequestTransformer:  def.RequestTransformer,
+					ResponseTransformer: def.ResponseTransformer,
+				},
+			}
+		})
 	}
 }
