@@ -29,17 +29,42 @@ func policyRequestTransformer(props map[string]interface{}, _ base.TransformCont
 }
 
 // policyResponseTransformer puts the project back, which the response does not
-// carry, and drops the kind discriminator that is not a property of the policy.
+// carry, and drops the kind discriminator.
+//
+// Cloud DNS stamps "kind" on nested objects as well as the policy itself - every
+// entry of networks and of targetNameServers carries one - so it has to be
+// stripped all the way down. Left in, it appears as a property the forma never
+// declared and that nothing marks as a provider default.
 func policyResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
-	out := make(map[string]interface{}, len(apiResponse)+1)
-	for k, v := range apiResponse {
-		if k == "kind" {
-			continue
-		}
-		out[k] = v
+	out, _ := stripKind(apiResponse).(map[string]interface{})
+	if out == nil {
+		out = map[string]interface{}{}
 	}
 	if ctx.Project != "" {
 		out["project"] = ctx.Project
 	}
 	return out
+}
+
+// stripKind removes every "kind" discriminator from a decoded JSON value.
+func stripKind(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(v))
+		for k, item := range v {
+			if k == "kind" {
+				continue
+			}
+			out[k] = stripKind(item)
+		}
+		return out
+	case []interface{}:
+		out := make([]interface{}, 0, len(v))
+		for _, item := range v {
+			out = append(out, stripKind(item))
+		}
+		return out
+	default:
+		return value
+	}
 }
