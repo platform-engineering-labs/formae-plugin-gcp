@@ -8,15 +8,39 @@ amends "@formae/forma.pkl"
 
 import "@gcp/memcache/memcacheInstance.pkl" as memcacheInstance
 import "@gcp/compute/network.pkl"
+import "@gcp/compute/globalAddress.pkl"
+import "@gcp/servicenetworking/connection.pkl"
 import "./config/vars.pkl" as v
 
-// The nodes attach to a VPC network, so one comes first. The instance is billed
-// by node-hour for as long as it exists: one node of the smallest size is what
-// this case asks for, and it still takes twenty minutes or more to create.
+// A memcached instance reaches its nodes over private service access, and the
+// API refuses outright without it: "Google private service access is not
+// enabled." So the chain is a VPC, a reserved range for the producer to peer
+// into, the peering itself, and only then the instance.
+//
+// The instance is billed by node-hour for as long as it exists - one node of
+// the smallest size here - and takes twenty minutes or more to create, which
+// makes this among the slowest cases in the suite.
 local net = new network.Network {
   label = "plugin-sdk-test-mc-network"
   name = "formae-plugin-sdk-test-mc-net-\(v.testRunID)"
-  autoCreateSubnetworks = true
+  autoCreateSubnetworks = false
+}
+
+local peerRange = new globalAddress.GlobalAddress {
+  label = "plugin-sdk-test-mc-range"
+  name = "formae-plugin-sdk-test-mc-range-\(v.testRunID)"
+  addressType = "INTERNAL"
+  purpose = "VPC_PEERING"
+  prefixLength = 16
+  network = net.res.selfLink
+}
+
+local psa = new connection.Connection {
+  label = "plugin-sdk-test-mc-psa"
+  network = net.res.selfLink
+  reservedPeeringRanges = new Listing {
+    peerRange.res.name
+  }
 }
 
 forma {
@@ -24,14 +48,18 @@ forma {
   v.target
 
   net
+  peerRange
+  psa
 
   new memcacheInstance.Instance {
     label = "plugin-sdk-test-memcache-instance"
     project = v.gcpProject
     name = "formae-plugin-sdk-test-mc-\(v.testRunID)"
     displayName = "Plugin SDK conformance"
-    // Resolvable -> the network exists before the nodes attach to it.
-    authorizedNetwork = net.res.name
+    // Resolvable through the peering, not the network: the instance needs
+    // private service access to exist, not merely the VPC, and naming the
+    // connection is what orders it after the peering is established.
+    authorizedNetwork = psa.res.network
     nodeCount = 1
     nodeConfig = new memcacheInstance.NodeConfig {
       cpuCount = 1
