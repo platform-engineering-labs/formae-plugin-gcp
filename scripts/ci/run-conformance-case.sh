@@ -196,7 +196,7 @@ needs_prereq_cleanup() {
     alloydb-*|eventarc-*|datastream-*|filestore-backup|filestore-snapshot|\
     security-policy-rule|region-security-policy-rule|\
     network-firewall-policy-association|region-network-firewall-policy-association|\
-    network-firewall-policy-rule|machine-image)
+    network-firewall-policy-rule|machine-image|spanner-database)
       return 0 ;;
   esac
   # A case that builds a network needs the same treatment for a different

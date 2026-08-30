@@ -28,6 +28,7 @@ case "${1:-}" in
     region-network-firewall-policy-association) PREFIX="formae-plugin-sdk-test-rnfpa-pol-" KIND=firewall ;;
     network-firewall-policy-rule)               PREFIX="formae-plugin-sdk-test-nfpr-pol-"  KIND=firewall ;;
     machine-image)                              PREFIX="formae-plugin-sdk-test-mi-"        KIND=vmchain ;;
+    spanner-database)                           PREFIX="formae-plugin-sdk-test-spdbi-"     KIND=spanner ;;
     *)
         KIND=network
         ;;
@@ -67,6 +68,21 @@ if [ "${KIND:-}" = "network" ]; then
     gcloud compute networks list --format="value(name)" 2>/dev/null         | grep "^${NET_PREFIX}" | while read -r n; do
             echo "  network $n"
             gcloud compute networks delete "$n" --quiet 2>&1 | tail -1 || true
+        done
+    exit 0
+fi
+
+# A Spanner instance is billed for as long as it exists, and the database case
+# builds one as a prerequisite - which Destroy leaves behind. Left alone until
+# the end-of-run sweep, a failed run holds a chargeable instance for the rest of
+# the matrix; three of them survived a single afternoon of local runs.
+if [ "${KIND:-}" = "spanner" ]; then
+    echo "Cleaning Spanner instances named ${PREFIX}* ..."
+    # Deleting an instance takes its databases with it.
+    gcloud spanner instances list --format="value(name)" 2>/dev/null \
+        | grep "^${PREFIX}" | while read -r inst; do
+            echo "  instance $inst"
+            gcloud spanner instances delete "$inst" --quiet 2>&1 | tail -1 || true
         done
     exit 0
 fi
