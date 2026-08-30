@@ -178,6 +178,9 @@ func (b *BaseResource) buildTransformContext(pathCtx PathContext, operation reso
 		Location:     pathCtx.Location,
 		ResourceType: pathCtx.ResourceType,
 		Operation:    operation,
+
+		ParentResource: pathCtx.ParentResource,
+		ParentType:     pathCtx.ParentType,
 	}
 }
 

@@ -1,0 +1,96 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS ResponsePolicyRule
+///
+/// One override inside a response policy: for a given DNS name, either answer
+/// with data of your own or hand the query back to normal resolution.
+///
+/// Its id field is `ruleName`, not `name`.
+module gcp.dns.responsePolicyRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::ResponsePolicyRule"
+
+/// One record set the rule answers with.
+class LocalDataRecordSet {
+    /// The DNS name this record answers for, fully qualified with a trailing
+    /// dot.
+    @gcp.FieldHint
+    name: String?
+
+    /// Record type, e.g. "A" or "CNAME".
+    @gcp.FieldHint
+    type: String?
+
+    @gcp.FieldHint
+    ttl: Int?
+
+    /// The record data, e.g. one or more IP addresses.
+    @gcp.FieldHint
+    rrdatas: Listing<String>?
+}
+
+/// The answers the rule gives instead of normal resolution.
+class LocalData {
+    @gcp.FieldHint
+    localDatas: Listing<LocalDataRecordSet>?
+}
+
+open class ResponsePolicyRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden ruleName: ResponsePolicyRuleResolvable = (this) {
+        property = "ruleName"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "ruleName"
+    parent = "GCP::DNS::ResponsePolicy"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "responsePolicyName" listParameter = "responsePolicy"
+        }
+    }.toList()
+}
+open class ResponsePolicyRule extends formae.Resource {
+    hidden parent = this
+
+    /// User-assigned rule id, unique within the response policy. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    ruleName: String
+
+    /// The response policy holding the rule. A short response policy id or a
+    /// ResponsePolicy reference.
+    @gcp.FieldHint { createOnly = true }
+    responsePolicy: (String|formae.Resolvable)
+
+    /// The project holding the rule.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    /// The DNS name the rule applies to, fully qualified with a trailing dot.
+    @gcp.FieldHint
+    dnsName: String?
+
+    /// Answer with this data instead of resolving normally. Set this or
+    /// `behavior`, not both.
+    @gcp.FieldHint
+    localData: LocalData?
+
+    /// "behaviorUnspecified" or "bypassResponsePolicy" - hand the query back to
+    /// normal resolution. Set this or `localData`, not both.
+    @gcp.FieldHint
+    behavior: String?
+
+    hidden res: ResponsePolicyRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

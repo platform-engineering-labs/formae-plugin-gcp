@@ -68,3 +68,34 @@ func stripKind(value interface{}) interface{} {
 		return value
 	}
 }
+
+// ruleRequestTransformer drops the fields that address a rule rather than
+// describe it: the project and the response policy are both in the URL. The
+// rule id stays, as Cloud DNS takes it in the body.
+func ruleRequestTransformer(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "project" || k == "responsePolicy" || policyServerSet[k] {
+			continue
+		}
+		body[k] = v
+	}
+	return body, nil
+}
+
+// ruleResponseTransformer is the mirror. The response carries neither the
+// project nor the response policy the rule belongs to - both live only in the
+// path - so a forma's declared values are put back alongside the API's answer.
+func ruleResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	out, _ := stripKind(apiResponse).(map[string]interface{})
+	if out == nil {
+		out = map[string]interface{}{}
+	}
+	if ctx.Project != "" {
+		out["project"] = ctx.Project
+	}
+	if ctx.ParentResource != "" {
+		out["responsePolicy"] = ctx.ParentResource
+	}
+	return out
+}

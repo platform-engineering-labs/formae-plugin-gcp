@@ -33,9 +33,15 @@ var DNSNativeID = base.NativeIDConfig{
 	Parser: parseDNSNativeID,
 }
 
-// dnsPathBuilder builds /projects/{project}/{resourceType}[/{name}].
+// dnsPathBuilder builds /projects/{project}/{resourceType}[/{name}], and for a
+// resource that hangs off another - a response policy rule under its response
+// policy - /projects/{project}/{parentType}/{parent}/{resourceType}[/{name}].
 func dnsPathBuilder(ctx base.PathContext) string {
-	path := fmt.Sprintf("/projects/%s/%s", ctx.Project, ctx.ResourceType)
+	path := fmt.Sprintf("/projects/%s", ctx.Project)
+	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	}
+	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {
 		path += "/" + ctx.ResourceName
 	}
@@ -61,20 +67,43 @@ func extractDNSNativeID(response map[string]interface{}, ctx base.PathContext) s
 		}
 	}
 	if name == "" {
+		if n, ok := response["ruleName"].(string); ok {
+			name = n
+		}
+	}
+	if name == "" {
 		return ""
+	}
+	if ctx.ParentType != "" && ctx.ParentResource != "" {
+		return fmt.Sprintf("projects/%s/%s/%s/%s/%s",
+			ctx.Project, ctx.ParentType, ctx.ParentResource, ctx.ResourceType, name)
 	}
 	return fmt.Sprintf("projects/%s/%s/%s", ctx.Project, ctx.ResourceType, name)
 }
 
-// parseDNSNativeID parses "projects/{project}/{resourceType}/{name}".
+// parseDNSNativeID parses "projects/{project}/{resourceType}/{name}" and the
+// nested "projects/{project}/{parentType}/{parent}/{resourceType}/{name}".
 func parseDNSNativeID(nativeID string) (base.PathContext, error) {
 	parts := strings.Split(nativeID, "/")
-	if len(parts) != 4 || parts[0] != "projects" {
+	if parts[0] != "projects" {
 		return base.PathContext{}, fmt.Errorf("invalid DNS native ID: %s", nativeID)
 	}
-	return base.PathContext{
-		Project:      parts[1],
-		ResourceType: parts[2],
-		ResourceName: parts[3],
-	}, nil
+	switch len(parts) {
+	case 4:
+		return base.PathContext{
+			Project:      parts[1],
+			ResourceType: parts[2],
+			ResourceName: parts[3],
+		}, nil
+	case 6:
+		return base.PathContext{
+			Project:        parts[1],
+			ParentType:     parts[2],
+			ParentResource: parts[3],
+			ResourceType:   parts[4],
+			ResourceName:   parts[5],
+		}, nil
+	default:
+		return base.PathContext{}, fmt.Errorf("invalid DNS native ID: %s (expected 4 or 6 segments)", nativeID)
+	}
 }

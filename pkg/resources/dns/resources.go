@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	ManagedZoneResourceType    = "GCP::DNS::ManagedZone"
-	PolicyResourceType         = "GCP::DNS::Policy"
-	ResponsePolicyResourceType = "GCP::DNS::ResponsePolicy"
+	ManagedZoneResourceType        = "GCP::DNS::ManagedZone"
+	PolicyResourceType             = "GCP::DNS::Policy"
+	ResponsePolicyResourceType     = "GCP::DNS::ResponsePolicy"
+	ResponsePolicyRuleResourceType = "GCP::DNS::ResponsePolicyRule"
 )
 
 var dnsRegistry *base.ResourceRegistry
@@ -57,6 +58,24 @@ func init() {
 			},
 			RequestTransformer:  base.RequestTransformerFunc(policyRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(policyResponseTransformer),
+		},
+		{
+			// A rule hangs off a response policy:
+			// /projects/{p}/responsePolicies/{rp}/rules[/{rule}].
+			ResourceType: ResponsePolicyRuleResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "rules",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "responsePolicies",
+					PropertyName:   "responsePolicy",
+					RequiresParent: true,
+				},
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPatch,
+				ListItemsKey:   "responsePolicyRules",
+			},
+			RequestTransformer:  base.RequestTransformerFunc(ruleRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(ruleResponseTransformer),
 		},
 	})
 	if err != nil {

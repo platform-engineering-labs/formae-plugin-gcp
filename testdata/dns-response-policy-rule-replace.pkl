@@ -1,0 +1,62 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/responsePolicy.pkl"
+import "@gcp/dns/responsePolicyRule.pkl"
+import "@gcp/compute/network.pkl"
+import "./config/vars.pkl" as v
+
+// A rule lives inside a response policy, which applies to a network, so both
+// come first. None of the three costs anything to hold.
+local net = new network.Network {
+  label = "plugin-sdk-test-dnsrpr-network"
+  name = "formae-plugin-sdk-test-dnsrpr-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+local rp = new responsePolicy.ResponsePolicy {
+  label = "plugin-sdk-test-dnsrpr-policy"
+  project = v.gcpProject
+  responsePolicyName = "formae-plugin-sdk-test-dnsrpr-\(v.testRunID)"
+  description = "Plugin SDK conformance response policy for a rule"
+  networks = new Listing {
+    new responsePolicy.ResponsePolicyNetwork {
+      networkUrl = net.res.selfLink
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  rp
+
+  new responsePolicyRule.ResponsePolicyRule {
+    label = "plugin-sdk-test-dns-response-policy-rule"
+    project = v.gcpProject
+    // Resolvable -> the response policy exists before a rule is added to it.
+    responsePolicy = rp.res.responsePolicyName
+    // The id is immutable, so changing it forces a replace rather than an
+    // update. The response policy above is a prerequisite and stays put.
+    ruleName = "formae-plugin-sdk-test-dnsrule-r2-\(v.testRunID)"
+    // example.com is reserved for documentation, so this overrides nothing real.
+    dnsName = "conformance.example.com."
+    localData = new responsePolicyRule.LocalData {
+      localDatas = new Listing {
+        new responsePolicyRule.LocalDataRecordSet {
+          name = "conformance.example.com."
+          type = "A"
+          ttl = 300
+          rrdatas = new Listing { "192.0.2.10" }
+        }
+      }
+    }
+  }
+}
