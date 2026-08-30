@@ -574,6 +574,15 @@ done
 # resembling a plugin bug - which is exactly how target-https-proxy failed on
 # 2026-08-29, against eight certificates left behind since July. The sweep knew
 # about ssl-policies but never about the certificates themselves.
+# Certificates are swept only when asked. They are the one resource here whose
+# removal is not obviously safe to decide automatically: unlike a namespace or an
+# api, a certificate can be one someone installed deliberately, and the cap being
+# global means a wrong deletion is felt project-wide. Set
+# FORMAE_SWEEP_SSL_CERTIFICATES=1 to include them.
+if [ "${FORMAE_SWEEP_SSL_CERTIFICATES:-0}" != "1" ]; then
+    echo "Skipping GCP SSL certificates (set FORMAE_SWEEP_SSL_CERTIFICATES=1 to sweep them)"
+else
+
 echo "Cleaning GCP regional SSL certificates..."
 REGION_CERTS=$(gcloud compute ssl-certificates list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
 if [ -n "$REGION_CERTS" ]; then
@@ -595,6 +604,8 @@ if [ -n "$SSL_CERTS" ]; then
     done
 else
     echo "  No SSL certificates found"
+fi
+
 fi
 
 # --- 1h. Network attachments (hold a subnet reference, so delete before subnets) ---

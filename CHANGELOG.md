@@ -147,10 +147,15 @@ formae agent.
   failed having run no test at all. Three attempts now, 10s then 30s apart. A
   failure that is not setup still fails on the first attempt.
 
-- Leaked SSL certificates are swept. A project holds at most 10 globally, so
+- Leaked SSL certificates can be swept. A project holds at most 10 globally, so
   once the cap is reached any case creating one fails with
   "Quota 'SSL_CERTIFICATES' exceeded" rather than anything resembling a plugin
   bug. The sweep knew about `ssl-policies` but never about the certificates.
+
+  It is opt-in, behind `FORMAE_SWEEP_SSL_CERTIFICATES=1`. Certificates are the
+  one resource here whose removal is not obviously safe to decide
+  automatically: unlike a namespace or an api, one can have been installed
+  deliberately, and a global cap means a wrong deletion is felt project-wide.
 
 - A `GCP::Storage::Object` reports its properties when created. Create returned
   a native ID and nothing else, so a freshly created object had no stored state
