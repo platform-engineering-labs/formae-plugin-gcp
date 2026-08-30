@@ -26,6 +26,23 @@ formae agent.
   IAM service account. Each changes an immutable name, which is what makes the
   operation a replace rather than an update.
 
+- `GCP::Memcache::Instance` - Memorystore for Memcached: a managed memcached
+  cluster on a VPC network. It is billed by node-hour for as long as it exists
+  and takes twenty minutes or more to create, so its conformance case is the
+  slowest here at 27 minutes and the fixture asks for the smallest thing the API
+  accepts, one node of 1 GiB.
+
+  An instance reaches its nodes over private service access and the API refuses
+  one outright without it, so the case builds a VPC, the range reserved for the
+  service producer to peer into, the peering itself, and only then the instance.
+  The instance names the peering rather than the network: it needs private
+  service access to exist, not merely the VPC.
+
+  The authorized network is accepted in any of the three forms a forma can name
+  one - short, path, or self link - and normalised to the single form the API
+  takes. A reference to another resource's network property resolves to a self
+  link, which memcache rejects outright.
+
 - `GCP::Spanner::Instance` and `GCP::Spanner::Database` - Spanner is the one
   service here whose resources are billed for as long as they exist: the
   smallest regional instance is 100 processing units, a tenth of a node. A forma
