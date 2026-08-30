@@ -548,6 +548,25 @@ else
     echo "  No API Gateway apis found"
 fi
 
+# --- Memorystore for Memcached ---
+# A memcached instance is billed by node-hour for as long as it exists, and it
+# takes 20-30 minutes to create, so a leaked one is both a standing cost and a
+# slow thing to notice.
+echo "Cleaning GCP Memcache instances..."
+for mc_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
+    [ -z "$mc_loc" ] && continue
+    MEMCACHE=$(gcloud memcache instances list --region="$mc_loc" \
+        --filter="name~formae-plugin-sdk|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$MEMCACHE" ]; then
+        echo "$MEMCACHE" | while read -r inst; do
+            echo "  Deleting Memcache instance: $inst (region: $mc_loc)"
+            gcloud memcache instances delete "$inst" --region="$mc_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Memcache instances found in $mc_loc"
+    fi
+done
+
 # --- Spanner (databases go with their instance) ---
 # Unlike almost everything else swept here, a Spanner instance is billed for as
 # long as it exists - the smallest regional one is 100 processing units - so a
