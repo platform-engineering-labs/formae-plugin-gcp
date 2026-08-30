@@ -65,6 +65,24 @@ if [ "${KIND:-}" = "network" ]; then
             echo "  subnet $n ($r)"
             gcloud compute networks subnets delete "$n" --region="$r" --quiet 2>&1 | tail -1 || true
         done
+    # Nor before the ranges reserved for private service access on it. Those are
+    # global addresses pointing at the network rather than anything under it, so
+    # deleting the network first answers RESOURCE_IN_USE_BY_ANOTHER_RESOURCE and
+    # the network survives - five accumulated from the memcache case that way,
+    # each holding a /16 and a peering.
+    #
+    # The match is on the network each address points at, not on a name prefix:
+    # the range and the network are named differently (mc-range- against
+    # mc-net-), so a prefix match would miss it and a looser one would reach
+    # ranges belonging to other cases.
+    gcloud compute addresses list --global --filter="purpose=VPC_PEERING" --format="value(name,network)" 2>/dev/null | while read -r addr net; do
+        case "${net##*/}" in
+            "${NET_PREFIX}"*)
+                echo "  peering range $addr"
+                gcloud compute addresses delete "$addr" --global --quiet 2>&1 | tail -1 || true
+                ;;
+        esac
+    done
     gcloud compute networks list --format="value(name)" 2>/dev/null         | grep "^${NET_PREFIX}" | while read -r n; do
             echo "  network $n"
             gcloud compute networks delete "$n" --quiet 2>&1 | tail -1 || true
