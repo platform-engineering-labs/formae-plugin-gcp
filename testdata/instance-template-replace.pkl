@@ -1,0 +1,68 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/instanceTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// Managed network + subnet the template's NIC attaches to, referenced by
+// self-link so they round-trip against the API's returned full URLs and so
+// formae creates them before the template.
+local net = new network.Network {
+  label = "plugin-sdk-test-instance-template-net"
+  name = "formae-plugin-sdk-test-tmpl-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-instance-template-subnet"
+  name = "formae-plugin-sdk-test-tmpl-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.91.0.0/24"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  new instanceTemplate.InstanceTemplate {
+    label = "plugin-sdk-test-instance-template"
+    // The name is immutable, so changing it forces a replace rather than
+    // an update: the old resource is destroyed and a new one takes its place.
+    name = "formae-plugin-sdk-test-tmpl-r2-\(v.testRunID)"
+    description = "Test instance template for plugin SDK conformance tests"
+    properties = new instanceTemplate.InstanceProperties {
+      machineType = "e2-micro"
+      disks = new Listing {
+        new instanceTemplate.TemplateAttachedDisk {
+          boot = true
+          autoDelete = true
+          initializeParams = new instanceTemplate.TemplateDiskInitializeParams {
+            sourceImage = "projects/debian-cloud/global/images/family/debian-12"
+          }
+        }
+      }
+      // Internal IP only (no accessConfigs) to comply with the
+      // compute.vmExternalIpAccess org policy in the test project.
+      networkInterfaces = new Listing {
+        new instanceTemplate.TemplateNetworkInterface {
+          network = net.res.selfLink
+          subnetwork = subnet.res.selfLink
+        }
+      }
+      labels = new Mapping {
+        ["environment"] = "test"
+        ["managed-by"] = "formae"
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/monitoring/customService.pkl"
+import "@gcp/monitoring/slo.pkl"
+import "./config/vars.pkl" as v
+
+// The service the SLO hangs off. Referenced through its resolvable so formae
+// creates it first — the service id is a path component of the SLO.
+local svc = new customService.CustomService {
+  label = "plugin-sdk-test-slo-service"
+  name = "formae-plugin-sdk-test-svc-\(v.testRunID)"
+  displayName = "Formae conformance service"
+}
+
+forma {
+  v.stack
+  v.target
+
+  svc
+
+  new slo.Slo {
+    label = "plugin-sdk-test-monitoring-slo"
+    // The name is immutable, so changing it forces a replace rather than
+    // an update: the old resource is destroyed and a new one takes its place.
+    name = "formae-plugin-sdk-test-slo-r2-\(v.testRunID)"
+    service = svc.res.name
+    displayName = "99% of API requests under 500ms"
+    goal = 0.99
+    rollingPeriod = "604800s"
+    serviceLevelIndicator = new Mapping {
+      ["windowsBased"] = new Mapping {
+        ["windowPeriod"] = "300s"
+        ["goodTotalRatioThreshold"] = new Mapping {
+          ["threshold"] = 0.99
+          ["performance"] = new Mapping {
+            ["distributionCut"] = new Mapping {
+              ["distributionFilter"] = "metric.type=\"serviceruntime.googleapis.com/api/request_latencies\" resource.type=\"consumed_api\""
+              ["range"] = new Mapping {
+                ["max"] = 0.5
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

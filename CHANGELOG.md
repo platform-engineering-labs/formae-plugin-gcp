@@ -19,8 +19,12 @@ formae agent.
   resource works. The three Service Directory cases now carry one: each changes
   the immutable id, which is what forces a replace, and the harness verifies the
   native ID actually changed rather than the resource being updated in place.
-  `GCP::SecretManager::Secret` carries one too, so the phase is covered for a
-  type that predates this work rather than only for new ones.
+  Cases that predate this work carry one too, so the phase is covered for types
+  this batch did not add: a bucket, a Pub/Sub topic, a secret, an address, a
+  health check, a network, a firewall rule, three logging types, a monitoring
+  service and dashboard, an SLO, an instance template, a backend bucket and an
+  IAM service account. Each changes an immutable name, which is what makes the
+  operation a replace rather than an update.
 
 - `GCP::ApiGateway::Api`, `GCP::ApiGateway::ApiConfig` and
   `GCP::ApiGateway::Gateway` - API Gateway serves an api from a regional
