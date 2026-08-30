@@ -30,6 +30,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/iam"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/kms"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/logging"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/memcache"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/monitoring"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/networkconnectivity"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/orgpolicy"

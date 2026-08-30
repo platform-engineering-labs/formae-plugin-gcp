@@ -1,0 +1,41 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/memcache/memcacheInstance.pkl" as memcacheInstance
+import "@gcp/compute/network.pkl"
+import "./config/vars.pkl" as v
+
+// The nodes attach to a VPC network, so one comes first. The instance is billed
+// by node-hour for as long as it exists: one node of the smallest size is what
+// this case asks for, and it still takes twenty minutes or more to create.
+local net = new network.Network {
+  label = "plugin-sdk-test-mc-network"
+  name = "formae-plugin-sdk-test-mc-net-\(v.testRunID)"
+  autoCreateSubnetworks = true
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new memcacheInstance.Instance {
+    label = "plugin-sdk-test-memcache-instance"
+    project = v.gcpProject
+    name = "formae-plugin-sdk-test-mc-\(v.testRunID)"
+    displayName = "Plugin SDK conformance"
+    // Resolvable -> the network exists before the nodes attach to it.
+    authorizedNetwork = net.res.name
+    nodeCount = 1
+    nodeConfig = new memcacheInstance.NodeConfig {
+      cpuCount = 1
+      memorySizeMb = 1024
+    }
+  }
+}
