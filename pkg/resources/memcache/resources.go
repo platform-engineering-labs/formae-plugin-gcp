@@ -113,10 +113,28 @@ func requestTransformer(props map[string]interface{}, ctx base.TransformContext)
 		}
 		body[k] = v
 	}
-	if n, ok := body["authorizedNetwork"].(string); ok && n != "" && !strings.Contains(n, "/") {
-		body["authorizedNetwork"] = fmt.Sprintf("projects/%s/global/networks/%s", project, n)
+	if n, ok := body["authorizedNetwork"].(string); ok && n != "" {
+		body["authorizedNetwork"] = normalizeNetwork(n, project)
 	}
 	return body, nil
+}
+
+// normalizeNetwork puts a network into the one form memcache accepts:
+// "projects/{project}/global/networks/{network}".
+//
+// A forma may name a network three ways, and only the middle one is what the
+// API wants. A short name has to be expanded, and a self link has to be cut
+// down - a reference to another resource's network property resolves to the
+// full URL, and memcache rejects it outright: "Invalid format for authorized
+// network name."
+func normalizeNetwork(n, project string) string {
+	if i := strings.Index(n, "/projects/"); i >= 0 {
+		return n[i+1:]
+	}
+	if !strings.Contains(n, "/") {
+		return fmt.Sprintf("projects/%s/global/networks/%s", project, n)
+	}
+	return n
 }
 
 // responseTransformer is the mirror: the API reports the full path as name,
