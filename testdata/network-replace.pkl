@@ -1,0 +1,33 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/gcp.pkl"
+
+import "@gcp/compute/network.pkl"
+
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+
+  v.target
+
+  new network.Network {
+    label = "plugin-sdk-test-network"
+    // A network name is immutable, so changing it forces a replace.
+    name = "formae-plugin-sdk-test-n2-\(v.testRunID)"
+    description = "Test network for plugin SDK tests"
+    autoCreateSubnetworks = false
+    networkFirewallPolicyEnforcementOrder = "AFTER_CLASSIC_FIREWALL"
+    routingConfig {
+        routingMode = "REGIONAL"
+        bgpBestPathSelectionMode = "LEGACY"
+    }
+  }
+}
