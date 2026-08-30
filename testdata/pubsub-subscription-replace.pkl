@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/pubsub/topic.pkl"
+import "@gcp/pubsub/subscription.pkl"
+import "./config/vars.pkl" as v
+
+// Subscription references its topic via the resolvable so formae creates the
+// topic first and passes the topic's full resource path to the subscription.
+forma {
+  local t = new topic.Topic {
+    label = "plugin-sdk-test-sub-topic"
+    name = "formae-plugin-sdk-test-sub-topic-\(v.testRunID)"
+  }
+
+  v.stack
+  v.target
+
+  t
+
+  new subscription.Subscription {
+    label = "plugin-sdk-test-pubsub-subscription"
+    // The name is immutable, so changing it forces a replace rather than
+    // an update: the old subscription is destroyed and a new one takes its
+    // place. The topic it reads from is a prerequisite and stays put.
+    name = "formae-plugin-sdk-test-sub-r2-\(v.testRunID)"
+    topic = t.res.name
+    ackDeadlineSeconds = 30
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}
