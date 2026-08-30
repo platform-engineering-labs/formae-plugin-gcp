@@ -26,6 +26,22 @@ formae agent.
   IAM service account. Each changes an immutable name, which is what makes the
   operation a replace rather than an update.
 
+- `GCP::Spanner::Instance` and `GCP::Spanner::Database` - Spanner is the one
+  service here whose resources are billed for as long as they exist: the
+  smallest regional instance is 100 processing units, a tenth of a node. A forma
+  declaring one is spending money until it is destroyed, and the module doc says
+  so.
+
+  Two shapes the generic engine does not cover. An instance's id travels as
+  `instanceId` alongside an `instance` object rather than as a name in the body
+  or a query parameter, so the create body is assembled. And Spanner creates a
+  database by executing a `CREATE DATABASE` statement rather than taking a name,
+  so the plugin builds that statement from the name a forma declares.
+
+  A database name is capped at 30 characters, which the usual test prefix plus a
+  run id exceeds, so the fixture names it short - it does not need the prefix,
+  because deleting an instance takes its databases with it.
+
 - `GCP::BigQuery::Connection` - a named handle BigQuery uses to reach something
   outside itself. A `cloudResource` connection carries no configuration of its
   own: BigQuery mints a service account for it, and granting that account access
