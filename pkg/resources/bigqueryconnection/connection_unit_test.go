@@ -57,3 +57,24 @@ func TestRequestDropsLiftedServiceAccount(t *testing.T) {
 		t.Error("name must survive a create for the id parameter")
 	}
 }
+
+// The native ID is where a later read gets its path context, so a project
+// number left in it comes back as the project on every sync. Both forms address
+// the resource, so the configured id is used.
+func TestNativeIDKeepsTheConfiguredProject(t *testing.T) {
+	got := extractConnectionNativeID(
+		map[string]interface{}{"name": "projects/989754770009/locations/eu/connections/c1"},
+		base.PathContext{Project: "my-project"},
+	)
+	if got != "projects/my-project/locations/eu/connections/c1" {
+		t.Errorf("native ID = %q", got)
+	}
+	// With no configured project there is nothing better than what the API said.
+	got = extractConnectionNativeID(
+		map[string]interface{}{"name": "projects/989754770009/locations/eu/connections/c1"},
+		base.PathContext{},
+	)
+	if got != "projects/989754770009/locations/eu/connections/c1" {
+		t.Errorf("native ID = %q", got)
+	}
+}

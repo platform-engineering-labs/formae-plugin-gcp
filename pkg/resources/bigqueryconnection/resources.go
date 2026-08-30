@@ -50,15 +50,27 @@ func connectionPathBuilder(ctx base.PathContext) string {
 	return path
 }
 
-// extractConnectionNativeID takes the full path the API reports.
+// extractConnectionNativeID takes the full path the API reports, with the
+// project put back the way the forma names it.
+//
+// The API answers with the project *number*, and the native ID is where a later
+// read gets its path context from - so a number left here comes back as the
+// project on every sync, and no amount of fixing the response transformer
+// changes that. Both forms address the resource, so the configured id is used.
 func extractConnectionNativeID(response map[string]interface{}, ctx base.PathContext) string {
-	if name := utils.GetString(response, "name"); name != "" {
-		return name
+	name := utils.GetString(response, "name")
+	if name == "" {
+		if ctx.ResourceName == "" {
+			return ""
+		}
+		return strings.TrimPrefix(connectionPathBuilder(ctx), "/")
 	}
-	if ctx.ResourceName == "" {
-		return ""
+	parts := strings.Split(name, "/")
+	if ctx.Project != "" && len(parts) == 6 && parts[0] == "projects" {
+		parts[1] = ctx.Project
+		return strings.Join(parts, "/")
 	}
-	return strings.TrimPrefix(connectionPathBuilder(ctx), "/")
+	return name
 }
 
 func parseConnectionNativeID(nativeID string) (base.PathContext, error) {
