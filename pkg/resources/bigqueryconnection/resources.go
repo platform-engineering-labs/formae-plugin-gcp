@@ -81,7 +81,7 @@ func requestTransformer(props map[string]interface{}, ctx base.TransformContext)
 	body := make(map[string]interface{}, len(props))
 	for k, v := range props {
 		switch k {
-		case "project", "location", "hasCredential":
+		case "project", "location", "hasCredential", "cloudResourceServiceAccountId":
 			continue
 		case "name":
 			if ctx.Operation == resource.OperationUpdate {
@@ -100,13 +100,25 @@ func responseTransformer(apiResponse map[string]interface{}, ctx base.TransformC
 	for k, v := range apiResponse {
 		out[k] = v
 	}
+	// The service account BigQuery mints is reported inside cloudResource, but a
+	// hint is only emitted for a top-level field, so a nested one cannot be
+	// marked as server-filled and reads as a property the forma never declared.
+	// Lift it out and leave the selector empty, which is all a create sends.
+	if cr, ok := out["cloudResource"].(map[string]interface{}); ok {
+		if sa, ok := cr["serviceAccountId"].(string); ok && sa != "" {
+			out["cloudResourceServiceAccountId"] = sa
+		}
+		out["cloudResource"] = map[string]interface{}{}
+	}
+
 	name, _ := out["name"].(string)
 	parts := strings.Split(name, "/")
 	if len(parts) == 6 && parts[0] == "projects" && parts[2] == "locations" {
+		// The path reports the project *number*, while a forma names the project
+		// by id, so the configured id wins where there is one.
 		out["project"] = parts[1]
 		out["location"] = parts[3]
 		out["name"] = parts[5]
-		return out
 	}
 	if ctx.Project != "" {
 		out["project"] = ctx.Project

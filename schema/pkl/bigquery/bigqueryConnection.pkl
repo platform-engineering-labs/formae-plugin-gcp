@@ -19,13 +19,14 @@ import "@formae/formae.pkl"
 
 const type = "GCP::BigQuery::Connection"
 
-/// A connection to Google Cloud resources. It carries no configuration: the
-/// server fills in the service account it created.
+/// A connection to Google Cloud resources. It selects the kind of connection
+/// and carries no configuration of its own.
+///
+/// The service account BigQuery mints for it is reported as
+/// `cloudResourceServiceAccountId` rather than nested here: a hint is only
+/// emitted for a top-level field, so a nested one cannot be marked as
+/// server-filled and reads as a property the forma never declared.
 class CloudResourceProperties {
-    /// The service account BigQuery created for this connection. Grant it
-    /// access to whatever the connection should reach.
-    @gcp.FieldHint { hasProviderDefault = true }
-    serviceAccountId: String?
 }
 
 open class ConnectionResolvable extends formae.Resolvable {
@@ -65,6 +66,11 @@ open class Connection extends formae.Resource {
     /// Reach Google Cloud resources through a service account BigQuery mints.
     @gcp.FieldHint
     cloudResource: CloudResourceProperties?
+
+    /// The service account BigQuery created for a `cloudResource` connection.
+    /// Grant it access to whatever the connection should reach.
+    @gcp.FieldHint { hasProviderDefault = true }
+    cloudResourceServiceAccountId: String?
 
     /// Whether the connection has credentials configured - server-reported.
     @gcp.FieldHint { hasProviderDefault = true }
