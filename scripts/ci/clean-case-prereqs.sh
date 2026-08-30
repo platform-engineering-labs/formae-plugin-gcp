@@ -44,14 +44,8 @@ esac
 if [ "${KIND:-}" = "network" ]; then
     fixture="$here/../../testdata/${1}.pkl"
     [ -f "$fixture" ] || { echo "clean-case-prereqs: nothing to do for '${1:-}'"; exit 0; }
-    NET_PREFIX=$(python3 - "$fixture" <<'PYEOF'
-import re,sys
-s=open(sys.argv[1]).read()
-m=re.search(r'new network\.Network \{.*?
-\s*name = "([^"\]*)\\(v\.testRunID\)"', s, re.S)
-print(m.group(1) if m else "")
-PYEOF
-)
+    NET_PREFIX=$("$here/network-prefix-for-case.py" "$fixture")
+
     if [ -z "$NET_PREFIX" ]; then
         echo "clean-case-prereqs: nothing to do for '${1:-}'"
         exit 0
