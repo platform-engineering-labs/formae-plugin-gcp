@@ -1,0 +1,1277 @@
+{
+  "_comment": "Disposition of every hasProviderDefault schema annotation. Checked by TestProviderDefaultDispositionsManifest: each annotation needs a row, stale rows fail, and disposition \"keep\" needs a pin (\"documentation\" or \"fixture:<path>\"). \"pending\" means the audit has not reached the field yet.",
+  "dispositions": [
+    {
+      "key": "alloydb/alloydbBackup.pkl#Backup.location",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbBackup.pkl#Backup.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbCluster.pkl#Cluster.databaseVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbInstance.pkl#Instance.availabilityType",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbInstance.pkl#Instance.ipAddress",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbInstance.pkl#Instance.location",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbInstance.pkl#Instance.machineConfig",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbInstance.pkl#MachineConfig.machineType",
+      "disposition": "pending"
+    },
+    {
+      "key": "alloydb/alloydbUser.pkl#User.location",
+      "disposition": "pending"
+    },
+    {
+      "key": "artifactregistry/repository.pkl#Repository.mode",
+      "disposition": "pending"
+    },
+    {
+      "key": "bigquery/routine.pkl#Routine.createdTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "bigquery/routine.pkl#Routine.determinismLevel",
+      "disposition": "pending"
+    },
+    {
+      "key": "bigquery/routine.pkl#Routine.lastModified",
+      "disposition": "pending"
+    },
+    {
+      "key": "bigquery/routine.pkl#Routine.project",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudrun/job.pkl#TaskTemplate.executionEnvironment",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudrun/job.pkl#TaskTemplate.serviceAccount",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudrun/worker_pool.pkl#WorkerPool.scaling",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudrun/worker_pool.pkl#WorkerPoolScaling.manualInstanceCount",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudscheduler/schedulerJob.pkl#HttpTarget.headers",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudscheduler/schedulerJob.pkl#Job.attemptDeadline",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudtasks/queue.pkl#RateLimits.maxBurstSize",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudtasks/queue.pkl#RetryConfig.maxBackoff",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudtasks/queue.pkl#RetryConfig.maxDoublings",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudtasks/queue.pkl#RetryConfig.minBackoff",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/autoscaler.pkl#AutoscalingPolicy.coolDownPeriodSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/autoscaler.pkl#AutoscalingPolicy.cpuUtilization",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/autoscaler.pkl#AutoscalingPolicy.minNumReplicas",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/autoscaler.pkl#AutoscalingPolicy.mode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/autoscaler.pkl#CpuUtilization.predictiveMethod",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendBucket.pkl#BackendBucket.compressionMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendBucket.pkl#BackendBucket.enableCdn",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.affinityCookieTtlSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.connectionDraining",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.enableCDN",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.port",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.portName",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/backendService.pkl#BackendService.sessionAffinity",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/disk.pkl#Disk.architecture",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/disk.pkl#Disk.enableConfidentialCompute",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/disk.pkl#Disk.guestOsFeatures",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/disk.pkl#Disk.licenses",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/disk.pkl#Disk.physicalBlockSizeBytes",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/diskResourcePolicyAttachment.pkl#DiskResourcePolicyAttachment.zone",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/externalVpnGateway.pkl#ExternalVpnGateway.redundancyType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/firewall.pkl#Firewall.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/firewall.pkl#Firewall.logConfig",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalAddress.pkl#GlobalAddress.address",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalAddress.pkl#GlobalAddress.networkTier",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalAddress.pkl#GlobalAddress.status",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalForwardingRule.pkl#GlobalForwardingRule.IPAddress",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalForwardingRule.pkl#GlobalForwardingRule.labelFingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalForwardingRule.pkl#GlobalForwardingRule.networkTier",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalForwardingRule.pkl#GlobalForwardingRule.pscConnectionId",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/globalForwardingRule.pkl#GlobalForwardingRule.pscConnectionStatus",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/haVpnGateway.pkl#HaVpnGateway.gatewayIpVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/haVpnGateway.pkl#HaVpnGateway.stackType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/haVpnGateway.pkl#HaVpnGateway.vpnInterfaces",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/haVpnGateway.pkl#VpnInterface.id",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/haVpnGateway.pkl#VpnInterface.interconnectAttachment",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/haVpnGateway.pkl#VpnInterface.ipAddress",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.checkIntervalSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.healthyThreshold",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.host",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.port",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.requestPath",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.timeoutSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpHealthCheck.pkl#HttpHealthCheck.unhealthyThreshold",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.checkIntervalSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.healthyThreshold",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.host",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.port",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.requestPath",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.timeoutSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/httpsHealthCheck.pkl#HttpsHealthCheck.unhealthyThreshold",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/image.pkl#Image.diskSizeGb",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/image.pkl#Image.guestOsFeatures",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/image.pkl#Image.storageLocations",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#AttachedDisk.deviceName",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#Instance.deletionProtection",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#Instance.metadata",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#Instance.scheduling",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#Metadata.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#NetworkInterface.accessConfigs",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#NetworkInterface.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instance.pkl#NetworkInterface.networkIP",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceGroupManager.pkl#InstanceGroupManager.instanceGroup",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceGroupManager.pkl#InstanceGroupManager.targetSize",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#InstanceProperties.canIpForward",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#InstanceProperties.scheduling",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAccessConfig.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAccessConfig.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAccessConfig.networkTier",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAccessConfig.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAttachedDisk.deviceName",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAttachedDisk.index",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAttachedDisk.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAttachedDisk.mode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateAttachedDisk.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateDiskInitializeParams.diskSizeGb",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateDiskInitializeParams.diskType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateNetworkInterface.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateNetworkInterface.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateNetworkInterface.stackType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateScheduling.automaticRestart",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateScheduling.onHostMaintenance",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateScheduling.preemptible",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instanceTemplate.pkl#TemplateScheduling.provisioningModel",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/instantSnapshot.pkl#InstantSnapshot.diskSizeGb",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/machineImage.pkl#MachineImage.guestFlush",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/machineImage.pkl#MachineImage.storageLocations",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/network.pkl#Network.mtu",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/network.pkl#Network.networkFirewallPolicyEnforcementOrder",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/network.pkl#Network.routingConfig",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkAttachment.pkl#NetworkAttachment.connectionPreference",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkAttachment.pkl#NetworkAttachment.network",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkFirewallPolicyRule.pkl#NetworkFirewallPolicyRule.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkFirewallPolicyRule.pkl#NetworkFirewallPolicyRule.enableLogging",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkFirewallPolicyRule.pkl#NetworkFirewallPolicyRule.targetType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.autoCreateRoutes",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.exchangeSubnetRoutes",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.exportCustomRoutes",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.exportSubnetRoutesWithPublicIp",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.importCustomRoutes",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.importSubnetRoutesWithPublicIp",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.stackType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.stateDetails",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/networkPeering.pkl#NetworkPeering.updateStrategy",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/nodeTemplate.pkl#NodeTemplate.cpuOvercommitType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionAutoscaler.pkl#AutoscalingPolicy.coolDownPeriodSec",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionAutoscaler.pkl#AutoscalingPolicy.cpuUtilization",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionAutoscaler.pkl#AutoscalingPolicy.minNumReplicas",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionAutoscaler.pkl#AutoscalingPolicy.mode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionAutoscaler.pkl#CpuUtilization.predictiveMethod",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionBackendService.pkl#RegionBackendService.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionCompositeHealthCheck.pkl#RegionCompositeHealthCheck.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionDiskResourcePolicyAttachment.pkl#RegionDiskResourcePolicyAttachment.region",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionHealthAggregationPolicy.pkl#RegionHealthAggregationPolicy.minHealthyThreshold",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionHealthAggregationPolicy.pkl#RegionHealthAggregationPolicy.policyType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionHealthSource.pkl#RegionHealthSource.sourceType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceGroupManager.pkl#DistributionPolicy.targetShape",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceGroupManager.pkl#DistributionPolicy.zones",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceGroupManager.pkl#DistributionPolicyZone.zone",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceGroupManager.pkl#RegionInstanceGroupManager.distributionPolicy",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceGroupManager.pkl#RegionInstanceGroupManager.instanceGroup",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceGroupManager.pkl#RegionInstanceGroupManager.targetSize",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#InstanceProperties.canIpForward",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#InstanceProperties.scheduling",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAccessConfig.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAccessConfig.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAccessConfig.networkTier",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAccessConfig.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAttachedDisk.deviceName",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAttachedDisk.index",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAttachedDisk.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAttachedDisk.mode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateAttachedDisk.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateDiskInitializeParams.diskSizeGb",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateDiskInitializeParams.diskType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateNetworkInterface.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateNetworkInterface.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateNetworkInterface.stackType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateScheduling.automaticRestart",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateScheduling.onHostMaintenance",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateScheduling.preemptible",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstanceTemplate.pkl#TemplateScheduling.provisioningModel",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionInstantSnapshot.pkl#RegionInstantSnapshot.diskSizeGb",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionSecurityPolicy.pkl#RegionSecurityPolicy.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionSecurityPolicy.pkl#Rule.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionSecurityPolicy.pkl#Rule.preview",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionSecurityPolicyRule.pkl#RegionSecurityPolicyRule.preview",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionSslPolicy.pkl#RegionSslPolicy.minTlsVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionSslPolicy.pkl#RegionSslPolicy.profile",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionTargetHttpProxy.pkl#RegionTargetHttpProxy.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionUrlMap.pkl#RegionUrlMap.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/resourcePolicy.pkl#DailyCycle.duration",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/resourcePolicy.pkl#HourlyCycle.duration",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/resourcePolicy.pkl#SnapshotProperties.guestFlush",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/resourcePolicy.pkl#SnapshotRetentionPolicy.onSourceDiskDelete",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/router.pkl#Router.encryptedInterconnectRouter",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerInterface.pkl#RouterInterface.ipRange",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerInterface.pkl#RouterInterface.ipVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerNamedSet.pkl#RouterNamedSet.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerNat.pkl#RouterNat.autoNetworkTier",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerNat.pkl#RouterNat.enableEndpointIndependentMapping",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerNat.pkl#RouterNat.endpointTypes",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerNat.pkl#RouterNat.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/routerRoutePolicy.pkl#RouterRoutePolicy.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/securityPolicy.pkl#Rule.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/securityPolicy.pkl#Rule.preview",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/securityPolicyRule.pkl#SecurityPolicyRule.preview",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/serviceAttachment.pkl#ServiceAttachment.connectionPreference",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/serviceAttachment.pkl#ServiceAttachment.enableProxyProtocol",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/serviceAttachment.pkl#ServiceAttachment.reconcileConnections",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/snapshot.pkl#Snapshot.diskSizeGb",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/snapshot.pkl#Snapshot.snapshotType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/snapshot.pkl#Snapshot.storageLocations",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/sslCertificate.pkl#SslCertificate.type",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/sslPolicy.pkl#SslPolicy.minTlsVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/sslPolicy.pkl#SslPolicy.profile",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/subnetwork.pkl#Subnetwork.allowSubnetCidrRoutesOverlap",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/subnetwork.pkl#Subnetwork.gatewayAddress",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/subnetwork.pkl#Subnetwork.privateIpv6GoogleAccess",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/subnetwork.pkl#Subnetwork.purpose",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/subnetwork.pkl#Subnetwork.stackType",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetGrpcProxy.pkl#TargetGrpcProxy.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetGrpcProxy.pkl#TargetGrpcProxy.validateForProxyless",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetHttpProxy.pkl#TargetHttpProxy.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetInstance.pkl#TargetInstance.natPolicy",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetTcpProxy.pkl#TargetTcpProxy.proxyBind",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetVpnGateway.pkl#TargetVpnGateway.labelFingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/targetVpnGateway.pkl#TargetVpnGateway.status",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/urlMap.pkl#UrlMap.fingerprint",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/vpnTunnel.pkl#VpnTunnel.description",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/vpnTunnel.pkl#VpnTunnel.ikeVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/autoscalingPolicy.pkl#AutoscalingPolicy.secondaryWorkerConfig",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/autoscalingPolicy.pkl#BasicAutoscalingAlgorithm.cooldownPeriod",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/autoscalingPolicy.pkl#InstanceGroupAutoscalingPolicyConfig.maxInstances",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/autoscalingPolicy.pkl#InstanceGroupAutoscalingPolicyConfig.minInstances",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/autoscalingPolicy.pkl#InstanceGroupAutoscalingPolicyConfig.weight",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/sessionTemplate.pkl#SessionTemplate.creator",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataproc/workflowTemplate.pkl#WorkflowTemplate.version",
+      "disposition": "pending"
+    },
+    {
+      "key": "datastream/connectionProfile.pkl#MysqlProfile.port",
+      "disposition": "pending"
+    },
+    {
+      "key": "datastream/connectionProfile.pkl#OracleProfile.port",
+      "disposition": "pending"
+    },
+    {
+      "key": "datastream/connectionProfile.pkl#PostgresqlProfile.port",
+      "disposition": "pending"
+    },
+    {
+      "key": "essentialcontacts/contact.pkl#Contact.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/messageBus.pkl#MessageBus.loggingConfig",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/messageBus.pkl#MessageBus.uid",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/pipeline.pkl#Pipeline.retryPolicy",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/pipeline.pkl#Pipeline.uid",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/trigger.pkl#Pubsub.topic",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/trigger.pkl#Transport.pubsub",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/trigger.pkl#Trigger.channel",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/trigger.pkl#Trigger.serviceAccount",
+      "disposition": "pending"
+    },
+    {
+      "key": "eventarc/trigger.pkl#Trigger.transport",
+      "disposition": "pending"
+    },
+    {
+      "key": "filestore/filestoreInstance.pkl#Instance.protocol",
+      "disposition": "pending"
+    },
+    {
+      "key": "filestore/filestoreInstance.pkl#NetworkConfig.connectMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "filestore/filestoreInstance.pkl#NetworkConfig.ipAddresses",
+      "disposition": "pending"
+    },
+    {
+      "key": "filestore/filestoreInstance.pkl#NetworkConfig.reservedIpRange",
+      "disposition": "pending"
+    },
+    {
+      "key": "gkebackup/backupPlan.pkl#BackupConfig.includeSecrets",
+      "disposition": "pending"
+    },
+    {
+      "key": "gkebackup/backupPlan.pkl#BackupConfig.includeVolumeData",
+      "disposition": "pending"
+    },
+    {
+      "key": "gkebackup/backupPlan.pkl#BackupPlan.deactivated",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/logScope.pkl#LogScope.location",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/logView.pkl#LogView.location",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/projectExclusion.pkl#ProjectExclusion.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/projectSink.pkl#Exclusion.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/projectSink.pkl#ProjectSink.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/projectSink.pkl#ProjectSink.writerIdentity",
+      "disposition": "pending"
+    },
+    {
+      "key": "logging/savedQuery.pkl#SavedQuery.location",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/alertPolicy.pkl#AlertPolicy.enabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/alertPolicy.pkl#AlertPolicy.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/alertPolicy.pkl#Condition.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/customService.pkl#CustomService.custom",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/dashboard.pkl#DataSet.plotType",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/dashboard.pkl#DataSet.targetAxis",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/dashboard.pkl#TextWidget.format",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/dashboard.pkl#TextWidget.style",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/group.pkl#Group.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/metricDescriptor.pkl#LabelDescriptor.valueType",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/notificationChannel.pkl#NotificationChannel.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/uptimeCheckConfig.pkl#MonitoredResource.labels",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/uptimeCheckConfig.pkl#UptimeCheckConfig.checkerType",
+      "disposition": "pending"
+    },
+    {
+      "key": "monitoring/uptimeCheckConfig.pkl#UptimeCheckConfig.name",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/hub.pkl#Hub.exportPsc",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/hub.pkl#Hub.policyMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/hub.pkl#Hub.presetTopology",
+      "disposition": "pending"
+    },
+    {
+      "key": "pubsub/subscription.pkl#Subscription.messageRetentionDuration",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/redisInstance.pkl#Instance.authorizedNetwork",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/redisInstance.pkl#Instance.connectMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/redisInstance.pkl#Instance.redisVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/redisInstance.pkl#Instance.reservedIpRange",
+      "disposition": "pending"
+    },
+    {
+      "key": "secretmanager/secret.pkl#Secret.replication",
+      "disposition": "pending"
+    },
+    {
+      "key": "servicenetworking/connection.pkl#Connection.reservedPeeringRanges",
+      "disposition": "pending"
+    },
+    {
+      "key": "servicenetworking/connection.pkl#Connection.service",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupConfiguration.backupRetentionSettings",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupConfiguration.backupTier",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupConfiguration.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupConfiguration.startTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupConfiguration.transactionLogRetentionDays",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupConfiguration.transactionalLogStorageState",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupRetentionSettings.retainedBackups",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#BackupRetentionSettings.retentionUnit",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#IpConfiguration.authorizedNetworks",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#IpConfiguration.requireSsl",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#IpConfiguration.serverCaMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#IpConfiguration.serverCertificateRotationMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#IpConfiguration.sslMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.activationPolicy",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.authorizedGaeApplications",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.connectorEnforcement",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.deletionProtectionEnabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.edition",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.enableDataplexIntegration",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.locationPreference",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.pricingPlan",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.replicationLagMaxSeconds",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.replicationType",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.settingsVersion",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/database.pkl#Settings.storageAutoResizeLimit",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/sqlDatabase.pkl#Database.charset",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/sqlDatabase.pkl#Database.collation",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/sqlDatabase.pkl#Database.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/sqlDatabase.pkl#Database.kind",
+      "disposition": "pending"
+    },
+    {
+      "key": "sql/sqlDatabase.pkl#Database.selfLink",
+      "disposition": "pending"
+    },
+    {
+      "key": "storage/bucket.pkl#Bucket.id",
+      "disposition": "pending"
+    },
+    {
+      "key": "storage/bucket.pkl#Bucket.projectNumber",
+      "disposition": "pending"
+    },
+    {
+      "key": "storage/bucket.pkl#Bucket.timeCreated",
+      "disposition": "pending"
+    },
+    {
+      "key": "storage/bucket.pkl#Bucket.updated",
+      "disposition": "pending"
+    },
+    {
+      "key": "vpcaccess/connector.pkl#Connector.machineType",
+      "disposition": "pending"
+    },
+    {
+      "key": "vpcaccess/connector.pkl#Connector.maxInstances",
+      "disposition": "pending"
+    },
+    {
+      "key": "vpcaccess/connector.pkl#Connector.maxThroughput",
+      "disposition": "pending"
+    },
+    {
+      "key": "vpcaccess/connector.pkl#Connector.minInstances",
+      "disposition": "pending"
+    },
+    {
+      "key": "vpcaccess/connector.pkl#Connector.minThroughput",
+      "disposition": "pending"
+    },
+    {
+      "key": "workflows/workflow.pkl#Workflow.revisionId",
+      "disposition": "pending"
+    },
+    {
+      "key": "workflows/workflow.pkl#Workflow.serviceAccount",
+      "disposition": "pending"
+    },
+    {
+      "key": "workflows/workflow.pkl#Workflow.state",
+      "disposition": "pending"
+    }
+  ]
+}
