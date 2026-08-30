@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Spanner Database
+///
+/// A database inside a Spanner instance. The instance carries the cost; a
+/// database adds only the storage its data uses.
+///
+/// Spanner creates a database by executing a `CREATE DATABASE` statement rather
+/// than by taking a name field, so the plugin builds that statement from the
+/// name a forma declares.
+module gcp.spanner.spannerDatabase
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Spanner::Database"
+
+open class DatabaseResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DatabaseResolvable = (this) {
+        property = "name"
+    }
+
+    /// A reference to the database's instance, so a resource that needs both -
+    /// a backup names its instance and its database - can take them from one
+    /// reference and be ordered after the database.
+    hidden instance: DatabaseResolvable = (this) {
+        property = "instance"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::Spanner::Instance"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty { parentProperty = "name" listParameter = "instance"
+        }
+    }.toList()
+}
+open class Database extends formae.Resource {
+    hidden parent = this
+
+    /// Short database id, unique within the instance. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The instance holding the database. A short instance name or an Instance
+    /// reference.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// The project holding the database.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    /// Which SQL dialect the database speaks. Immutable.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    databaseDialect: ("GOOGLE_STANDARD_SQL"|"POSTGRESQL")?
+
+    /// CREATING, READY or READY_OPTIMIZING - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// Whether a delete is refused until the protection is lifted.
+    @gcp.FieldHint
+    enableDropProtection: Boolean?
+
+    hidden res: DatabaseResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
