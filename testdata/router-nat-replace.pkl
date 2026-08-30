@@ -1,0 +1,64 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/router.pkl"
+import "@gcp/compute/routerNat.pkl"
+import "./config/vars.pkl" as v
+
+// Network + subnet + router + a Cloud NAT on that router. The same prerequisite
+// chain the router-interface case builds, which is the cheapest way to get a
+// router; nothing here boots a VM.
+//
+// AUTO_ONLY lets GCP allocate the NAT addresses rather than reserving external
+// IPs of our own, and ALL_SUBNETWORKS_ALL_IP_RANGES avoids naming subnets the
+// NAT would then depend on. A NAT gateway with no instances behind it does no
+// translation.
+local net = new network.Network {
+  label = "plugin-sdk-test-nat-network"
+  name = "formae-plugin-sdk-test-nat-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+
+local sub = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-nat-subnet"
+  name = "formae-plugin-sdk-test-nat-sub-\(v.testRunID)"
+  region = v.gcpRegion
+  ipCidrRange = "10.46.0.0/24"
+  network = net.res.selfLink
+}
+
+local rt = new router.Router {
+  label = "plugin-sdk-test-nat-router"
+  name = "formae-plugin-sdk-test-nat-rt-\(v.testRunID)"
+  region = v.gcpRegion
+  network = net.res.selfLink
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  sub
+  rt
+
+  new routerNat.RouterNat {
+    label = "plugin-sdk-test-router-nat"
+    // The name is immutable, so changing it forces a replace rather than
+    // an update. The prerequisites above are untouched: only the resource
+    // under test is replaced.
+    name = "formae-plugin-sdk-test-nat-r2-\(v.testRunID)"
+    // Resolvable -> the router exists before the NAT is configured on it.
+    router = rt.res.name
+    region = v.gcpRegion
+    natIpAllocateOption = "AUTO_ONLY"
+    sourceSubnetworkIpRangesToNat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+  }
+}
