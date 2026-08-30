@@ -91,6 +91,13 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
+  memcache-instance)
+    # A memcached instance takes 20-30 minutes to create, and the lifecycle
+    # builds two of them - the initial one and the OOB-delete re-apply - so the
+    # 5m default expires long before the first is READY.
+    TIMEOUT_ARG="TIMEOUT=40"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=40 FORMAE_TEST_OOB_TIMEOUT=40 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   monitoring-metric-descriptor)
     # The OOB-delete step waits for sync to tombstone a descriptor deleted out
     # of band, and the 2m default is far too short: sync only notices an absence
