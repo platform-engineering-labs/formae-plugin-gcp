@@ -92,10 +92,17 @@ case "$TEST_CASE" in
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
   monitoring-metric-descriptor)
-    # Cloud Monitoring reflects a deleted descriptor in metricDescriptors.list
-    # slowly, and the OOB-delete step waits for sync to tombstone it - which it
-    # cannot do while the descriptor is still being listed. The 2m default
-    # expires first, so the case failed on a deletion that had already happened.
+    # The OOB-delete step waits for sync to tombstone a descriptor deleted out
+    # of band, and the 2m default is far too short: sync only notices an absence
+    # once discovery has swept every registered type, and there are over a
+    # hundred of them.
+    #
+    # This raises the ceiling but does not make the case reliable. A run at 15m
+    # still timed out while the descriptor was already gone from the API -
+    # verified by listing it afterwards - so whether the case passes depends on
+    # where this type falls in the sweep, which is a property of formae's
+    # discovery cycle rather than of the plugin. The case passes in some runs
+    # and not others for that reason.
     export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;
   apigateway-api|apigateway-api-config|apigateway-gateway)
