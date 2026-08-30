@@ -26,6 +26,27 @@ formae agent.
   IAM service account. Each changes an immutable name, which is what makes the
   operation a replace rather than an update.
 
+- `GCP::BigQuery::Connection` - a named handle BigQuery uses to reach something
+  outside itself. A `cloudResource` connection carries no configuration of its
+  own: BigQuery mints a service account for it, and granting that account access
+  is how a query reaches the resource. Holding one costs nothing.
+
+  It lives behind a separate API - a different host and a location-based path -
+  so it has its own package rather than joining BigQuery's, whose config points
+  at bigquery.googleapis.com.
+
+  The service account is reported as `cloudResourceServiceAccountId` rather than
+  nested inside `cloudResource`, because a schema hint is only emitted for a
+  top-level field: a nested one cannot be marked as server-filled and reads as a
+  property the forma never declared. Hiding it would have been the smaller
+  change and the wrong one - granting that account access is the point of the
+  type.
+
+  The connection's native ID carries the project as a forma names it. The API
+  answers with the project number, and the native ID is where a later read gets
+  its path context, so a number left there comes back as the project on every
+  sync however the response is transformed.
+
 - `GCP::DNS::Policy`, `GCP::DNS::ResponsePolicy` and
   `GCP::DNS::ResponsePolicyRule` - a policy decides how DNS behaves for the
   networks it is attached to; a response policy overrides what DNS answers for
