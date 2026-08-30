@@ -184,9 +184,16 @@ needs_prereq_cleanup() {
     network-firewall-policy-association|region-network-firewall-policy-association|\
     network-firewall-policy-rule|machine-image)
       return 0 ;;
-    *)
-      return 1 ;;
   esac
+  # A case that builds a network needs the same treatment for a different
+  # reason: the network survives Destroy, and 30 fixtures build one against a
+  # project cap of 30, so a full matrix runs the cap down on itself. Whether a
+  # case builds one is a property of its fixture, so ask the fixture.
+  if [ -f "testdata/${TEST_CASE}.pkl" ] &&
+     grep -q "new network\.Network" "testdata/${TEST_CASE}.pkl"; then
+    return 0
+  fi
+  return 1
 }
 
 # shellcheck disable=SC2086 # TIMEOUT_ARG is a deliberate word-split make arg.
