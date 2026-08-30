@@ -95,7 +95,10 @@ func requestTransformer(props map[string]interface{}, ctx base.TransformContext)
 		switch k {
 		case "project", "location", "hasCredential", "cloudResourceServiceAccountId":
 			continue
-		case "name":
+		case "name", "cloudResource":
+			// The update mask is built from the body. The id is immutable, and
+			// cloudResource selects the kind of connection at create - naming
+			// either in a mask asks the API to change something it will not.
 			if ctx.Operation == resource.OperationUpdate {
 				continue
 			}

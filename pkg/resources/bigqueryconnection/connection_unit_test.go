@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // The API reports the project *number* in the path it returns, while a forma
@@ -76,5 +77,45 @@ func TestNativeIDKeepsTheConfiguredProject(t *testing.T) {
 	)
 	if got != "projects/989754770009/locations/eu/connections/c1" {
 		t.Errorf("native ID = %q", got)
+	}
+}
+
+// The update mask is built from the body, and both the id and the connection
+// kind are fixed at create: naming either asks the API to change something it
+// will not.
+func TestUpdateBodyDropsImmutableFields(t *testing.T) {
+	body, err := requestTransformer(map[string]interface{}{
+		"name":          "c1",
+		"cloudResource": map[string]interface{}{},
+		"friendlyName":  "renamed",
+		"description":   "still here",
+	}, base.TransformContext{Operation: resource.OperationUpdate})
+	if err != nil {
+		t.Fatalf("transform failed: %v", err)
+	}
+	for _, dropped := range []string{"name", "cloudResource"} {
+		if _, ok := body[dropped]; ok {
+			t.Errorf("%s must not be in an update body", dropped)
+		}
+	}
+	if body["friendlyName"] != "renamed" || body["description"] != "still here" {
+		t.Errorf("mutable fields were dropped: %v", body)
+	}
+}
+
+// A create still needs both.
+func TestCreateBodyKeepsNameAndKind(t *testing.T) {
+	body, err := requestTransformer(map[string]interface{}{
+		"name":          "c1",
+		"cloudResource": map[string]interface{}{},
+	}, base.TransformContext{Operation: resource.OperationCreate})
+	if err != nil {
+		t.Fatalf("transform failed: %v", err)
+	}
+	if body["name"] != "c1" {
+		t.Error("name must survive a create for the id parameter")
+	}
+	if _, ok := body["cloudResource"]; !ok {
+		t.Error("cloudResource selects the connection kind and must survive a create")
 	}
 }
