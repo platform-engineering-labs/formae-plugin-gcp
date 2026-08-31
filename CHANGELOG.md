@@ -12,6 +12,33 @@ formae agent.
 
 ### Added
 
+- `GCP::Storage::ManagedFolder` — an IAM boundary inside a bucket, letting a
+  policy be attached to a prefix without granting it over the whole bucket.
+  Requires uniform bucket-level access.
+- `GCP::Storage::Folder` — a real directory node, available only in a bucket
+  created with a hierarchical namespace. Renaming one moves everything beneath
+  it, where a managed folder only governs who may read a prefix.
+- `GCP::Storage::Bucket` models `iamConfiguration.uniformBucketLevelAccess` and
+  `hierarchicalNamespace`. Neither folder type can exist without them, and
+  hierarchical namespace is fixed at creation — a bucket is created flat or
+  hierarchical and cannot convert.
+
+### Fixed
+
+- `GCP::Storage::Bucket`'s resolvable names properties the resource actually
+  has. It pointed at `"Id"`, `"SelfLink"` and `"Name"` — capitalised, matching
+  nothing — so `bkt.res.name` resolved to no value and **any resource
+  referencing a bucket reached the plugin with the reference unresolved**. It
+  went unnoticed because nothing in the repository referenced a bucket until the
+  folder types did. `selfLink` is removed: the bucket has no such property.
+- Storage names containing a slash survive a native-ID round trip. Both folder
+  types are named with a **trailing slash that is part of the identity**
+  ("reports/" is not "reports"), and the parser took a single path segment, so
+  the slash was dropped and the rebuilt URL addressed a folder that does not
+  exist. The name is now taken whole and escaped when addressed — a no-op for
+  every pre-existing storage name, none of which contains a slash.
+
+### Fixed
 - `GCP::DNS::ResourceRecordSet` — what a managed zone actually serves: one name,
   one record type, and the data behind it. This completes Cloud DNS.
 

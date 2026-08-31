@@ -1,0 +1,62 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Storage Managed Folder
+///
+/// An IAM boundary inside a bucket: it lets a policy be attached to a prefix
+/// without granting it over the whole bucket. The objects themselves are
+/// unaffected — a managed folder is about who may read them, not where they
+/// live.
+///
+/// Requires uniform bucket-level access on the bucket; GCS refuses to create
+/// one where per-object ACLs still apply.
+module gcp.storage.folder
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::Folder"
+
+open class FolderResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: FolderResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Folder extends formae.Resource {
+    hidden parent = this
+
+    /// The folder's name, which **must end with a slash** — "reports/" is a
+    /// managed folder, "reports" is not. The trailing slash is part of the
+    /// identity, not decoration, and is escaped when the resource is addressed.
+    /// Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String(endsWith("/"))
+
+    /// Name of the owning bucket. A path component, not a body field — pass
+    /// `bkt.res.name` so formae creates the bucket first.
+    @gcp.FieldHint { createOnly = true }
+    bucket: (String|formae.Resolvable)
+
+    /// When GCS created the folder.
+    @gcp.FieldHint { hasProviderDefault = true }
+    createTime: String?
+
+    /// When GCS last updated it.
+    @gcp.FieldHint { hasProviderDefault = true }
+    updateTime: String?
+
+    hidden res: FolderResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
