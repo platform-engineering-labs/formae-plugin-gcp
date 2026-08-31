@@ -6,19 +6,18 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/spanner/spannerInstance.pkl" as spannerInstance
-import "@gcp/spanner/spannerDatabase.pkl" as spannerDatabase
+import "@gcp/spanner/instance_spanner.pkl" as instance
+import "@gcp/spanner/database_spanner.pkl" as database
 import "./config/vars.pkl" as v
 
-// A database lives inside an instance, and the instance is what costs money -
-// 100 processing units is the smallest the API accepts. The database itself
-// adds only the storage its data uses, and it holds none.
-local inst = new spannerInstance.Instance {
-  label = "plugin-sdk-test-spdb-instance"
-  project = v.gcpProject
-  name = "formae-plugin-sdk-test-spdbi-\(v.testRunID)"
+// The replace companion of spanner-database. The instance is unchanged - it is
+// the prerequisite, not the resource under test - while the database id moves.
+// A database id is immutable and capped at 30 characters.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-spanner-db-instance"
+  name = "formae-test-spdb-inst-\(v.testRunID)"
   config = "regional-\(v.gcpRegion)"
-  displayName = "Plugin SDK conformance db"
+  displayName = "Formae db host"
   processingUnits = 100
 }
 
@@ -28,20 +27,9 @@ forma {
 
   inst
 
-  new spannerDatabase.Database {
+  new database.Database {
     label = "plugin-sdk-test-spanner-database"
-    project = v.gcpProject
-    // Resolvable -> the instance exists before a database is created in it.
+    name = "formae-sp-db2-\(v.testRunID)"
     instance = inst.res.name
-    // Spanner creates a database by executing CREATE DATABASE, and the plugin
-    // builds that statement from this name.
-    //
-    // Short on purpose: a database name is capped at 30 characters, and the
-    // usual formae-plugin-sdk-test- prefix plus a run id is 36. It does not
-    // need to match the sweep either - deleting an instance takes its
-    // databases with it, and the instance above carries the prefix.
-    // The id is immutable, so changing it forces a replace rather than an
-    // update. The instance above is a prerequisite and stays put.
-    name = "fmtest-db2-\(v.testRunID)"
   }
 }
