@@ -14,6 +14,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigqueryconnection"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigtable"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/certificateauthority"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/certificatemanager"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/cloudrun"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/cloudscheduler"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/cloudtasks"

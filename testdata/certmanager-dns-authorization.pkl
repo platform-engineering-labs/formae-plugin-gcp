@@ -1,0 +1,25 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificatemanager/dnsAuthorization.pkl" as dnsAuthorization
+import "./config/vars.pkl" as v
+
+// Creating the authorization is immediate and free - it just hands back a CNAME
+// to publish. Only issuing a certificate against it waits on DNS, and this case
+// does not issue one, so example.com never has to resolve.
+forma {
+  v.stack
+  v.target
+
+  new dnsAuthorization.DnsAuthorization {
+    label = "plugin-sdk-test-certmanager-dns-auth"
+    name = "formae-test-dnsauth-\(v.testRunID)"
+    domain = "formae-\(v.testRunID).example.com"
+    description = "Test DNS authorization for plugin SDK conformance tests"
+  }
+}

@@ -16,6 +16,7 @@ const (
 	ProjectSinkResourceType      = "GCP::Logging::ProjectSink"
 	ProjectExclusionResourceType = "GCP::Logging::ProjectExclusion"
 	LogViewResourceType          = "GCP::Logging::LogView"
+	LogBucketResourceType        = "GCP::Logging::LogBucket"
 	SavedQueryResourceType       = "GCP::Logging::SavedQuery"
 	LogScopeResourceType         = "GCP::Logging::LogScope"
 )
@@ -98,6 +99,32 @@ func init() {
 		},
 		// LogView - a filtered window onto a log bucket, used to grant access to
 		// a subset of a bucket's entries.
+		{
+			// A log bucket is where log entries are actually retained; a view is
+			// a window onto one, and a sink routes entries into one. The
+			// project's _Default and _Required buckets are created by GCP, so
+			// discovery reports two per project it did not create.
+			ResourceType:    LogBucketResourceType,
+			APIConfig:       LoggingViewAPI,
+			OperationConfig: LoggingViewOperations,
+			NativeIDConfig:  LoggingBucketNativeID,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:       "buckets",
+				CreateIDParam:      "bucketId",
+				SupportsUpdate:     true,
+				UpdateMethod:       base.UpdateMethodPatch,
+				UpdateMaskFromBody: true,
+			},
+			// "location" is a path component, not a body field, and would
+			// otherwise land in the updateMask.
+			RequestTransformer: &base.CompositeRequestTransformer{
+				Transformers: []base.RequestTransformer{
+					base.DropFields("location"),
+					base.DropFieldsOnUpdate("name"),
+				},
+			},
+			ResponseTransformer: base.ResponseTransformerFunc(logBucketResponseTransformer),
+		},
 		{
 			ResourceType:    LogViewResourceType,
 			APIConfig:       LoggingViewAPI,
@@ -197,6 +224,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	registerLogBucketOverrides()
 
 	// Log views need a List that walks the buckets; see log_view_list.go.
 	registerLogViewListOverride()
