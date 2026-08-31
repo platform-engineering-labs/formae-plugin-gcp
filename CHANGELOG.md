@@ -113,14 +113,20 @@ formae agent.
   operation with nothing but the declared properties to route with; it now
   carries the grandparent in `PathContext.CustomSegments[0]`.
 
-### Fixed
+### Removed
 
-- A `GCP::Compute::DiskAsyncReplication` no longer plans a replacement of itself.
-  Its two disk references are createOnly, and an extracted forma writes a
-  reference to another resource unresolved, so comparing it against the URL
-  already in state read as a change to an immutable field. Which disks a pair
-  joins is fixed at creation and is what its native ID is made of, so the two
-  fields are now write-only - excluded from drift detection, unchanged on create.
+- `GCP::Compute::DiskAsyncReplication` is withdrawn. It never shipped in a stable
+  release, only in 0.1.13-dev.1 and -dev.2. Its two properties are the disks the
+  pair joins: both immutable, and both declared as references to the disk
+  resources, which is how a forma names them. An extracted forma writes such a
+  reference unresolved, so the re-apply compares a reference against the URL in
+  state on an immutable path and plans a replacement of the pair already in
+  place. Suppressing that comparison fixes the lifecycle and makes the pair
+  undiscoverable, because the agent requires both fields on a resource it
+  persists; reporting them keeps discovery and brings the replacement back. No
+  plugin-side shape satisfies both, so the type is out until the agent can
+  resolve a reference at plan time. The work, the four conformance runs behind
+  that conclusion, and the two agent-side asks are in the draft PR.
 
 ### Fixed
 
