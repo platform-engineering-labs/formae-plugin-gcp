@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/dnsPolicy.pkl" as dnsPolicy
+import "./config/vars.pkl" as v
+
+// A policy attached to no network is valid and applies to nothing, which keeps
+// this case free of prerequisites. Inbound forwarding and logging are the two
+// settings a policy exists to change.
+forma {
+  v.stack
+  v.target
+
+  new dnsPolicy.Policy {
+    label = "plugin-sdk-test-dns-policy"
+    name = "formae-test-dns-policy-\(v.testRunID)"
+    description = "Updated DNS policy description"
+    enableInboundForwarding = false
+    enableLogging = true
+  }
+}

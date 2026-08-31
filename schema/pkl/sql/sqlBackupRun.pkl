@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud SQL Backup Run
+///
+/// One on-demand backup of a Cloud SQL instance. Automated backups are a
+/// setting on the instance; this is the way to take and keep a specific one,
+/// for example before a migration.
+///
+/// A backup run is addressed by the numeric id sqladmin assigns it, not by any
+/// name a forma chooses, and there is no update method — a backup is a point in
+/// time rather than something you edit. Unlike Spanner's and Bigtable's
+/// backups, it takes no absolute expiry, so a fixture for it cannot rot.
+module gcp.sql.sqlBackupRun
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::SQL::BackupRun"
+
+open class BackupRunResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: BackupRunResolvable = (this) {
+        property = "id"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "id"
+}
+open class BackupRun extends formae.Resource {
+    hidden parent = this
+
+    /// Server-generated id, and what get and delete address the backup by.
+    /// Rendered as a string: Google sends int64 as a string, so nothing here
+    /// parses a number.
+    @gcp.FieldHint { hasProviderDefault = true }
+    id: String?
+
+    /// Short id of the instance being backed up. A path component, not a body
+    /// field — pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// Free-text description. Only meaningful for on-demand backups.
+    @gcp.FieldHint { createOnly = true }
+    description: String?
+
+    /// Where the backup is stored. GCP defaults to the instance's region.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    location: String?
+
+    /// "ON_DEMAND" for a backup a forma asks for; "AUTOMATED" for one the
+    /// instance's own schedule took.
+    @gcp.FieldHint { hasProviderDefault = true }
+    type: String?
+
+    /// Lifecycle status GCP reports, e.g. "SUCCESSFUL".
+    @gcp.FieldHint { hasProviderDefault = true }
+    status: String?
+
+    /// Whether the backup is a physical copy or a snapshot.
+    @gcp.FieldHint { hasProviderDefault = true }
+    backupKind: String?
+
+    hidden res: BackupRunResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

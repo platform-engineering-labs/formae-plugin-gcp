@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/responsePolicy.pkl" as responsePolicy
+import "@gcp/dns/responsePolicyRule.pkl" as responsePolicyRule
+import "./config/vars.pkl" as v
+
+// The policy the rule lives under. Referenced through its resolvable so formae
+// creates it first. Both are free.
+local policy = new responsePolicy.ResponsePolicy {
+  label = "plugin-sdk-test-dns-rule-policy"
+  name = "formae-test-dns-rule-rp-\(v.testRunID)"
+  description = "Response policy owning the rule under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  policy
+
+  // The rule answers one name with a fixed address - the private-DNS
+  // equivalent of a hosts-file entry.
+  new responsePolicyRule.ResponsePolicyRule {
+    label = "plugin-sdk-test-dns-response-policy-rule"
+    name = "formae-test-dns-rule-\(v.testRunID)"
+    responsePolicy = policy.res.name
+    dnsName = "formae-\(v.testRunID).internal.example.com."
+    localData = new responsePolicyRule.LocalData {
+      localDatas = new Listing {
+        new responsePolicyRule.LocalDataRecordSet {
+          name = "formae-\(v.testRunID).internal.example.com."
+          type = "A"
+          ttl = 300
+          rrdatas = new Listing { "10.0.0.2" }
+        }
+      }
+    }
+  }
+}

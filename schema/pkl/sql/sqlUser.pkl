@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud SQL User
+///
+/// A database user on a Cloud SQL instance. An instance ships with no usable
+/// login of its own, so this is what makes one reachable by an application.
+///
+/// Cloud SQL addresses users inconsistently: `get` takes the name as a path
+/// segment, while `delete` takes it as a query parameter against the
+/// collection. The plugin handles both forms.
+///
+/// ponytail: update is off. Every field modelled here is fixed at creation, so
+/// a change replaces. `users.update` also addresses the user by query
+/// parameter and would need its own verification pass.
+///
+/// ponytail: `host` is not modelled. It only applies to MySQL, it is part of a
+/// user's identity rather than a property of it, and a `DeleteRequest` carries
+/// no properties for the plugin to read it back from — so supporting it means
+/// encoding it in the native ID. Users created without one get MySQL's default.
+module gcp.sql.sqlUser
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::SQL::User"
+
+/// BUILT_IN is a password user; the CLOUD_IAM_* variants authenticate as a
+/// Google identity and take no password.
+typealias SqlUserType = "BUILT_IN"|"CLOUD_IAM_USER"|"CLOUD_IAM_SERVICE_ACCOUNT"|"CLOUD_IAM_GROUP"
+
+open class UserResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: UserResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class User extends formae.Resource {
+    hidden parent = this
+
+    /// The user name. Immutable — a rename is a different user.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning instance. A path component, not a body field —
+    /// pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// Password for a BUILT_IN user. Input-only: the API never returns it, so
+    /// it cannot reach stored state. Wrap it (`formae.value(...).opaque`) to
+    /// keep it out of plans.
+    ///
+    /// ponytail: createOnly, as AlloyDB's user does. Rotating it means a
+    /// replace until `users.update` has its own verification pass — and with
+    /// every modelled field immutable there is nothing else an update could
+    /// carry.
+    @gcp.FieldHint { createOnly = true; writeOnly = true }
+    password: (String|formae.Value)?
+
+    /// How the user authenticates. GCP defaults to BUILT_IN.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    type: SqlUserType?
+
+    hidden res: UserResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

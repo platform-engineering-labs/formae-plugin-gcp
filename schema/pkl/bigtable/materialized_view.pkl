@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-// © 2025 Platform Engineering Labs Inc.
-//
-// SPDX-License-Identifier: FSL-1.1-ALv2
-
-/// GCP Bigtable MaterializedView
+/// GCP Bigtable Materialized View
 ///
-/// A materialized view of a Bigtable table.
+/// A continuously-updated view over Bigtable data, defined by a SQL query. A
+/// table serves what was written to it; a materialized view serves a
+/// precomputed answer instead.
+///
+/// Views live under their instance (`.../instances/{instance}/materializedViews/{name}`).
 module gcp.bigtable.materialized_view
 
 import "../gcp.pkl"
@@ -18,25 +18,14 @@ import "@formae/formae.pkl"
 
 const type = "GCP::Bigtable::MaterializedView"
 
-@gcp.SubResourceHint
-open class DeletionProtection extends formae.SubResource {
-  @gcp.FieldHint
-  enabled: Boolean
-}
-
 open class MaterializedViewResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden name: MaterializedViewResolvable = (this) {
         property = "name"
     }
-
-    hidden sourceTable: MaterializedViewResolvable = (this) {
-        property = "sourceTable"
-    }
 }
 
-/// GCP Bigtable MaterializedView resource
 @gcp.ResourceHint {
     type = module.type
     identifier = "name"
@@ -44,32 +33,22 @@ open class MaterializedViewResolvable extends formae.Resolvable {
 open class MaterializedView extends formae.Resource {
     hidden parent = this
 
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    project: String
-
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    instance: String
-
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    cluster: String
-
-    @gcp.FieldHint {
-        createOnly = true
-    }
+    /// Short view id. Immutable.
+    @gcp.FieldHint { createOnly = true }
     name: String
 
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    sourceTable: String
+    /// Short id of the owning instance. A path component, not a body field —
+    /// pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
 
-    @gcp.FieldHint
+    /// The SQL query defining the view. Immutable — the API has no way to
+    /// redefine a view in place.
+    @gcp.FieldHint { createOnly = true }
+    query: String
+
+    /// Refuses deletion while set. Patchable.
+    @gcp.FieldHint { hasProviderDefault = true }
     deletionProtection: Boolean?
 
     hidden res: MaterializedViewResolvable = new {

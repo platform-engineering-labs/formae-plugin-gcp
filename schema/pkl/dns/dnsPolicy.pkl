@@ -1,0 +1,96 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS Policy
+///
+/// Governs how DNS resolves for the VPC networks attached to it: whether an
+/// on-premises resolver may query into the network (inbound forwarding), which
+/// name servers to use instead of Google's, and whether queries are logged. A
+/// network with no policy just uses the defaults, so this is how those are
+/// changed.
+module gcp.dns.dnsPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::Policy"
+
+/// One alternative name server to send queries to.
+@gcp.SubResourceHint
+open class NameServer extends formae.SubResource {
+    /// IPv4 address of the target name server.
+    @gcp.FieldHint
+    ipv4Address: String?
+
+    /// IPv6 address of the target name server.
+    @gcp.FieldHint
+    ipv6Address: String?
+
+    /// Whether the server is reachable over the VPC or the public internet.
+    /// GCP fills this in when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    forwardingPath: String?
+}
+
+@gcp.SubResourceHint
+open class AlternativeNameServerConfig extends formae.SubResource {
+    @gcp.FieldHint
+    targetNameServers: Listing<NameServer>?
+}
+
+/// A VPC network the policy applies to.
+@gcp.SubResourceHint
+open class PolicyNetwork extends formae.SubResource {
+    /// Full self-link of the network, e.g.
+    /// "https://www.googleapis.com/compute/v1/projects/{p}/global/networks/{n}".
+    @gcp.FieldHint
+    networkUrl: String
+}
+
+open class PolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Policy extends formae.Resource {
+    hidden parent = this
+
+    /// User-assigned policy name. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Lets an on-premises resolver query into the attached networks.
+    @gcp.FieldHint
+    enableInboundForwarding: Boolean?
+
+    /// Logs every query made from the attached networks.
+    @gcp.FieldHint
+    enableLogging: Boolean?
+
+    /// Name servers to use in place of Google's default resolver.
+    @gcp.FieldHint
+    alternativeNameServerConfig: AlternativeNameServerConfig?
+
+    /// Networks the policy applies to. A policy with none is valid and applies
+    /// to nothing.
+    @gcp.FieldHint
+    networks: Listing<PolicyNetwork>?
+
+    hidden res: PolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

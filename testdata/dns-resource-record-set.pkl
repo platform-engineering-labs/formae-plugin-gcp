@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dns/managedZone.pkl"
+import "@gcp/dns/resourceRecordSet.pkl" as resourceRecordSet
+import "./config/vars.pkl" as v
+
+// The zone that serves the record. Referenced through its resolvable so formae
+// creates it first. A public zone for a domain nobody owns costs nothing and
+// answers only to whoever queries it directly.
+local zone = new managedZone.ManagedZone {
+  label = "plugin-sdk-test-rrset-zone"
+  name = "formae-test-rrset-zone-\(v.testRunID)"
+  dnsName = "formae-rrset-\(v.testRunID).example.com."
+  description = "Zone serving the record set under test"
+  visibility = "public"
+}
+
+forma {
+  v.stack
+  v.target
+
+  zone
+
+  // Name and type together identify the record set; both are fixed at creation.
+  new resourceRecordSet.ResourceRecordSet {
+    label = "plugin-sdk-test-dns-resource-record-set"
+    name = "www.formae-rrset-\(v.testRunID).example.com."
+    managedZone = zone.res.name
+    type = "A"
+    ttl = 300
+    rrdatas = new Listing { "10.0.0.1" }
+  }
+}

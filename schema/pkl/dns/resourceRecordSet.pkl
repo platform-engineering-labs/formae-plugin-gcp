@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud DNS Resource Record Set
+///
+/// What a managed zone actually serves: one name, one record type, and the data
+/// behind it. A zone with no record sets of its own answers nothing beyond the
+/// SOA and NS records GCP creates with it.
+///
+/// A record set is addressed by name *and* type
+/// (`.../rrsets/{name}/{type}`), the only resource in this plugin identified by
+/// two path segments. Both are fixed at creation: changing either is a
+/// different record set, not an edit.
+///
+/// Note that every zone is born with an SOA and an NS record set nobody
+/// declared, so discovery will report two per zone as unmanaged.
+module gcp.dns.resourceRecordSet
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::DNS::ResourceRecordSet"
+
+open class ResourceRecordSetResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ResourceRecordSetResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ResourceRecordSet extends formae.Resource {
+    hidden parent = this
+
+    /// Fully qualified domain name, with the trailing dot
+    /// (e.g. "www.example.com."). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the managed zone that serves this record. A path component,
+    /// not a body field — pass `zone.res.name` so formae creates the zone
+    /// first.
+    @gcp.FieldHint { createOnly = true }
+    managedZone: (String|formae.Resolvable)
+
+    /// Record type, e.g. "A", "AAAA", "CNAME", "TXT", "MX". Immutable — it is
+    /// half of the record set's identity.
+    @gcp.FieldHint { createOnly = true }
+    type: String
+
+    /// Time to live, in seconds.
+    @gcp.FieldHint
+    ttl: Int?
+
+    /// The record data, e.g. ["10.0.0.1"] for an A record. Quoting rules are
+    /// the record type's own: a TXT value carries its own quotes.
+    @gcp.FieldHint
+    rrdatas: Listing<String>?
+
+    hidden res: ResourceRecordSetResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
