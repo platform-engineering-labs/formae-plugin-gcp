@@ -1,0 +1,75 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/table.pkl" as table
+import "@gcp/bigtable/materialized_view.pkl" as materializedView
+import "./config/vars.pkl" as v
+
+// A materialized view is defined by a GoogleSQL query over the instance's data,
+// so the instance and the table the query reads both come first. DEVELOPMENT is
+// the cheap single-node instance type the other Bigtable cases use.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-mv-instance"
+  project = v.gcpProject
+  name = "formae-test-instance-mv-\(v.testRunID)"
+  // Bigtable caps displayName at 30 characters.
+  displayName = "Plugin SDK MV instance"
+  type = "DEVELOPMENT"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+    }
+  }
+}
+
+// The query has to name the table as plain text: interpolating a resolvable
+// into a string emits its serialized form, and the API answered
+// "Table not found: <base64 of the resolvable>". The name is declared once and
+// used in both places instead.
+local tblName = "formae_test_mv_table_\(v.testRunID)"
+
+local tbl = new table.Table {
+  label = "plugin-sdk-test-mv-table"
+  project = v.gcpProject
+  instance = inst.res.name
+  name = tblName
+  columnFamilies = new Mapping {
+    ["cf1"] = new table.ColumnFamily {
+      name = "cf1"
+      gcRule = new table.GCRule {
+        maxNumVersions = 1
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+  tbl
+
+  new materializedView.MaterializedView {
+    label = "plugin-sdk-test-bigtable-materialized-view"
+    project = v.gcpProject
+    // The instance is read off the table, not the instance: it carries the same
+    // value and it is the one reference the view can make to the table, which
+    // must exist first. The query names the table as text, and text creates no
+    // ordering edge - a resolvable interpolated into a string is emitted as its
+    // encoded envelope rather than resolved, because an interpolated reference
+    // creates no edge and so the value is not known yet.
+    instance = tbl.res.instance
+    name = "formae_test_mv_\(v.testRunID)"
+    // Bigtable refuses a view whose query is a plain projection: "queries must
+    // contain a GROUP BY or ORDER BY clause".
+    query = "SELECT _key, COUNT(*) AS entries FROM `\(tblName)` GROUP BY _key"
+  }
+}

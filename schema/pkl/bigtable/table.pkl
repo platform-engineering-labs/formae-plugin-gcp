@@ -51,6 +51,14 @@ open class TableResolvable extends formae.Resolvable {
     hidden name: TableResolvable = (this) {
         property = "name"
     }
+
+    /// A reference to the table's instance. A materialized view is defined by a
+    /// query that names a table, which the query text cannot express as a
+    /// reference, so the view refers to the table's instance instead: it
+    /// carries the value the view needs and orders the view after the table.
+    hidden instance: TableResolvable = (this) {
+        property = "instance"
+    }
 }
 
 /// GCP Bigtable Table resource
@@ -90,7 +98,8 @@ open class Table extends formae.Resource {
     @gcp.FieldHint
     columnFamilies: Mapping<String, ColumnFamily>?
 
-    @gcp.FieldHint
+    /// GCP fills this in with MILLIS when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
     granularity: String?
 
     @gcp.FieldHint

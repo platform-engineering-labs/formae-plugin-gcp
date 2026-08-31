@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "./config/vars.pkl" as v
+
+forma {
+  v.stack
+  v.target
+
+  new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-healthcheck"
+    // A health check name is immutable, so changing it forces a replace.
+    name = "formae-plugin-sdk-test-hc2-\(v.testRunID)"
+    description = "Test health check for plugin SDK conformance tests"
+    type = "TCP"
+    checkIntervalSec = 10
+    timeoutSec = 5
+    healthyThreshold = 2
+    unhealthyThreshold = 3
+    tcpHealthCheck = new healthCheck.TcpHealthCheck {
+      port = 80
+      proxyHeader = "NONE"
+    }
+  }
+}

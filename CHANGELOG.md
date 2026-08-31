@@ -12,6 +12,574 @@ formae agent.
 
 ### Added
 
+- The Replace phase is exercised for the first time. Every conformance case in
+  this plugin reported replace as skipped, because a case only tests it when a
+  `-replace.pkl` accompanies it and none existed - so a run reporting "8/8" was
+  really seven steps and a skip, and nothing had ever checked that replacing a
+  resource works. The three Service Directory cases now carry one: each changes
+  the immutable id, which is what forces a replace, and the harness verifies the
+  native ID actually changed rather than the resource being updated in place.
+  Cases that predate this work carry one too, so the phase is covered for types
+  this batch did not add: a bucket, a Pub/Sub topic, a secret, an address, a
+  health check, a network, a firewall rule, three logging types, a monitoring
+  service and dashboard, an SLO, an instance template, a backend bucket and an
+  IAM service account. Each changes an immutable name, which is what makes the
+  operation a replace rather than an update.
+
+- `GCP::Memcache::Instance` - Memorystore for Memcached: a managed memcached
+  cluster on a VPC network. It is billed by node-hour for as long as it exists
+  and takes twenty minutes or more to create, so its conformance case is the
+  slowest here at 27 minutes and the fixture asks for the smallest thing the API
+  accepts, one node of 1 GiB.
+
+  An instance reaches its nodes over private service access and the API refuses
+  one outright without it, so the case builds a VPC, the range reserved for the
+  service producer to peer into, the peering itself, and only then the instance.
+  The instance names the peering rather than the network: it needs private
+  service access to exist, not merely the VPC.
+
+  The authorized network is accepted in any of the three forms a forma can name
+  one - short, path, or self link - and normalised to the single form the API
+  takes. A reference to another resource's network property resolves to a self
+  link, which memcache rejects outright.
+
+- `GCP::Spanner::Instance` and `GCP::Spanner::Database` - Spanner is the one
+  service here whose resources are billed for as long as they exist: the
+  smallest regional instance is 100 processing units, a tenth of a node. A forma
+  declaring one is spending money until it is destroyed, and the module doc says
+  so.
+
+  Two shapes the generic engine does not cover. An instance's id travels as
+  `instanceId` alongside an `instance` object rather than as a name in the body
+  or a query parameter, so the create body is assembled. And Spanner creates a
+  database by executing a `CREATE DATABASE` statement rather than taking a name,
+  so the plugin builds that statement from the name a forma declares.
+
+  A database name is capped at 30 characters, which the usual test prefix plus a
+  run id exceeds, so the fixture names it short - it does not need the prefix,
+  because deleting an instance takes its databases with it.
+
+- `GCP::BigQuery::Connection` - a named handle BigQuery uses to reach something
+  outside itself. A `cloudResource` connection carries no configuration of its
+  own: BigQuery mints a service account for it, and granting that account access
+  is how a query reaches the resource. Holding one costs nothing.
+
+  It lives behind a separate API - a different host and a location-based path -
+  so it has its own package rather than joining BigQuery's, whose config points
+  at bigquery.googleapis.com.
+
+  The service account is reported as `cloudResourceServiceAccountId` rather than
+  nested inside `cloudResource`, because a schema hint is only emitted for a
+  top-level field: a nested one cannot be marked as server-filled and reads as a
+  property the forma never declared. Hiding it would have been the smaller
+  change and the wrong one - granting that account access is the point of the
+  type.
+
+  The connection's native ID carries the project as a forma names it. The API
+  answers with the project number, and the native ID is where a later read gets
+  its path context, so a number left there comes back as the project on every
+  sync however the response is transformed.
+
+- `GCP::DNS::Policy`, `GCP::DNS::ResponsePolicy` and
+  `GCP::DNS::ResponsePolicyRule` - a policy decides how DNS behaves for the
+  networks it is attached to; a response policy overrides what DNS answers for
+  them, one rule at a time. None costs anything to hold: Cloud DNS bills zones
+  and queries, and Cloud DNS had shipped with a single type until now.
+
+  Three shapes the generic engine did not expect. A response policy's id field
+  is `responsePolicyName` and a rule's is `ruleName`, not `name` - a listed item
+  carries no path context to fall back on, so without handling them every
+  response policy and rule would have listed with an empty native ID and never
+  been discovered. Cloud DNS also stamps a `kind` discriminator on nested
+  objects, not just the resource itself, and each survivor reads as a property
+  the forma never declared.
+
+  A rule hangs off its response policy, so the DNS path builder and native ID
+  handle a parent now; both previously assumed a flat
+  `/projects/{p}/{collection}/{name}`.
+
+  Deleting a policy detaches its networks first. Cloud DNS refuses to delete one
+  while a network is still attached, and nothing in the forma is holding it - the
+  network is a prerequisite that outlives the policy - so the deletion looks
+  unblocked and simply fails.
+
+- `GCP::ApiGateway::Api`, `GCP::ApiGateway::ApiConfig` and
+  `GCP::ApiGateway::Gateway` - API Gateway serves an api from a regional
+  gateway: an api holds immutable configs, and a gateway names the config it
+  serves rather than the api, because a change to a config produces a new one.
+  Holding an api or a config costs nothing; API Gateway bills the calls a
+  gateway serves.
+
+  Apis and configs are always global while gateways are regional, so the path
+  builder supplies the location for the first two rather than requiring one to
+  be named. Every write is a long-running operation, and a fresh operation does
+  not carry the resource - its metadata names the target it is building, which
+  is where the native ID comes from. A config only exists underneath an api and
+  there is no wildcard in the api position, so a parentless list walks the apis.
+
+  A gateway names the region it runs in. API Gateway serves eleven regions and a
+  target's is often not among them - creating a gateway in one it does not serve
+  answers "Location ... is not found or access is unauthorized" - so the region
+  cannot be taken from the target. It is not scoped either: every scope
+  available overwrites the location, one by clearing it and one by substituting
+  the target's, and a read that lost it addressed a wildcard path rather than
+  the gateway. A parentless list spans every region with the location wildcard,
+  which the API accepts, rather than looking only where the target happens to
+  be.
+
+  A config also reports its own full resource path. A gateway names the config
+  it serves that way, while `name` holds the short id a forma declares, and a
+  reference interpolated into a string is emitted as its envelope rather than
+  resolved - so without it the reference could not be expressed at all.
+
+- `GCP::ServiceDirectory::Namespace`, `GCP::ServiceDirectory::Service` and
+  `GCP::ServiceDirectory::Endpoint` - Service Directory publishes where a
+  service lives without running a registry: a namespace holds services and a
+  service holds endpoints. Holding them costs nothing, only lookups are billed,
+  so the whole hierarchy is testable without provisioning anything.
+
+  All three are config-driven. The id travels as a create-time query parameter,
+  updates are a PATCH with a mask built from the body, and every operation is
+  synchronous. An endpoint is addressed by a namespace and a service at once and
+  uses the two-property parent for it. Nothing can be listed across its parents -
+  `locations/-` answers "Unsupported location: -", and `namespaces/-` and
+  `services/-` both answer "Could not parse namespace name" - so a service walks
+  the namespaces and an endpoint walks the services inside them.
+
+### Fixed
+
+- `GCP::SQL::Database` is discoverable. A database only exists underneath an
+  instance and Cloud SQL cannot be asked across instances -
+  `/projects/{p}/databases` answers 404 and `/projects/{p}/instances/-/databases`
+  answers 400, so there is no wildcard to substitute - while discovery lists
+  with no parent to name. A parentless list now walks the project's instances,
+  skipping any it cannot read but reporting an error rather than an empty list
+  if every one fails.
+
+- `GCP::Storage::ObjectAccessControl` is registered, and `knownParityGaps` is
+  empty. It hangs off a bucket *and* an object, and nothing could carry two
+  parent properties - which is why its registration had been commented out.
+  `ParentResourceConfig.SecondPropertyName` now joins them as
+  `{bucket}/{object}`, the form the Storage path builder and native ID already
+  expected. Every type the schema declares now has a provisioner behind it.
+  Discovery needs more than that: it lists with neither parent to name, so an
+  object ACL is found by walking the buckets and then their objects. Listing a
+  bucket's objects with `projection=full` carries every object's `acl` inline,
+  which keeps that to one request per bucket rather than one per object.
+
+- `GCP::Bigtable::MaterializedView` matches its API and has a provisioner. The
+  schema declared `sourceTable` and `cluster`; the API has neither. A
+  materialized view belongs to an instance and is defined by a GoogleSQL
+  `query`, alongside `deletionProtection`, `clusterStates` and `etag`. Nothing
+  had noticed because the type had no provisioner either, so a forma declaring
+  one failed at apply before any field could be rejected. Both are fixed, and
+  `knownParityGaps` is down to one. Like a backup, it has to be bound to
+  Bigtable's own provisioner: the generic one sends no id query parameter, and
+  the API answered `Invalid id for collection materializedViews : Length should
+  be between [1,128], but found 0`. The parameter is snake_case while the
+  collection is camelCase, so trimming the plural alone produced
+  `materializedView_id`, which the API ignored before rejecting the create for
+  the empty id it had never been given. It is listed by walking the instances,
+  for the same reason a backup is.
+
+- `GCP::Bigtable::Backup` works. Its schema shipped with no provisioner behind
+  it, so declaring a backup failed at apply - one of three types in
+  `knownParityGaps` that were declarable and unusable. Much of what it needed
+  was already there: the three-level path builder, the native ID handling and
+  the cluster extraction in Create all handled backups. Registering the type was
+  not enough, though - it also has to be bound to Bigtable's own provisioner,
+  and being left out of that list sent it to the generic one instead, which
+  knows nothing of the cluster a backup lives under and so addressed
+  `/instances/{i}/backups`, a route that does not exist. It is now bound, with
+  the transformers that expand `sourceTable` to the full path on the way out and
+  recover the instance and cluster from the path on the way back, and with a
+  list that walks the project's instances and uses the `clusters/-` wildcard
+  within each - discovery lists with no parent to name, and no route spans
+  instances. Two known parity gaps remain.
+
+- `GCP::Eventarc::Trigger` can be created at all. Eventarc requires the short id
+  in `?triggerId=` and the full resource path in the body's `name` - which its
+  own schema marks Required - at the same time. `base.Create` reads the id out
+  of `name` and deletes it, so the body reached the API without one and every
+  create failed with "The request was invalid: trigger.name is empty". Trigger
+  now has a Create that supplies both.
+
+- `GCP::BigQuery::Routine` is discoverable. Its `List` refused to run without a
+  `datasetId` in AdditionalProperties, and discovery lists with no properties at
+  all - it cannot know a routine's parent, because the provisioner is
+  hand-written and declares no `ParentResource`. A parentless list now walks
+  every dataset in the project; a caller that names one still gets just that one.
+  `GCP::BigQuery::Table` has the same shape and is left as it is for now, with a
+  comment saying so: it has no conformance case, and an unverified fix is easily
+  mistaken for a verified one.
+
+- `GCP::Monitoring::MetricDescriptor` is discoverable. `metricDescriptors.list`
+  returns every descriptor a project can see - well over a thousand built-in
+  ones for GCP's own services - so a custom metric was somewhere in that pile
+  and not necessarily on the first page: discovery listed, never saw the
+  descriptor it had just created, and timed out. The list is now filtered to the
+  prefix a project can own. That is not only an optimisation: a built-in
+  descriptor cannot be created, changed or deleted, so it is not a resource
+  formae can manage and does not belong in discovery.
+
+  It is one prefix and not two because Cloud Monitoring rejects the obvious
+  form: `metric.type = starts_with(...) OR metric.type = starts_with(...)`
+  answers HTTP 400, "Within the 'metric' prefix, OR can only be used to connect
+  a list of 'labels'". A rejected filter fails the whole list, and an empty list
+  reads downstream as "the resource is gone" - sync tombstoned a descriptor that
+  was really there. `external.googleapis.com/user/` descriptors are not listed
+  as a result; they are written by the Cloud Monitoring agent, not by a forma.
+
+- Conformance setup retries back off instead of going again immediately. The
+  harness fetches the formae binary and starts an agent before it touches any
+  cloud infrastructure, and a single instant retry only survives a blip shorter
+  than the retry itself: in a 151-case matrix the package channel went away for
+  long enough that both attempts hit it seconds apart, and two unrelated cases
+  failed having run no test at all. Three attempts now, 10s then 30s apart. A
+  failure that is not setup still fails on the first attempt.
+
+- Leaked SSL certificates can be swept. A project holds at most 10 globally, so
+  once the cap is reached any case creating one fails with
+  "Quota 'SSL_CERTIFICATES' exceeded" rather than anything resembling a plugin
+  bug. The sweep knew about `ssl-policies` but never about the certificates.
+
+  It is opt-in, behind `FORMAE_SWEEP_SSL_CERTIFICATES=1`. Certificates are the
+  one resource here whose removal is not obviously safe to decide
+  automatically: unlike a namespace or an api, one can have been installed
+  deliberately, and a global cap means a wrong deletion is felt project-wide.
+
+- A `GCP::Storage::Object` reports its properties when created. Create returned
+  a native ID and nothing else, so a freshly created object had no stored state
+  and anything referencing one resolved against nothing and stayed an unresolved
+  reference. That is how an object ACL reached the plugin with its object still
+  a reference and addressed the bucket alone.
+
+- An object name is percent-encoded in bucket-scoped paths.
+  `conformance/acl-target.txt` is one object, not a folder and a file. The
+  object provisioner escaped it in its own URLs but the shared path builder did
+  not, so an object ACL addressed a path that does not exist and the API
+  answered 404. The native ID keeps the name raw, and the parser now reads the
+  object as everything between the object marker and the trailing type and name
+  rather than as a single segment.
+
+- A resource addressed by two parents is refused rather than silently collapsed.
+  When the second parent was missing, the path context kept only the first and
+  both the request URL and the native ID became the one-parent form - which the
+  API accepts as a perfectly valid *different* resource. An object ACL created
+  without its object became a bucket ACL: create reported one native ID,
+  discovery reported another, and nothing downstream could tell them apart. A
+  wrong resource created successfully is worse than a failed create.
+
+- A `GCP::Eventarc::Trigger` can reference the `Workflow` it delivers to.
+  `destination.workflow` was a plain `String`, so a forma could name a workflow
+  but not reference it - and ordering comes only from resolvable references, so
+  formae was free to create the trigger before the workflow it targets. It now
+  accepts a resolvable, and the request expands the bare name into the full path
+  Eventarc wants while the response shortens it back.
+
+- A resource identified by anything other than `name` can be discovered. The
+  generic list path required every listed item to carry a `name` before it would
+  consult the API's own native-ID extractor, so a Cloud Storage ACL entry -
+  identified by `entity`, with no name at all - produced nothing, and the list
+  came back empty with no error. The extractor is now asked first, and the
+  name-shaped path is the fallback.
+
+- Fourteen Storage fields the schema itself documents as "(output only)" are
+  marked as provider defaults, across the three ACL types and `AnywhereCache`:
+  `projectTeam`, `entityId`, `generation`, `domain` and `email`. A
+  `DefaultObjectAccessControl` reported drift on `projectTeam` the moment it was
+  created, because the comment said output-only and the hint did not.
+
+- Bigtable creates hand their properties back. `BaseResource.Status` does not
+  read the resource once an asynchronous operation completes, and an async
+  create returns no properties either - so nothing that referenced a Bigtable
+  resource could resolve. A table declaring `instance.res.name` failed with
+  "instance is required for nested resources" on an instance that was plainly
+  declared, because the create it referenced handed back nothing to resolve
+  from. Status now routes through `base.StatusWithRead`.
+
+- Resolvables that pointed at a property name the schema does not have. A
+  `GCP::Storage::Bucket` resolvable's `name` targeted `"Name"`, so every forma
+  referencing `bucket.res.name` failed to apply with `source resource ... has no
+  property "Name"` - which is what a bucket ACL case hit. GCP's JSON is
+  camelCase, and 17 resolvable targets across `Bucket`, `AnywhereCache`, the
+  three ACL types, `Container::Cluster` and `Container::NodePool` were
+  capitalised. Corrected wherever the lowercase field is declared in the same
+  file, which makes each one provable rather than guessed.
+
+  `Bucket`'s `selfLink` resolvable is removed outright: the type has no
+  `selfLink` property at all, so it could never resolve.
+
+- `GCP::Bigtable` creates unwrap wrapped property values. The hand-written
+  provisioner read properties directly while `base.Create` unwraps them first,
+  so a wrapped value read as a plain string came back empty - surfacing as
+  "instance is required for nested resources" on a table whose instance was
+  declared.
+
+- `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
+  are discoverable. An ACL entry lives at `/b/{bucket}/acl`, and Cloud Storage
+  has no endpoint spanning buckets - no `-` wildcard in the bucket position, as
+  privateca and Datastream offer - so discovery, which lists with no parent,
+  asked for a URL with an empty bucket segment and found nothing. Both types now
+  walk the project's buckets, skipping any whose ACLs cannot be read: a bucket
+  with uniform bucket-level access rejects the read outright, and a shared
+  project holds buckets a target does not own.
+
+- Creating a `GCP::Datastream::ConnectionProfile` no longer half-succeeds. The
+  API validates a profile against the source it describes, and does so inside
+  the long-running operation - after the profile has been created. A profile
+  naming a host that does not answer was therefore created *and* reported as
+  failed; formae retried, and the retry collided with the profile the first
+  attempt had made ("Resource ... already exists"), so the validation error
+  never surfaced at all. Creates now send `force=true`, as stream creates
+  already did.
+
+- `GCP::Bigtable::Table` no longer reports drift the moment it is created. The
+  API reports a table's `name` as the full path
+  `projects/{p}/instances/{i}/tables/{t}` while a forma declares the short id
+  and the instance separately, and Table was registered with the generic
+  response transformer, which only fills in the project. Instance and Cluster
+  each had one of their own; Table now does too, and recovers the instance from
+  the path as well - it lives nowhere else in the response.
+
+- `GCP::Compute::Address.networkTier` and `purpose`, and
+  `GCP::Bigtable::Table.granularity`, are marked as provider defaults. GCP fills
+  all three in when unset.
+
+- `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
+  can be created at all. Their `role` field carried no `@gcp.FieldHint`, so the
+  plugin never treated it as a resource property and never sent it - and the API
+  rejects an ACL without one: "Access control must contain a role". Both types
+  had shipped in this state, with no conformance case to reveal it.
+  `ObjectAccessControl` has the same omission and is fixed alongside, though it
+  still has no provisioner.
+
+- Server-populated fields across nine services are marked as provider defaults,
+  so a forma that does not declare them no longer reports drift the moment the
+  resource is created. Twenty-four fields in all: every `proxyHeader` (GCP fills
+  it in with NONE), the `fingerprint` and `labelFingerprint` hashes, and the
+  `state`, `status`, `selfLink`, `kind`, `uid`, `createTime` and `updateTime`
+  fields on Container, Storage, CloudRun, BigQuery and Compute types.
+
+  Two lookalikes are deliberately left alone: `WorkflowTemplate.id` is the
+  identifier a forma chooses, and `ExternalVpnGatewayInterface.id` is a
+  caller-supplied 0-based index that `VpnTunnel` references.
+
+- Six server-populated Compute fields are marked as provider defaults, so a
+  forma that does not declare them no longer reports drift the moment the
+  resource is created: `Address.labelFingerprint`, `effectiveLabels`,
+  `terraformLabels`, `users` and `selfLink`; `TargetHttpsProxy.fingerprint` and
+  `RegionTargetHttpsProxy.fingerprint`; `TargetSslProxy.proxyHeader`; and
+  `ForwardingRule.labelFingerprint`. Each was reported as "not expected and not
+  a provider default" the first time a conformance case exercised the type.
+
+- A successful long-running operation is no longer reported as a failure. The
+  status checker treated the mere presence of an `error` key as a failure, but a
+  finished operation may carry `"error": {}` - present and empty, which is an
+  absent status, not an error. Every affected create was reported failed after
+  it had already succeeded; formae then retried it, and the retry answered
+  "Resource ... already exists", which masked the original operation entirely.
+  An error now counts only when it carries a message or a non-zero
+  `google.rpc.Code`.
+
+  Affected Datastream, Eventarc, Certificate Authority Service and Filestore -
+  every package with an asynchronous create. All four had an identical copy of
+  the checker; they now share one in `base`.
+
+- `GCP::Datastream::Route` is discoverable. A route only exists underneath a
+  private connection, and discovery lists with no parent to name, so the plugin
+  asked for `/projects/{p}/locations/{l}/routes` - a 404 - and no route was ever
+  found. Datastream accepts `-` in the private-connection position, so a
+  parentless list now asks across every one. No parent-walking List needed,
+  unlike Analytics Hub, which has no such wildcard.
+
+- Bigtable's nested types can now reference their parent. `Table.instance`,
+  `Cluster.instance`, `Backup.instance`/`cluster`/`sourceTable` and the same
+  three on `MaterializedView` were plain `String`, so a forma could name a
+  parent but not reference it. Ordering in a forma comes only from resolvable
+  references, so declaring an instance and a table together gave formae no edge
+  between them and nothing guaranteed the instance existed first. All eight
+  fields now accept `(String|formae.Resolvable)`.
+
+- Four Compute types no longer claim to support updates their API cannot
+  perform: `TargetPool`, `TargetSslProxy`, `TargetTcpProxy` and
+  `RegionTargetTcpProxy`. None of `targetPools`, `targetSslProxies`,
+  `targetTcpProxies` or `regionTargetTcpProxies` has a `patch` or an `update`
+  method - they offer only setters such as `setBackendService` and
+  `setSslCertificates` - so an update planned a PATCH to a URL the API does not
+  serve. A change now replaces.
+
+  Found by writing the first conformance case for `TargetPool`, then checking
+  every Compute definition against the discovery document: 62 scanned, 4 wrong.
+  Three of the four had no conformance case at all, and the fourth
+  (`TargetTcpProxy`) had one with no update fixture.
+
+### Added
+
+- `GCP::Storage::Object` - a single object in a bucket with its content declared
+  inline, for the small files infrastructure is made of: a config document, a
+  startup script, a static index page. The content is part of the forma, so it
+  is part of the plan and the state; wrap it with `formae.value(...).opaque` to
+  keep it out of both.
+
+  Uploading needed two additions to the transport, which until now sent only
+  JSON: `RawBody`/`ContentType` for sending bytes verbatim, and `SendRaw` for
+  reading them back - an object's bytes are a declared property, so without
+  reading them a changed object would never read as changed.
+
+- A conformance case for `GCP::Bigtable::MaterializedView`.
+
+- A conformance case for `GCP::Bigtable::Backup`, and `FORMAE_TEST_FUTURE_TIMESTAMP`
+  in the environment conformance cases run with. A backup's `expireTime` must be
+  an absolute timestamp between 6 hours and 90 days out, and Pkl has no clock, so
+  a fixture cannot compute one.
+
+- A conformance case for `GCP::Bigtable::Cluster`, the first to use the
+  on-demand list. A cluster is an additional replica of an instance and the
+  instance must be PRODUCTION - a DEVELOPMENT instance cannot have a second
+  cluster - so the forma holds two billed nodes while it runs. It is excluded
+  from the automatic matrix and run by naming it in debug-conformance.
+
+- `testdata/on-demand-cases.txt`, a list of conformance cases excluded from the
+  automatic CI and nightly matrix. Every other case runs on every push to main
+  and every night; a case named here runs only when dispatched explicitly
+  through debug-conformance. It exists so a resource that cannot be covered for
+  free can still be covered at all, rather than being left with no conformance
+  case because covering it would add spend to every run.
+
+- A conformance case for `GCP::SQL::Database`, which shipped without one. It
+  builds a `db-f1-micro` instance to hold the database, mirroring the
+  cloudsql-instance case's private-IP settings.
+
+- A conformance case for `GCP::Eventarc::Trigger`, the last Eventarc type
+  without one. It delivers to a `Workflow`, which is free to define and needs no
+  container image or network attachment.
+
+- A conformance case for `GCP::BigQuery::Routine`. It is the first case to
+  exercise any BigQuery type: `Dataset` and `Table` also shipped without one,
+  and this case builds a dataset to hold the routine.
+
+- A conformance case for `GCP::Monitoring::MetricDescriptor`, which shipped
+  without one. A custom metric descriptor stands on its own and costs nothing,
+  so the case declares one and nothing else.
+
+- `iamConfiguration` on `GCP::Storage::Bucket`, so a forma can say whether a
+  bucket uses uniform bucket-level access. A UBLA bucket is controlled by IAM
+  alone and rejects ACLs outright, so without this field a bucket meant to carry
+  a `BucketAccessControl` depended on a project or organisation default.
+
+- A conformance case for `GCP::Bigtable::Table`, the first for any nested
+  Bigtable type.
+
+- Conformance cases for `GCP::Storage::BucketAccessControl` and
+  `GCP::Storage::DefaultObjectAccessControl`. Both shipped without one.
+  `GCP::Storage::ObjectAccessControl` still has none: it needs an object to
+  attach to, and there is no `GCP::Storage::Object` type.
+
+- Conformance cases for `GCP::Compute::Address`, `GCP::Compute::TargetPool`,
+  `GCP::Compute::BackendBucket`, `GCP::Compute::TargetHttpsProxy`,
+  `GCP::Compute::TargetSslProxy`, `GCP::Compute::RouterNat` and
+  `GCP::Compute::RegionTargetTcpProxy`. All seven shipped without one, so
+  nothing ever exercised them against the live API. That leaves
+  `GCP::Compute::RegionTargetHttpsProxy` as the only untested Compute type: it
+  needs a regional SSL certificate, and a regional MANAGED certificate is not
+  supported, so the case would have to commit a self-managed key pair.
+
+- `GCP::Storage::Notification` - publishes a bucket's object change events to a
+  Pub/Sub topic. Cloud Storage publishes as the project's own service agent, so
+  the topic must already grant that principal `roles/pubsub.publisher`; the new
+  `GCP::PubSub::TopicIamMember` is what expresses that, and the conformance case
+  declares it rather than relying on a grant made by hand.
+
+- `GCP::PubSub::TopicIamMember` and `GCP::PubSub::SubscriptionIamMember` - a
+  single (role, member) binding on a topic's or subscription's IAM policy,
+  managed read-modify-write so sibling bindings survive. A binding is modelled
+  rather than the whole policy because a policy is shared with principals
+  outside the forma - GCP's own service agents write to it - and declaring the
+  whole policy would delete their bindings on every apply.
+
+- `GCP::Compute::RegionSnapshot` - a regional incremental disk backup. Distinct
+  from the global `Snapshot` already shipped: that one lives at
+  `/global/snapshots`, this one at `/regions/{region}/snapshots` and stays in
+  its region.
+
+- `GCP::Filestore::Backup` and `GCP::Filestore::Snapshot`. `Snapshot` ships
+  without a conformance case: every tier that supports snapshots is
+  enterprise-class, and `EnterpriseStorageGibPerRegion` is 0 in the shared test
+  project, so a create cannot succeed there at all. Raising that quota is what
+  would let the case exist. A backup copies one
+  file share and outlives the instance it came from; a snapshot lives inside the
+  instance and goes when it does.
+
+  Snapshots are nested under an instance and Filestore has no wildcard in that
+  position, so discovery walks the instances rather than asking for a URL with
+  an empty segment.
+
+- `GCP::Datastream::Stream`, `GCP::Datastream::PrivateConnection` and
+  `GCP::Datastream::Route` - the rest of the creatable Datastream surface. A
+  stream is what actually moves data; a connection profile on its own moves
+  nothing. A private connection peers a VPC with Datastream's network for
+  sources that are not publicly reachable, and a route tells it which address to
+  reach the source on.
+
+  Creating a stream sends `force=true`. Datastream validates a stream against
+  its source at create time, so without it a stream whose source is not
+  reachable at apply time fails on validation rather than on anything wrong with
+  the declaration.
+
+- `GCP::CertificateAuthority::CertificateAuthority` and
+  `GCP::CertificateAuthority::CertificateTemplate`. A CA is what actually signs;
+  a `CaPool` with no CA in it issues nothing. A template is a reusable issuance
+  policy, location-scoped rather than pool-scoped.
+
+  A CA is deleted with `skipGracePeriod`, because a plain DELETE does not delete
+  it: it moves to state DELETED and sits there for 30 days, still holding its id
+  and still billed. `ignoreActiveCertificates` and `ignoreDependentResources` go
+  along so a CA that did issue something still tears down.
+
+  Not implemented: `certificates`. The API has no delete for them - a
+  certificate can only be revoked - so they are not a CRUD resource.
+
+- `GCP::AnalyticsHub::DataExchange`, `GCP::AnalyticsHub::Listing` and
+  `GCP::AnalyticsHub::QueryTemplate` - the whole creatable surface of Analytics
+  Hub. An exchange is the container a publisher shares through, a listing
+  publishes one BigQuery dataset into an exchange, and a query template is the
+  data-clean-room construct that lets a subscriber run a routine against shared
+  data without seeing the rows.
+
+  Neither listings nor query templates have a URL spanning exchanges, and there
+  is no wildcard in the parent position, so discovery - which lists with no
+  parent to name - walks the exchanges and asks each one.
+
+  Analytics Hub ids allow only letters, digits and underscores, so its test
+  fixtures are underscore-named where every other fixture here is
+  hyphen-named - and its cleanup sweep greps accordingly.
+
+- `GCP::Eventarc::Enrollment` - the routing rule of an Eventarc Advanced setup:
+  a CEL expression matched against the events on a `MessageBus`, and the
+  `Pipeline` matching events are handed to. A bus without an enrollment routes
+  nothing, so this is what makes the existing `MessageBus` and `Pipeline` types
+  useful together.
+
+- `GCP::Eventarc::GoogleApiSource` - routes this project's own Google API events
+  onto a `MessageBus`. Only one is allowed per project per region, the same
+  constraint `MessageBus` already carries.
+
+  Both name other Advanced resources through a scalar path field, so both get
+  the expand-on-write / shorten-on-read pair a forma needs to pass a resolvable
+  (`bus.res.name`) instead of hand-writing a full path - the scalar counterpart
+  of what `pipelineRequestTransformer` already does for a pipeline's nested
+  destinations.
+
+- `GCP::PubSub::Snapshot` - captures a subscription's acknowledgement state so
+  the subscription can later be seeked back to it. Pub/Sub creates a snapshot by
+  `PUT`ting to its resource path, and the create body is not the resource: it
+  takes the `subscription` to snapshot, while the snapshot itself reports only
+  the `topic` that subscription was attached to. `subscription` is therefore
+  write-only, so it is sent on create and left out of drift detection.
+
+### Fixed
+
 - `GCP::CertificateManager::CertificateMap` — groups the certificates a load
   balancer serves, selected per hostname by its entries. A target HTTPS proxy
   points at a map rather than a single certificate, which is how one proxy

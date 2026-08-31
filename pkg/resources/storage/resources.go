@@ -10,6 +10,8 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 // Resource type constants
@@ -21,6 +23,7 @@ const (
 	ManagedFolderResourceType              = "GCP::Storage::ManagedFolder"
 	FolderResourceType                     = "GCP::Storage::Folder"
 	ObjectAccessControlResourceType        = "GCP::Storage::ObjectAccessControl"
+	NotificationResourceType               = "GCP::Storage::Notification"
 )
 
 // storageRegistry is the unified registry for all Storage resources
@@ -107,6 +110,30 @@ func init() {
 			ResponseTransformer: nil,
 		},
 		{
+			// Bucket notification - publishes object change events to a Pub/Sub
+			// topic. The id is server-assigned, so a forma does not name one.
+			ResourceType: NotificationResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "notificationConfigs",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:         "bucket", // property name in props
+					RequiresParent:     true,
+					ParentPathSegments: []string{"b"},
+				},
+				SupportsUpdate: false, // immutable: a change replaces
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(notificationRequest),
+			ResponseTransformer: base.ResponseTransformerFunc(notificationResponse),
+		},
+		{
 			ResourceType: BucketAccessControlResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "acl",
@@ -144,6 +171,28 @@ func init() {
 				},
 			},
 			RequestTransformer:  wrapBodyBuilder(aclBodyBuilder),
+			ResponseTransformer: nil,
+		},
+		{
+			// An ACL entry on one object. It hangs off a bucket AND an object,
+			// which is why this was commented out: nothing could carry two
+			// parent properties. ParentResourceConfig.SecondPropertyName now
+			// can, joining them as "{bucket}/{object}" - the form the Storage
+			// path builder and native ID already expected.
+			ResourceType: ObjectAccessControlResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "acl",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:         "bucket",
+					PropertyName:       "bucket",
+					SecondPropertyName: "object",
+					RequiresParent:     true,
+					ParentPathSegments: []string{"b", "o"},
+				},
+				SupportsUpdate: true,
+			},
+			RequestTransformer:  wrapBodyBuilder(objectAclBodyBuilder),
 			ResponseTransformer: nil,
 		},
 		{
@@ -187,35 +236,73 @@ func init() {
 			RequestTransformer:  base.DropFields("bucket"),
 			ResponseTransformer: base.ResponseTransformerFunc(bucketScopedResponseTransformer),
 		},
-		// NOTE: ObjectAccessControlResourceType requires special handling for object-scoped resources
-		// The base package currently doesn't support resources that need TWO parent properties (bucket + object).
-		// This resource type is commented out pending enhancement to base package's parent extraction mechanism.
-		// {
-		// 	ResourceType: ObjectAccessControlResourceType,
-		// 	ResourceConfig: base.ResourceConfig{
-		// 		ResourceType: "acl",
-		// 		Scope:        nil,
-		// 		ParentResource: &base.ParentResourceConfig{
-		// 			ParentType:         "bucket", // Need both bucket AND object
-		// 			RequiresParent:     true,
-		// 			ParentPathSegments: []string{"b", "o"},
-		// 		},
-		// 		SupportsUpdate: true,
-		// 		OptimisticLocking: &base.OptimisticLockingConfig{
-		// 			Enabled:       false,
-		// 			FieldName:     "",
-		// 			LocationInURL: false,
-		// 		},
-		// 	},
-		// 	RequestTransformer:  base.RequestTransformerFunc(objectScopedRequestTransformer),
-		// 	ResponseTransformer: nil,
-		// },
 	})
 
 	if err != nil {
 		panic(err)
 	}
 
+	// Re-register the two ACL types behind a provisioner that walks the buckets
+	// on List. Everything else stays config-driven; only List has to differ,
+	// because Cloud Storage has no endpoint spanning buckets. See
+	// acl_walking_list.go.
+	for _, resourceType := range []string{
+		BucketAccessControlResourceType,
+		DefaultObjectAccessControlResourceType,
+	} {
+		rt := resourceType
+		def := storageRegistry.Definitions[rt]
+		registry.Register(rt, def.Operations, func(cfg *config.Config) prov.Provisioner {
+			return &aclProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           StorageAPI,
+					OperationConfig:     StorageOperations,
+					ResourceConfig:      def.ResourceConfig,
+					NativeIDConfig:      StorageNativeID,
+					RequestTransformer:  def.RequestTransformer,
+					ResponseTransformer: def.ResponseTransformer,
+				},
+			}
+		})
+	}
+
+	// A notification hangs off a bucket and Cloud Storage cannot be asked
+	// across buckets, so a parentless list walks them. See acl_walking_list.go.
+	notifDef := storageRegistry.Definitions[NotificationResourceType]
+	registry.Register(NotificationResourceType, notifDef.Operations,
+		func(cfg *config.Config) prov.Provisioner {
+			return &notificationProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           StorageAPI,
+					OperationConfig:     StorageOperations,
+					ResourceConfig:      notifDef.ResourceConfig,
+					NativeIDConfig:      StorageNativeID,
+					RequestTransformer:  notifDef.RequestTransformer,
+					ResponseTransformer: notifDef.ResponseTransformer,
+				},
+			}
+		})
+
+	// An object ACL needs a walk of its own: it hangs off a bucket *and* an
+	// object, so the bucket walk above stops one level short of it. See
+	// object_acl_walking_list.go.
+	oacDef := storageRegistry.Definitions[ObjectAccessControlResourceType]
+	registry.Register(ObjectAccessControlResourceType, oacDef.Operations,
+		func(cfg *config.Config) prov.Provisioner {
+			return &objectAclProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           StorageAPI,
+					OperationConfig:     StorageOperations,
+					ResourceConfig:      oacDef.ResourceConfig,
+					NativeIDConfig:      StorageNativeID,
+					RequestTransformer:  oacDef.RequestTransformer,
+					ResponseTransformer: oacDef.ResponseTransformer,
+				},
+			}
+		})
 	registerBucketWalkingLists()
 }
 

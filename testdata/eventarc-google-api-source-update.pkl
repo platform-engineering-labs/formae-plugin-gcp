@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/eventarc/messageBus.pkl"
+import "@gcp/eventarc/googleApiSource.pkl"
+import "./config/vars.pkl" as v
+
+// A googleApiSource needs only the bus it feeds.
+//
+// Pins europe-west3. Eventarc Advanced rejects GCP_LOCATION's europe-central2,
+// and only ONE message bus is allowed per project per region — europe-west1,
+// us-central1 and us-east4 are already claimed by the eventarc-message-bus,
+// eventarc-pipeline and eventarc-enrollment cases. Only one googleApiSource is
+// allowed per project per region too, so the region has to be its own either way.
+local region = "europe-west3"
+
+local bus = new messageBus.MessageBus {
+  label = "plugin-sdk-test-gas-bus"
+  name = "formae-plugin-sdk-test-gas-bus-\(v.testRunID)"
+  location = region
+}
+
+forma {
+  v.stack
+  v.target
+
+  bus
+
+  new googleApiSource.GoogleApiSource {
+    label = "plugin-sdk-test-eventarc-google-api-source"
+    name = "formae-plugin-sdk-test-gas-\(v.testRunID)"
+    location = region
+    // Resolvable -> the bus exists first; the plugin expands this short name
+    // into the full path Eventarc wants.
+    displayName = "updated by conformance"
+    destination = bus.res.name
+    labels = new Mapping {
+      ["environment"] = "staging"
+    }
+  }
+}

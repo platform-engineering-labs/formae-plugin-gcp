@@ -1,0 +1,23 @@
+# Conformance cases excluded from the automatic CI and nightly matrix.
+#
+# Every other case in testdata/ runs on every push to main and every night.
+# A case listed here does not - it is run on demand, by naming it in the
+# debug-conformance workflow, which takes explicit case names and ignores this
+# file.
+#
+# This exists so a resource that cannot be covered for free still gets covered.
+# Without it the choice is between no conformance case at all and adding
+# recurring spend to every run, and the first option is how types end up
+# shipping broken - a fifth of this plugin's types had no case, and writing the
+# first one for a type found a real defect almost every time.
+#
+# List a case here only for a reason that survives being written down: it costs
+# real money to hold, or it mutates something shared. Slowness alone is not a
+# reason; that is what the per-case timeouts are for.
+#
+# One case name per line. Blank lines and # comments are ignored.
+
+# A PRODUCTION Bigtable instance with two clusters bills per node per hour, and
+# a DEVELOPMENT instance - which the other Bigtable cases use - cannot have a
+# second cluster at all, so there is no cheap way to exercise this type.
+bigtable-cluster

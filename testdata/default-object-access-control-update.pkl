@@ -1,0 +1,50 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/default_object_access_control.pkl" as acl
+import "./config/vars.pkl" as v
+
+// The default ACL applied to objects created in a bucket, so the bucket comes
+// first. Unlike an ObjectAccessControl this needs no object to exist - which is
+// why this type can be covered and that one cannot.
+//
+// The bucket disables uniform bucket-level access explicitly. A UBLA bucket is
+// controlled by IAM alone and rejects ACLs outright, and whether a new bucket
+// gets UBLA depends on a project or organisation default - so leaving it unset
+// would make this case pass or fail on someone else's setting.
+//
+// The entity is the project's own editors group: a principal that always exists
+// for the project, needs no setup, and is already an editor - so the grant adds
+// no access anyone did not have.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-doac-bucket"
+  name = "formae-plugin-sdk-test-doac-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+  iamConfiguration = new bucket.IamConfiguration {
+    uniformBucketLevelAccess = new bucket.UniformBucketLevelAccess {
+      enabled = false
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+
+  new acl.DefaultObjectAccessControl {
+    label = "plugin-sdk-test-default-object-access-control"
+    // Resolvable -> the bucket exists before the ACL entry is written.
+    bucket = b.res.name
+    entity = "project-editors-\(v.gcpProjectNumber)"
+    role = "READER"
+  }
+}

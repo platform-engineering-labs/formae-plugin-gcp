@@ -1,0 +1,58 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/object.pkl" as storageObject
+import "@gcp/storage/object_access_control.pkl" as acl
+import "./config/vars.pkl" as v
+
+// An ACL entry on one object, so the bucket and the object both come first.
+//
+// The bucket disables uniform bucket-level access explicitly: a UBLA bucket is
+// governed by IAM alone and rejects ACLs outright, and whether a new bucket gets
+// UBLA depends on a project or organisation default.
+//
+// The entity is the project's own editors group - a principal that always
+// exists and is already an editor, so the grant adds no access anyone lacked.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-oac-bucket"
+  name = "formae-plugin-sdk-test-oac-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+  iamConfiguration = new bucket.IamConfiguration {
+    uniformBucketLevelAccess = new bucket.UniformBucketLevelAccess {
+      enabled = false
+    }
+  }
+}
+
+local obj = new storageObject.Object {
+  label = "plugin-sdk-test-oac-object"
+  bucket = b.res.name
+  name = "conformance/acl-target.txt"
+  contentType = "text/plain"
+  content = "target of the object ACL conformance case\n"
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+  obj
+
+  new acl.ObjectAccessControl {
+    label = "plugin-sdk-test-object-access-control"
+    // Resolvables -> the bucket and the object exist before the entry is
+    // written. Both are path components; neither is a body field.
+    bucket = b.res.name
+    object = obj.res.name
+    entity = "project-editors-\(v.gcpProjectNumber)"
+    role = "READER"
+  }
+}

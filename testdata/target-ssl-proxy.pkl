@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/sslCertificate.pkl"
+import "@gcp/compute/targetSslProxy.pkl"
+import "./config/vars.pkl" as v
+
+// Global external SSL proxy LB: HealthCheck -> BackendService -> TargetSslProxy,
+// plus the certificate the proxy terminates with. Unlike an HTTPS proxy this one
+// fronts the backend service directly - there is no UrlMap in an SSL proxy LB.
+//
+// The backend service protocol is SSL, which is what a TargetSslProxy requires;
+// the EXTERNAL scheme is the classic proxy LB, not EXTERNAL_MANAGED.
+forma {
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-tsp-healthcheck"
+    name = "formae-plugin-sdk-test-tsp-hc-\(v.testRunID)"
+    type = "TCP"
+    tcpHealthCheck = new healthCheck.TcpHealthCheck {
+      port = 443
+    }
+  }
+
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-tsp-backend-service"
+    name = "formae-plugin-sdk-test-tsp-bs-\(v.testRunID)"
+    loadBalancingScheme = "EXTERNAL"
+    protocol = "SSL"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  local cert = new sslCertificate.SslCertificate {
+    label = "plugin-sdk-test-tsp-cert"
+    name = "formae-plugin-sdk-test-tsp-cert-\(v.testRunID)"
+    type = "MANAGED"
+    managedDomains = new Listing {
+      "formae-tsp-\(v.testRunID).example.com"
+    }
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+  cert
+
+  new targetSslProxy.TargetSslProxy {
+    label = "plugin-sdk-test-target-ssl-proxy"
+    name = "formae-plugin-sdk-test-tsp-\(v.testRunID)"
+    description = "Test target SSL proxy for plugin SDK conformance tests"
+    service = bs.res.selfLink
+    sslCertificates = new Listing {
+      cert.res.selfLink
+    }
+  }
+}

@@ -1,0 +1,92 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Analytics Hub QueryTemplate
+///
+/// A data-clean-room construct: a routine a subscriber may run against shared
+/// data without seeing the rows. Query templates only exist inside a
+/// `DataExchange` created as a clean room - one whose
+/// `sharingEnvironmentConfig.dcrExchangeConfig` is set.
+///
+/// A template is proposed, then submitted and approved; `state` reports where
+/// it is in that flow and is not something a forma sets.
+module gcp.analyticshub.queryTemplate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AnalyticsHub::QueryTemplate"
+
+/// The routine the template proposes.
+@gcp.SubResourceHint
+open class Routine extends formae.SubResource {
+    /// Required when a routine is given. E.g. "TABLE_VALUED_FUNCTION".
+    @gcp.FieldHint
+    routineType: String?
+
+    /// The SQL body.
+    @gcp.FieldHint
+    definitionBody: String?
+}
+
+open class QueryTemplateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: QueryTemplateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class QueryTemplate extends formae.Resource {
+    hidden parent = this
+
+    /// Short template id. Immutable. Letters, digits and underscores only.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the template. A path component, not a body field. Must match
+    /// the exchange's.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The clean-room exchange this belongs to. A short exchange name or a
+    /// DataExchange resolvable. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    dataExchange: (String|formae.Resolvable)
+
+    /// Human-readable name. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    documentation: String?
+
+    @gcp.FieldHint
+    primaryContact: String?
+
+    /// Who proposed the template.
+    @gcp.FieldHint
+    proposer: String?
+
+    @gcp.FieldHint
+    routine: Routine?
+
+    /// Where the template is in the propose/submit/approve flow. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    hidden res: QueryTemplateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

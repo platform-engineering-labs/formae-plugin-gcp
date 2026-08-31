@@ -185,7 +185,9 @@ open class ForwardingRule extends formae.Resource {
     @gcp.FieldHint
     allowPscGlobalAccess: Boolean?
 
+    /// Hash of the current labels, used for optimistic locking on setLabels. Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     labelFingerprint: String?
 

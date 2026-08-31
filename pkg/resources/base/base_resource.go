@@ -46,6 +46,19 @@ func (b *BaseResource) Create(
 	// Build path context
 	pathCtx := b.buildPathContext(request.TargetConfig, props)
 
+	// A resource addressed by two parents collapses to the one-parent form if
+	// the second is missing, and the API accepts that silently as a different
+	// resource: an object ACL created without its object becomes a bucket ACL.
+	// Nothing downstream can tell the two apart, so refuse here instead.
+	if pr := b.ResourceConfig.ParentResource; pr != nil && pr.SecondPropertyName != "" {
+		if second, _ := props[pr.SecondPropertyName].(string); second == "" {
+			return b.createFailureResult(resource.OperationErrorCodeInvalidRequest,
+				fmt.Sprintf("%s is required to address this resource and was not supplied (got %T); "+
+					"without it the request would create a different resource",
+					pr.SecondPropertyName, props[pr.SecondPropertyName])), nil
+		}
+	}
+
 	// Transform request properties
 	body := props
 	if b.RequestTransformer != nil {
@@ -404,6 +417,12 @@ func (b *BaseResource) List(
 		}
 		if request.AdditionalProperties != nil {
 			if parent, ok := request.AdditionalProperties[propName]; ok && parent != "" {
+				// Same two-property parent as buildPathContext handles.
+				if second := b.ResourceConfig.ParentResource.SecondPropertyName; second != "" {
+					if secondValue := request.AdditionalProperties[second]; secondValue != "" {
+						parent = parent + "/" + secondValue
+					}
+				}
 				pathCtx.ParentResource = parent
 				pathCtx.ParentType = b.ResourceConfig.ParentResource.ParentType
 			}

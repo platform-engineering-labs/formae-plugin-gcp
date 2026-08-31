@@ -71,21 +71,23 @@ const (
 	SnapshotResourceType                           = "GCP::Compute::Snapshot"
 	InstantSnapshotResourceType                    = "GCP::Compute::InstantSnapshot"
 	RegionInstantSnapshotResourceType              = "GCP::Compute::RegionInstantSnapshot"
+	RegionSnapshotResourceType                     = "GCP::Compute::RegionSnapshot"
 	NodeTemplateResourceType                       = "GCP::Compute::NodeTemplate"
 	RegionDiskResourceType                         = "GCP::Compute::RegionDisk"
 
 	// HA VPN
-	ExternalVpnGatewayResourceType = "GCP::Compute::ExternalVpnGateway"
-	HaVpnGatewayResourceType       = "GCP::Compute::HaVpnGateway"
-	TargetVpnGatewayResourceType   = "GCP::Compute::TargetVpnGateway"
-	VpnTunnelResourceType          = "GCP::Compute::VpnTunnel"
-	SslCertificateResourceType     = "GCP::Compute::SslCertificate"
-	SslPolicyResourceType          = "GCP::Compute::SslPolicy"
-	RegionSslPolicyResourceType    = "GCP::Compute::RegionSslPolicy"
-	HttpHealthCheckResourceType    = "GCP::Compute::HttpHealthCheck"
-	HttpsHealthCheckResourceType   = "GCP::Compute::HttpsHealthCheck"
-	NetworkAttachmentResourceType  = "GCP::Compute::NetworkAttachment"
-	ServiceAttachmentResourceType  = "GCP::Compute::ServiceAttachment"
+	ExternalVpnGatewayResourceType         = "GCP::Compute::ExternalVpnGateway"
+	HaVpnGatewayResourceType               = "GCP::Compute::HaVpnGateway"
+	TargetVpnGatewayResourceType           = "GCP::Compute::TargetVpnGateway"
+	VpnTunnelResourceType                  = "GCP::Compute::VpnTunnel"
+	SslCertificateResourceType             = "GCP::Compute::SslCertificate"
+	SslPolicyResourceType                  = "GCP::Compute::SslPolicy"
+	RegionSslPolicyResourceType            = "GCP::Compute::RegionSslPolicy"
+	RegionNotificationEndpointResourceType = "GCP::Compute::RegionNotificationEndpoint"
+	HttpHealthCheckResourceType            = "GCP::Compute::HttpHealthCheck"
+	HttpsHealthCheckResourceType           = "GCP::Compute::HttpsHealthCheck"
+	NetworkAttachmentResourceType          = "GCP::Compute::NetworkAttachment"
+	ServiceAttachmentResourceType          = "GCP::Compute::ServiceAttachment"
 
 	// Load Balancer - Global resources
 	GlobalAddressResourceType  = "GCP::Compute::GlobalAddress"
@@ -705,6 +707,25 @@ func init() {
 
 		// Region Instant Snapshot - the regional twin, taken from a regional
 		// disk, so it survives losing a zone. Same SSD-class source requirement.
+		// Region Snapshot - a regional incremental backup, stored in the same
+		// region as its source. Distinct from the global Snapshot above: that
+		// one lives at /global/snapshots, this one at /regions/{r}/snapshots.
+		// ponytail: as with the global snapshot, only setLabels mutates one, so
+		// update replaces.
+		{
+			ResourceType: RegionSnapshotResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "snapshots",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    false,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
 		{
 			ResourceType: RegionInstantSnapshotResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1053,6 +1074,9 @@ func init() {
 		},
 
 		// Target TCP Proxy - Global TCP proxy for load balancers
+		// ponytail: update is off. targetTcpProxies has no patch and no update - only setBackendService
+		// and setProxyHeader, so a PATCH would go to a URL the
+		// API does not serve. A change replaces.
 		{
 			ResourceType: TargetTcpProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1060,7 +1084,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeGlobal,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1068,6 +1092,9 @@ func init() {
 		},
 
 		// Target SSL Proxy - Global SSL proxy for load balancers
+		// ponytail: update is off. targetSslProxies has no patch and no update - only setBackendService,
+		// setCertificateMap, setProxyHeader, setSslCertificates and setSslPolicy, so a PATCH would go to a URL the
+		// API does not serve. A change replaces.
 		{
 			ResourceType: TargetSslProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1075,7 +1102,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeGlobal,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1187,6 +1214,8 @@ func init() {
 		},
 
 		// Region Target TCP Proxy - Regional TCP proxy for internal proxy load balancers
+		// ponytail: update is off. regionTargetTcpProxies has only delete, get, insert and list, so a PATCH would go to a URL the
+		// API does not serve. A change replaces.
 		{
 			ResourceType: RegionTargetTcpProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1194,7 +1223,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1220,7 +1249,13 @@ func init() {
 			ResponseTransformer: base.RegionResponseTransformer,
 		},
 
-		// Target Pool - Classic target pool for network load balancers
+		// Target Pool - Classic target pool for network load balancers.
+		//
+		// ponytail: update is off. targetPools has no patch and no update in the
+		// compute API - only addHealthCheck, addInstance, removeHealthCheck,
+		// removeInstance, setBackup and setSecurityPolicy - so a PATCH would go
+		// to a URL the API does not serve. It was registered as updatable, and
+		// no conformance case ever exercised it.
 		{
 			ResourceType: TargetPoolResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1228,7 +1263,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,

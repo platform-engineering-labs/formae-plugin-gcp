@@ -83,8 +83,10 @@ open class Address extends formae.Resource {
     }
     network: (String|formae.Resolvable)?
 
+    /// GCP fills this in with the only tier valid for the address type when unset.
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     networkTier: NetworkTier?
 
@@ -93,8 +95,10 @@ open class Address extends formae.Resource {
     }
     prefixLength: Int?
 
+    /// GCP infers this from the address type when unset.
     @gcp.FieldHint {
         createOnly = true
+        hasProviderDefault = true
     }
     purpose: Purpose?
 
@@ -108,23 +112,33 @@ open class Address extends formae.Resource {
     }
     subnetwork: (String|formae.Resolvable)?
 
+    /// Labels as the API reports them, including any applied outside the forma. Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     effectiveLabels: Mapping<String, String>?
 
+    /// Hash of the current labels, used for optimistic locking on setLabels. Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     labelFingerprint: String?
 
+    /// Labels the API reports for Terraform interoperability. Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     terraformLabels: Mapping<String, String>?
 
+    /// Resources currently using this address. Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     users: Listing<String>?
 
+    /// Server-assigned URL for this resource. Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     selfLink: String?
 

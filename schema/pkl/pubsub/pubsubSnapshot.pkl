@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Pub/Sub Snapshot
+///
+/// A snapshot captures the acknowledgement state of a subscription at a point
+/// in time, so a subscription can later be seeked back to it.
+module gcp.pubsub.pubsubSnapshot
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::PubSub::Snapshot"
+
+open class SnapshotResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SnapshotResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Snapshot extends formae.Resource {
+    hidden parent = this
+
+    /// Short snapshot ID (e.g. "my-snapshot").
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The subscription whose acknowledgement state is captured, as a full path
+    /// "projects/{project}/subscriptions/{sub}" or a Subscription resolvable.
+    ///
+    /// Write-only: the create request takes a subscription, but a snapshot
+    /// reports only the `topic` that subscription was attached to, so this
+    /// value never comes back from the API.
+    @gcp.FieldHint {
+        createOnly = true
+        writeOnly = true
+    }
+    subscription: (String|formae.Resolvable)?
+
+    /// Topic the snapshotted subscription belongs to. Set by the API.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    topic: String?
+
+    /// When the snapshot expires. Defaults to 7 days after creation.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    expireTime: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: SnapshotResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

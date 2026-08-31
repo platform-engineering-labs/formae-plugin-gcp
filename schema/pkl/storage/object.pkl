@@ -1,0 +1,67 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Storage Object
+///
+/// A single object in a `Bucket`, with its content declared inline.
+///
+/// This is for the small files infrastructure is made of - a config document, a
+/// startup script, a static index page - not for data. The content is part of
+/// the forma, so it is part of the plan and the state; wrap it with
+/// `formae.value(...).opaque` if it should not appear there.
+module gcp.storage.object
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Storage::Object"
+
+open class ObjectResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ObjectResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Object extends formae.Resource {
+    hidden parent = this
+
+    /// Bucket holding the object. A short bucket name or a Bucket resolvable.
+    /// A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    bucket: (String|formae.Resolvable)
+
+    /// Object name, which may contain slashes - Cloud Storage has no
+    /// directories, only names that look like paths.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The object's content, written verbatim.
+    @gcp.FieldHint
+    content: String
+
+    /// MIME type. GCP stores application/octet-stream when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    contentType: String?
+
+    /// Generation number. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    generation: String?
+
+    /// Size in bytes, as a string. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    size: String?
+
+    hidden res: ObjectResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

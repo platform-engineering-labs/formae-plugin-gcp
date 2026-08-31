@@ -509,6 +509,141 @@ else
     echo "  No SSL policies found"
 fi
 
+# --- API Gateway (gateways, then configs, then apis) ---
+# A config cannot be deleted while a gateway serves it, and an api cannot be
+# deleted while it holds configs, so the hierarchy is torn down from the bottom.
+# Every delete is a long-running operation; --async would leave the next delete
+# racing the previous one, so these wait.
+echo "Cleaning GCP API Gateway gateways..."
+for agw_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
+    [ -z "$agw_loc" ] && continue
+    AGW_GW=$(gcloud api-gateway gateways list --location="$agw_loc" \
+        --filter="name~formae-plugin-sdk|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$AGW_GW" ]; then
+        echo "$AGW_GW" | while read -r gw; do
+            echo "  Deleting API Gateway gateway: $gw (location: $agw_loc)"
+            gcloud api-gateway gateways delete "$gw" --location="$agw_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No API Gateway gateways found in $agw_loc"
+    fi
+done
+
+echo "Cleaning GCP API Gateway apis and their configs..."
+AGW_APIS=$(gcloud api-gateway apis list --filter="name~formae-plugin-sdk|name~formae-test" \
+    --format="value(name)" 2>/dev/null || true)
+if [ -n "$AGW_APIS" ]; then
+    echo "$AGW_APIS" | while read -r agw_api; do
+        AGW_CFGS=$(gcloud api-gateway api-configs list --api="$agw_api" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$AGW_CFGS" ]; then
+            echo "$AGW_CFGS" | while read -r cfg; do
+                echo "  Deleting API Gateway config: $cfg (api: $agw_api)"
+                gcloud api-gateway api-configs delete "$cfg" --api="$agw_api" --quiet 2>/dev/null || true
+            done
+        fi
+        echo "  Deleting API Gateway api: $agw_api"
+        gcloud api-gateway apis delete "$agw_api" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No API Gateway apis found"
+fi
+
+# --- Memorystore for Memcached ---
+# A memcached instance is billed by node-hour for as long as it exists, and it
+# takes 20-30 minutes to create, so a leaked one is both a standing cost and a
+# slow thing to notice.
+echo "Cleaning GCP Memcache instances..."
+for mc_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
+    [ -z "$mc_loc" ] && continue
+    MEMCACHE=$(gcloud memcache instances list --region="$mc_loc" \
+        --filter="name~formae-plugin-sdk|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$MEMCACHE" ]; then
+        echo "$MEMCACHE" | while read -r inst; do
+            echo "  Deleting Memcache instance: $inst (region: $mc_loc)"
+            gcloud memcache instances delete "$inst" --region="$mc_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Memcache instances found in $mc_loc"
+    fi
+done
+
+# --- Spanner (databases go with their instance) ---
+# Unlike almost everything else swept here, a Spanner instance is billed for as
+# long as it exists - the smallest regional one is 100 processing units - so a
+# leaked instance is a standing cost rather than a tidiness problem. Deleting an
+# instance takes its databases with it.
+echo "Cleaning GCP Spanner instances..."
+SPANNER=$(gcloud spanner instances list --filter="name~formae-plugin-sdk|name~formae-test" \
+    --format="value(name)" 2>/dev/null || true)
+if [ -n "$SPANNER" ]; then
+    echo "$SPANNER" | while read -r inst; do
+        echo "  Deleting Spanner instance: $inst"
+        gcloud spanner instances delete "$inst" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Spanner instances found"
+fi
+
+# --- Service Directory (endpoints, then services, then namespaces) ---
+# Deleting a namespace takes its services and endpoints with it, so only the
+# namespaces need sweeping. goog-psc-default is Google-managed and does not
+# match the test prefix.
+echo "Cleaning GCP Service Directory namespaces..."
+for sd_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
+    [ -z "$sd_loc" ] && continue
+    SD_NS=$(gcloud service-directory namespaces list --location="$sd_loc" \
+        --filter="name~formae-plugin-sdk|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    if [ -n "$SD_NS" ]; then
+        echo "$SD_NS" | while read -r ns; do
+            echo "  Deleting Service Directory namespace: $ns (location: $sd_loc)"
+            gcloud service-directory namespaces delete "$ns" --location="$sd_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Service Directory namespaces found in $sd_loc"
+    fi
+done
+
+# --- 1h. SSL certificates (must delete after the proxies that reference them) ---
+# A project holds at most 10 SSL certificates globally, and every leaked one
+# counts. Once the cap is reached, any case that creates a certificate fails with
+# "Quota 'SSL_CERTIFICATES' exceeded. Limit: 10.0 globally." rather than anything
+# resembling a plugin bug - which is exactly how target-https-proxy failed on
+# 2026-08-29, against eight certificates left behind since July. The sweep knew
+# about ssl-policies but never about the certificates themselves.
+# Certificates are swept only when asked. They are the one resource here whose
+# removal is not obviously safe to decide automatically: unlike a namespace or an
+# api, a certificate can be one someone installed deliberately, and the cap being
+# global means a wrong deletion is felt project-wide. Set
+# FORMAE_SWEEP_SSL_CERTIFICATES=1 to include them.
+if [ "${FORMAE_SWEEP_SSL_CERTIFICATES:-0}" != "1" ]; then
+    echo "Skipping GCP SSL certificates (set FORMAE_SWEEP_SSL_CERTIFICATES=1 to sweep them)"
+else
+
+echo "Cleaning GCP regional SSL certificates..."
+REGION_CERTS=$(gcloud compute ssl-certificates list --format="value(name,region.basename())" 2>/dev/null | grep "^formae-plugin-sdk" || true)
+if [ -n "$REGION_CERTS" ]; then
+    echo "$REGION_CERTS" | while read -r cert region; do
+        [ -z "$region" ] && continue
+        echo "  Deleting regional SSL certificate: $cert (region: $region)"
+        gcloud compute ssl-certificates delete "$cert" --region="$region" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No regional SSL certificates found"
+fi
+
+echo "Cleaning GCP SSL certificates..."
+SSL_CERTS=$(gcloud compute ssl-certificates list --global --filter="name~^formae-plugin-sdk" --format="value(name)" 2>/dev/null || true)
+if [ -n "$SSL_CERTS" ]; then
+    echo "$SSL_CERTS" | while read -r cert; do
+        echo "  Deleting SSL certificate: $cert"
+        gcloud compute ssl-certificates delete "$cert" --global --quiet 2>/dev/null || true
+    done
+else
+    echo "  No SSL certificates found"
+fi
+
+fi
+
 # --- 1h. Network attachments (hold a subnet reference, so delete before subnets) ---
 # Service attachments hold forwarding-rule and PSC-subnet references, so they
 # must go before the forwarding rules and subnets below.
@@ -845,27 +980,27 @@ else
     echo "  No workflows found"
 fi
 
-echo "Cleaning GCP eventarc pipelines..."
-for pl_loc in europe-west1 us-central1; do
-    PLS=$(gcloud eventarc pipelines list --location="$pl_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
-    [ -z "$PLS" ] && continue
-    echo "$PLS" | while read -r pl; do
-        [ -z "$pl" ] && continue
-        echo "  Deleting pipeline: $pl ($pl_loc)"
-        gcloud eventarc pipelines delete "$pl" --location="$pl_loc" --quiet 2>/dev/null || true
-    done
-done
+# This gcloud has no eventarc message-buses/pipelines/enrollments/
+# google-api-sources surface at all, so the sweep that used to live here was a
+# silent no-op: the missing subcommand went to /dev/null and every leftover
+# survived. clean-eventarc-case.sh already talks REST for exactly this reason,
+# so reuse it rather than keeping a second, dead copy.
+echo "Cleaning GCP eventarc Advanced resources..."
+"$(dirname "$0")/clean-eventarc-case.sh" all
 
-echo "Cleaning GCP eventarc message buses..."
-for mb_loc in europe-west1 us-central1; do
-    MBS=$(gcloud eventarc message-buses list --location="$mb_loc" --format="value(name)" 2>/dev/null | grep '^formae-plugin-sdk' || true)
-    [ -z "$MBS" ] && continue
-    echo "$MBS" | while read -r mb; do
-        [ -z "$mb" ] && continue
-        echo "  Deleting message bus: $mb ($mb_loc)"
-        gcloud eventarc message-buses delete "$mb" --location="$mb_loc" --quiet 2>/dev/null || true
-    done
-done
+# Analytics Hub and private CA get their own scripts for the same reason:
+# gcloud cannot see those resources either, and private CA leaks cost money.
+"$(dirname "$0")/clean-analyticshub.sh"
+
+"$(dirname "$0")/clean-privateca.sh"
+
+# Datastream private connections hold a reserved /29 until they are really
+# gone, so a leak blocks the next run's peering, not just tidiness.
+"$(dirname "$0")/clean-datastream-case.sh" all
+
+# A leaked Filestore instance is the most expensive leak in the suite: a
+# BASIC_HDD instance has a 1 TiB minimum and is billed per GiB-month.
+"$(dirname "$0")/clean-filestore-case.sh" all
 
 echo "Cleaning GCP artifact registry repositories..."
 AR_REPOS=$(gcloud artifacts repositories list --format="value(name)" 2>/dev/null | grep -E '(^|/)formae-' || true)
@@ -1065,8 +1200,12 @@ else
 fi
 
 # --- 8. Storage buckets ---
+# formae-probe- covers resources created by hand while investigating a failure.
+# Those are as disposable as a test's own, but they carry neither test prefix, so
+# nothing swept them and they outlived every run - and the credentials used to
+# create one often cannot delete it.
 echo "Cleaning GCP storage buckets..."
-BUCKETS=$(gcloud storage buckets list --filter="name~^formae-plugin-sdk-test" --format="value(name)" 2>/dev/null || true)
+BUCKETS=$(gcloud storage buckets list --filter="name~^formae-plugin-sdk-test OR name~^formae-probe-" --format="value(name)" 2>/dev/null || true)
 if [ -n "$BUCKETS" ]; then
     echo "$BUCKETS" | while read -r bucket; do
         echo "  Deleting bucket: $bucket"
@@ -1078,7 +1217,7 @@ fi
 
 # --- 9. Bigtable instances ---
 echo "Cleaning GCP Bigtable instances..."
-INSTANCES=$(gcloud bigtable instances list --filter="name~formae-test-instance" --format="value(name)" 2>/dev/null || true)
+INSTANCES=$(gcloud bigtable instances list --filter="name~^formae-test-instance" --format="value(name)" 2>/dev/null || true)
 if [ -n "$INSTANCES" ]; then
     echo "$INSTANCES" | while read -r instance; do
         echo "  Deleting Bigtable instance: $instance"

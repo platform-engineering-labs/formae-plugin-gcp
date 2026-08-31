@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/object.pkl" as storageObject
+import "./config/vars.pkl" as v
+
+// An object lives in a bucket, so the bucket comes first. Both are free: an
+// empty STANDARD bucket costs nothing and this object is a few dozen bytes.
+//
+// The name contains a slash on purpose. Cloud Storage has no directories, only
+// names that look like paths, and the native ID has to survive that.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-object-bucket"
+  name = "formae-plugin-sdk-test-obj-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+
+  new storageObject.Object {
+    label = "plugin-sdk-test-storage-object"
+    // Resolvable -> the bucket exists before the object is uploaded into it.
+    bucket = b.res.name
+    name = "conformance/hello.txt"
+    contentType = "text/plain"
+    content = "written by the formae GCP plugin conformance suite\n"
+  }
+}

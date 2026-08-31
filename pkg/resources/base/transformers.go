@@ -18,6 +18,13 @@ type TransformContext struct {
 	Location     string
 	ResourceType string
 	Operation    resource.Operation
+
+	// ParentResource is the resource this one hangs off, where there is one.
+	// A nested resource's response often carries neither its parent nor its
+	// project - both live only in the path - so a transformer needs them from
+	// here to put back what a forma declared.
+	ParentResource string
+	ParentType     string
 }
 
 // RequestTransformer transforms request properties before sending to API

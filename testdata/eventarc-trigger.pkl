@@ -1,0 +1,59 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/workflows/workflow.pkl"
+import "@gcp/eventarc/trigger.pkl"
+import "./config/vars.pkl" as v
+
+// A trigger needs somewhere to deliver to. A Workflow is the cheapest
+// destination: defining one is free, only executions are billed, and nothing
+// executes this. Cloud Run would need a container image and an HTTP endpoint
+// would need a real network attachment.
+//
+// The event filter matches Pub/Sub publishes. Eventarc creates the transport
+// topic itself when none is named, so the forma declares no topic.
+//
+// The service account is the project's default compute identity, which exists
+// in every project with Compute enabled and already has the roles Eventarc
+// needs to deliver. Declaring one is required for a Google-source trigger.
+local wf = new workflow.Workflow {
+  label = "plugin-sdk-test-trigger-workflow"
+  name = "formae-plugin-sdk-test-trig-wf-\(v.testRunID)"
+  description = "Destination workflow for the Eventarc trigger test"
+  sourceContents = """
+    main:
+      steps:
+        - done:
+            return: "ok"
+
+    """
+}
+
+forma {
+  v.stack
+  v.target
+
+  wf
+
+  new trigger.Trigger {
+    label = "plugin-sdk-test-eventarc-trigger"
+    name = "formae-plugin-sdk-test-trig-\(v.testRunID)"
+    eventFilters = new Listing {
+      new trigger.EventFilter {
+        attribute = "type"
+        value = "google.cloud.pubsub.topic.v1.messagePublished"
+      }
+    }
+    destination = new trigger.Destination {
+      // Resolvable -> the workflow exists before the trigger targets it, and
+      // the plugin expands the bare name into the full path Eventarc wants.
+      workflow = wf.res.name
+    }
+    serviceAccount = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+  }
+}

@@ -17,11 +17,12 @@ import (
 
 // Resource type constants
 const (
-	InstanceResourceType = "GCP::Bigtable::Instance"
-	ClusterResourceType  = "GCP::Bigtable::Cluster"
-	TableResourceType    = "GCP::Bigtable::Table"
-
-	AppProfileResourceType = "GCP::Bigtable::AppProfile"
+	InstanceResourceType         = "GCP::Bigtable::Instance"
+	ClusterResourceType          = "GCP::Bigtable::Cluster"
+	TableResourceType            = "GCP::Bigtable::Table"
+	BackupResourceType           = "GCP::Bigtable::Backup"
+	MaterializedViewResourceType = "GCP::Bigtable::MaterializedView"
+	AppProfileResourceType       = "GCP::Bigtable::AppProfile"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -132,7 +133,59 @@ func init() {
 				RequestWrapper: "table", // Bigtable API expects payload wrapped in "table"
 			},
 			RequestTransformer:  base.RequestTransformerFunc(wrapTableBodyBuilder),
-			ResponseTransformer: base.AddProjectResponseTransformer,
+			ResponseTransformer: base.ResponseTransformerFunc(tableResponseTransformer),
+		},
+		{
+			// A backup of a table, held by one cluster of the instance - the
+			// only three-level resource here, which the path builder and
+			// Create already handled. It was simply never registered, so the
+			// schema shipped with nothing behind it and any forma declaring a
+			// backup failed at apply.
+			ResourceType: BackupResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "backups",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(backupRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(backupResponseTransformer),
+		},
+		{
+			// A view over an instance's data, defined by a GoogleSQL query. It
+			// hangs off the instance, not a cluster - the schema previously said
+			// otherwise and had no provisioner, so nothing ever sent it.
+			ResourceType: MaterializedViewResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "materializedViews",
+				Scope:        nil,
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				SupportsUpdate: false,
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(materializedViewRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(materializedViewResponseTransformer),
 		},
 		// The three types below take their create id as a camelCase query
 		// parameter (?appProfileId=), which CreateIDParam sends verbatim. They
@@ -193,6 +246,28 @@ func init() {
 			func(cfg *config.Config) prov.Provisioner {
 				provisioner, _ := NewBigtableProvisioner(cfg, resourceType)
 				return provisioner
+			},
+		)
+	}
+
+	// Backups and materialized views need the same Create handling, and were
+	// left out of the list above: they fell through to the generic provisioner,
+	// which sends no *_id query parameter and knows nothing of the cluster a
+	// backup lives under. A backup create went to /instances/{i}/backups and
+	// 404ed, and a materialized view create was refused for an empty id. They
+	// also need a List that walks the instances - see walking_list.go.
+	for _, rt := range []string{BackupResourceType, MaterializedViewResourceType} {
+		resourceType := rt // capture by value for closure
+		registry.Register(
+			resourceType,
+			bigtableRegistry.Definitions[resourceType].Operations,
+			func(cfg *config.Config) prov.Provisioner {
+				provisioner, _ := NewBigtableProvisioner(cfg, resourceType)
+				bigtableProvisioner, ok := provisioner.(*BigtableProvisioner)
+				if !ok {
+					return provisioner
+				}
+				return &walkingListProvisioner{BigtableProvisioner: bigtableProvisioner}
 			},
 		)
 	}

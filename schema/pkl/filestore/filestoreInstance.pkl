@@ -104,6 +104,17 @@ open class Instance extends formae.Resource {
     }
     name: String
 
+    /// Zone the instance runs in (or region, for the REGIONAL and ENTERPRISE
+    /// tiers). A path component, not a body field. Defaults to the target's
+    /// location when unset - declare it when a forma also holds a resource
+    /// whose location differs, such as a `Backup`, which is regional and so
+    /// cannot share a location with a zonal instance.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    location: String?
+
     /// Service tier of the instance (e.g. "BASIC_HDD", "BASIC_SSD",
     /// "STANDARD", "ZONAL", "REGIONAL", "ENTERPRISE"). Immutable.
     @gcp.FieldHint {

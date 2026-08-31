@@ -11,6 +11,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 )
 
 // Resource type constants
@@ -176,6 +177,24 @@ func init() {
 		panic(err)
 	}
 
+	// Re-register Database behind a provisioner that walks the instances on
+	// List. Everything else stays config-driven; only List has to differ,
+	// because Cloud SQL has no way to ask for databases across instances. See
+	// database_walking_list.go.
+	def := sqlRegistry.Definitions[DatabaseResourceType]
+	registry.Register(DatabaseResourceType, def.Operations, func(cfg *config.Config) prov.Provisioner {
+		return &databaseProvisioner{
+			BaseResource: &base.BaseResource{
+				Config:              cfg,
+				APIConfig:           SQLAPI,
+				OperationConfig:     SQLOperations,
+				ResourceConfig:      def.ResourceConfig,
+				NativeIDConfig:      SQLNativeID,
+				RequestTransformer:  def.RequestTransformer,
+				ResponseTransformer: def.ResponseTransformer,
+			},
+		}
+	})
 	registerUserOverrides()
 	registerBackupRunReadOverride()
 	registerInstanceWalkingLists()

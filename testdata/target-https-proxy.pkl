@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/compute/urlMap.pkl"
+import "@gcp/compute/sslCertificate.pkl"
+import "@gcp/compute/targetHttpsProxy.pkl"
+import "./config/vars.pkl" as v
+
+// Global external HTTPS LB chain: HealthCheck -> BackendService -> UrlMap, plus
+// an SslCertificate, then TargetHttpsProxy. The same chain the target-http-proxy
+// case builds, with the certificate an HTTPS proxy additionally requires.
+//
+// The certificate is MANAGED: the resource is created immediately and
+// Google-managed issuance for the domain is a separate async step the proxy does
+// not wait on, so nothing here depends on a domain anyone controls.
+forma {
+  local hc = new healthCheck.HealthCheck {
+    label = "plugin-sdk-test-thsp-healthcheck"
+    name = "formae-plugin-sdk-test-thsp-hc-\(v.testRunID)"
+    type = "TCP"
+    tcpHealthCheck = new healthCheck.TcpHealthCheck {
+      port = 80
+    }
+  }
+
+  local bs = new backendService.BackendService {
+    label = "plugin-sdk-test-thsp-backend-service"
+    name = "formae-plugin-sdk-test-thsp-bs-\(v.testRunID)"
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    protocol = "HTTP"
+    timeoutSec = 30
+    healthChecks = new Listing {
+      hc.res.selfLink
+    }
+  }
+
+  local um = new urlMap.UrlMap {
+    label = "plugin-sdk-test-thsp-url-map"
+    name = "formae-plugin-sdk-test-thsp-um-\(v.testRunID)"
+    defaultService = bs.res.selfLink
+  }
+
+  local cert = new sslCertificate.SslCertificate {
+    label = "plugin-sdk-test-thsp-cert"
+    name = "formae-plugin-sdk-test-thsp-cert-\(v.testRunID)"
+    type = "MANAGED"
+    managedDomains = new Listing {
+      "formae-thsp-\(v.testRunID).example.com"
+    }
+  }
+
+  v.stack
+  v.target
+
+  hc
+  bs
+  um
+  cert
+
+  new targetHttpsProxy.TargetHttpsProxy {
+    label = "plugin-sdk-test-target-https-proxy"
+    name = "formae-plugin-sdk-test-thsp-\(v.testRunID)"
+    description = "Test target HTTPS proxy for plugin SDK conformance tests"
+    urlMap = um.res.selfLink
+    sslCertificates = new Listing {
+      cert.res.selfLink
+    }
+  }
+}

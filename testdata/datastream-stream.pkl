@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/datastream/connectionProfile.pkl" as connectionProfile
+import "@gcp/datastream/stream.pkl" as stream
+import "./config/vars.pkl" as v
+
+// A stream joins two connection profiles, so both come first.
+//
+// The source is a MySQL profile pointing at a hostname that does not answer.
+// Datastream validates a stream against its source on create, so the plugin
+// creates with force=true - which is exactly the case this fixture exercises. A
+// real MySQL instance would cost money and take minutes to provision, and the
+// stream is never started, so nothing ever tries to connect.
+local source = new connectionProfile.ConnectionProfile {
+  label = "plugin-sdk-test-stream-source"
+  name = "formae-test-src-\(v.testRunID)"
+  displayName = "Plugin SDK Test Stream Source"
+  mysqlProfile = new connectionProfile.MysqlProfile {
+    hostname = "10.255.255.1"
+    username = "formae-conformance"
+    password = "not-a-real-password"
+    port = 3306
+  }
+}
+
+local destination = new connectionProfile.ConnectionProfile {
+  label = "plugin-sdk-test-stream-destination"
+  name = "formae-test-dst-\(v.testRunID)"
+  displayName = "Plugin SDK Test Stream Destination"
+  gcsProfile = new connectionProfile.GcsProfile {
+    bucket = "formae-test-datastream-\(v.testRunID)"
+    rootPath = "/"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  source
+  destination
+
+  new stream.Stream {
+    label = "plugin-sdk-test-datastream-stream"
+    name = "formae-test-stream-\(v.testRunID)"
+    displayName = "Plugin SDK Test Stream"
+    // Resolvables -> both profiles exist first, and the plugin expands each
+    // short name into the full path Datastream wants.
+    sourceConfig = new stream.SourceConfig {
+      sourceConnectionProfile = source.res.name
+      // Must carry something: an empty MysqlSourceConfig serialises away, and
+      // the API then answers "field 'source_config.source_stream_config':
+      // Source Stream Config is not specified" - the oneof was never set.
+      // includeObjects with no tables means every table.
+      mysqlSourceConfig = new stream.MysqlSourceConfig {
+        maxConcurrentBackfillTasks = 4
+        includeObjects = new stream.MysqlRdbms {}
+      }
+    }
+    destinationConfig = new stream.DestinationConfig {
+      destinationConnectionProfile = destination.res.name
+      gcsDestinationConfig = new stream.GcsDestinationConfig {
+        path = "/conformance"
+        jsonFileFormat = new stream.JsonFileFormat {
+          compression = "NO_COMPRESSION"
+          schemaFileFormat = "NO_SCHEMA_FILE"
+        }
+      }
+    }
+    // A stream must declare exactly one backfill strategy.
+    backfillNone = new stream.BackfillNoneStrategy {}
+  }
+}

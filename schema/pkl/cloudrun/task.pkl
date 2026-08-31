@@ -54,7 +54,8 @@ open class Task extends formae.Resource {
     name: String
 
     /// Read-only: unique identifier
-    @gcp.FieldHint
+    /// Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
     uid: String?
 
     /// The grandparent job name

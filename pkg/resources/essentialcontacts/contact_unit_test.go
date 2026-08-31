@@ -75,7 +75,9 @@ func TestContactRegistered(t *testing.T) {
 			t.Errorf("%s not registered for %v", ContactResourceType, op)
 		}
 	}
-	// Update is intentionally unsupported.
+	// Update stays unsupported: contacts.patch exists, but an Allowed Contact
+	// Domains org policy stops a conformance case creating a contact at all, so
+	// nothing can verify it.
 	if registry.HasProvisioner(ContactResourceType, resource.OperationUpdate) {
 		t.Errorf("%s should not be registered for Update", ContactResourceType)
 	}

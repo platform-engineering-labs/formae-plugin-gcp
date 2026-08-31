@@ -1,0 +1,61 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/firewall.pkl"
+import "./config/vars.pkl" as v
+
+local testNetworkName = "formae-plugin-sdk-test-fw-net-\(v.testRunID)"
+
+forma {
+  v.stack
+  v.target
+
+  // Parent network for the firewall
+  new network.Network {
+    label = "plugin-sdk-test-network-for-firewall"
+    name = testNetworkName
+    description = "Test network for firewall conformance test"
+    autoCreateSubnetworks = false
+    routingConfig = new network.RoutingConfig {
+      routingMode = "REGIONAL"
+    }
+  }
+
+  // Test firewall rule - allow SSH
+  new firewall.Firewall {
+    label = "plugin-sdk-test-firewall"
+    // The name is immutable, so changing it forces a replace rather than
+    // an update: the old resource is destroyed and a new one takes its place.
+    name = "formae-plugin-sdk-test-fw-r2-\(v.testRunID)"
+    description = "Test firewall for plugin SDK conformance tests"
+    network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
+    direction = "INGRESS"
+    priority = 1000
+    sourceRanges = new Listing {
+      "10.0.0.0/8"
+    }
+    allowed = new Listing {
+      new firewall.Rule {
+        protocol = "tcp"
+        ports = new Listing {
+          "22"
+          "80"
+          "443"
+        }
+      }
+      new firewall.Rule {
+        protocol = "icmp"
+        ports = new Listing {}
+      }
+    }
+    targetTags = new Listing {
+      "test-server"
+    }
+  }
+}

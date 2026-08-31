@@ -27,15 +27,15 @@ open class ObjectAccessControlResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden entity: ObjectAccessControlResolvable = (this) {
-        property = "Entity"
+        property = "entity"
     }
 
     hidden role: ObjectAccessControlResolvable = (this) {
-        property = "Role"
+        property = "role"
     }
 
     hidden entityId: ObjectAccessControlResolvable = (this) {
-        property = "EntityId"
+        property = "entityId"
     }
 }
 
@@ -61,7 +61,7 @@ open class ObjectAccessControl extends formae.Resource {
     @gcp.FieldHint {
         createOnly = true
     }
-    object: String
+    object: (String|formae.Resolvable)
 
     /// The entity holding the permission, in one of the following forms:
     /// - user-{{userId}}
@@ -78,30 +78,36 @@ open class ObjectAccessControl extends formae.Resource {
     entity: String
 
     /// The access permission for the entity
+    @gcp.FieldHint
     role: Role
 
     /// The domain associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     domain: String?
 
     /// The email address associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     email: String?
 
     /// The ID for the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     entityId: String?
 
     /// The content generation of the object, if applied to an object (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     generation: Int?
 
     /// The project team associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     projectTeam: ProjectTeam?
 

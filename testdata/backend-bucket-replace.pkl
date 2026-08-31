@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/compute/backendBucket.pkl"
+import "./config/vars.pkl" as v
+
+// A backend bucket points a load balancer at a Cloud Storage bucket, so the
+// bucket comes first. Both are free to hold: an empty STANDARD bucket costs
+// nothing, and a backend bucket is configuration.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-backend-bucket-source"
+  name = "formae-plugin-sdk-test-bb-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+
+  new backendBucket.BackendBucket {
+    label = "plugin-sdk-test-backend-bucket"
+    // The name is immutable, so changing it forces a replace rather than
+    // an update: the old resource is destroyed and a new one takes its place.
+    name = "formae-plugin-sdk-test-bbk-r2-\(v.testRunID)"
+    description = "Test backend bucket for plugin SDK conformance tests"
+    // Resolvable -> the bucket exists before the backend references it.
+    bucketName = b.res.name
+    enableCdn = false
+  }
+}

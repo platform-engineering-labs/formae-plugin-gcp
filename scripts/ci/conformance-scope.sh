@@ -32,7 +32,7 @@ EVENT_NAME="${EVENT_NAME:-push}"
 BASE_SHA="${BASE_SHA:-}"
 FULL_LABEL="${FULL_LABEL:-false}"
 
-SKIP_FILE=".github/conformance-pr-skip.txt"
+
 
 emit() {
   local cases="$1" count="$2" reason="$3" skipped="${4:-}"
@@ -44,7 +44,7 @@ emit() {
     {
       printf '### Conformance scope\n\n%s\n\n' "$reason"
       if [ -n "$skipped" ]; then
-        printf 'Skipped per `%s`:\n\n' "$SKIP_FILE"
+        printf 'Not started (never-run lists):\n\n'
         printf '%s\n' "$skipped" | sed 's/^/- `/;s/$/`/'
         printf '\n'
       fi
@@ -58,7 +58,7 @@ emit() {
   fi
   printf '%s\n' "$reason"
   if [ -n "$skipped" ]; then
-    printf 'skipped per %s: %s\n' "$SKIP_FILE" "$(printf '%s' "$skipped" | tr '\n' ' ')"
+    printf 'not started (never-run lists): %s\n' "$(printf '%s' "$skipped" | tr '\n' ' ')"
   fi
   printf 'count=%s\n' "$count"
   echo "$cases" | jq -r 'if length == 0 then "(none)" else join(", ") end'
@@ -72,6 +72,10 @@ entries() {
 
 # Every case name ci.yml would run: a top-level testdata/*.pkl that is not an
 # -update / -replace companion. testdata/config/ holds shared Pkl, not fixtures.
+# testdata/ holds every fixture that exists. discovered() answers "does this
+# case exist", so it stays unfiltered - the never-run lists are subtracted from
+# the *scope* further down, after the existence checks, so that excluding a case
+# can never make a genuinely broken fixture name look like a typo.
 discovered() {
   find testdata -maxdepth 1 -name '*.pkl' -type f 2>/dev/null \
     | sed 's|^testdata/||;s|\.pkl$||' \
@@ -79,8 +83,17 @@ discovered() {
     | sort -u
 }
 
-# A skip entry that names no case does nothing and looks like it does. Fail
-# rather than let the two drift apart.
+# Two never-run lists, subtracted from the scope but never from existence:
+#   SKIP_FILE      - cases a pull request should not start; the full matrix on
+#                    main still runs them.
+#   ON_DEMAND_FILE - cases no matrix ever starts, whatever the event, because
+#                    they cost money to hold or mutate something shared. They
+#                    are run by naming them in debug-conformance.
+SKIP_FILE=".github/conformance-pr-skip.txt"
+ON_DEMAND_FILE="testdata/on-demand-cases.txt"
+
+on_demand() { entries "$ON_DEMAND_FILE" | sort -u; }
+
 assert_skip_names_exist() {
   local unknown
   unknown=$(comm -23 <(entries "$SKIP_FILE" | sort -u) <(discovered))
@@ -94,7 +107,7 @@ assert_skip_names_exist
 
 # --- full matrix ------------------------------------------------------------
 if [ "$EVENT_NAME" != "pull_request" ] || [ "$FULL_LABEL" = "true" ]; then
-  CASES=$(discovered | jq -R . | jq -sc .)
+  CASES=$(discovered | comm -23 - <(on_demand) | jq -R . | jq -sc .)
   COUNT=$(echo "$CASES" | jq 'length')
   if [ "$COUNT" -eq 0 ]; then
     echo "::error::no test cases discovered in testdata/" >&2
@@ -149,8 +162,9 @@ fi
 
 # Subtract the never-auto-run list. After the existence check, so a typo in the
 # skip file cannot mask a genuinely broken fixture name.
-SKIPPED=$(comm -12 <(printf '%s\n' "$NAMES") <(entries "$SKIP_FILE" | sort -u))
-KEPT=$(comm -23 <(printf '%s\n' "$NAMES") <(entries "$SKIP_FILE" | sort -u))
+NEVER=$( { entries "$SKIP_FILE"; on_demand; } | sort -u )
+SKIPPED=$(comm -12 <(printf '%s\n' "$NAMES") <(printf '%s\n' "$NEVER" | sed '/^$/d'))
+KEPT=$(comm -23 <(printf '%s\n' "$NAMES") <(printf '%s\n' "$NEVER" | sed '/^$/d'))
 
 if [ -z "$KEPT" ]; then
   emit '[]' 0 'Every case this pull request touched is on the never-auto-run list.' "$SKIPPED"

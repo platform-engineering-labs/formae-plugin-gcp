@@ -574,7 +574,9 @@ open class PrivateClusterConfig extends formae.SubResource {
 open class DatabaseEncryption extends formae.SubResource {
     keyName: String?
 
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     state: DatabaseEncryptionState?
 }
@@ -766,11 +768,11 @@ open class ClusterResolvable extends formae.Resolvable {
     }
 
     hidden selfLink: ClusterResolvable = (this) {
-        property = "SelfLink"
+        property = "selfLink"
     }
 
     hidden name: ClusterResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
 
     hidden endpoint: ClusterResolvable = (this) {
@@ -940,11 +942,15 @@ open class Cluster extends formae.Resource {
     }
     currentNodeVersion: String?
 
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     createTime: String?
 
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     status: String?
 
@@ -980,7 +986,9 @@ open class Cluster extends formae.Resource {
     }
     endpoint: String?
 
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     selfLink: String?
 

@@ -120,6 +120,14 @@ type ParentResourceConfig struct {
 	// e.g., ["b"] for bucket, ["b", "o"] for object
 	ParentPathSegments []string
 
+	// SecondPropertyName names a second property that, with PropertyName,
+	// identifies the parent. A Cloud Storage object ACL hangs off a bucket AND
+	// an object, and neither alone addresses it. When set, PathContext's
+	// ParentResource carries the two joined by "/" - "{bucket}/{object}" -
+	// which is the form the Storage path builder and native ID already expect.
+	//
+	// Leave empty for the usual single-property parent.
+	SecondPropertyName string
 	// GrandParentType and GrandParentPropertyName describe a second level of
 	// nesting, for APIs three collections deep (Service Directory:
 	// namespaces > services > endpoints). Read/Update/Delete rebuild the whole

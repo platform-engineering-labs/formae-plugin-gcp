@@ -1,0 +1,92 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Filestore Backup
+///
+/// A copy of one file share of an `Instance`, kept independently of it: a
+/// backup outlives the instance it was taken from and can restore into a new
+/// one.
+///
+/// **A backup is regional while a Filestore BASIC instance is zonal**, and the
+/// API is explicit about it: creating one at a zone answers "is not a valid
+/// location for backup creation, it should be a valid GCP region". So
+/// `location` is a region, and the instance named by `sourceInstance` lives in
+/// a zone inside it - a different value, given as `sourceInstanceLocation`.
+module gcp.filestore.filestoreBackup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Filestore::Backup"
+
+open class BackupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BackupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Backup extends formae.Resource {
+    hidden parent = this
+
+    /// Short backup id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region the backup is stored in. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The instance being backed up. A short instance name or an Instance
+    /// resolvable - expanded using `sourceInstanceLocation` - or a full
+    /// "projects/{p}/locations/{zone}/instances/{i}" path. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    sourceInstance: (String|formae.Resolvable)?
+
+    /// Zone of the instance named by `sourceInstance`, when it is given as a
+    /// bare name. Defaults to this backup's `location`, which is only right if
+    /// the instance is regional too. Not sent to the API - it exists so a forma
+    /// can pass a resolvable instead of hand-writing a path, which would
+    /// stringify the resolvable and lose the ordering edge.
+    @gcp.FieldHint { createOnly = true; writeOnly = true }
+    sourceInstanceLocation: String?
+
+    /// Which file share of that instance. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    sourceFileShare: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// CREATING, FINALIZING, READY or DELETING. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// Capacity of the source instance, as a string. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    capacityGb: String?
+
+    /// Tier of the source instance. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    sourceInstanceTier: String?
+
+    /// Bytes the backup occupies, as a string. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    storageBytes: String?
+
+    hidden res: BackupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

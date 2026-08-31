@@ -19,11 +19,7 @@ import (
 // principle: a schema without a provisioner is declarable but fails at apply,
 // and a provisioner without a schema cannot be declared at all. The test locks
 // in today's state so new drift fails loudly; shrink this list, never grow it.
-var knownParityGaps = map[string]string{
-	"GCP::Bigtable::Backup":             "schema/pkl/bigtable/backup.pkl has no provisioner",
-	"GCP::Bigtable::MaterializedView":   "schema/pkl/bigtable/materialized_view.pkl has no provisioner - the schema is correct now, but the create query needs Bigtable SQL semantics that could not be settled from CI logs",
-	"GCP::Storage::ObjectAccessControl": "registration is commented out in pkg/resources/storage/resources.go (object-scoped ACLs need both bucket and object in the path)",
-}
+var knownParityGaps = map[string]string{}
 
 var schemaTypeRE = regexp.MustCompile(`const type = "(GCP::[^"]+)"`)
 

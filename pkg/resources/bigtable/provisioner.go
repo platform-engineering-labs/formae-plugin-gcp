@@ -68,6 +68,13 @@ func (p *BigtableProvisioner) Create(
 	// a plain String and why the type still has no conformance case.
 	props = base.UnwrapValues(props)
 
+	// A forma can wrap a property so it is stored or displayed differently, and
+	// base.Create unwraps those before reading anything. This provisioner is
+	// hand-written and did not, so a wrapped value read as a plain string came
+	// back empty - which surfaced as "instance is required for nested
+	// resources" on a table whose instance was in fact declared.
+	props = base.UnwrapValues(props)
+
 	// Extract resource name for query parameter
 	resourceName := utils.GetString(props, "name")
 	if resourceName == "" {
@@ -143,10 +150,8 @@ func (p *BigtableProvisioner) Create(
 	// Add Bigtable-specific query parameter for resource ID
 	// Format: ?instance_id={name} or ?cluster_id={name} or ?table_id={name}
 	// Note: Bigtable Admin API uses snake_case for query parameters
-	resourceIDSuffix := strings.TrimSuffix(p.resourceTypeAPI, "s")
-	resourceIDParam := resourceIDSuffix + "_id"
 	url, err = transport.AddQueryParams(url, map[string]string{
-		resourceIDParam: resourceName,
+		bigtableIDParam(p.resourceTypeAPI): resourceName,
 	})
 	if err != nil {
 		return createBigtableFailureResult(resource.OperationErrorCodeInvalidRequest,
@@ -235,6 +240,27 @@ func newBigtableProvisionerWithBase(baseResource *base.BaseResource, resourceTyp
 		BaseResource:    baseResource,
 		resourceTypeAPI: resourceTypeAPI,
 	}
+}
+
+// bigtableIDParam names the query parameter that carries a new resource's id.
+// The API collection is camelCase while the parameter is snake_case, so
+// "materializedViews" has to become "materialized_view_id" - trimming the
+// plural alone yielded "materializedView_id", which the API ignored and then
+// rejected the create for an empty id.
+func bigtableIDParam(resourceTypeAPI string) string {
+	var b strings.Builder
+	for i, r := range strings.TrimSuffix(resourceTypeAPI, "s") {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r - 'A' + 'a')
+			continue
+		}
+		b.WriteRune(r)
+	}
+	b.WriteString("_id")
+	return b.String()
 }
 
 // describeValue renders a property's Go type and value for an error message,

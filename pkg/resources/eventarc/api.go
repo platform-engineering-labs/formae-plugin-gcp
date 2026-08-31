@@ -155,7 +155,10 @@ func locationResponseTransformer(collection string) base.ResponseTransformerFunc
 // a specific region, because Advanced runs in a subset of regions and rarely the
 // target's. Discovery would otherwise look only in the target's location and
 // never find them; Eventarc accepts "locations/-" on list, so use it.
-var advancedCollections = map[string]bool{"messageBuses": true, "pipelines": true}
+var advancedCollections = map[string]bool{
+	"messageBuses": true, "pipelines": true,
+	"enrollments": true, "googleApiSources": true,
+}
 
 func eventarcPathBuilder(ctx base.PathContext) string {
 	if ctx.IsList && advancedCollections[ctx.ResourceType] {
@@ -206,16 +209,5 @@ func extractEventarcNativeID(response map[string]interface{}, ctx base.PathConte
 // checkOperationStatus reports whether a polled Operation is done, mapping a
 // present "error" to a terminal failure.
 func checkOperationStatus(op map[string]interface{}) (bool, error) {
-	done, _ := op["done"].(bool)
-	if !done {
-		return false, nil
-	}
-	if errObj, ok := op["error"].(map[string]interface{}); ok {
-		msg, _ := errObj["message"].(string)
-		if msg == "" {
-			msg = "operation failed"
-		}
-		return true, fmt.Errorf("%s", msg)
-	}
-	return true, nil
+	return base.CheckLROStatus(op)
 }

@@ -135,6 +135,23 @@ if [ $? -eq 0 ]; then echo "ok   push and full-conformance label use the whole m
 else echo "FAIL push and full-conformance label use the whole matrix"; FAIL=$((FAIL+1)); fi
 rm -rf "$dir"
 
+# An on-demand case is never in a matrix, whatever the event: it costs money to
+# hold or mutates something shared, and is run by naming it in debug-conformance.
+dir=$(mktemp -d); ( cd "$dir"
+  git init -q .; mkdir -p testdata .github
+  : > testdata/bucket.pkl; : > testdata/pricey.pkl
+  printf 'pricey\n' > testdata/on-demand-cases.txt
+  git add -A >/dev/null; git -c user.email=t@t -c user.name=t commit -qm base
+  cp -r "$OLDPWD/scripts" .
+  push_out=$(EVENT_NAME=push bash scripts/ci/conformance-scope.sh 2>&1 | tail -1)
+  touched_out=$(EVENT_NAME=pull_request FULL_LABEL=true BASE_SHA=$(git rev-parse HEAD) \
+                bash scripts/ci/conformance-scope.sh 2>&1 | tail -1)
+  [ "$push_out" = "bucket" ] && [ "$touched_out" = "bucket" ]
+)
+if [ $? -eq 0 ]; then echo "ok   on-demand case is kept out of every matrix"; PASS=$((PASS+1))
+else echo "FAIL on-demand case is kept out of every matrix"; FAIL=$((FAIL+1)); fi
+rm -rf "$dir"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

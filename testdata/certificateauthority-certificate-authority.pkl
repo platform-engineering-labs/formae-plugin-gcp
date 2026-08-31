@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificateauthority/caPool.pkl"
+import "@gcp/certificateauthority/certificateAuthorityCa.pkl" as ca
+import "./config/vars.pkl" as v
+
+// A CA lives inside a pool, so the pool comes first.
+//
+// The pool is DEVOPS, not the ENTERPRISE the caPool case uses: a CA is billed
+// for as long as it exists and the tier sets the rate, so the cheap tier is the
+// right one for a resource a test creates and destroys. The plugin deletes with
+// skipGracePeriod, so the CA does not sit in DELETED - and billed - for 30 days
+// after the run.
+local pool = new caPool.CaPool {
+  label = "plugin-sdk-test-ca-pool"
+  name = "formae-test-ca-pool-\(v.testRunID)"
+  tier = "DEVOPS"
+}
+
+forma {
+  v.stack
+  v.target
+
+  pool
+
+  new ca.CertificateAuthority {
+    label = "plugin-sdk-test-certificate-authority"
+    name = "formae-test-ca-\(v.testRunID)"
+    location = v.gcpLocation
+    // Resolvable -> the pool exists before the CA is created.
+    caPool = pool.res.name
+    type = "SELF_SIGNED"
+    lifetime = "315360000s"
+    keySpec = new ca.KeyVersionSpec {
+      algorithm = "RSA_PKCS1_4096_SHA256"
+    }
+    config = new ca.CertificateConfig {
+      subjectConfig = new ca.SubjectConfig {
+        subject = new ca.Subject {
+          commonName = "formae-conformance-root"
+          organization = "formae plugin sdk test"
+        }
+      }
+      x509Config = new ca.X509Config {
+        caOptions = new ca.CaOptions {
+          isCa = true
+        }
+        keyUsage = new ca.KeyUsage {
+          baseKeyUsage = new ca.KeyUsageOptions {
+            certSign = true
+            crlSign = true
+          }
+        }
+      }
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

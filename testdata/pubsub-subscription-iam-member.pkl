@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/pubsub/topic.pkl"
+import "@gcp/pubsub/subscription.pkl"
+import "@gcp/pubsub/subscriptionIamMember.pkl" as iam
+import "./config/vars.pkl" as v
+
+// A subscription needs a topic, and the binding needs the subscription, so both
+// come first.
+//
+// The member is the project's Cloud Storage service agent - a principal that
+// always exists, needs no setup, and whose grant on a throwaway subscription
+// affects nothing else.
+local t = new topic.Topic {
+  label = "plugin-sdk-test-subiam-topic"
+  name = "formae-plugin-sdk-test-subiam-topic-\(v.testRunID)"
+}
+
+local s = new subscription.Subscription {
+  label = "plugin-sdk-test-subiam-subscription"
+  name = "formae-plugin-sdk-test-subiam-sub-\(v.testRunID)"
+  topic = t.res.name
+}
+
+forma {
+  v.stack
+  v.target
+
+  t
+  s
+
+  new iam.SubscriptionIamMember {
+    label = "plugin-sdk-test-pubsub-subscription-iam-member"
+    // Resolvable -> the subscription exists before the binding is written.
+    subscription = s.res.name
+    role = "roles/pubsub.subscriber"
+    member = "serviceAccount:service-\(v.gcpProjectNumber)@gs-project-accounts.iam.gserviceaccount.com"
+  }
+}

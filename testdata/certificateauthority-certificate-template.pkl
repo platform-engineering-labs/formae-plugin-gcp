@@ -1,0 +1,29 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificateauthority/certificateTemplate.pkl"
+import "./config/vars.pkl" as v
+
+// A template is location-scoped, not pool-scoped: it needs no CA pool and no
+// CA, issues nothing on its own, and costs nothing.
+forma {
+  v.stack
+  v.target
+
+  new certificateTemplate.CertificateTemplate {
+    label = "plugin-sdk-test-certificate-template"
+    name = "formae-test-tmpl-\(v.testRunID)"
+    location = v.gcpLocation
+    description = "Created by the formae GCP plugin conformance suite."
+    maximumLifetime = "86400s"
+    identityConstraints = new certificateTemplate.CertificateIdentityConstraints {
+      allowSubjectPassthrough = true
+      allowSubjectAltNamesPassthrough = true
+    }
+  }
+}

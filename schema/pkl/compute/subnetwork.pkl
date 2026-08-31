@@ -170,7 +170,9 @@ open class Subnetwork extends formae.Resource {
     }
     allowSubnetCidrRoutesOverlap: Boolean?
 
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     state: String?
 

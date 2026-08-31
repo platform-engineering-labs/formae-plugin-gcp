@@ -17,11 +17,11 @@ open class BucketAccessControlResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden entity: BucketAccessControlResolvable = (this) {
-        property = "Entity"
+        property = "entity"
     }
 
     hidden role: BucketAccessControlResolvable = (this) {
-        property = "Role"
+        property = "role"
     }
 }
 
@@ -59,15 +59,18 @@ open class BucketAccessControl extends formae.Resource {
     entity: String
 
     /// The access permission for the entity
+    @gcp.FieldHint
     role: Role?
 
     /// The domain associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     domain: String?
 
     /// The email address associated with the entity (output only)
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     email: String?
 

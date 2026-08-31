@@ -1,0 +1,58 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/sql/database.pkl" as instance
+import "@gcp/sql/sqlDatabase.pkl" as sqlDatabase
+import "./config/vars.pkl" as v
+
+// A database lives inside a Cloud SQL instance, so the instance comes first.
+// Its settings mirror the cloudsql-instance case exactly, including the private
+// IP configuration: org policy constraints/sql.restrictPublicIp forbids a public
+// IP on this project, so the instance uses private IP on the default VPC, which
+// needs the Service Networking peering that project already has.
+//
+// db-f1-micro is the smallest tier. The cost of the case is dominated by how
+// long an instance takes to provision, not by the instance itself.
+local inst = new instance.DatabaseInstance {
+  label = "plugin-sdk-test-db-instance"
+  project = v.gcpProject
+  name = "formae-test-sqldb-\(v.testRunID)"
+  databaseVersion = "MYSQL_8_0"
+  region = v.gcpRegion
+  settings = new instance.Settings {
+    tier = "db-f1-micro"
+    availabilityType = "ZONAL"
+    dataDiskSizeGb = 10
+    dataDiskType = "PD_SSD"
+    storageAutoResize = true
+    ipConfiguration = new instance.IpConfiguration {
+      ipv4Enabled = false
+      privateNetwork = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
+    }
+    backupConfiguration = new instance.BackupConfiguration {
+      enabled = false
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  new sqlDatabase.Database {
+    label = "plugin-sdk-test-sql-database"
+    project = v.gcpProject
+    // Resolvable -> the instance exists before the database is created in it.
+    instance = inst.res.name
+    name = "formae_test_db_\(v.testRunID)"
+    charset = "utf8mb4"
+    collation = "utf8mb4_general_ci"
+  }
+}

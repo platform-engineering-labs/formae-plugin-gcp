@@ -1,0 +1,37 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/pubsub/topic.pkl"
+import "@gcp/pubsub/topicIamMember.pkl" as iam
+import "./config/vars.pkl" as v
+
+// A binding needs a topic to bind on, so the topic comes first.
+//
+// The member is the project's own Cloud Storage service agent, which is the
+// grant a bucket notification actually needs. It is a principal that always
+// exists for a project with Storage enabled, needs no setup, and granting it
+// publish on a throwaway topic has no effect on anything else.
+local t = new topic.Topic {
+  label = "plugin-sdk-test-iam-topic"
+  name = "formae-plugin-sdk-test-iam-topic-\(v.testRunID)"
+}
+
+forma {
+  v.stack
+  v.target
+
+  t
+
+  new iam.TopicIamMember {
+    label = "plugin-sdk-test-pubsub-topic-iam-member"
+    // Resolvable -> the topic exists before the binding is written.
+    topic = t.res.name
+    role = "roles/pubsub.publisher"
+    member = "serviceAccount:service-\(v.gcpProjectNumber)@gs-project-accounts.iam.gserviceaccount.com"
+  }
+}

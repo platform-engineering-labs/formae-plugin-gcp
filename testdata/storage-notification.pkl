@@ -1,0 +1,71 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/notification.pkl" as notification
+import "@gcp/pubsub/topic.pkl"
+import "@gcp/pubsub/topicIamMember.pkl" as iam
+import "./config/vars.pkl" as v
+
+// A notification needs three things to exist first: the bucket whose changes
+// are published, the topic they go to, and - the part that is easy to miss -
+// the IAM binding letting Cloud Storage publish to that topic.
+//
+// Cloud Storage publishes as the project's own service agent, so without
+// roles/pubsub.publisher on the topic the create fails outright. Declaring the
+// binding as a resource is what makes this forma self-contained rather than
+// depending on a grant someone made by hand.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-notification-bucket"
+  name = "formae-plugin-sdk-test-notif-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+}
+
+local t = new topic.Topic {
+  label = "plugin-sdk-test-notification-topic"
+  name = "formae-plugin-sdk-test-notif-topic-\(v.testRunID)"
+}
+
+local publisher = new iam.TopicIamMember {
+  label = "plugin-sdk-test-notification-publisher"
+  topic = t.res.name
+  role = "roles/pubsub.publisher"
+  member = "serviceAccount:service-\(v.gcpProjectNumber)@gs-project-accounts.iam.gserviceaccount.com"
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+  t
+  publisher
+
+  new notification.Notification {
+    label = "plugin-sdk-test-storage-notification"
+    // Resolvables -> bucket and topic exist first, and the plugin expands the
+    // bare topic name into the //pubsub.googleapis.com/... form this API wants.
+    //
+    // The topic is referenced through the BINDING, not the topic directly.
+    // Referencing t.res.name would order the notification after the topic but
+    // not after the grant, and formae would be free to create the notification
+    // first - which fails, because Cloud Storage cannot publish yet. Ordering
+    // here comes only from resolvable references, so the reference has to go
+    // through the thing that must exist.
+    bucket = b.res.name
+    topic = publisher.res.topic
+    payload_format = "JSON_API_V1"
+    event_types = new Listing {
+      "OBJECT_FINALIZE"
+    }
+    custom_attributes = new Mapping {
+      ["managed-by"] = "formae"
+    }
+  }
+}

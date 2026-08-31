@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/apigateway/api.pkl"
+import "@gcp/apigateway/apiConfig.pkl"
+import "./config/vars.pkl" as v
+
+// A config is a snapshot of an api, so the api comes first. Neither costs
+// anything to hold — API Gateway bills the calls a gateway serves, and nothing
+// here serves any.
+local parentApi = new api.Api {
+  label = "plugin-sdk-test-agw-cfg-api"
+  project = v.gcpProject
+  name = "formae-plugin-sdk-test-agwc-\(v.testRunID)"
+  displayName = "Plugin SDK config api"
+}
+
+// API Gateway takes an OpenAPI 2.0 document. x-google-backend names where a
+// request would be sent; example.com is reserved for documentation, so nothing
+// is actually reachable.
+local openapi = """
+  swagger: '2.0'
+  info:
+    title: formae-conformance
+    description: Plugin SDK conformance config
+    version: 1.0.0
+  schemes:
+    - https
+  produces:
+    - application/json
+  paths:
+    /hello:
+      get:
+        summary: Greet
+        operationId: hello
+        x-google-backend:
+          address: https://example.com/hello
+        responses:
+          '200':
+            description: ok
+
+  """
+
+forma {
+  v.stack
+  v.target
+
+  parentApi
+
+  new apiConfig.ApiConfig {
+    label = "plugin-sdk-test-apigateway-api-config"
+    project = v.gcpProject
+    // Resolvable -> the api exists before a config is added to it.
+    api = parentApi.res.name
+    name = "formae-plugin-sdk-test-agwcfg-\(v.testRunID)"
+    displayName = "Plugin SDK conformance config (updated)"
+    labels = new Mapping {
+      ["updated"] = "true"
+    }
+    openapiDocuments = new Listing {
+      new apiConfig.OpenApiDocument {
+        document = new apiConfig.ApiDocument {
+          path = "openapi.yaml"
+          contents = openapi.base64
+        }
+      }
+    }
+  }
+}

@@ -66,6 +66,26 @@ open class Versioning extends formae.SubResource {
     enabled: Boolean?
 }
 
+/// Uniform bucket-level access. When enabled, access is controlled only by IAM
+/// and the bucket rejects ACLs - so a `BucketAccessControl` or
+/// `DefaultObjectAccessControl` on such a bucket cannot be created.
+@gcp.SubResourceHint
+open class UniformBucketLevelAccess extends formae.SubResource {
+    @gcp.FieldHint
+    enabled: Boolean?
+}
+
+@gcp.SubResourceHint
+open class IamConfiguration extends formae.SubResource {
+    @gcp.FieldHint
+    uniformBucketLevelAccess: UniformBucketLevelAccess?
+
+    /// "inherited" or "enforced". Enforcing public access prevention blocks
+    /// making objects publicly readable.
+    @gcp.FieldHint { hasProviderDefault = true }
+    publicAccessPrevention: String?
+}
+
 @gcp.SubResourceHint
 open class Website extends formae.SubResource {
     mainPageSuffix: String?
@@ -219,6 +239,12 @@ open class Bucket extends formae.Resource {
         hasProviderDefault = true
     }
     updated: String?
+
+    /// IAM configuration. Set `uniformBucketLevelAccess.enabled = false` to
+    /// keep ACLs usable on this bucket; GCP's own default for new buckets has
+    /// varied, and an organisation policy can force it on.
+    @gcp.FieldHint { hasProviderDefault = true }
+    iamConfiguration: IamConfiguration?
 
     @gcp.FieldHint
     versioning: Versioning?

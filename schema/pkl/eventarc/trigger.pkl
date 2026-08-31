@@ -64,10 +64,14 @@ open class Destination extends formae.SubResource {
     @gcp.FieldHint
     cloudRun: CloudRun?
 
-    /// Workflow resource name target
-    /// ("projects/{p}/locations/{l}/workflows/{w}").
+    /// Workflow to deliver to. A short workflow name or a Workflow resolvable -
+    /// the plugin expands it to
+    /// "projects/{p}/locations/{l}/workflows/{w}" - or that full path written
+    /// out. It has to accept a resolvable: ordering in a forma comes only from
+    /// resolvable references, so a bare string leaves formae free to create the
+    /// trigger before the workflow it targets.
     @gcp.FieldHint
-    workflow: String?
+    workflow: (String|formae.Resolvable)?
 
     /// HTTP endpoint target.
     @gcp.FieldHint

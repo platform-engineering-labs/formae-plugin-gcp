@@ -24,6 +24,7 @@ import (
 const (
 	TopicResourceType        = "GCP::PubSub::Topic"
 	SubscriptionResourceType = "GCP::PubSub::Subscription"
+	SnapshotResourceType     = "GCP::PubSub::Snapshot"
 	SchemaResourceType       = "GCP::PubSub::Schema"
 )
 
@@ -72,6 +73,12 @@ func init() {
 			ResponseTransformer: base.ResponseTransformerFunc(subscriptionResponseTransformer),
 		},
 		{
+			ResourceType:        SnapshotResourceType,
+			ResourceConfig:      base.ResourceConfig{ResourceType: "snapshots"},
+			RequestTransformer:  base.RequestTransformerFunc(snapshotCreateTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(snapshotResponseTransformer),
+		},
+		{
 			ResourceType:        SchemaResourceType,
 			ResourceConfig:      base.ResourceConfig{ResourceType: "schemas"}, // immutable
 			RequestTransformer:  base.RequestTransformerFunc(stripName),
@@ -98,6 +105,9 @@ func init() {
 		SubscriptionResourceType: {createPut, "", "subscription", map[string]bool{
 			"ackDeadlineSeconds": true, "retainAckedMessages": true,
 			"messageRetentionDuration": true, "labels": true,
+		}},
+		SnapshotResourceType: {createPut, "", "snapshot", map[string]bool{
+			"labels": true,
 		}},
 		SchemaResourceType: {createPostQueryID, "schemaId", "", nil},
 	}
@@ -167,6 +177,32 @@ func subscriptionCreateTransformer(props map[string]interface{}, ctx base.Transf
 // subscriptionResponseTransformer normalizes the full-path "name" and "topic"
 // fields back to their short forms so stored state matches declared state.
 func subscriptionResponseTransformer(apiResponse map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	shortenField(apiResponse, "name")
+	shortenField(apiResponse, "topic")
+	return apiResponse
+}
+
+// snapshotCreateTransformer builds CreateSnapshotRequest. The create body is
+// not the Snapshot resource: it carries the "subscription" to snapshot (which
+// the API never echoes back — it reports that subscription's "topic" instead),
+// so every read-only field is dropped and "subscription" is expanded to the
+// full resource path the API requires.
+func snapshotCreateTransformer(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		switch k {
+		case "name", "topic", "expireTime":
+			continue
+		}
+		body[k] = v
+	}
+	if sub, ok := body["subscription"].(string); ok && sub != "" && !strings.HasPrefix(sub, "projects/") {
+		body["subscription"] = fmt.Sprintf("projects/%s/subscriptions/%s", ctx.Project, sub)
+	}
+	return body, nil
+}
+
+func snapshotResponseTransformer(apiResponse map[string]interface{}, _ base.TransformContext) map[string]interface{} {
 	shortenField(apiResponse, "name")
 	shortenField(apiResponse, "topic")
 	return apiResponse

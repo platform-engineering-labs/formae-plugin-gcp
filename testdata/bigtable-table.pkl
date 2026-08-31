@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigtable/instance_bigtable.pkl" as instance
+import "@gcp/bigtable/table.pkl" as table
+import "./config/vars.pkl" as v
+
+// A table lives inside an instance, so the instance comes first. DEVELOPMENT is
+// the cheap single-node instance type the bigtable-instance case already uses.
+local inst = new instance.Instance {
+  label = "plugin-sdk-test-table-instance"
+  project = v.gcpProject
+  name = "formae-test-instance-tbl-\(v.testRunID)"
+  displayName = "Plugin SDK Test Table Instance"
+  type = "DEVELOPMENT"
+  clusters = new Mapping {
+    ["cluster1"] = new instance.ClusterConfig {
+      location = "\(v.gcpRegion)-a"
+      defaultStorageType = "SSD"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  new table.Table {
+    label = "plugin-sdk-test-bigtable-table"
+    project = v.gcpProject
+    // Resolvable -> the instance exists before the table is created in it.
+    // Until this field accepted a resolvable the reference could only be a bare
+    // string, which gives formae no ordering edge at all.
+    instance = inst.res.name
+    name = "formae-test-table-\(v.testRunID)"
+    columnFamilies = new Mapping {
+      ["cf1"] = new table.ColumnFamily {
+        name = "cf1"
+        gcRule = new table.GCRule {
+          maxNumVersions = 1
+        }
+      }
+    }
+  }
+}

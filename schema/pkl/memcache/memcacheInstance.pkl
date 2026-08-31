@@ -1,0 +1,97 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Memorystore for Memcached Instance
+///
+/// A managed memcached cluster on a VPC network. It is billed by node-hour for
+/// as long as it exists — the smallest is one node of 1 GiB — and takes twenty
+/// minutes or more to create, so a forma declaring one is both spending money
+/// and waiting.
+module gcp.memcache.memcacheInstance
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Memcache::Instance"
+
+/// How much CPU and memory each node gets.
+class NodeConfig {
+    /// Virtual CPUs per node.
+    @gcp.FieldHint
+    cpuCount: Int?
+
+    /// Memory per node, in MiB.
+    @gcp.FieldHint
+    memorySizeMb: Int?
+}
+
+open class MemcacheInstanceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MemcacheInstanceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Instance extends formae.Resource {
+    hidden parent = this
+
+    /// Short instance id, unique within the region. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The project holding the instance.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    /// The region the instance runs in.
+    @gcp.FieldHint { hasProviderDefault = true }
+    region: String?
+
+    @gcp.FieldHint
+    displayName: String?
+
+    /// The VPC network the nodes attach to, as "projects/{p}/global/networks/{n}"
+    /// or a short network name. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    authorizedNetwork: (String|formae.Resolvable)?
+
+    /// Which zones the nodes are spread across. GCP picks when unset.
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    zones: Listing<String>?
+
+    /// How many nodes the cluster has.
+    @gcp.FieldHint
+    nodeCount: Int?
+
+    /// CPU and memory per node. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    nodeConfig: NodeConfig?
+
+    /// Memcached version, e.g. "MEMCACHE_1_5" or "MEMCACHE_1_6_15".
+    @gcp.FieldHint { createOnly = true; hasProviderDefault = true }
+    memcacheVersion: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// CREATING, READY, UPDATING, DELETING or PERFORMING_MAINTENANCE.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// The host the client library connects to, assigned by the server.
+    @gcp.FieldHint { hasProviderDefault = true }
+    discoveryEndpoint: String?
+
+    hidden res: MemcacheInstanceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

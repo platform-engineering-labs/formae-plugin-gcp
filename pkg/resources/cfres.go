@@ -7,8 +7,11 @@ package resources
 import (
 	// Import all provisioners to trigger their init() functions
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/alloydb"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/analyticshub"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/apigateway"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/artifactregistry"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigquery"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigqueryconnection"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/bigtable"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/certificateauthority"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/certificatemanager"
@@ -28,6 +31,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/iam"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/kms"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/logging"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/memcache"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/monitoring"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/networkconnectivity"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/orgpolicy"

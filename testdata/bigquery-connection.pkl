@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigquery/bigqueryConnection.pkl" as bqConnection
+import "./config/vars.pkl" as v
+
+// A connection has no prerequisites and costs nothing to hold - BigQuery bills
+// queries, and nothing queries through this. A cloudResource connection carries
+// no configuration of its own: BigQuery mints a service account for it, which
+// is what the response reports back.
+forma {
+  v.stack
+  v.target
+
+  new bqConnection.Connection {
+    label = "plugin-sdk-test-bigquery-connection"
+    project = v.gcpProject
+    name = "formae-plugin-sdk-test-bqconn-\(v.testRunID)"
+    friendlyName = "Plugin SDK conformance connection"
+    description = "Plugin SDK conformance connection"
+    cloudResource = new bqConnection.CloudResourceProperties {}
+  }
+}

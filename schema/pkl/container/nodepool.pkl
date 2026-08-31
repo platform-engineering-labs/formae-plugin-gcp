@@ -616,11 +616,11 @@ open class NodePoolResolvable extends formae.Resolvable {
     }
 
     hidden selfLink: NodePoolResolvable = (this) {
-        property = "SelfLink"
+        property = "selfLink"
     }
 
     hidden name: NodePoolResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
 }
 
@@ -682,7 +682,9 @@ open class NodePool extends formae.Resource {
     queuedProvisioning: QueuedProvisioning?
 
     // Output-only fields
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     status: NodePoolStatus?
 
@@ -694,7 +696,9 @@ open class NodePool extends formae.Resource {
     }
     instanceGroupUrls: Listing<String>?
 
+    /// Set by the API.
     @gcp.FieldHint {
+        hasProviderDefault = true
     }
     selfLink: String?
 

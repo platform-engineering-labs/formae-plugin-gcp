@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Filestore Snapshot
+///
+/// A point-in-time copy of an `Instance`'s file shares, stored inside the
+/// instance itself. Unlike a `Backup`, a snapshot does not outlive its
+/// instance - deleting the instance deletes its snapshots.
+///
+/// **Not every tier supports snapshots.** ZONAL, REGIONAL and ENTERPRISE do;
+/// the BASIC tiers do not, and answer "The service tier of the specified
+/// instance doesn't support snapshots" at create. `Backup` is what a BASIC
+/// instance uses instead.
+///
+/// **This type has no conformance case, and cannot have one in the shared test
+/// project.** Every tier that supports snapshots is enterprise-class, and those
+/// count against `EnterpriseStorageGibPerRegion`, which is 0 there - a create
+/// answers "Quota limit 'EnterpriseStorageGibPerRegion' has been exceeded.
+/// Limit: 0". Raising that quota (1024 GiB is the tier minimum) is what would
+/// let the case exist; until then this type ships unverified against the live
+/// API.
+module gcp.filestore.filestoreSnapshot
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Filestore::Snapshot"
+
+open class SnapshotResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SnapshotResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Snapshot extends formae.Resource {
+    hidden parent = this
+
+    /// Short snapshot id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Zone of the instance. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The instance this snapshot belongs to. A short instance name or an
+    /// Instance resolvable. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// CREATING, READY or DELETING. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// Bytes used by the file system at snapshot time, as a string. Set by the
+    /// API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    filesystemUsedBytes: String?
+
+    hidden res: SnapshotResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

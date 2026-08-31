@@ -27,9 +27,14 @@ func init() {
 		{
 			ResourceType: ContactResourceType,
 			ResourceConfig: base.ResourceConfig{
-				ResourceType:   "contacts",
-				Scope:          &base.ScopeConfig{Type: base.ScopeProjectLevel},
-				SupportsUpdate: false, // patch exists; defer until verified
+				ResourceType: "contacts",
+				Scope:        &base.ScopeConfig{Type: base.ScopeProjectLevel},
+				// contacts.patch exists and takes an updateMask, but nothing
+				// exercises it: the shared test project carries an Allowed
+				// Contact Domains org policy, so a conformance case cannot
+				// create a contact at all - "doesn't have a domain that matches
+				// the Allowed Contact Domains org policy". Still deferred.
+				SupportsUpdate: false,
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,
 			Operations: []resource.Operation{

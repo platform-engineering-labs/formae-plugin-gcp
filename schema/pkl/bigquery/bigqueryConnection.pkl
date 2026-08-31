@@ -1,0 +1,83 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP BigQuery Connection
+///
+/// A named handle BigQuery uses to reach something outside itself — Cloud SQL,
+/// Spark, or Google Cloud resources generally. A `cloudResource` connection is
+/// the simplest: BigQuery mints a service account for it, and granting that
+/// account access is how a query reaches the resource.
+///
+/// Holding a connection costs nothing; BigQuery bills queries.
+module gcp.bigquery.bigqueryConnection
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BigQuery::Connection"
+
+/// A connection to Google Cloud resources. It selects the kind of connection
+/// and carries no configuration of its own.
+///
+/// The service account BigQuery mints for it is reported as
+/// `cloudResourceServiceAccountId` rather than nested here: a hint is only
+/// emitted for a top-level field, so a nested one cannot be marked as
+/// server-filled and reads as a property the forma never declared.
+class CloudResourceProperties {
+}
+
+open class ConnectionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ConnectionResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Connection extends formae.Resource {
+    hidden parent = this
+
+    /// Short connection id, unique within the location. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The project holding the connection.
+    @gcp.FieldHint { createOnly = true }
+    project: (String|formae.Resolvable)?
+
+    /// The location the connection lives in. BigQuery connections live in a
+    /// region or in a multi-region such as "US" or "EU".
+    @gcp.FieldHint { hasProviderDefault = true }
+    location: String?
+
+    @gcp.FieldHint
+    friendlyName: String?
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Reach Google Cloud resources through a service account BigQuery mints.
+    @gcp.FieldHint
+    cloudResource: CloudResourceProperties?
+
+    /// The service account BigQuery created for a `cloudResource` connection.
+    /// Grant it access to whatever the connection should reach.
+    @gcp.FieldHint { hasProviderDefault = true }
+    cloudResourceServiceAccountId: String?
+
+    /// Whether the connection has credentials configured - server-reported.
+    @gcp.FieldHint { hasProviderDefault = true }
+    hasCredential: Boolean?
+
+    hidden res: ConnectionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

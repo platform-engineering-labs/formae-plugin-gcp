@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Eventarc Enrollment
+///
+/// The routing rule of an Eventarc Advanced setup: a CEL expression matched
+/// against the events on a `MessageBus`, and the `Pipeline` that matching
+/// events are handed to. A bus without an enrollment routes nothing.
+///
+/// **Eventarc Advanced runs in a subset of regions**, so an enrollment normally
+/// declares its own `location` rather than inheriting the target's - and it must
+/// be the same region as the bus and the pipeline it names.
+module gcp.eventarc.enrollment
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Eventarc::Enrollment"
+
+open class EnrollmentResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: EnrollmentResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Enrollment extends formae.Resource {
+    hidden parent = this
+
+    /// Short enrollment id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the enrollment. A path component, not a body field.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The bus whose events this rule matches. A short bus name or a
+    /// MessageBus resolvable; the plugin expands it to the full path.
+    /// Immutable - the API refuses to move an enrollment between buses.
+    @gcp.FieldHint { createOnly = true }
+    messageBus: (String|formae.Resolvable)
+
+    /// Where matching events go. A short pipeline name or a Pipeline
+    /// resolvable; the plugin expands it to the full path.
+    @gcp.FieldHint
+    destination: (String|formae.Resolvable)
+
+    /// CEL matched against each event, e.g. `message.type == "google.cloud.
+    /// pubsub.topic.v1.messagePublished"`. `true` matches everything.
+    @gcp.FieldHint
+    celMatch: String
+
+    @gcp.FieldHint
+    displayName: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    /// Server-assigned unique id.
+    @gcp.FieldHint { hasProviderDefault = true }
+    uid: String?
+
+    hidden res: EnrollmentResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

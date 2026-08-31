@@ -6,15 +6,33 @@
 package eventarc
 
 import (
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 const TriggerResourceType = "GCP::Eventarc::Trigger"
 const MessageBusResourceType = "GCP::Eventarc::MessageBus"
 const PipelineResourceType = "GCP::Eventarc::Pipeline"
+const EnrollmentResourceType = "GCP::Eventarc::Enrollment"
+const GoogleAPISourceResourceType = "GCP::Eventarc::GoogleApiSource"
 
 var eventarcRegistry *base.ResourceRegistry
+
+// An enrollment names its bus and its destination pipeline; a googleApiSource
+// names the bus it feeds. Both are scalar path fields, so both get the
+// expand-on-write / shorten-on-read pair.
+var (
+	enrollmentRequest, enrollmentResponse = advancedRefTransformers("enrollments", map[string]string{
+		"messageBus":  "messageBuses",
+		"destination": "pipelines",
+	})
+	googleAPISourceRequest, googleAPISourceResponse = advancedRefTransformers("googleApiSources", map[string]string{
+		"destination": "messageBuses",
+	})
+)
 
 func init() {
 	eventarcRegistry = base.NewResourceRegistry(
@@ -37,7 +55,8 @@ func init() {
 				resource.OperationList,
 				resource.OperationCheckStatus,
 			},
-			ResponseTransformer: base.ShortNameResponseTransformer,
+			RequestTransformer:  base.RequestTransformerFunc(triggerRequest),
+			ResponseTransformer: base.ResponseTransformerFunc(triggerResponse),
 		},
 		{
 			// The Eventarc Advanced hub that pipelines and enrollments attach
@@ -84,8 +103,75 @@ func init() {
 			RequestTransformer:  base.RequestTransformerFunc(pipelineRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(pipelineResponseTransformer),
 		},
+		{
+			// The routing rule of an Eventarc Advanced setup: a CEL match over
+			// the events on a bus, and the pipeline matching events go to.
+			ResourceType: EnrollmentResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:       "enrollments",
+				Scope:              &base.ScopeConfig{Type: base.ScopeLocationBased},
+				CreateIDParam:      "enrollmentId", // id goes in ?enrollmentId=
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true, // PATCH ?updateMask=<body fields>
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  enrollmentRequest,
+			ResponseTransformer: enrollmentResponse,
+		},
+		{
+			// Routes this project's own Google API audit events onto a bus.
+			// Only one is allowed per project per region.
+			ResourceType: GoogleAPISourceResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:       "googleApiSources",
+				Scope:              &base.ScopeConfig{Type: base.ScopeLocationBased},
+				CreateIDParam:      "googleApiSourceId", // id goes in ?googleApiSourceId=
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true, // PATCH ?updateMask=<body fields>
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationUpdate,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  googleAPISourceRequest,
+			ResponseTransformer: googleAPISourceResponse,
+		},
 	})
 	if err != nil {
 		panic(err)
 	}
+
+	// Trigger needs a Create of its own: Eventarc wants the short id in
+	// ?triggerId= and the full resource path in the body's "name" at the same
+	// time, and the generic engine can only put it in one. See
+	// trigger_create.go.
+	registry.Register(
+		TriggerResourceType,
+		eventarcRegistry.Definitions[TriggerResourceType].Operations,
+		func(cfg *config.Config) prov.Provisioner {
+			def := eventarcRegistry.Definitions[TriggerResourceType]
+			return &triggerProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           EventarcAPI,
+					OperationConfig:     EventarcOperations,
+					ResourceConfig:      def.ResourceConfig,
+					NativeIDConfig:      EventarcNativeID,
+					RequestTransformer:  def.RequestTransformer,
+					ResponseTransformer: def.ResponseTransformer,
+				},
+			}
+		},
+	)
 }

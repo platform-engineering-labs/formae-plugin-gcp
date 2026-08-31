@@ -1,0 +1,104 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Analytics Hub Listing
+///
+/// One published item inside a `DataExchange`: a BigQuery dataset a subscriber
+/// can link into their own project. A listing is metadata - it grants access to
+/// the dataset, it does not copy it.
+module gcp.analyticshub.listing
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::AnalyticsHub::Listing"
+
+/// Which BigQuery dataset the listing publishes, and optionally which tables of
+/// it. Omit `selectedResources` to share the whole dataset.
+@gcp.SubResourceHint
+open class BigQueryDatasetSource extends formae.SubResource {
+    /// The dataset, as "projects/{project}/datasets/{dataset}" or a Dataset
+    /// resolvable's `datasetId`; the plugin expands the short form.
+    @gcp.FieldHint
+    dataset: (String|formae.Resolvable)?
+}
+
+@gcp.SubResourceHint
+open class Publisher extends formae.SubResource {
+    @gcp.FieldHint
+    name: String?
+
+    @gcp.FieldHint
+    primaryContact: String?
+}
+
+open class ListingResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ListingResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Listing extends formae.Resource {
+    hidden parent = this
+
+    /// Short listing id. Immutable. Letters, digits and underscores only.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Region for the listing. A path component, not a body field. Must match
+    /// the exchange's.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    /// The exchange this is published into. A short exchange name or a
+    /// DataExchange resolvable. A path component, not a body field, and a
+    /// listing cannot move between exchanges.
+    @gcp.FieldHint { createOnly = true }
+    dataExchange: (String|formae.Resolvable)
+
+    /// Human-readable name. Required by the API.
+    @gcp.FieldHint
+    displayName: String
+
+    /// The dataset being published. Fixed at creation.
+    @gcp.FieldHint { createOnly = true }
+    bigqueryDataset: BigQueryDatasetSource?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    documentation: String?
+
+    @gcp.FieldHint
+    primaryContact: String?
+
+    @gcp.FieldHint
+    publisher: Publisher?
+
+    /// DISCOVERY_TYPE_PRIVATE (the default) or DISCOVERY_TYPE_PUBLIC.
+    @gcp.FieldHint { hasProviderDefault = true }
+    discoveryType: String?
+
+    /// ACTIVE once published. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    /// What kind of resource is published. Set by the API.
+    @gcp.FieldHint { hasProviderDefault = true }
+    resourceType: String?
+
+    hidden res: ListingResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -13,7 +13,16 @@
 /// **Eventarc Advanced runs in a subset of regions.** `europe-central2`, for
 /// example, is rejected outright ("region ... is not supported in Eventarc
 /// Advanced"), so a bus normally declares its own `location` rather than
-/// inheriting the target's.
+/// inheriting the target's. The subset is not the one `locations.list` returns
+/// - that lists every Eventarc *Standard* region - and it is not documented in
+/// the discovery doc either. Probed 2026-08-28, Advanced accepts:
+///
+/// `us-central1`, `us-east4`, `europe-west1`, `europe-west3`, `europe-north1`,
+/// `asia-southeast1`, `australia-southeast1`.
+///
+/// To re-probe without creating anything, POST an empty body to
+/// `messageBuses?messageBusId=probe&validateOnly=true` in each candidate region
+/// and read the error.
 ///
 /// **Only one bus is allowed per project per region** (quota
 /// `MessageBusesPerProjectPerRegion`, limit 1). A second bus in the same region

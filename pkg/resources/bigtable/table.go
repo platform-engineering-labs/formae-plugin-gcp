@@ -5,6 +5,9 @@
 package bigtable
 
 import (
+	"strings"
+
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 )
 
@@ -98,4 +101,30 @@ func buildGCRuleForAPI(gcRule map[string]interface{}) map[string]interface{} {
 	}
 
 	return rule
+}
+
+// tableResponseTransformer puts back the short name and the instance.
+//
+// The Bigtable Admin API reports a table's "name" as the full path
+// "projects/{p}/instances/{i}/tables/{t}", while a forma declares the short id
+// and the instance separately. Without this every read differs from what was
+// declared, so a table reported drift the moment it was created - and the
+// instance, which lives only in the path, went missing entirely.
+//
+// Instance and Cluster already had transformers of their own; Table was left
+// with the generic one, which only fills in the project.
+func tableResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	out := base.AddProjectResponseTransformer.Transform(apiResponse, ctx)
+
+	name, ok := out["name"].(string)
+	if !ok {
+		return out
+	}
+	parts := strings.Split(name, "/")
+	// projects/{project}/instances/{instance}/tables/{table}
+	if len(parts) == 6 && parts[2] == "instances" && parts[4] == "tables" {
+		out["instance"] = parts[3]
+		out["name"] = parts[5]
+	}
+	return out
 }

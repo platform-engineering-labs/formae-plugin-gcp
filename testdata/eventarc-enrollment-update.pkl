@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/eventarc/messageBus.pkl"
+import "@gcp/eventarc/pipeline.pkl"
+import "@gcp/eventarc/enrollment.pkl"
+import "./config/vars.pkl" as v
+
+// An enrollment needs both halves of an Advanced setup: the bus its CEL matches
+// against, and the pipeline matching events are handed to.
+//
+// Pins us-east4. Eventarc Advanced rejects GCP_LOCATION's europe-central2, and
+// only ONE message bus is allowed per project per region — europe-west1 and
+// us-central1 are already claimed by the eventarc-message-bus and
+// eventarc-pipeline cases, so this one needs a third Advanced region.
+local region = "us-east4"
+
+local bus = new messageBus.MessageBus {
+  label = "plugin-sdk-test-en-bus"
+  name = "formae-plugin-sdk-test-en-bus-\(v.testRunID)"
+  location = region
+}
+
+local pipe = new pipeline.Pipeline {
+  label = "plugin-sdk-test-en-pipeline"
+  name = "formae-plugin-sdk-test-en-pl-\(v.testRunID)"
+  location = region
+  destinations = new Listing {
+    new pipeline.PipelineDestination {
+      messageBus = bus.res.name
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  bus
+  pipe
+
+  new enrollment.Enrollment {
+    label = "plugin-sdk-test-eventarc-enrollment"
+    name = "formae-plugin-sdk-test-en-\(v.testRunID)"
+    location = region
+    // Resolvables -> bus and pipeline exist first, and the plugin expands each
+    // short name into the full path Eventarc wants.
+    messageBus = bus.res.name
+    destination = pipe.res.name
+    celMatch = "message.id != \"\""
+    labels = new Mapping {
+      ["environment"] = "staging"
+    }
+  }
+}

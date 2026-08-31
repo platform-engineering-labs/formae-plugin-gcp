@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/pubsub/topic.pkl"
+import "@gcp/pubsub/subscription.pkl"
+import "@gcp/pubsub/pubsubSnapshot.pkl" as snapshot
+import "./config/vars.pkl" as v
+
+// A snapshot captures a subscription's ack state, so the topic and the
+// subscription must both exist first; the resolvables give formae the ordering.
+forma {
+  local t = new topic.Topic {
+    label = "plugin-sdk-test-snap-topic"
+    name = "formae-plugin-sdk-test-snap-topic-\(v.testRunID)"
+  }
+
+  local s = new subscription.Subscription {
+    label = "plugin-sdk-test-snap-sub"
+    name = "formae-plugin-sdk-test-snap-sub-\(v.testRunID)"
+    topic = t.res.name
+  }
+
+  v.stack
+  v.target
+
+  t
+  s
+
+  new snapshot.Snapshot {
+    label = "plugin-sdk-test-pubsub-snapshot"
+    name = "formae-plugin-sdk-test-snapshot-\(v.testRunID)"
+    subscription = s.res.name
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+name: Probe Permissions
+
+# Answers "can CI actually create this?" before anyone writes a batch of
+# resources for it.
+#
+# The Analytics Hub batch was written in full - three schemas, a parent-walking
+# List, a cleanup script, unit tests - and only then failed at create with
+# "Permission 'analyticshub.dataExchanges.create' denied". Certificate Manager
+# went the same way. Both would have been one dispatch of this workflow.
+#
+# A local key answers a different question: CI's workload-identity service
+# account is broader, which is why DNS and Bigtable were wrongly written off as
+# unreachable and later shipped. This runs as CI, so its answer is the one that
+# decides whether a batch is worth starting.
+#
+# Read-only: testIamPermissions creates nothing and changes nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      permissions:
+        description: 'Comma-separated IAM permissions (e.g. "dataplex.lakes.create,dataplex.lakes.delete")'
+        required: true
+        type: string
+
+# No concurrency group: this touches no infrastructure, so it must not queue
+# behind a conformance run.
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Probe
+        env:
+          PERMISSIONS: ${{ inputs.permissions }}
+        run: |
+          echo "Permissions held by the CI service account:"
+          ./scripts/ci/probe-permissions.sh "$PERMISSIONS"

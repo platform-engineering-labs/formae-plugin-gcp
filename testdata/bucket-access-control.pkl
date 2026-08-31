@@ -1,0 +1,48 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/bucket_access_control.pkl" as acl
+import "./config/vars.pkl" as v
+
+// A legacy ACL entry on a bucket, so the bucket comes first.
+//
+// The bucket disables uniform bucket-level access explicitly. A UBLA bucket is
+// controlled by IAM alone and rejects ACLs outright, and whether a new bucket
+// gets UBLA depends on a project or organisation default - so leaving it unset
+// would make this case pass or fail on someone else's setting.
+//
+// The entity is the project's own editors group: a principal that always exists
+// for the project, needs no setup, and is already an editor - so the grant adds
+// no access anyone did not have.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-bac-bucket"
+  name = "formae-plugin-sdk-test-bac-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+  iamConfiguration = new bucket.IamConfiguration {
+    uniformBucketLevelAccess = new bucket.UniformBucketLevelAccess {
+      enabled = false
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+
+  new acl.BucketAccessControl {
+    label = "plugin-sdk-test-bucket-access-control"
+    // Resolvable -> the bucket exists before the ACL entry is written.
+    bucket = b.res.name
+    entity = "project-editors-\(v.gcpProjectNumber)"
+    role = "OWNER"
+  }
+}

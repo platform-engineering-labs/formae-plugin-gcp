@@ -31,21 +31,97 @@ var DatastreamOperations = base.OperationConfig{
 	OperationStatusChecker: checkOperationStatus,
 }
 
-// DatastreamNativeID - full path
-// "projects/{project}/locations/{location}/connectionProfiles/{name}".
+// DatastreamNativeID - full path, either
+// "projects/{p}/locations/{l}/connectionProfiles/{name}" or the nested
+// "projects/{p}/locations/{l}/privateConnections/{pc}/routes/{name}".
 var DatastreamNativeID = base.NativeIDConfig{
 	Format: base.FullPathFormat,
+	Parser: parseDatastreamNativeID,
+}
+
+// parseDatastreamNativeID handles the location-scoped form (6 segments) and the
+// nested form (8 segments: a route inside a private connection).
+func parseDatastreamNativeID(nativeID string) (base.PathContext, error) {
+	parts := strings.Split(nativeID, "/")
+	if len(parts) < 6 || parts[0] != "projects" || parts[2] != "locations" {
+		return base.PathContext{}, fmt.Errorf("invalid Datastream native ID: %s", nativeID)
+	}
+	switch len(parts) {
+	case 6:
+		return base.PathContext{
+			Project:      parts[1],
+			Location:     parts[3],
+			ResourceType: parts[4],
+			ResourceName: parts[5],
+		}, nil
+	case 8:
+		return base.PathContext{
+			Project:        parts[1],
+			Location:       parts[3],
+			ParentType:     parts[4],
+			ParentResource: parts[5],
+			ResourceType:   parts[6],
+			ResourceName:   parts[7],
+		}, nil
+	default:
+		return base.PathContext{}, fmt.Errorf(
+			"invalid Datastream native ID: %s (expected 6 or 8 path segments, got %d)", nativeID, len(parts))
+	}
 }
 
 // datastreamPathBuilder builds
-// /projects/{project}/locations/{location}/{resourceType}[/{name}].
+//
+//	/projects/{p}/locations/{l}/{resourceType}[/{name}]
+//	/projects/{p}/locations/{l}/privateConnections/{pc}/routes[/{name}]
+//
+// Creating a stream appends ?force=true. Datastream validates a stream against
+// its source when it is created, and a conformance source profile points at a
+// hostname that does not answer - so without force the create fails on
+// validation rather than on anything this plugin does. force is only correct on
+// create: CollectionURL is also what List builds, and IsList tells them apart.
 func datastreamPathBuilder(ctx base.PathContext) string {
-	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, ctx.Location, ctx.ResourceType)
+	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
+	switch {
+	case ctx.ParentType != "" && ctx.ParentResource != "":
+		path = fmt.Sprintf("%s/%s/%s", path, ctx.ParentType, ctx.ParentResource)
+	case ctx.IsList && nestedInPrivateConnection[ctx.ResourceType]:
+		// Discovery lists with no parent to name. Datastream accepts "-" in the
+		// private-connection position (verified live), so ask across every one
+		// rather than emitting a path with no parent at all - which is a 404,
+		// and made routes undiscoverable.
+		path += "/privateConnections/-"
+	}
+	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {
-		path += "/" + ctx.ResourceName
+		return path + "/" + ctx.ResourceName
+	}
+	if !ctx.IsList && forceOnCreate[ctx.ResourceType] {
+		path += "?force=true"
 	}
 	return path
 }
+
+// forceOnCreate are the collections whose create must skip Datastream's
+// connectivity validation.
+//
+// A connection profile is validated against the source it describes when it is
+// created, and the validation runs inside the long-running operation - after
+// the profile itself has been created. So a profile naming a host that does not
+// answer is created AND reported as failed, formae retries the create, and the
+// retry collides with the profile the first attempt made:
+// "Resource ... already exists". The original validation error never surfaces.
+//
+// force says "create it without validating", which is what a declarative apply
+// wants anyway: whether the source is reachable right now is not a property of
+// the declaration, and a half-created resource is worse than an unvalidated one.
+var forceOnCreate = map[string]bool{
+	"streams":            true,
+	"connectionProfiles": true,
+}
+
+// nestedInPrivateConnection are the collections that only exist underneath a
+// private connection.
+var nestedInPrivateConnection = map[string]bool{"routes": true}
 
 // extractOperationName returns the LRO operation name from a create/delete
 // response ("projects/{p}/locations/{l}/operations/{op}"). base.Status GETs
@@ -63,8 +139,11 @@ func extractOperationName(response map[string]interface{}) string {
 // to the operation's metadata.target.
 func extractDatastreamNativeID(response map[string]interface{}, ctx base.PathContext) string {
 	if ctx.ResourceName != "" {
-		return fmt.Sprintf("projects/%s/locations/%s/%s/%s",
-			ctx.Project, ctx.Location, ctx.ResourceType, ctx.ResourceName)
+		prefix := fmt.Sprintf("projects/%s/locations/%s", ctx.Project, ctx.Location)
+		if ctx.ParentType != "" && ctx.ParentResource != "" {
+			prefix = fmt.Sprintf("%s/%s/%s", prefix, ctx.ParentType, ctx.ParentResource)
+		}
+		return fmt.Sprintf("%s/%s/%s", prefix, ctx.ResourceType, ctx.ResourceName)
 	}
 	if md, ok := response["metadata"].(map[string]interface{}); ok {
 		if target, ok := md["target"].(string); ok {
@@ -85,16 +164,90 @@ func extractDatastreamNativeID(response map[string]interface{}, ctx base.PathCon
 // checkOperationStatus reports whether a polled Operation is done, mapping a
 // present "error" to a terminal failure.
 func checkOperationStatus(op map[string]interface{}) (bool, error) {
-	done, _ := op["done"].(bool)
-	if !done {
-		return false, nil
-	}
-	if errObj, ok := op["error"].(map[string]interface{}); ok {
-		msg, _ := errObj["message"].(string)
-		if msg == "" {
-			msg = "operation failed"
+	return base.CheckLROStatus(op)
+}
+
+// dropDatastreamPathFields removes the field that addresses a nested resource
+// in the URL. "name" stays: base.Create reads the create id out of it.
+func dropDatastreamPathFields(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+	body := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "privateConnection" {
+			continue
 		}
-		return true, fmt.Errorf("%s", msg)
+		body[k] = v
 	}
-	return true, nil
+	return body, nil
+}
+
+// streamRequest expands the two connection profiles a stream joins into the
+// full paths the API wants. A forma passes resolvables - so formae creates both
+// profiles first - and each resolves to a bare profile name.
+func streamRequest(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body, err := dropDatastreamPathFields(props, ctx)
+	if err != nil {
+		return nil, err
+	}
+	expandProfile(body, "sourceConfig", "sourceConnectionProfile", ctx)
+	expandProfile(body, "destinationConfig", "destinationConnectionProfile", ctx)
+	return body, nil
+}
+
+// streamResponse is the mirror of streamRequest. Without the symmetry the
+// declared profile name could never equal the full path read back, and every
+// comparison step would report drift on a stream that is in fact correct.
+func streamResponse(props map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	out := base.ShortNameResponseTransformer.Transform(props, ctx)
+	shortenProfile(out, "sourceConfig", "sourceConnectionProfile")
+	shortenProfile(out, "destinationConfig", "destinationConnectionProfile")
+	return out
+}
+
+func expandProfile(body map[string]interface{}, configKey, field string, ctx base.TransformContext) {
+	config, ok := body[configKey].(map[string]interface{})
+	if !ok {
+		return
+	}
+	copied := make(map[string]interface{}, len(config))
+	for k, v := range config {
+		copied[k] = v
+	}
+	if name, ok := copied[field].(string); ok && name != "" && !strings.Contains(name, "/") {
+		copied[field] = fmt.Sprintf("projects/%s/locations/%s/connectionProfiles/%s",
+			ctx.Project, ctx.Location, name)
+	}
+	body[configKey] = copied
+}
+
+func shortenProfile(out map[string]interface{}, configKey, field string) {
+	config, ok := out[configKey].(map[string]interface{})
+	if !ok {
+		return
+	}
+	copied := make(map[string]interface{}, len(config))
+	for k, v := range config {
+		copied[k] = v
+	}
+	if path, ok := copied[field].(string); ok {
+		if i := strings.LastIndex(path, "/connectionProfiles/"); i >= 0 {
+			copied[field] = path[i+len("/connectionProfiles/"):]
+		}
+	}
+	out[configKey] = copied
+}
+
+// routeResponse puts back the private connection, which lives only in the path.
+func routeResponse(props map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
+	// Read the full path first: ShortNameResponseTransformer rewrites "name" in
+	// place, and the parent only exists in the long form.
+	fullName, _ := props["name"].(string)
+	out := base.ShortNameResponseTransformer.Transform(props, ctx)
+	if name := fullName; name != "" {
+		parts := strings.Split(name, "/")
+		// projects/{p}/locations/{l}/privateConnections/{pc}/routes/{name}
+		if len(parts) == 8 && parts[4] == "privateConnections" && parts[6] == "routes" {
+			out["privateConnection"] = parts[5]
+		}
+	}
+	return out
 }
