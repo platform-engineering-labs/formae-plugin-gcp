@@ -45,10 +45,13 @@ run_make() {
 # the SDK reads.
 TIMEOUT_ARG=""
 case "$TEST_CASE" in
-  cloudsql-instance)
+  cloudsql-*)
     # Cloud SQL provisions an instance per create (5-15 min each). The CRUD
     # lifecycle creates two (initial + OOB-delete re-apply) and discovery
-    # creates a third, so allow 30 min per operation.
+    # creates a third, so allow 30 min per operation. The user, database,
+    # ssl-cert and backup-run cases each build an instance as a prerequisite
+    # before their own resource starts, so they pay the same cost: measured
+    # locally, crud alone runs 20-29 min for each of them.
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;

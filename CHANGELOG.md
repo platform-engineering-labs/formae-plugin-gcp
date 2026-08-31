@@ -12,6 +12,61 @@ formae agent.
 
 ### Added
 
+- `GCP::SQL::User` — a database user on a Cloud SQL instance. An instance ships
+  with no usable login of its own, so this is what makes one reachable by an
+  application. `password` is write-only and createOnly: the API never returns
+  it, so it cannot reach stored state, and rotating it replaces the user.
+
+  MySQL's `host` is deliberately not modelled: it is part of a user's identity
+  rather than a property of it, and a `DeleteRequest` carries no properties for
+  the plugin to read it back from, so supporting it means encoding it in the
+  native ID. Users created without one get MySQL's default.
+- `GCP::SQL::SslCert` — a client certificate for connecting over mutual TLS.
+  Addressed by a server-generated `sha1Fingerprint` rather than by the
+  `commonName` a forma declares, and the only sqladmin resource whose create
+  answers with the resource itself rather than only an Operation. The private
+  key is returned exactly once and is dropped rather than persisted: keeping it
+  would put a private key in stored state and guarantee drift on every later
+  read.
+- `GCP::SQL::BackupRun` — one on-demand backup of an instance. Addressed by the
+  numeric id sqladmin assigns, which arrives as `backupContext.backupId` on the
+  create Operation. Unlike Spanner's and Bigtable's backups it takes no absolute
+  expiry, so its fixture cannot rot.
+
+  All three are discovered by walking the instances: discovery lists with no
+  properties, so it can name no instance to look in, and sqladmin has no
+  wildcard for them.
+
+### Fixed
+
+- A nested Cloud SQL resource no longer takes its native ID from the create
+  Operation's `targetLink`. Every sqladmin mutation answers with an Operation
+  whose `targetLink` names the **instance**, so a nested resource was stored
+  under the instance's native ID — two resources sharing one id — and the next
+  sync read the instance and reconciled the nested resource away as absent.
+  This affected `GCP::SQL::Database`, which has been registered for some time
+  but had no conformance case and so had never exercised the path;
+  `testdata/cloudsql-database.pkl` now covers it.
+- A deleted `GCP::SQL::BackupRun` is now treated as gone. Cloud SQL does not
+  remove a deleted backup run — the record survives as a tombstone and a get
+  answers 200 with `status: "DELETED"` rather than 404 — so a backup deleted
+  outside formae was reported as still present and never left inventory.
+  Discovery also no longer offers long-dead backups as unmanaged resources to
+  import.
+- Cloud SQL now retries a 409 "another operation was already in progress"
+  instead of failing the resource. Operations are serialised per instance and
+  every nested type shares its instance's queue, so a mutation issued while
+  another is still running is ordinary contention rather than a fault. It joins
+  the existing "database is being accessed by other users" case.
+- `GCP::SQL::Database` is now discoverable. It had no parent-walking `List`, so
+  discovery — which lists with no properties — asked a collection URL with no
+  instance in it and found nothing. Every instance-scoped Cloud SQL type now
+  shares one walker, since the only thing that differed between them was how an
+  item names itself: users and databases by `name`, a certificate by
+  `sha1Fingerprint`, a backup run by its server-assigned `id`.
+
+### Added
+
 - `GCP::Spanner::Instance` — the compute and storage a Spanner deployment runs
   on. Project-scoped rather than location-scoped: an instance's region is its
   `config`, not a path segment, and is fixed at creation. `config` is written as
