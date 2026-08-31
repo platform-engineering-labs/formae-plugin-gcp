@@ -6,9 +6,11 @@
 
 /// GCP Service Directory Endpoint
 ///
-/// Where a service actually answers: an address and a port inside a service,
-/// inside a namespace. An endpoint is addressed by both its namespace and its
-/// service, so it names both.
+/// One address and port a service answers on. Endpoints are what a resolve call
+/// actually returns, so a service without them resolves to nothing.
+///
+/// Endpoints live two collections deep
+/// (`.../namespaces/{namespace}/services/{service}/endpoints/{endpoint}`).
 module gcp.servicedirectory.endpoint
 
 import "../gcp.pkl"
@@ -27,54 +29,41 @@ open class EndpointResolvable extends formae.Resolvable {
 @gcp.ResourceHint {
     type = module.type
     identifier = "name"
-    parent = "GCP::ServiceDirectory::Service"
-    listParam = new Listing<formae.ListProperty> {
-        new formae.ListProperty { parentProperty = "namespace" listParameter = "namespace"
-        }
-        new formae.ListProperty { parentProperty = "name" listParameter = "service"
-        }
-    }.toList()
 }
 open class Endpoint extends formae.Resource {
     hidden parent = this
 
-    /// Short endpoint id, unique within the service. Immutable.
+    /// Short endpoint id (e.g. "my-endpoint"). Immutable.
     @gcp.FieldHint { createOnly = true }
     name: String
 
-    /// The namespace holding the service. A short namespace name or a Namespace
-    /// reference.
+    /// Short id of the owning namespace. A path component, not a body field.
     @gcp.FieldHint { createOnly = true }
     namespace: (String|formae.Resolvable)
 
-    /// The service holding the endpoint. A short service name or a Service
-    /// reference.
+    /// Short id of the owning service. A path component, not a body field —
+    /// pass `svc.res.name` so formae creates the service first.
     @gcp.FieldHint { createOnly = true }
     service: (String|formae.Resolvable)
-
-    /// The project holding the endpoint.
-    @gcp.FieldHint { createOnly = true }
-    project: (String|formae.Resolvable)?
 
     /// IPv4 or IPv6 address the service answers on.
     @gcp.FieldHint
     address: String?
 
-    /// Port the service answers on, 0 to 65535.
+    /// Port the service answers on (1-65535).
     @gcp.FieldHint
     port: Int?
 
+    /// Free-form annotations. Keys beginning with "cloud.google.com/" are
+    /// reserved by GCP.
     @gcp.FieldHint
     annotations: Mapping<String, String>?
 
     /// VPC network the address belongs to, as
-    /// "projects/{projectNumber}/locations/global/networks/{network}".
+    /// `projects/{project number}/locations/global/networks/{network}`.
+    /// Immutable, and written with the project *number* rather than its id.
     @gcp.FieldHint { createOnly = true }
-    network: (String|formae.Resolvable)?
-
-    /// Server-set concurrency token.
-    @gcp.FieldHint { hasProviderDefault = true }
-    uid: String?
+    network: String?
 
     hidden res: EndpointResolvable = new {
         label = parent.label

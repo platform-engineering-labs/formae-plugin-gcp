@@ -23,6 +23,11 @@ on:
         required: false
         default: true
         type: boolean
+      formae_branch:
+        description: "Build formae from this branch instead of using the released binary (e.g. main) - use it to reproduce a nightly-only failure"
+        required: false
+        default: ""
+        type: string
 
 # Share the serialization group with ci.yml and nightly.yml so runs never race
 # for the same GCP test project. A debug invocation queues behind an in-flight
@@ -121,6 +126,38 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # Without this the run uses the released formae the SDK installs, which is
+      # the wrong binary for reproducing a nightly failure: the nightly validates
+      # plugin main against formae main, so an agent-side change that has not been
+      # released yet is only visible here. Mirrors the nightly's build step.
+      - name: Build formae from branch
+        if: inputs.formae_branch != ''
+        run: |
+          BRANCH="${{ inputs.formae_branch }}"
+          git clone --branch "${BRANCH}" --depth 1 https://github.com/platform-engineering-labs/formae.git /tmp/formae
+          cd /tmp/formae
+          git fetch --tags
+          # The baked VERSION becomes FORMAE_VERSION for plugins, which resolve
+          # their formae PKL dep against a published schema of that version, so
+          # it has to be a released X.Y.Z - the latest tag with any -dev.N
+          # suffix stripped, exactly as the nightly picks it.
+          LATEST_TAG=$(git tag -l "[0-9]*" --sort=-version:refname | head -1)
+          VERSION=$(echo "$LATEST_TAG" | cut -d'-' -f1)
+          echo "Building formae ${BRANCH} ($(git rev-parse --short HEAD)) with VERSION=${VERSION}"
+          make build VERSION="${VERSION}"
+          echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
+
+      - name: Inject formae replace directives
+        if: inputs.formae_branch != ''
+        run: |
+          for pkg in pkg/auth pkg/model pkg/plugin pkg/plugin-conformance-tests; do
+            if grep -q "formae/$pkg" go.mod 2>/dev/null; then
+              echo "Injecting replace for $pkg -> /tmp/formae/$pkg"
+              go mod edit -replace "github.com/platform-engineering-labs/formae/$pkg=/tmp/formae/$pkg"
+            fi
+          done
+          go mod tidy
 
       - name: Install plugin
         run: make install

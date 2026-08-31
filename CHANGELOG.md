@@ -580,12 +580,45 @@ formae agent.
 
 ### Fixed
 
-- A `GCP::Compute::DiskAsyncReplication` no longer plans a replacement of itself.
-  Its two disk references are createOnly, and an extracted forma writes a
-  reference to another resource unresolved, so comparing it against the URL
-  already in state read as a change to an immutable field. Which disks a pair
-  joins is fixed at creation and is what its native ID is made of, so the two
-  fields are now write-only - excluded from drift detection, unchanged on create.
+- `GCP::ServiceDirectory::Namespace` — the top-level container of a Service
+  Directory registry. Location-scoped and free; deleting one deletes every
+  service and endpoint under it.
+- `GCP::ServiceDirectory::Service` — a named service inside a namespace,
+  carrying the annotations clients read when they resolve it. Its `namespace`
+  is a path component rather than a body field, so it is dropped from the
+  request and lifted back out of the returned path.
+- `GCP::ServiceDirectory::Endpoint` — one address and port a service answers
+  on, and what a resolve call actually returns. It sits two collections deep
+  (`namespaces/{ns}/services/{svc}/endpoints/{ep}`).
+
+  Service Directory rejects a wildcard at every level — `locations/-` answers
+  "Unsupported location" and `namespaces/-` "Could not parse namespace name" —
+  so services and endpoints are discovered by walking the collections above
+  them, following `nextPageToken` at each level. A dropped namespace would
+  otherwise hide every service and endpoint under it.
+
+### Changed
+
+- `base.ParentResourceConfig` gained `GrandParentType` /
+  `GrandParentPropertyName`, for APIs three collections deep. Read, update and
+  delete rebuild the whole path from the native ID, so create was the one
+  operation with nothing but the declared properties to route with; it now
+  carries the grandparent in `PathContext.CustomSegments[0]`.
+
+### Removed
+
+- `GCP::Compute::DiskAsyncReplication` is withdrawn. It never shipped in a stable
+  release, only in 0.1.13-dev.1 and -dev.2. Its two properties are the disks the
+  pair joins: both immutable, and both declared as references to the disk
+  resources, which is how a forma names them. An extracted forma writes such a
+  reference unresolved, so the re-apply compares a reference against the URL in
+  state on an immutable path and plans a replacement of the pair already in
+  place. Suppressing that comparison fixes the lifecycle and makes the pair
+  undiscoverable, because the agent requires both fields on a resource it
+  persists; reporting them keeps discovery and brings the replacement back. No
+  plugin-side shape satisfies both, so the type is out until the agent can
+  resolve a reference at plan time. The work, the four conformance runs behind
+  that conclusion, and the two agent-side asks are in the draft PR.
 
 ### Fixed
 

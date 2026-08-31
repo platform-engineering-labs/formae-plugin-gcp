@@ -7,14 +7,14 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/servicedirectory/namespace.pkl"
-import "@gcp/servicedirectory/serviceDirectoryService.pkl" as service
+import "@gcp/servicedirectory/service_servicedirectory.pkl" as service
 import "./config/vars.pkl" as v
 
-// A service lives inside a namespace, so the namespace comes first.
+// The namespace the service is registered in. Referenced through its resolvable
+// so formae creates it first. Both are free.
 local ns = new namespace.Namespace {
   label = "plugin-sdk-test-sd-svc-namespace"
-  project = v.gcpProject
-  name = "formae-plugin-sdk-test-sd-sns-\(v.testRunID)"
+  name = "formae-test-sd-svc-ns-\(v.testRunID)"
 }
 
 forma {
@@ -25,13 +25,10 @@ forma {
 
   new service.Service {
     label = "plugin-sdk-test-sd-service"
-    project = v.gcpProject
-    // Resolvable -> the namespace exists before the service is created in it.
+    name = "formae-test-sd-svc-\(v.testRunID)"
     namespace = ns.res.name
-    name = "formae-plugin-sdk-test-sd-svc-\(v.testRunID)"
     annotations = new Mapping {
-      ["purpose"] = "conformance"
-      ["updated"] = "true"
+      ["environment"] = "updated"
     }
   }
 }

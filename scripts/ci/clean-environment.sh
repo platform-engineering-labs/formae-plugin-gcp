@@ -1326,5 +1326,23 @@ else
     echo "  No service accounts found"
 fi
 
+# --- 13. Service Directory namespaces (servicedirectory-* tests). Deleting a
+#         namespace deletes the services and endpoints under it, so this one
+#         sweep covers all three cases. The service and endpoint fixtures build
+#         a namespace as a prerequisite and conformance Destroy only removes the
+#         resource under test, so those namespaces outlive every run. ---
+echo "Cleaning GCP Service Directory namespaces..."
+# --filter is server-side here and Service Directory rejects the "~" operator
+# ("Failed to parse the filter"), so the prefix is matched with grep instead.
+SD_NAMESPACES=$(gcloud service-directory namespaces list --location="${GCP_LOCATION:-${GCP_REGION:-europe-central2}}" --format="value(name.basename())" 2>/dev/null | grep '^formae-test-sd' || true)
+if [ -n "$SD_NAMESPACES" ]; then
+    echo "$SD_NAMESPACES" | while read -r ns; do
+        echo "  Deleting Service Directory namespace: $ns"
+        gcloud service-directory namespaces delete "$ns" --location="${GCP_LOCATION:-${GCP_REGION:-europe-central2}}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Service Directory namespaces found"
+fi
+
 echo ""
 echo "clean-environment.sh: Cleanup complete"

@@ -7,23 +7,22 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/servicedirectory/namespace.pkl"
-import "@gcp/servicedirectory/serviceDirectoryService.pkl" as service
+import "@gcp/servicedirectory/service_servicedirectory.pkl" as service
 import "@gcp/servicedirectory/endpoint.pkl"
 import "./config/vars.pkl" as v
 
-// An endpoint is addressed by a namespace and a service at once, so both come
-// first.
+// An endpoint is what a resolve call actually returns, so it needs the two
+// collections above it. Both are free, and referencing them through their
+// resolvables orders the creates.
 local ns = new namespace.Namespace {
   label = "plugin-sdk-test-sd-ep-namespace"
-  project = v.gcpProject
-  name = "formae-plugin-sdk-test-sd-ens-\(v.testRunID)"
+  name = "formae-test-sd-ep-ns-\(v.testRunID)"
 }
 
 local svc = new service.Service {
   label = "plugin-sdk-test-sd-ep-service"
-  project = v.gcpProject
+  name = "formae-test-sd-ep-svc-\(v.testRunID)"
   namespace = ns.res.name
-  name = "formae-plugin-sdk-test-sd-esvc-\(v.testRunID)"
 }
 
 forma {
@@ -35,18 +34,10 @@ forma {
 
   new endpoint.Endpoint {
     label = "plugin-sdk-test-sd-endpoint"
-    project = v.gcpProject
-    // Both parents are read off the service: the namespace it belongs to
-    // carries the same value the endpoint needs, and taking it from there makes
-    // the endpoint wait for the service rather than only for the namespace.
-    namespace = svc.res.namespace
+    name = "formae-test-sd-ep-\(v.testRunID)"
+    namespace = ns.res.name
     service = svc.res.name
-    name = "formae-plugin-sdk-test-sd-ep-\(v.testRunID)"
-    // Documentation range, so the address is guaranteed not to route anywhere.
-    address = "192.0.2.10"
+    address = "10.20.30.40"
     port = 8080
-    annotations = new Mapping {
-      ["purpose"] = "conformance"
-    }
   }
 }

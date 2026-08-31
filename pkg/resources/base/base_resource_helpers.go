@@ -84,6 +84,18 @@ func (b *BaseResource) buildPathContext(targetConfig json.RawMessage, props map[
 			ctx.ParentResource = parent
 			ctx.ParentType = b.ResourceConfig.ParentResource.ParentType
 		}
+
+		// A resource nested two levels deep (namespaces > services > endpoints)
+		// carries its grandparent in CustomSegments[0].
+		if gpType := b.ResourceConfig.ParentResource.GrandParentType; gpType != "" {
+			gpProp := b.ResourceConfig.ParentResource.GrandParentPropertyName
+			if gpProp == "" {
+				gpProp = gpType
+			}
+			if gp, ok := props[gpProp].(string); ok && gp != "" {
+				ctx.CustomSegments = []string{gp}
+			}
+		}
 	}
 
 	// Extract location if specified in properties (overrides target)
