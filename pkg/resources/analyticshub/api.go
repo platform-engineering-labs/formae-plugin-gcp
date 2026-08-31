@@ -6,6 +6,7 @@ package analyticshub
 
 import (
 	"fmt"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -141,12 +142,21 @@ func shortNameWithLocation(collection string) base.ResponseTransformerFunc {
 // are not body fields. "name" stays: base.Create reads the create id
 // (?dataExchangeId=, ?listingId=, ?queryTemplateId=) out of it and deletes it
 // from the body itself.
-func dropPathFields(props map[string]interface{}, _ base.TransformContext) (map[string]interface{}, error) {
+func dropPathFields(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
 	body := make(map[string]interface{}, len(props))
 	for k, v := range props {
 		switch k {
 		case "location", "dataExchange":
 			continue
+		case "name", "project":
+			// The update mask is built from the body, so anything left in it is
+			// something the API is asked to change. The id and the project
+			// address the resource rather than describing it, and a mask naming
+			// either is refused - which failed the update on all three types
+			// while the create was fine.
+			if ctx.Operation == resource.OperationUpdate {
+				continue
+			}
 		}
 		body[k] = v
 	}

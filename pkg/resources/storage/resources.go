@@ -224,6 +224,24 @@ func init() {
 		})
 	}
 
+	// A notification hangs off a bucket and Cloud Storage cannot be asked
+	// across buckets, so a parentless list walks them. See acl_walking_list.go.
+	notifDef := storageRegistry.Definitions[NotificationResourceType]
+	registry.Register(NotificationResourceType, notifDef.Operations,
+		func(cfg *config.Config) prov.Provisioner {
+			return &notificationProvisioner{
+				BaseResource: &base.BaseResource{
+					Config:              cfg,
+					APIConfig:           StorageAPI,
+					OperationConfig:     StorageOperations,
+					ResourceConfig:      notifDef.ResourceConfig,
+					NativeIDConfig:      StorageNativeID,
+					RequestTransformer:  notifDef.RequestTransformer,
+					ResponseTransformer: notifDef.ResponseTransformer,
+				},
+			}
+		})
+
 	// An object ACL needs a walk of its own: it hangs off a bucket *and* an
 	// object, so the bucket walk above stops one level short of it. See
 	// object_acl_walking_list.go.

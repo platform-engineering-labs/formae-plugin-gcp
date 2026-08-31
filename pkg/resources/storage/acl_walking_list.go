@@ -142,3 +142,78 @@ func (a *aclProvisioner) listEntities(
 	}
 	return out, nil
 }
+
+// notificationProvisioner lists bucket notifications by walking the buckets
+// that hold them.
+//
+// A notification lives at /b/{bucket}/notificationConfigs and Cloud Storage has
+// no endpoint spanning buckets, while discovery lists with no parent to name -
+// the same shape as the ACL types above, and the reason a notification could
+// never be discovered.
+type notificationProvisioner struct {
+	*base.BaseResource
+}
+
+func (n *notificationProvisioner) List(
+	ctx context.Context,
+	request *resource.ListRequest,
+) (*resource.ListResult, error) {
+	// A caller that names its bucket wants only that one.
+	if request.AdditionalProperties != nil {
+		if parent := request.AdditionalProperties["bucket"]; parent != "" {
+			return n.BaseResource.List(ctx, request)
+		}
+	}
+
+	cfg := config.FromTargetConfig(request.TargetConfig, n.Config.Deps())
+	if cfg.Project == "" {
+		return &resource.ListResult{NativeIDs: []string{}}, nil
+	}
+
+	client, err := transport.NewClient(ctx, n.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+
+	buckets, err := (&aclProvisioner{BaseResource: n.BaseResource}).listBuckets(ctx, client, cfg.Project)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list buckets: %w", err)
+	}
+
+	var nativeIDs []string
+	var lastErr error
+	failed := 0
+	for _, bucket := range buckets {
+		response, err := client.SendRequest(ctx, transport.RequestOptions{
+			Method: "GET",
+			URL:    fmt.Sprintf("%s/b/%s/notificationConfigs", n.APIConfig.BaseURL, bucket),
+		})
+		if err != nil {
+			// A shared project holds buckets this target does not own.
+			lastErr = err
+			failed++
+			continue
+		}
+		items, _ := response.Body["items"].([]interface{})
+		for _, raw := range items {
+			item, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			// The id is server-assigned and is what addresses the notification.
+			if id, ok := item["id"].(string); ok && id != "" {
+				nativeIDs = append(nativeIDs, fmt.Sprintf("b/%s/notificationConfigs/%s", bucket, id))
+			}
+		}
+	}
+
+	// Skipping one unreadable bucket is right; skipping every one and reporting
+	// an empty list is not - that is indistinguishable from "nothing exists".
+	if len(nativeIDs) == 0 && failed > 0 && failed == len(buckets) {
+		return nil, fmt.Errorf("could not read notifications on any of %d buckets: %w", failed, lastErr)
+	}
+	if nativeIDs == nil {
+		nativeIDs = []string{}
+	}
+	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
