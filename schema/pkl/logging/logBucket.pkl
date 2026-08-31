@@ -1,0 +1,79 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Logging Log Bucket
+///
+/// Where log entries are actually retained. A sink routes entries into a
+/// bucket and a view is a window onto one, so this is the thing that decides
+/// how long logs live and where.
+///
+/// Every project has `_Default` and `_Required` buckets created by GCP, so
+/// discovery reports two per project that nobody declared.
+///
+/// Deleting a bucket does not remove it: it enters `DELETE_REQUESTED` and stays
+/// for seven days so it can be undeleted. The plugin reports a bucket in that
+/// state as gone.
+module gcp.logging.logBucket
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Logging::LogBucket"
+
+open class LogBucketResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: LogBucketResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class LogBucket extends formae.Resource {
+    hidden parent = this
+
+    /// Short bucket id (e.g. "my-logs"). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Location the bucket lives in — "global", or a region. Immutable: a
+    /// bucket cannot be moved.
+    @gcp.FieldHint { createOnly = true }
+    location: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// How long entries are kept, in days. GCP defaults to 30.
+    @gcp.FieldHint { hasProviderDefault = true }
+    retentionDays: Int?
+
+    /// Turns on Log Analytics, which makes the bucket queryable through
+    /// BigQuery. Cannot be turned off once enabled.
+    @gcp.FieldHint { hasProviderDefault = true }
+    analyticsEnabled: Boolean?
+
+    /// Whether the bucket's retention is locked.
+    ///
+    /// **A locked bucket can never be deleted, and locking cannot be undone.**
+    /// It is modelled so an existing locked bucket reads correctly, not as
+    /// something to set casually.
+    @gcp.FieldHint { hasProviderDefault = true }
+    locked: Boolean?
+
+    /// Lifecycle as GCP reports it: "ACTIVE", or "DELETE_REQUESTED" for a
+    /// bucket inside its seven-day undelete window.
+    @gcp.FieldHint { hasProviderDefault = true }
+    lifecycleState: String?
+
+    hidden res: LogBucketResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

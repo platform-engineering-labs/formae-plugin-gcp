@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/logging/logBucket.pkl" as logBucket
+import "./config/vars.pkl" as v
+
+// A bucket with nothing routed into it retains nothing and costs nothing.
+// `locked` is deliberately left unset: locking a bucket cannot be undone and
+// a locked bucket can never be deleted, which would strand the test resource.
+forma {
+  v.stack
+  v.target
+
+  new logBucket.LogBucket {
+    label = "plugin-sdk-test-logging-log-bucket"
+    name = "formae-test-logbucket-\(v.testRunID)"
+    location = v.gcpLocation
+    description = "Test log bucket for plugin SDK conformance tests"
+    retentionDays = 30
+  }
+}

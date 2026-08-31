@@ -177,6 +177,27 @@ func parseLoggingViewNativeID(nativeID string) (base.PathContext, error) {
 	}, nil
 }
 
+// LoggingBucketNativeID - a log bucket's path carries its location:
+// projects/{p}/locations/{loc}/buckets/{id}. The flat project-level form would
+// not round-trip, and the view parser wants two more segments.
+var LoggingBucketNativeID = base.NativeIDConfig{
+	Format: base.FullPathFormat,
+	Parser: parseLoggingBucketNativeID,
+}
+
+func parseLoggingBucketNativeID(nativeID string) (base.PathContext, error) {
+	parts := strings.Split(nativeID, "/")
+	if len(parts) != 6 || parts[0] != "projects" || parts[2] != "locations" || parts[4] != "buckets" {
+		return base.PathContext{}, fmt.Errorf("invalid Logging bucket native ID: %s", nativeID)
+	}
+	return base.PathContext{
+		Project:      parts[1],
+		Location:     parts[3],
+		ResourceType: parts[4],
+		ResourceName: parts[5],
+	}, nil
+}
+
 // LoggingOperations - Cloud Logging log-metric operations are synchronous:
 // metrics.create/update return the LogMetric directly and metrics.delete
 // returns google.protobuf.Empty. No long-running Operation is involved.
