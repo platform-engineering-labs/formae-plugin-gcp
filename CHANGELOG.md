@@ -28,6 +28,31 @@ formae agent.
   reports two per project that nobody declared.
 
 ### Fixed
+- `GCP::ServiceDirectory::Namespace` — the top-level container of a Service
+  Directory registry. Location-scoped and free; deleting one deletes every
+  service and endpoint under it.
+- `GCP::ServiceDirectory::Service` — a named service inside a namespace,
+  carrying the annotations clients read when they resolve it. Its `namespace`
+  is a path component rather than a body field, so it is dropped from the
+  request and lifted back out of the returned path.
+- `GCP::ServiceDirectory::Endpoint` — one address and port a service answers
+  on, and what a resolve call actually returns. It sits two collections deep
+  (`namespaces/{ns}/services/{svc}/endpoints/{ep}`).
+
+  Service Directory rejects a wildcard at every level — `locations/-` answers
+  "Unsupported location" and `namespaces/-` "Could not parse namespace name" —
+  so services and endpoints are discovered by walking the collections above
+  them, following `nextPageToken` at each level. A dropped namespace would
+  otherwise hide every service and endpoint under it.
+
+### Changed
+
+- `base.ParentResourceConfig` gained `GrandParentType` /
+  `GrandParentPropertyName`, for APIs three collections deep. Read, update and
+  delete rebuild the whole path from the native ID, so create was the one
+  operation with nothing but the declared properties to route with; it now
+  carries the grandparent in `PathContext.CustomSegments[0]`.
+
 ### Removed
 
 - `GCP::Compute::DiskAsyncReplication` is withdrawn. It never shipped in a stable

@@ -112,6 +112,19 @@ type ParentResourceConfig struct {
 	// ParentPathSegments for hierarchical APIs like Storage
 	// e.g., ["b"] for bucket, ["b", "o"] for object
 	ParentPathSegments []string
+
+	// GrandParentType and GrandParentPropertyName describe a second level of
+	// nesting, for APIs three collections deep (Service Directory:
+	// namespaces > services > endpoints). Read/Update/Delete rebuild the whole
+	// context from the native ID, so only Create needs this: it is the one
+	// operation that has nothing but the declared properties to route with.
+	// buildPathContext copies the named property into CustomSegments[0], where
+	// the API's path builder reads it.
+	GrandParentType string
+
+	// GrandParentPropertyName is the property holding the grandparent id.
+	// Defaults to GrandParentType when empty.
+	GrandParentPropertyName string
 }
 
 // OptimisticLockingConfig defines optimistic locking behavior
