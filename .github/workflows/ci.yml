@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # No branches filter: a pull request based on another pull request's branch is
+  # still a pull request, and a stacked one got no CI at all - not conformance,
+  # not even the build. The scope is resolved from the diff either way, so a
+  # stacked pull request tests exactly the fixtures it touches. The push filter
+  # stays: only main runs the full matrix.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 # Prevent concurrent conformance tests (CI and nightly share test resources)
