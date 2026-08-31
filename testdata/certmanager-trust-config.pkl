@@ -9,8 +9,16 @@ amends "@formae/forma.pkl"
 import "@gcp/certificatemanager/trustConfig.pkl" as trustConfig
 import "./config/vars.pkl" as v
 
-// A trust config with no stores is valid and trusts nothing, which avoids
-// committing a PEM certificate to the repository just to have a fixture.
+// Certificate Manager rejects a trust config that carries neither a trust store
+// nor an allowlisted certificate: "trust config must contain at least one trust
+// store or allowlisted certificate". So the fixture pins one anchor. The PEM is
+// a throwaway self-signed certificate generated for this test - it anchors
+// nothing real and holds no private key.
+//
+// The blank line before the closing delimiter is load-bearing: Certificate
+// Manager appends a trailing newline to every pemCertificate it stores,
+// whatever was sent, so a PEM declared without one never matches on read and
+// the resource drifts on every re-apply.
 forma {
   v.stack
   v.target
@@ -19,6 +27,37 @@ forma {
     label = "plugin-sdk-test-certmanager-trust-config"
     name = "formae-test-trustcfg-\(v.testRunID)"
     description = "Test trust config for plugin SDK conformance tests"
+    trustStores = new Listing {
+      new trustConfig.TrustStore {
+        trustAnchors = new Listing {
+          new trustConfig.TrustCertificate {
+            pemCertificate = """
+              -----BEGIN CERTIFICATE-----
+              MIIDMzCCAhugAwIBAgIUZJqm2ZH6GOG2DZ5+vLMJNFLeM3kwDQYJKoZIhvcNAQEL
+              BQAwKTEnMCUGA1UEAwweZm9ybWFlLWNvbmZvcm1hbmNlLXRlc3QtYW5jaG9yMB4X
+              DTI2MDgzMTE0NDk0NloXDTQ2MDgyNjE0NDk0NlowKTEnMCUGA1UEAwweZm9ybWFl
+              LWNvbmZvcm1hbmNlLXRlc3QtYW5jaG9yMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+              MIIBCgKCAQEAyWzZ1iBZLFs+vSTC8e8DDv3+Gh80PzPRP3Gyl1L9dMAET2nZQyfF
+              uviJ/t9cBbHOoswDP1uYOXUghxADEOx9FUsWdCfKL8gZfTNQxX77mNgHKdDQ0x1c
+              gpF4ZbI2q7aZ/wNq+2dM2M3yvO79sTWzc+gyGXA3ukyZqvjToUwg87rb24QZ1uAZ
+              uRPfoFti1jQXRUvUtNCBjhW0SQITc9esN2k/JqJtu98Kngphyd3rUP3J7b+rZrDn
+              1DtWWNsS+KHOOz41OlXvZnnu8yJ59VfRoRA+eSHuv+tmK/di/YaL32m8QoStDpCy
+              36GLtzX5FPWf9su3NewhQUGMgs3EwwY29wIDAQABo1MwUTAdBgNVHQ4EFgQU58iv
+              5+wlBZNnLehoe4JxpSSUGX4wHwYDVR0jBBgwFoAU58iv5+wlBZNnLehoe4JxpSSU
+              GX4wDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAR+0Ducak3BYk
+              bFeNj1Jnutt1MSJrnp/LkN1hFHbADoLu7aiw/WIwQ0mJcyTq16MRZnqiZl+77i1v
+              8uqIY/SaGS0AAYW4UgbBg8sB8V4Oo2guxIDrCsG176DrgyofE2yQlMtfOF7YHw7P
+              bS4826epY5CnDjkhFHF406dZcPQVTsFUGFRfBkC1xDhGKgta1JVvrc63NdAvpUxT
+              5yNT1KIJUoNKzQE9HV0oNPpc5RiwWZs6BRBiQ0tj8HbiHnxkTfLLFymApLoHamgb
+              LAh362zDAnzZ32PDrLn5fX/nCo1QV/1/l+9XaSoCLB/mC7dDQRPEn65sSmnxUAm8
+              lAUYL4cUKA==
+              -----END CERTIFICATE-----
+
+              """
+          }
+        }
+      }
+    }
     labels = new Mapping {
       ["environment"] = "test"
     }

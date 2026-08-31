@@ -56,8 +56,10 @@ open class TrustConfig extends formae.Resource {
     @gcp.FieldHint
     description: String?
 
-    /// The trust stores this config offers. A config with none is valid and
-    /// trusts nothing.
+    /// The trust stores this config offers. Certificate Manager requires at
+    /// least one trust store or allowlisted certificate: a config carrying
+    /// neither is rejected at create with "trust config must contain at least
+    /// one trust store or allowlisted certificate".
     @gcp.FieldHint
     trustStores: Listing<TrustStore>?
 

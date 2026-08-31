@@ -20,7 +20,11 @@ formae agent.
   Creating one returns a CNAME to publish; only issuing a managed certificate
   waits on that record resolving, so the authorization itself is immediate.
 - `GCP::CertificateManager::TrustConfig` — the certificate authorities a load
-  balancer will accept client certificates from, for mutual TLS.
+  balancer will accept client certificates from, for mutual TLS. It must carry
+  at least one trust store or allowlisted certificate; Certificate Manager
+  rejects an empty one at create. Note that it appends a trailing newline to
+  every `pemCertificate` it stores, whatever was sent, so a PEM declared
+  without one drifts on every re-apply.
 
 - `GCP::Bigtable::AppProfile` — decides how an application's requests are routed
   across an instance's clusters. Every instance has a default profile; this is
