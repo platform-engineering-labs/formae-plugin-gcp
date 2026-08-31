@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificatemanager/certificateMap.pkl" as certificateMap
+import "./config/vars.pkl" as v
+
+// A map with no entries is valid and serves nothing, which keeps this case free
+// of prerequisites.
+forma {
+  v.stack
+  v.target
+
+  new certificateMap.CertificateMap {
+    label = "plugin-sdk-test-certmanager-map"
+    name = "formae-test-certmap-\(v.testRunID)"
+    description = "Test certificate map for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
+  }
+}
