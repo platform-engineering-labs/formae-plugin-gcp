@@ -1,0 +1,40 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/storage/managed_folder.pkl" as managedFolder
+import "./config/vars.pkl" as v
+
+// A managed folder needs uniform bucket-level access: GCS refuses to create one
+// in a bucket where per-object ACLs still apply. An empty bucket stores nothing
+// and costs nothing.
+local bkt = new bucket.Bucket {
+  label = "plugin-sdk-test-mf-bucket"
+  name = "formae-plugin-sdk-test-mf-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+  iamConfiguration = new bucket.IamConfiguration {
+    uniformBucketLevelAccess = new bucket.UniformBucketLevelAccess {
+      enabled = true
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  bkt
+
+  // The trailing slash is part of the name, not decoration.
+  new managedFolder.ManagedFolder {
+    label = "plugin-sdk-test-storage-managed-folder"
+    name = "formae-reports/"
+    bucket = bkt.res.name
+  }
+}

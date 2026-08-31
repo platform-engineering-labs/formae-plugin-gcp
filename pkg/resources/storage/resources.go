@@ -20,6 +20,8 @@ const (
 	AnywhereCacheResourceType              = "GCP::Storage::AnywhereCache"
 	BucketAccessControlResourceType        = "GCP::Storage::BucketAccessControl"
 	DefaultObjectAccessControlResourceType = "GCP::Storage::DefaultObjectAccessControl"
+	ManagedFolderResourceType              = "GCP::Storage::ManagedFolder"
+	FolderResourceType                     = "GCP::Storage::Folder"
 	ObjectAccessControlResourceType        = "GCP::Storage::ObjectAccessControl"
 	NotificationResourceType               = "GCP::Storage::Notification"
 )
@@ -193,6 +195,47 @@ func init() {
 			RequestTransformer:  wrapBodyBuilder(objectAclBodyBuilder),
 			ResponseTransformer: nil,
 		},
+		{
+			// A managed folder is an IAM boundary inside a bucket: it lets a
+			// policy be attached to a prefix without giving it to the whole
+			// bucket. It requires uniform bucket-level access - GCS refuses to
+			// create one where per-object ACLs still apply.
+			//
+			// Its name ends with a slash, which is part of its identity and is
+			// escaped in the URL.
+			ResourceType: ManagedFolderResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "managedFolders",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:         "bucket",
+					RequiresParent:     true,
+					ParentPathSegments: []string{"b"},
+				},
+				// A managed folder carries nothing but its name; there is
+				// nothing an update could change.
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.DropFields("bucket"),
+			ResponseTransformer: base.ResponseTransformerFunc(bucketScopedResponseTransformer),
+		},
+		{
+			// A folder is a real directory, available only in a bucket created
+			// with a hierarchical namespace. Where a managed folder is an IAM
+			// boundary over a prefix, a folder is an actual node - renaming one
+			// moves everything beneath it.
+			ResourceType: FolderResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "folders",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:         "bucket",
+					RequiresParent:     true,
+					ParentPathSegments: []string{"b"},
+				},
+				SupportsUpdate: false,
+			},
+			RequestTransformer:  base.DropFields("bucket"),
+			ResponseTransformer: base.ResponseTransformerFunc(bucketScopedResponseTransformer),
+		},
 	})
 
 	if err != nil {
@@ -260,4 +303,23 @@ func init() {
 				},
 			}
 		})
+	registerBucketWalkingLists()
+}
+
+// bucketScopedResponseTransformer puts back the bucket a folder belongs to and
+// drops what GCS echoes that describes the request rather than the resource.
+// Both folder types report "bucket" themselves, so unlike most nested resources
+// here nothing has to be recovered from the URL.
+func bucketScopedResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		switch k {
+		case "kind", "selfLink", "metageneration", "id":
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
