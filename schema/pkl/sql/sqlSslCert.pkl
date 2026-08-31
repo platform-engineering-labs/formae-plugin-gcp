@@ -1,0 +1,82 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud SQL Client Certificate
+///
+/// A client certificate for connecting to a Cloud SQL instance over mutual TLS.
+/// An instance with `requireSsl` set rejects clients that present none, so this
+/// is what makes such an instance reachable.
+///
+/// Certificates are immutable — sqladmin has no update method for one — and are
+/// addressed by a server-generated `sha1Fingerprint` rather than by the
+/// `commonName` a forma declares.
+///
+/// The private key is returned by the create call and never again. The plugin
+/// drops it rather than persisting it: keeping it would put a private key in
+/// stored state and guarantee drift on the next read. Take it from the create
+/// output if you need it.
+module gcp.sql.sqlSslCert
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::SQL::SslCert"
+
+open class SslCertResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden commonName: SslCertResolvable = (this) {
+        property = "commonName"
+    }
+
+    hidden sha1Fingerprint: SslCertResolvable = (this) {
+        property = "sha1Fingerprint"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "commonName"
+}
+open class SslCert extends formae.Resource {
+    hidden parent = this
+
+    /// The certificate's common name, and the only thing a forma chooses about
+    /// it. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    commonName: String
+
+    /// Short id of the owning instance. A path component, not a body field —
+    /// pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// Server-generated fingerprint, and what get and delete address the
+    /// certificate by.
+    @gcp.FieldHint { hasProviderDefault = true }
+    sha1Fingerprint: String?
+
+    /// The PEM-encoded certificate, issued by GCP.
+    @gcp.FieldHint { hasProviderDefault = true }
+    cert: String?
+
+    /// Serial number GCP assigned the certificate.
+    @gcp.FieldHint { hasProviderDefault = true }
+    certSerialNumber: String?
+
+    /// When the certificate was issued (RFC 3339).
+    @gcp.FieldHint { hasProviderDefault = true }
+    createTime: String?
+
+    /// When the certificate expires (RFC 3339).
+    @gcp.FieldHint { hasProviderDefault = true }
+    expirationTime: String?
+
+    hidden res: SslCertResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
