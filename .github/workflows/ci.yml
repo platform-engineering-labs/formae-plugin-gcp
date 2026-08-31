@@ -53,6 +53,9 @@ jobs:
       - name: Run unit tests
         run: make test-unit
 
+      - name: Self-check CI scripts
+        run: ./scripts/ci/conformance-scope_test.sh
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -104,41 +107,38 @@ jobs:
       - name: Verify schema
         run: make verify-schema
 
-  # Discover test cases from testdata/ directory for matrix strategy
+  # Resolve which test cases this run exercises: the whole testdata/ matrix on
+  # push, dispatch or a `full-conformance` label; only the cases a pull request
+  # touched otherwise. A PR touching no fixture resolves to zero and skips the
+  # conformance jobs and their cleanup entirely.
   discover-tests:
     needs: [build, lint, pkl-validate, verify-schema, test-unit]
     runs-on: ubuntu-latest
-    # Conformance does not run on pull requests - see debug-conformance.yml
-    # for the targeted per-branch run. PRs are gated on the fast checks above.
-    if: github.event_name != 'pull_request'
     outputs:
       test-cases: ${{ steps.discover.outputs.test-cases }}
+      count: ${{ steps.discover.outputs.count }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The pull_request path diffs against the base commit, which needs the
+          # full history. Not a `github.event_name` ternary: `... && 0 || 1`
+          # yields 1 on a pull request, because 0 is falsy in a GitHub
+          # expression and `||` then takes the right branch.
+          fetch-depth: 0
 
-      - name: Discover test cases
+      - name: Resolve conformance scope
         id: discover
-        run: |
-          # Find all *.pkl files in testdata/, exclude -update.pkl and -replace.pkl variants,
-          # and extract the base test case name
-          # Cases listed in testdata/on-demand-cases.txt are excluded: they cost
-          # money to hold or mutate something shared, so they are run by naming
-          # them in debug-conformance rather than on every push and every night.
-          ON_DEMAND=$(grep -vE '^\s*(#|$)' testdata/on-demand-cases.txt 2>/dev/null || true)
-          TEST_CASES=$(ls testdata/*.pkl 2>/dev/null \
-            | xargs -n1 basename \
-            | grep -v '\-update\.pkl$' \
-            | grep -v '\-replace\.pkl$' \
-            | sed 's/\.pkl$//' \
-            | { if [ -n "$ON_DEMAND" ]; then grep -vxF "$ON_DEMAND"; else cat; fi } \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "Discovered test cases: ${TEST_CASES}"
-          echo "test-cases=${TEST_CASES}" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-conformance') }}
+        run: ./scripts/ci/conformance-scope.sh
 
   # Clean up test resources before running any conformance tests
   pre-cleanup:
     needs: [discover-tests]
+    if: needs.discover-tests.outputs.count != '0'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -161,21 +161,18 @@ jobs:
       - name: Clean test resources
         run: ./scripts/ci/clean-environment.sh
 
-  # Conformance tests run the full CRUD lifecycle against real GCP resources,
-  # on push to main and on manual dispatch - not on pull requests.
+  # Conformance tests run the full CRUD lifecycle against real GCP resources.
   # Each test case runs in its own isolated job via matrix strategy.
   # Cleanup is handled by separate pre/post-cleanup jobs, NOT per test.
+  # An empty matrix vector is a hard error in Actions, so the count gate here is
+  # what makes "this PR touched no fixture" a skip rather than a red run.
   conformance-tests:
     needs: [discover-tests, pre-cleanup]
+    if: needs.discover-tests.outputs.count != '0'
     runs-on: ubuntu-latest
     # Raised to accommodate Cloud SQL: the CRUD + discovery lifecycle
     # provisions three instances sequentially (5-15 min each).
-    # 75 was not enough for the slowest case. datastream-route runs ~24m of
-    # crud, waits for a VPC peering teardown between phases, then ~40m of
-    # discovery - each phase building a private connection - and was killed
-    # mid-discovery at the cap. Raised with headroom rather than to the
-    # observed figure, so the next slow case does not need another bump.
-    timeout-minutes: 120
+    timeout-minutes: 75
     strategy:
       matrix:
         test-case: ${{ fromJson(needs.discover-tests.outputs.test-cases) }}
