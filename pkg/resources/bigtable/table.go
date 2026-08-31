@@ -99,4 +99,3 @@ func buildGCRuleForAPI(gcRule map[string]interface{}) map[string]interface{} {
 
 	return rule
 }
-

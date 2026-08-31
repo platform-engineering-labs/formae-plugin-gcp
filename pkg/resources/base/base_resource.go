@@ -264,6 +264,10 @@ func (b *BaseResource) Delete(
 	urlBuilder := NewURLBuilder(b.APIConfig, pathCtx)
 	url := urlBuilder.ResourceURL(pathCtx.ResourceName)
 
+	if len(b.ResourceConfig.DeleteQueryParams) > 0 {
+		url, _ = transport.AddQueryParams(url, b.ResourceConfig.DeleteQueryParams)
+	}
+
 	// Send DELETE request
 	response, err := client.SendRequest(ctx, transport.RequestOptions{
 		Method: "DELETE",

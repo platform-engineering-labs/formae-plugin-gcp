@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -21,6 +22,26 @@ import (
 type BigtableProvisioner struct {
 	*base.BaseResource
 	resourceTypeAPI string // "instances", "clusters", "tables"
+}
+
+// Status routes through base.StatusWithRead so a completed async create comes
+// back carrying the resource's properties.
+//
+// BigtableProvisioner embeds *base.BaseResource and overrode only Create, so it
+// inherited the raw BaseResource.Status - which reports success and nothing
+// else. UnifiedProvisioner wraps that with a Read for exactly this reason; a
+// hand-written provisioner has to do the same or the resource has no properties
+// after it is created.
+//
+// The visible symptom was a reference to a Bigtable instance never resolving:
+// with no properties on the instance there is no ".name" to read, so a table
+// declared alongside its instance reached the plugin with an unresolved
+// reference and failed with "instance is required for nested resources".
+func (p *BigtableProvisioner) Status(
+	ctx context.Context,
+	request *resource.StatusRequest,
+) (*resource.StatusResult, error) {
+	return base.StatusWithRead(ctx, p.BaseResource, p.Read, request)
 }
 
 // Create overrides the base Create to add Bigtable-specific query parameters
@@ -39,6 +60,13 @@ func (p *BigtableProvisioner) Create(
 		return createBigtableFailureResult(resource.OperationErrorCodeInvalidRequest,
 			fmt.Sprintf("failed to parse properties: %v", err)), nil
 	}
+	// base.Create does this and this provisioner did not, so any property whose
+	// value arrived wrapped - which is what a reference to another resource
+	// produces - read as empty. A table declared alongside its instance failed
+	// with "instance is required for nested resources" even though the instance
+	// was right there, which is why bigtable's table schema typed `instance` as
+	// a plain String and why the type still has no conformance case.
+	props = base.UnwrapValues(props)
 
 	// Extract resource name for query parameter
 	resourceName := utils.GetString(props, "name")
@@ -63,8 +91,14 @@ func (p *BigtableProvisioner) Create(
 		}
 		parent := utils.GetString(props, parentProp)
 		if parent == "" && p.ResourceConfig.ParentResource.RequiresParent {
+			// Say what was actually received. "instance is required" on its own
+			// is unfalsifiable from a CI log - the property may be absent, may
+			// be present under another name, or may be a type this code cannot
+			// read - and a plugin-side create failure carries no other
+			// diagnostic out of an apply.
 			return createBigtableFailureResult(resource.OperationErrorCodeInvalidRequest,
-				fmt.Sprintf("%s is required for nested resources", parentProp)), nil
+				fmt.Sprintf("%s is required for nested resources; got %s from properties %s",
+					parentProp, describeValue(props[parentProp]), sortedKeys(props))), nil
 		}
 		pathCtx.ParentResource = parent
 		pathCtx.ParentType = p.ResourceConfig.ParentResource.ParentType
@@ -201,4 +235,23 @@ func newBigtableProvisionerWithBase(baseResource *base.BaseResource, resourceTyp
 		BaseResource:    baseResource,
 		resourceTypeAPI: resourceTypeAPI,
 	}
+}
+
+// describeValue renders a property's Go type and value for an error message,
+// so "missing" can be told apart from "present but unreadable".
+func describeValue(v interface{}) string {
+	if v == nil {
+		return "<absent>"
+	}
+	return fmt.Sprintf("%T(%v)", v, v)
+}
+
+// sortedKeys lists the property names a request actually carried.
+func sortedKeys(props map[string]interface{}) string {
+	keys := make([]string, 0, len(props))
+	for k := range props {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
 }
