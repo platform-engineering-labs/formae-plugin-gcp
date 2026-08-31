@@ -61,6 +61,13 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
+  spanner-*)
+    # A Spanner instance is provisioned compute, and the database and
+    # backup-schedule cases each build one as a prerequisite before their own
+    # resource starts - 2m30s locally for the database case, before CI load.
+    TIMEOUT_ARG="TIMEOUT=15"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   servicenetworking-connection)
     # PSA connections are async and global (VPC peering); create and especially
     # discovery take longer to surface in inventory than any other resource.
