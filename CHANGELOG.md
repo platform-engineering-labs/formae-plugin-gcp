@@ -28,6 +28,171 @@ formae agent.
   reports two per project that nobody declared.
 
 ### Fixed
+- `GCP::Storage::ManagedFolder` — an IAM boundary inside a bucket, letting a
+  policy be attached to a prefix without granting it over the whole bucket.
+  Requires uniform bucket-level access.
+- `GCP::Storage::Folder` — a real directory node, available only in a bucket
+  created with a hierarchical namespace. Renaming one moves everything beneath
+  it, where a managed folder only governs who may read a prefix.
+- `GCP::Storage::Bucket` models `iamConfiguration.uniformBucketLevelAccess` and
+  `hierarchicalNamespace`. Neither folder type can exist without them, and
+  hierarchical namespace is fixed at creation — a bucket is created flat or
+  hierarchical and cannot convert.
+
+### Fixed
+
+- `GCP::Storage::Bucket`'s resolvable names properties the resource actually
+  has. It pointed at `"Id"`, `"SelfLink"` and `"Name"` — capitalised, matching
+  nothing — so `bkt.res.name` resolved to no value and **any resource
+  referencing a bucket reached the plugin with the reference unresolved**. It
+  went unnoticed because nothing in the repository referenced a bucket until the
+  folder types did. `selfLink` is removed: the bucket has no such property.
+- Storage names containing a slash survive a native-ID round trip. Both folder
+  types are named with a **trailing slash that is part of the identity**
+  ("reports/" is not "reports"), and the parser took a single path segment, so
+  the slash was dropped and the rebuilt URL addressed a folder that does not
+  exist. The name is now taken whole and escaped when addressed — a no-op for
+  every pre-existing storage name, none of which contains a slash.
+
+### Fixed
+- `GCP::DNS::ResourceRecordSet` — what a managed zone actually serves: one name,
+  one record type, and the data behind it. This completes Cloud DNS.
+
+  It is the only resource in the plugin addressed by **two** path segments
+  (`.../rrsets/{name}/{type}`). Both travel in the native ID joined by a slash,
+  which is unambiguous because a DNS name may contain dots but never a slash,
+  and both are fixed at creation — changing either is a different record set,
+  not an edit.
+
+  Every zone is born with an SOA and an NS record set nobody declared, so
+  discovery reports two per zone as unmanaged.
+
+- `GCP::Bigtable::AppProfile` — decides how an application's requests are routed
+  across an instance's clusters. Every instance has a default profile; this is
+  how a workload gets its own routing without affecting the rest.
+
+### Fixed
+
+- `schema/pkl/bigtable/materialized_view.pkl` describes the real API. It
+  demanded a `cluster` — materialized views are instance-scoped — and omitted
+  `query`, which is required, so the module was declarable and broken on
+  contact. It still has no provisioner and remains a recorded parity gap: the
+  create query needs Bigtable SQL semantics that could not be settled from CI
+  logs.
+- `BigtableProvisioner` routes `Status` through `base.StatusWithRead`. It
+  embedded `*base.BaseResource` and overrode only `Create`, so it inherited the
+  raw `Status`, which reports success and no properties. A completed async
+  create therefore left the resource with nothing to read, and a reference to a
+  Bigtable instance never resolved — a table declared alongside its instance
+  failed with "instance is required for nested resources". Affects `Instance`,
+  `Cluster` and `Table`.
+- `BigtableProvisioner.Create` unwraps wrapped property values, as `base.Create`
+  already did. Without it any property carrying a reference read as empty.
+- An app-profile create is treated as synchronous. `appProfiles.create` answers
+  with the resource, not an Operation, so polling looked for an operation id
+  that was never there and asked the bare base URL, which answers 404.
+- `GCP::Bigtable::Table` accepts a resolvable for `instance`. As a plain
+  `String` a table could only ever name an instance that already existed, so it
+  could not be declared in the same forma as its instance — which is why the
+  type has no conformance case to this day.
+- The Bigtable native-ID parser no longer switches on each collection by name.
+  An unlisted collection parsed to an empty resource type and read nothing,
+  silently; every instance-scoped collection now falls through one branch, with
+  cluster-scoped backups the only special case.
+
+- `GCP::DNS::Policy` — governs resolution for the VPC networks attached to it:
+  inbound forwarding from an on-premises resolver, alternative name servers,
+  and query logging. A policy attached to no network is valid and applies to
+  nothing.
+- `GCP::DNS::ResponsePolicy` — the container for rules that override resolution
+  for its networks, the private-DNS equivalent of a hosts file.
+- `GCP::DNS::ResponsePolicyRule` — one override, saying what a given DNS name
+  resolves to. Discovered by walking the response policies, since discovery
+  lists with no properties and Cloud DNS has no wildcard for that segment.
+
+  Cloud DNS does not agree with itself about what an identifier is called: a
+  managed zone and a policy use `name`, a response policy uses
+  `responsePolicyName`, a rule uses `ruleName`. A forma declares `name` for all
+  of them and the plugin translates at the API boundary, so the inconsistency
+  stays inside the plugin. The rule collection is likewise `rules` in the URL
+  but `responsePolicyRules` in a list response.
+
+- `GCP::SQL::User` — a database user on a Cloud SQL instance. An instance ships
+  with no usable login of its own, so this is what makes one reachable by an
+  application. `password` is write-only and createOnly: the API never returns
+  it, so it cannot reach stored state, and rotating it replaces the user.
+
+  MySQL's `host` is deliberately not modelled: it is part of a user's identity
+  rather than a property of it, and a `DeleteRequest` carries no properties for
+  the plugin to read it back from, so supporting it means encoding it in the
+  native ID. Users created without one get MySQL's default.
+- `GCP::SQL::SslCert` — a client certificate for connecting over mutual TLS.
+  Addressed by a server-generated `sha1Fingerprint` rather than by the
+  `commonName` a forma declares, and the only sqladmin resource whose create
+  answers with the resource itself rather than only an Operation. The private
+  key is returned exactly once and is dropped rather than persisted: keeping it
+  would put a private key in stored state and guarantee drift on every later
+  read.
+- `GCP::SQL::BackupRun` — one on-demand backup of an instance. Addressed by the
+  numeric id sqladmin assigns, which arrives as `backupContext.backupId` on the
+  create Operation. Unlike Spanner's and Bigtable's backups it takes no absolute
+  expiry, so its fixture cannot rot.
+
+  All three are discovered by walking the instances: discovery lists with no
+  properties, so it can name no instance to look in, and sqladmin has no
+  wildcard for them.
+
+### Fixed
+
+- A nested Cloud SQL resource no longer takes its native ID from the create
+  Operation's `targetLink`. Every sqladmin mutation answers with an Operation
+  whose `targetLink` names the **instance**, so a nested resource was stored
+  under the instance's native ID — two resources sharing one id — and the next
+  sync read the instance and reconciled the nested resource away as absent.
+  This affected `GCP::SQL::Database`, which has been registered for some time
+  but had no conformance case and so had never exercised the path;
+  `testdata/cloudsql-database.pkl` now covers it.
+- A deleted `GCP::SQL::BackupRun` is now treated as gone. Cloud SQL does not
+  remove a deleted backup run — the record survives as a tombstone and a get
+  answers 200 with `status: "DELETED"` rather than 404 — so a backup deleted
+  outside formae was reported as still present and never left inventory.
+  Discovery also no longer offers long-dead backups as unmanaged resources to
+  import.
+- Cloud SQL now retries a 409 "another operation was already in progress"
+  instead of failing the resource. Operations are serialised per instance and
+  every nested type shares its instance's queue, so a mutation issued while
+  another is still running is ordinary contention rather than a fault. It joins
+  the existing "database is being accessed by other users" case.
+- `GCP::SQL::Database` is now discoverable. It had no parent-walking `List`, so
+  discovery — which lists with no properties — asked a collection URL with no
+  instance in it and found nothing. Every instance-scoped Cloud SQL type now
+  shares one walker, since the only thing that differed between them was how an
+  item names itself: users and databases by `name`, a certificate by
+  `sha1Fingerprint`, a backup run by its server-assigned `id`.
+
+### Added
+
+- `GCP::Spanner::Instance` — the compute and storage a Spanner deployment runs
+  on. Project-scoped rather than location-scoped: an instance's region is its
+  `config`, not a path segment, and is fixed at creation. `config` is written as
+  the bare instance-config id (`regional-europe-central2`) and qualified by the
+  plugin, so a forma carries no project id and stays portable between targets.
+- `GCP::Spanner::Database` — a database on an instance. Spanner has no `name`
+  field on create; the id goes into a `CREATE DATABASE` statement, quoted with
+  backticks for GoogleSQL and double quotes for PostgreSQL.
+- `GCP::Spanner::BackupSchedule` — a recurring backup of one database, which is
+  what extends a database beyond its point-in-time retention window. Sits two
+  collections deep and, unlike instances and databases, is synchronous.
+
+  Spanner rejects a wildcard for both nested collections —
+  `instances/-/databases` and `databases/-/backupSchedules` answer 400 "Invalid
+  List... request" — so databases and schedules are discovered by walking the
+  collections above them, following `nextPageToken` at each level.
+
+  Note that Spanner creates a `default_daily_full_backup_schedule` alongside
+  every database, so discovery reports one nobody declared, and that
+  `clean-environment.sh` now sweeps Spanner instances: they are billed by the
+  hour, and the database and backup-schedule fixtures each leave one behind.
 - `GCP::ServiceDirectory::Namespace` — the top-level container of a Service
   Directory registry. Location-scoped and free; deleting one deletes every
   service and endpoint under it.

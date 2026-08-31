@@ -87,20 +87,55 @@ open class RetentionPolicy extends formae.SubResource {
     retentionPeriod: Int?
 }
 
+/// Every entry here names a property this resource actually declares.
+///
+/// They previously read "Id", "SelfLink" and "Name" — capitalised, matching
+/// nothing — so `bkt.res.name` resolved to no value and any resource
+/// referencing a bucket reached the plugin with the reference unresolved. It
+/// went unnoticed because nothing in the repository referenced a bucket until
+/// the folder types did. `selfLink` is gone with them: the bucket has no such
+/// property to point at.
 open class BucketResolvable extends formae.Resolvable {
     hidden type = module.type
 
     hidden id: BucketResolvable = (this) {
-        property = "Id"
-    }
-
-    hidden selfLink: BucketResolvable = (this) {
-        property = "SelfLink"
+        property = "id"
     }
 
     hidden name: BucketResolvable = (this) {
-        property = "Name"
+        property = "name"
     }
+}
+
+/// Whether ACLs are disabled in favour of IAM alone. Managed folders require
+/// this to be enabled — GCS refuses to create one in a bucket that still has
+/// per-object ACLs.
+@gcp.SubResourceHint
+open class UniformBucketLevelAccess extends formae.SubResource {
+    @gcp.FieldHint
+    enabled: Boolean?
+
+    /// When the setting stops being reversible. Set by GCS.
+    @gcp.FieldHint { hasProviderDefault = true }
+    lockedTime: String?
+}
+
+@gcp.SubResourceHint
+open class IamConfiguration extends formae.SubResource {
+    @gcp.FieldHint
+    uniformBucketLevelAccess: UniformBucketLevelAccess?
+
+    /// GCS fills this in ("inherited" unless set).
+    @gcp.FieldHint { hasProviderDefault = true }
+    publicAccessPrevention: String?
+}
+
+/// Gives the bucket real folders rather than name prefixes. Fixed at creation:
+/// an existing flat bucket cannot be converted.
+@gcp.SubResourceHint
+open class HierarchicalNamespace extends formae.SubResource {
+    @gcp.FieldHint
+    enabled: Boolean?
 }
 
 @gcp.ResourceHint {
@@ -148,6 +183,21 @@ open class Bucket extends formae.Resource {
         createOnly = true
     }
     name: String
+
+    /// How access is controlled. GCS always reports this, so it is a provider
+    /// default when a forma says nothing; set
+    /// `uniformBucketLevelAccess.enabled` to turn ACLs off, which managed
+    /// folders require.
+    @gcp.FieldHint { hasProviderDefault = true }
+    iamConfiguration: IamConfiguration?
+
+    /// Enables real folders. Immutable — a bucket is created flat or
+    /// hierarchical and cannot change afterwards.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    hierarchicalNamespace: HierarchicalNamespace?
 
     @gcp.FieldHint
     owner: Owner?

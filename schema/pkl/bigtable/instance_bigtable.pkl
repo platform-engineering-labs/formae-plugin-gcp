@@ -72,7 +72,7 @@ open class Instance extends formae.Resource {
     name: String
 
     @gcp.FieldHint
-    displayName: String
+    displayName: String(length >= 4 && length <= 30)
 
     @gcp.FieldHint {
         createOnly = true

@@ -45,10 +45,13 @@ run_make() {
 # the SDK reads.
 TIMEOUT_ARG=""
 case "$TEST_CASE" in
-  cloudsql-instance)
+  cloudsql-*)
     # Cloud SQL provisions an instance per create (5-15 min each). The CRUD
     # lifecycle creates two (initial + OOB-delete re-apply) and discovery
-    # creates a third, so allow 30 min per operation.
+    # creates a third, so allow 30 min per operation. The user, database,
+    # ssl-cert and backup-run cases each build an instance as a prerequisite
+    # before their own resource starts, so they pay the same cost: measured
+    # locally, crud alone runs 20-29 min for each of them.
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;
@@ -60,6 +63,13 @@ case "$TEST_CASE" in
     # means here.
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
+    ;;
+  spanner-*)
+    # A Spanner instance is provisioned compute, and the database and
+    # backup-schedule cases each build one as a prerequisite before their own
+    # resource starts - 2m30s locally for the database case, before CI load.
+    TIMEOUT_ARG="TIMEOUT=15"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;
   servicenetworking-connection)
     # PSA connections are async and global (VPC peering); create and especially
