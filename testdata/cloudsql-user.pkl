@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+import "@formae/formae.pkl"
+
+import "@gcp/sql/database.pkl"
+import "@gcp/sql/sqlUser.pkl" as sqlUser
+import "./config/vars.pkl" as v
+
+// The instance the user logs in to. Same shape as the cloudsql-instance case:
+// org policy constraints/sql.restrictPublicIp forbids a public IP here, so the
+// instance is private-IP only on the default VPC.
+local inst = new database.DatabaseInstance {
+  label = "plugin-sdk-test-sqluser-instance"
+  project = v.gcpProject
+  name = "formae-test-sqluser-\(v.testRunID)"
+  databaseVersion = "MYSQL_8_0"
+  region = v.gcpRegion
+  settings = new database.Settings {
+    tier = "db-f1-micro"
+    availabilityType = "ZONAL"
+    dataDiskSizeGb = 10
+    dataDiskType = "PD_SSD"
+    storageAutoResize = true
+    ipConfiguration = new database.IpConfiguration {
+      ipv4Enabled = false
+      privateNetwork = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
+    }
+    backupConfiguration = new database.BackupConfiguration {
+      enabled = false
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  new sqlUser.User {
+    label = "plugin-sdk-test-sqluser"
+    name = "formae-test-user"
+    // Resolvable -> the instance exists before the user is created.
+    instance = inst.res.name
+    // Write-only: the API never returns it, so it never reaches stored state.
+    password = formae.value("Conformance-Test-Pw-1!").opaque
+  }
+}

@@ -1344,5 +1344,22 @@ else
     echo "  No Service Directory namespaces found"
 fi
 
+# --- 14. Spanner instances (spanner-* tests). Deleting an instance deletes the
+#         databases and backup schedules under it, so this one sweep covers all
+#         three cases. Unlike most leftovers these are **billed by the hour**:
+#         the database and backup-schedule fixtures each build an instance as a
+#         prerequisite, and conformance Destroy only removes the resource under
+#         test, so every run of those two cases leaves one running. ---
+echo "Cleaning GCP Spanner instances..."
+SPANNER_INSTANCES=$(gcloud spanner instances list --format="value(name)" 2>/dev/null | grep '^formae-' || true)
+if [ -n "$SPANNER_INSTANCES" ]; then
+    echo "$SPANNER_INSTANCES" | while read -r inst; do
+        echo "  Deleting Spanner instance: $inst"
+        gcloud spanner instances delete "$inst" --quiet 2>&1 | tail -1 || true
+    done
+else
+    echo "  No Spanner instances found"
+fi
+
 echo ""
 echo "clean-environment.sh: Cleanup complete"

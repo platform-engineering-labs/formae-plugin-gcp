@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/sql/database.pkl"
+import "@gcp/sql/sqlDatabase.pkl" as sqlDatabase
+import "./config/vars.pkl" as v
+
+// GCP::SQL::Database has been registered since before this batch but had no
+// conformance case, which is how it kept a native-ID defect nobody saw: every
+// sqladmin mutation answers with an Operation whose targetLink names the
+// *instance*, so a nested resource that took its id from there was stored under
+// the instance's native ID and the next sync reconciled it away as absent.
+//
+// The instance is the same shape as the cloudsql-instance case: org policy
+// constraints/sql.restrictPublicIp forbids a public IP here, so it is private-IP
+// only on the default VPC.
+local inst = new database.DatabaseInstance {
+  label = "plugin-sdk-test-sqldb-instance"
+  project = v.gcpProject
+  name = "formae-test-sqldb-\(v.testRunID)"
+  databaseVersion = "MYSQL_8_0"
+  region = v.gcpRegion
+  settings = new database.Settings {
+    tier = "db-f1-micro"
+    availabilityType = "ZONAL"
+    dataDiskSizeGb = 10
+    dataDiskType = "PD_SSD"
+    storageAutoResize = true
+    ipConfiguration = new database.IpConfiguration {
+      ipv4Enabled = false
+      privateNetwork = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
+    }
+    backupConfiguration = new database.BackupConfiguration {
+      enabled = false
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  new sqlDatabase.Database {
+    label = "plugin-sdk-test-sqldatabase"
+    project = v.gcpProject
+    // Resolvable -> the instance exists before the database is created.
+    instance = inst.res.name
+    name = "formae_test_db"
+  }
+}

@@ -56,13 +56,30 @@ var SQLOperations = base.OperationConfig{
 		return isDone, nil
 	},
 
-	// A database delete right after its client disconnects can fail with
-	// "database ... is being accessed by other users" — Cloud SQL reaps lingering
-	// sessions on a lag. Treat it as retryable so formae core re-runs the delete
-	// until the sessions clear, instead of failing the teardown.
-	RetryableError: func(err error) bool {
-		return err != nil && strings.Contains(err.Error(), "is being accessed by other users")
-	},
+	RetryableError: isRetryableSQLError,
+}
+
+// isRetryableSQLError names the two transient answers sqladmin gives that say
+// "not yet" rather than "no".
+//
+//   - A database delete right after its client disconnects can fail with
+//     "database ... is being accessed by other users" — Cloud SQL reaps
+//     lingering sessions on a lag.
+//   - Cloud SQL serialises operations per instance, so any mutation issued
+//     while another is still running answers 409 "Operation failed because
+//     another operation was already in progress". Every nested resource here
+//     shares its instance's operation queue, so this is ordinary contention
+//     rather than a fault.
+//
+// Both are reported as NotStabilized so formae core re-runs the operation
+// instead of failing the resource.
+func isRetryableSQLError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "is being accessed by other users") ||
+		strings.Contains(msg, "another operation was already in progress")
 }
 
 // SQLNativeID defines native ID format for SQL resources
@@ -90,6 +107,17 @@ func sqlPathBuilder(ctx base.PathContext) string {
 
 // extractSQLNativeID extracts the native ID from SQL API response
 func extractSQLNativeID(response map[string]interface{}, ctx base.PathContext) string {
+	// A nested resource must be addressed by its own path, never by the
+	// operation's targetLink. Every sqladmin mutation answers with an Operation
+	// whose targetLink points at the *instance* - so a user or a database whose
+	// native ID came from there would be stored under the instance's id, two
+	// resources would share one native ID, and the next sync would read the
+	// instance and reconcile the nested resource away as absent.
+	if ctx.ParentType != "" && ctx.ParentResource != "" && ctx.ResourceName != "" {
+		return fmt.Sprintf("projects/%s/%s/%s/%s/%s",
+			ctx.Project, ctx.ParentType, ctx.ParentResource, ctx.ResourceType, ctx.ResourceName)
+	}
+
 	// For operations, check targetLink first
 	if targetLink, ok := response["targetLink"].(string); ok {
 		return utils.SelfLinkToNativeID(targetLink)

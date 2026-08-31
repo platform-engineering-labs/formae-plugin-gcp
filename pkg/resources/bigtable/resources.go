@@ -6,6 +6,7 @@ package bigtable
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -21,6 +22,7 @@ const (
 	TableResourceType            = "GCP::Bigtable::Table"
 	BackupResourceType           = "GCP::Bigtable::Backup"
 	MaterializedViewResourceType = "GCP::Bigtable::MaterializedView"
+	AppProfileResourceType       = "GCP::Bigtable::AppProfile"
 )
 
 // bigtableRegistry is the unified registry for all Bigtable resources
@@ -185,6 +187,39 @@ func init() {
 			RequestTransformer:  base.RequestTransformerFunc(materializedViewRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(materializedViewResponseTransformer),
 		},
+		// The three types below take their create id as a camelCase query
+		// parameter (?appProfileId=), which CreateIDParam sends verbatim. They
+		// deliberately do NOT go through BigtableProvisioner: that derives the
+		// parameter by trimming a trailing "s" and appending "_id", which gives
+		// "appProfile_id" and is not what the API asks for.
+		{
+			// An app profile is one of the two Bigtable creates that answer with
+			// the resource itself rather than an Operation (a table is the
+			// other). Treating it as async made base poll an operation id that
+			// was never there, against BaseURL + "/" - which answers 404.
+			ResourceType:    AppProfileResourceType,
+			OperationConfig: BigtableSyncOperations,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "appProfiles",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "instances",
+					PropertyName:   "instance",
+					RequiresParent: true,
+				},
+				CreateIDParam:      "appProfileId",
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true,
+				// Bigtable refuses to delete an app profile without this, and
+				// refuses to update one that changes routing without it either.
+				UpdateQueryParams: map[string]string{"ignoreWarnings": "true"},
+				DeleteQueryParams: map[string]string{"ignoreWarnings": "true"},
+			},
+			RequestTransformer: &base.CompositeRequestTransformer{Transformers: []base.RequestTransformer{
+				base.DropFields("instance"),
+				base.DropFieldsOnUpdate("name"),
+			}},
+			ResponseTransformer: base.ResponseTransformerFunc(instanceScopedResponseTransformer),
+		},
 	})
 
 	if err != nil {
@@ -193,6 +228,8 @@ func init() {
 
 	// Override registrations with BigtableProvisioner for proper Create handling
 	// BigtableProvisioner adds the required instance_id/cluster_id/table_id query parameters
+	registerInstanceWalkingLists()
+
 	bigtableResourceTypes := []string{InstanceResourceType, ClusterResourceType, TableResourceType}
 	for _, rt := range bigtableResourceTypes {
 		resourceType := rt // capture by value for closure
@@ -234,4 +271,28 @@ func init() {
 			},
 		)
 	}
+}
+
+// instanceScopedResponseTransformer puts back what the API leaves in the
+// resource path. Bigtable reports only a full name
+// ("projects/{p}/instances/{i}/appProfiles/{a}"), so the instance a forma
+// declares would otherwise look absent and every sync would plan a change.
+func instanceScopedResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	out := make(map[string]interface{}, len(props)+1)
+	for k, v := range props {
+		if k == "etag" {
+			continue
+		}
+		out[k] = v
+	}
+	name, _ := props["name"].(string)
+	parts := strings.Split(name, "/")
+	// projects/{p}/instances/{i}/{collection}/{name}
+	if len(parts) == 6 && parts[0] == "projects" && parts[2] == "instances" {
+		out["instance"] = parts[3]
+		out["name"] = parts[5]
+	}
+	return out
 }

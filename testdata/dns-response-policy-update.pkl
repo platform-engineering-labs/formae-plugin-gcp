@@ -6,23 +6,18 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/dns/responsePolicy.pkl"
+import "@gcp/dns/responsePolicy.pkl" as responsePolicy
 import "./config/vars.pkl" as v
 
-// No network prerequisite: a response policy may attach to networks but does
-// not have to, and every fixture that builds one competes for a project-wide
-// cap of 30 networks that a full matrix already runs up against. dns-policy
-// keeps its network so the reference is still covered somewhere.
-
+// Cloud DNS calls this resource's identifier "responsePolicyName"; a forma
+// declares "name" like every other resource here and the plugin translates.
 forma {
   v.stack
   v.target
 
   new responsePolicy.ResponsePolicy {
     label = "plugin-sdk-test-dns-response-policy"
-    project = v.gcpProject
-    // The id field is responsePolicyName, not name.
-    responsePolicyName = "formae-plugin-sdk-test-dnsrp-\(v.testRunID)"
-    description = "Plugin SDK conformance response policy (updated)"
+    name = "formae-test-dns-rp-\(v.testRunID)"
+    description = "Updated response policy description"
   }
 }

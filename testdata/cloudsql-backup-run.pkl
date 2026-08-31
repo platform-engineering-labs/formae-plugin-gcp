@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/sql/database.pkl"
+import "@gcp/sql/sqlBackupRun.pkl" as sqlBackupRun
+import "./config/vars.pkl" as v
+
+// The instance being backed up. Unlike the other Cloud SQL fixtures this one
+// enables backupConfiguration: an on-demand backup run needs the instance to
+// have backups turned on.
+local inst = new database.DatabaseInstance {
+  label = "plugin-sdk-test-backuprun-instance"
+  project = v.gcpProject
+  name = "formae-test-backuprun-\(v.testRunID)"
+  databaseVersion = "MYSQL_8_0"
+  region = v.gcpRegion
+  settings = new database.Settings {
+    tier = "db-f1-micro"
+    availabilityType = "ZONAL"
+    dataDiskSizeGb = 10
+    dataDiskType = "PD_SSD"
+    storageAutoResize = true
+    ipConfiguration = new database.IpConfiguration {
+      ipv4Enabled = false
+      privateNetwork = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
+    }
+    backupConfiguration = new database.BackupConfiguration {
+      enabled = true
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  // No expiry to declare: unlike Spanner's and Bigtable's backups, a Cloud SQL
+  // backup run takes no absolute timestamp, so this fixture cannot rot.
+  new sqlBackupRun.BackupRun {
+    label = "plugin-sdk-test-backuprun"
+    instance = inst.res.name
+    description = "Formae conformance on-demand backup"
+    type = "ON_DEMAND"
+  }
+}

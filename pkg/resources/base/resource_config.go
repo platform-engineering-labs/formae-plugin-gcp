@@ -50,6 +50,13 @@ type ResourceConfig struct {
 	// from the body so a full-reconcile PATCH masks exactly the fields it sends.
 	UpdateMaskFromBody bool
 
+	// DeleteQueryParams specifies additional query parameters to include in
+	// delete requests. Some GCP deletes are refused without a force flag:
+	// Bigtable answers an app-profile delete with a safety-check failure unless
+	// "ignoreWarnings=true" is sent, and its own discovery document describes
+	// the parameter as required while flagging it optional.
+	DeleteQueryParams map[string]string
+
 	// OptimisticLocking defines optimistic locking configuration
 	OptimisticLocking *OptimisticLockingConfig
 

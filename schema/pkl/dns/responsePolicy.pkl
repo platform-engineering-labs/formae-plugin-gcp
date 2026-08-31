@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
-/// GCP Cloud DNS ResponsePolicy
+/// GCP Cloud DNS Response Policy
 ///
-/// A set of rules that override what DNS would otherwise answer for the
-/// networks it is attached to — the private equivalent of a DNS "response
-/// policy zone". Holding one costs nothing; Cloud DNS bills zones and queries.
+/// A container for rules that override DNS resolution for the networks attached
+/// to it — the private-DNS equivalent of a hosts file. The rules do the work;
+/// the policy is what a network is attached to.
 ///
-/// Its id field is `responsePolicyName`, not `name`.
+/// Cloud DNS calls this resource's identifier `responsePolicyName` rather than
+/// `name`. A forma declares `name`, as it does for every other resource here,
+/// and the plugin translates at the API boundary.
 module gcp.dns.responsePolicy
 
 import "../gcp.pkl"
@@ -18,44 +20,43 @@ import "@formae/formae.pkl"
 
 const type = "GCP::DNS::ResponsePolicy"
 
-/// A network the response policy applies to.
-class ResponsePolicyNetwork {
+/// A VPC network the response policy applies to.
+@gcp.SubResourceHint
+open class ResponsePolicyNetwork extends formae.SubResource {
+    /// Full self-link of the network.
     @gcp.FieldHint
-    networkUrl: (String|formae.Resolvable)?
+    networkUrl: String
 }
 
 open class ResponsePolicyResolvable extends formae.Resolvable {
     hidden type = module.type
 
-    hidden responsePolicyName: ResponsePolicyResolvable = (this) {
-        property = "responsePolicyName"
+    hidden name: ResponsePolicyResolvable = (this) {
+        property = "name"
     }
 }
 
 @gcp.ResourceHint {
     type = module.type
-    identifier = "responsePolicyName"
+    identifier = "name"
 }
 open class ResponsePolicy extends formae.Resource {
     hidden parent = this
 
-    /// User-assigned response policy id. Immutable.
+    /// User-assigned policy name. Immutable. Sent to the API as
+    /// `responsePolicyName`.
     @gcp.FieldHint { createOnly = true }
-    responsePolicyName: String
-
-    /// The project holding the response policy.
-    @gcp.FieldHint { createOnly = true }
-    project: (String|formae.Resolvable)?
+    name: String
 
     @gcp.FieldHint
     description: String?
 
+    /// Networks the policy applies to.
     @gcp.FieldHint
     networks: Listing<ResponsePolicyNetwork>?
 
-    /// Server-assigned numeric id.
-    @gcp.FieldHint { hasProviderDefault = true }
-    id: String?
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
 
     hidden res: ResponsePolicyResolvable = new {
         label = parent.label

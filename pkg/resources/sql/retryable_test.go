@@ -18,8 +18,8 @@ func TestSQLRetryableError(t *testing.T) {
 	}
 	cases := map[string]bool{
 		`operation failed: failed to delete database formae. Detail: pq: database "formae" is being accessed by other users.`: true,
-		"is being accessed by other users":                    true,
-		"operation failed: some other error":                  false,
+		"is being accessed by other users":   true,
+		"operation failed: some other error": false,
 	}
 	for msg, want := range cases {
 		if got := re(errors.New(msg)); got != want {

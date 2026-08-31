@@ -1,0 +1,68 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Spanner Database
+///
+/// A database inside a Spanner instance. Spanner has no "name" field on create:
+/// the id goes into a DDL statement (`CREATE DATABASE ...`), which the plugin
+/// builds from `name` and quotes for the dialect.
+///
+/// Databases live under their instance (`.../instances/{instance}/databases/{database}`).
+module gcp.spanner.database
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Spanner::Database"
+
+typealias DatabaseDialect = "GOOGLE_STANDARD_SQL"|"POSTGRESQL"
+
+open class DatabaseResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DatabaseResolvable = (this) {
+        property = "name"
+    }
+
+    hidden instance: DatabaseResolvable = (this) {
+        property = "instance"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Database extends formae.Resource {
+    hidden parent = this
+
+    /// Short database id (e.g. "my-database"). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning instance. A path component, not a body field —
+    /// pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    /// SQL dialect. Fixed at creation and decides how the id is quoted in the
+    /// CREATE statement. GCP defaults to GOOGLE_STANDARD_SQL.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    databaseDialect: DatabaseDialect?
+
+    /// How far back point-in-time reads may go (e.g. "1h", "7d"). GCP defaults
+    /// to one hour.
+    @gcp.FieldHint { hasProviderDefault = true }
+    versionRetentionPeriod: String?
+
+    hidden res: DatabaseResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

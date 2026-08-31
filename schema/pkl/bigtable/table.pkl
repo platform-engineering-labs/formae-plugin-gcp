@@ -80,6 +80,11 @@ open class Table extends formae.Resource {
     }
     project: String
 
+    /// Short id of the owning instance. A path component, not a body field.
+    /// Accepts a resolvable (`inst.res.name`) so a table can be declared in the
+    /// same forma as its instance - as a plain String it could only ever refer
+    /// to an instance that already existed, which is why no conformance case
+    /// could be written for this type.
     @gcp.FieldHint {
         createOnly = true
     }

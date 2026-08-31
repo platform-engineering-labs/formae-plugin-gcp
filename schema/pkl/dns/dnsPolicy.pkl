@@ -6,10 +6,11 @@
 
 /// GCP Cloud DNS Policy
 ///
-/// How DNS behaves for the networks it is attached to: whether they accept
-/// inbound forwarding, whether queries are logged, and which name servers
-/// answer instead of Google's. A policy costs nothing to hold — Cloud DNS bills
-/// zones and queries.
+/// Governs how DNS resolves for the VPC networks attached to it: whether an
+/// on-premises resolver may query into the network (inbound forwarding), which
+/// name servers to use instead of Google's, and whether queries are logged. A
+/// network with no policy just uses the defaults, so this is how those are
+/// changed.
 module gcp.dns.dnsPolicy
 
 import "../gcp.pkl"
@@ -17,30 +18,36 @@ import "@formae/formae.pkl"
 
 const type = "GCP::DNS::Policy"
 
-/// A network the policy applies to.
-class PolicyNetwork {
-    /// The network's self link or full URL.
-    @gcp.FieldHint
-    networkUrl: (String|formae.Resolvable)?
-}
-
-/// A name server that answers instead of Google's.
-class PolicyNameServer {
+/// One alternative name server to send queries to.
+@gcp.SubResourceHint
+open class NameServer extends formae.SubResource {
+    /// IPv4 address of the target name server.
     @gcp.FieldHint
     ipv4Address: String?
 
+    /// IPv6 address of the target name server.
     @gcp.FieldHint
     ipv6Address: String?
 
-    /// Whether the address is reached over the private VPC or the internet.
+    /// Whether the server is reachable over the VPC or the public internet.
+    /// GCP fills this in when unset.
     @gcp.FieldHint { hasProviderDefault = true }
-    forwardingPath: ("default"|"private")?
+    forwardingPath: String?
 }
 
-/// The name servers that replace Google's for this policy.
-class AlternativeNameServerConfig {
+@gcp.SubResourceHint
+open class AlternativeNameServerConfig extends formae.SubResource {
     @gcp.FieldHint
-    targetNameServers: Listing<PolicyNameServer>?
+    targetNameServers: Listing<NameServer>?
+}
+
+/// A VPC network the policy applies to.
+@gcp.SubResourceHint
+open class PolicyNetwork extends formae.SubResource {
+    /// Full self-link of the network, e.g.
+    /// "https://www.googleapis.com/compute/v1/projects/{p}/global/networks/{n}".
+    @gcp.FieldHint
+    networkUrl: String
 }
 
 open class PolicyResolvable extends formae.Resolvable {
@@ -62,30 +69,25 @@ open class Policy extends formae.Resource {
     @gcp.FieldHint { createOnly = true }
     name: String
 
-    /// The project holding the policy.
-    @gcp.FieldHint { createOnly = true }
-    project: (String|formae.Resolvable)?
-
     @gcp.FieldHint
     description: String?
 
-    /// Whether the networks accept DNS queries forwarded in from on-premises.
-    @gcp.FieldHint { hasProviderDefault = true }
+    /// Lets an on-premises resolver query into the attached networks.
+    @gcp.FieldHint
     enableInboundForwarding: Boolean?
 
-    /// Whether queries against the networks are logged.
-    @gcp.FieldHint { hasProviderDefault = true }
+    /// Logs every query made from the attached networks.
+    @gcp.FieldHint
     enableLogging: Boolean?
 
-    @gcp.FieldHint
-    networks: Listing<PolicyNetwork>?
-
+    /// Name servers to use in place of Google's default resolver.
     @gcp.FieldHint
     alternativeNameServerConfig: AlternativeNameServerConfig?
 
-    /// Server-assigned numeric id.
-    @gcp.FieldHint { hasProviderDefault = true }
-    id: String?
+    /// Networks the policy applies to. A policy with none is valid and applies
+    /// to nothing.
+    @gcp.FieldHint
+    networks: Listing<PolicyNetwork>?
 
     hidden res: PolicyResolvable = new {
         label = parent.label

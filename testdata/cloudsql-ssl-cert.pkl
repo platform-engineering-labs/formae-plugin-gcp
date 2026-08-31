@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/sql/database.pkl"
+import "@gcp/sql/sqlSslCert.pkl" as sqlSslCert
+import "./config/vars.pkl" as v
+
+// The instance the certificate authenticates against. Same shape as the
+// cloudsql-instance case: org policy constraints/sql.restrictPublicIp forbids a
+// public IP here, so it is private-IP only on the default VPC.
+local inst = new database.DatabaseInstance {
+  label = "plugin-sdk-test-sslcert-instance"
+  project = v.gcpProject
+  name = "formae-test-sslcert-\(v.testRunID)"
+  databaseVersion = "MYSQL_8_0"
+  region = v.gcpRegion
+  settings = new database.Settings {
+    tier = "db-f1-micro"
+    availabilityType = "ZONAL"
+    dataDiskSizeGb = 10
+    dataDiskType = "PD_SSD"
+    storageAutoResize = true
+    ipConfiguration = new database.IpConfiguration {
+      ipv4Enabled = false
+      privateNetwork = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"
+    }
+    backupConfiguration = new database.BackupConfiguration {
+      enabled = false
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  inst
+
+  // commonName is the only thing a forma chooses about a certificate; GCP
+  // assigns the fingerprint that addresses it, and returns the private key
+  // once, which the plugin drops rather than persisting.
+  new sqlSslCert.SslCert {
+    label = "plugin-sdk-test-sslcert"
+    commonName = "formae-conformance-client"
+    instance = inst.res.name
+  }
+}

@@ -21,10 +21,10 @@ forma {
     label = "plugin-sdk-test-spanner-instance"
     name = "formae-test-spanner-\(v.testRunID)"
     config = "regional-\(v.gcpRegion)"
-    displayName = "Formae conformance"
+    displayName = "Formae conformance 2"
     processingUnits = 100
     labels = new Mapping {
-      ["environment"] = "test"
+      ["environment"] = "updated"
       ["managed-by"] = "formae"
     }
   }

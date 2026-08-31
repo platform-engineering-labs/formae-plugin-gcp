@@ -1,0 +1,74 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Bigtable App Profile
+///
+/// Decides how an application's requests are routed across an instance's
+/// clusters. Every instance has a default profile; declaring another is how a
+/// workload gets its own routing and isolation without affecting the rest.
+///
+/// Exactly one routing policy must be set: `multiClusterRoutingUseAny` for
+/// failover across clusters, or `singleClusterRouting` to pin traffic to one.
+module gcp.bigtable.app_profile
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Bigtable::AppProfile"
+
+/// Route to one named cluster, optionally allowing transactional writes.
+@gcp.SubResourceHint
+open class SingleClusterRouting extends formae.SubResource {
+    @gcp.FieldHint
+    clusterId: String
+
+    /// Single-row transactions are rejected unless this is set.
+    @gcp.FieldHint
+    allowTransactionalWrites: Boolean?
+}
+
+open class AppProfileResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AppProfileResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class AppProfile extends formae.Resource {
+    hidden parent = this
+
+    /// Short profile id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning instance. A path component, not a body field —
+    /// pass `inst.res.name` so formae creates the instance first.
+    @gcp.FieldHint { createOnly = true }
+    instance: (String|formae.Resolvable)
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Route to any cluster, failing over as needed. Pass an empty mapping to
+    /// accept the defaults. Mutually exclusive with `singleClusterRouting`.
+    @gcp.FieldHint
+    multiClusterRoutingUseAny: Mapping<String, Any>?
+
+    /// Pin traffic to one cluster. Mutually exclusive with
+    /// `multiClusterRoutingUseAny`.
+    @gcp.FieldHint
+    singleClusterRouting: SingleClusterRouting?
+
+    hidden res: AppProfileResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

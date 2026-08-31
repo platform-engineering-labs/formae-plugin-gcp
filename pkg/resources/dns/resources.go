@@ -5,10 +5,7 @@
 package dns
 
 import (
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/prov"
-	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 )
 
 const (
@@ -16,6 +13,7 @@ const (
 	PolicyResourceType             = "GCP::DNS::Policy"
 	ResponsePolicyResourceType     = "GCP::DNS::ResponsePolicy"
 	ResponsePolicyRuleResourceType = "GCP::DNS::ResponsePolicyRule"
+	ResourceRecordSetResourceType  = "GCP::DNS::ResourceRecordSet"
 )
 
 var dnsRegistry *base.ResourceRegistry
@@ -36,35 +34,37 @@ func init() {
 			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 		{
-			// A policy fits the same engine: the name travels in the body, and
-			// the path is the generic /projects/{p}/policies[/{name}]. Cloud DNS
-			// patches a policy with the whole object rather than a field mask.
+			// A policy governs DNS resolution for the networks attached to it -
+			// inbound forwarding, alternative name servers, logging. Plain
+			// project-level CRUD.
 			ResourceType: PolicyResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:   "policies",
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPatch,
-				ListItemsKey:   "policies",
 			},
-			RequestTransformer:  base.RequestTransformerFunc(policyRequestTransformer),
-			ResponseTransformer: base.ResponseTransformerFunc(policyResponseTransformer),
+			RequestTransformer:  base.DropFieldsOnUpdate("name"),
+			ResponseTransformer: base.ShortNameResponseTransformer,
 		},
 		{
-			// A response policy is the same shape as a policy, except that its
-			// id field is responsePolicyName rather than name.
+			// A response policy holds the rules that override resolution for
+			// its networks. Cloud DNS calls its identifier "responsePolicyName"
+			// rather than "name", so the transformers translate: a forma
+			// declares "name" like every other resource here.
 			ResourceType: ResponsePolicyResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType:   "responsePolicies",
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPatch,
-				ListItemsKey:   "responsePolicies",
 			},
-			RequestTransformer:  base.RequestTransformerFunc(policyRequestTransformer),
-			ResponseTransformer: base.ResponseTransformerFunc(policyResponseTransformer),
+			RequestTransformer:  base.RequestTransformerFunc(responsePolicyRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(responsePolicyResponseTransformer),
 		},
 		{
-			// A rule hangs off a response policy:
-			// /projects/{p}/responsePolicies/{rp}/rules[/{rule}].
+			// A rule lives under its response policy. Two things the generic
+			// engine needs told: the collection is "rules" in the path but
+			// "responsePolicyRules" in a list response, and the identifier is
+			// "ruleName".
 			ResourceType: ResponsePolicyRuleResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "rules",
@@ -73,36 +73,104 @@ func init() {
 					PropertyName:   "responsePolicy",
 					RequiresParent: true,
 				},
+				ListItemsKey:   "responsePolicyRules",
 				SupportsUpdate: true,
 				UpdateMethod:   base.UpdateMethodPatch,
-				ListItemsKey:   "responsePolicyRules",
 			},
-			RequestTransformer:  base.RequestTransformerFunc(ruleRequestTransformer),
-			ResponseTransformer: base.ResponseTransformerFunc(ruleResponseTransformer),
+			RequestTransformer:  base.RequestTransformerFunc(responsePolicyRuleRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(responsePolicyRuleResponseTransformer),
+		},
+		{
+			// A record set is what a managed zone actually serves. It is the one
+			// resource here addressed by two path segments - .../rrsets/{name}/{type}
+			// - which the native ID carries joined by a slash; create posts to
+			// the collection and needs no id parameter at all.
+			ResourceType: ResourceRecordSetResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "rrsets",
+				ParentResource: &base.ParentResourceConfig{
+					ParentType:     "managedZones",
+					PropertyName:   "managedZone",
+					RequiresParent: true,
+				},
+				ListItemsKey:   "rrsets",
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPatch,
+			},
+			RequestTransformer:  base.DropFields("managedZone"),
+			ResponseTransformer: base.ResponseTransformerFunc(resourceRecordSetResponseTransformer),
 		},
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	// Cloud DNS refuses to delete a policy while a network is attached to it, so
-	// both policy types delete behind a provisioner that detaches first. See
-	// policy_delete.go.
-	for _, rt := range []string{PolicyResourceType, ResponsePolicyResourceType} {
-		resourceType := rt // capture by value for closure
-		def := dnsRegistry.Definitions[resourceType]
-		registry.Register(resourceType, def.Operations, func(cfg *config.Config) prov.Provisioner {
-			return &policyProvisioner{
-				BaseResource: &base.BaseResource{
-					Config:              cfg,
-					APIConfig:           DNSAPI,
-					OperationConfig:     DNSOperations,
-					ResourceConfig:      def.ResourceConfig,
-					NativeIDConfig:      DNSNativeID,
-					RequestTransformer:  def.RequestTransformer,
-					ResponseTransformer: def.ResponseTransformer,
-				},
-			}
-		})
+	registerResourceRecordSetList()
+	registerResponsePolicyList()
+	registerResponsePolicyRuleList()
+}
+
+// Cloud DNS names the identifier of a response policy "responsePolicyName" and
+// that of a rule "ruleName". Every other resource in this plugin declares
+// "name", and base builds its path context from that, so the transformers
+// translate in both directions rather than leaking the API's inconsistency into
+// every forma.
+
+func responsePolicyRequestTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) (map[string]interface{}, error) {
+	return renameKey(props, "name", "responsePolicyName"), nil
+}
+
+func responsePolicyResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	return renameKey(props, "responsePolicyName", "name")
+}
+
+func responsePolicyRuleRequestTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) (map[string]interface{}, error) {
+	// "responsePolicy" addresses the rule rather than describing it, and the
+	// API rejects it as an unknown body field.
+	body := renameKey(props, "name", "ruleName")
+	delete(body, "responsePolicy")
+	return body, nil
+}
+
+func responsePolicyRuleResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	return renameKey(props, "ruleName", "name")
+}
+
+// renameKey copies props with one key renamed, leaving the original untouched
+// when it is absent.
+func renameKey(props map[string]interface{}, from, to string) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == from {
+			out[to] = v
+			continue
+		}
+		out[k] = v
 	}
+	return out
+}
+
+// resourceRecordSetResponseTransformer puts back the zone a record set belongs
+// to. A record set reports its name, type, ttl and rrdatas and nothing naming
+// its managed zone - that lives only in the URL - so a forma's `managedZone`
+// would otherwise read as absent on every sync.
+func resourceRecordSetResponseTransformer(
+	props map[string]interface{}, _ base.TransformContext,
+) map[string]interface{} {
+	out := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		if k == "kind" || k == "signatureRrdatas" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
