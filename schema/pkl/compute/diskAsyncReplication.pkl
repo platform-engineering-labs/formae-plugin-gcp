@@ -46,7 +46,8 @@ open class DiskAsyncReplication extends formae.Resource {
     /// comparing it against the URL already in state reads as a change to a
     /// createOnly field and plans a replacement of the pair that is already in
     /// place. Which disks a pair joins is fixed at creation and is what its
-    /// native ID is made of, so there is no drift to detect here.
+    /// native ID is made of, so there is no drift to detect here. The
+    /// provisioner's Read reports no properties, as write-only requires.
     @gcp.FieldHint {
         createOnly = true
         writeOnly = true
