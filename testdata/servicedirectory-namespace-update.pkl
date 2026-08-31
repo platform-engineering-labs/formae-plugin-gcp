@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/servicedirectory/namespace.pkl"
+import "./config/vars.pkl" as v
+
+// A namespace is the root of a Service Directory registry and stores nothing of
+// its own, so this case is free and instant.
+forma {
+  v.stack
+  v.target
+
+  new namespace.Namespace {
+    label = "plugin-sdk-test-sd-namespace"
+    name = "formae-test-sd-ns-\(v.testRunID)"
+    labels = new Mapping {
+      ["environment"] = "updated"
+      ["managed-by"] = "formae"
+    }
+  }
+}

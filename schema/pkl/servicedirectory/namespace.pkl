@@ -1,0 +1,48 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Service Directory Namespace
+///
+/// The top-level container of a Service Directory registry: services are
+/// registered inside a namespace, and endpoints inside a service. A namespace
+/// is location-scoped and free — it stores nothing of its own.
+///
+/// Deleting a namespace deletes every service and endpoint under it.
+module gcp.servicedirectory.namespace
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ServiceDirectory::Namespace"
+
+open class NamespaceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: NamespaceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Namespace extends formae.Resource {
+    hidden parent = this
+
+    /// Short namespace id (e.g. "my-namespace"). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Free-form labels.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: NamespaceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

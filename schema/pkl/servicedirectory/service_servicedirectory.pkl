@@ -1,0 +1,55 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Service Directory Service
+///
+/// A named service inside a namespace. It carries the metadata clients resolve
+/// (annotations) and owns the endpoints that give it addresses; a namespace on
+/// its own registers nothing, which is the gap a service closes.
+///
+/// Services live under their namespace
+/// (`.../namespaces/{namespace}/services/{service}`).
+module gcp.servicedirectory.service
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ServiceDirectory::Service"
+
+open class ServiceResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ServiceResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Service extends formae.Resource {
+    hidden parent = this
+
+    /// Short service id (e.g. "my-service"). Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Short id of the owning namespace. A path component, not a body field —
+    /// pass `ns.res.name` so formae creates the namespace first.
+    @gcp.FieldHint { createOnly = true }
+    namespace: (String|formae.Resolvable)
+
+    /// Free-form annotations clients read when they resolve the service.
+    /// Keys beginning with "cloud.google.com/" are reserved by GCP.
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    hidden res: ServiceResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
