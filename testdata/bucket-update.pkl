@@ -22,7 +22,7 @@ forma {
     location = v.gcpRegion
     storageClass = "STANDARD"
     versioning = new bucket.Versioning {
-      enabled = false  // This is the mutable field being tested (changed from false to true)
+      enabled = true  // This is the mutable field being tested (changed from false to true)
     }
     labels = new Mapping {
       ["environment"] = "test"
