@@ -1,0 +1,34 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/servicedirectory/namespace.pkl"
+import "@gcp/servicedirectory/service_servicedirectory.pkl" as service
+import "./config/vars.pkl" as v
+
+// The namespace the service is registered in. Referenced through its resolvable
+// so formae creates it first. Both are free.
+local ns = new namespace.Namespace {
+  label = "plugin-sdk-test-sd-svc-namespace"
+  name = "formae-test-sd-svc-ns-\(v.testRunID)"
+}
+
+forma {
+  v.stack
+  v.target
+
+  ns
+
+  new service.Service {
+    label = "plugin-sdk-test-sd-service"
+    name = "formae-test-sd-svc-\(v.testRunID)"
+    namespace = ns.res.name
+    annotations = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}
