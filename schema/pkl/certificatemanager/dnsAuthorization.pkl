@@ -1,0 +1,65 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Manager DNS Authorization
+///
+/// Proves control of a domain. Creating one returns a CNAME record to publish
+/// in that domain's zone; a Google-managed certificate for the domain cannot be
+/// issued until the record resolves. The authorization itself costs nothing and
+/// is created immediately — only issuance waits on DNS.
+module gcp.certificatemanager.dnsAuthorization
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateManager::DnsAuthorization"
+
+/// PER_PROJECT_RECORD authorizes one domain; FIXED_RECORD is the legacy form.
+typealias DnsAuthorizationType = "PER_PROJECT_RECORD"|"FIXED_RECORD"
+
+open class DnsAuthorizationResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DnsAuthorizationResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class DnsAuthorization extends formae.Resource {
+    hidden parent = this
+
+    /// Short authorization id. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// The domain being authorized, without a trailing dot
+    /// (e.g. "example.com"). Immutable — an authorization is bound to the
+    /// domain it was created for.
+    @gcp.FieldHint { createOnly = true }
+    domain: String
+
+    /// GCP defaults to PER_PROJECT_RECORD.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    type: DnsAuthorizationType?
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: DnsAuthorizationResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

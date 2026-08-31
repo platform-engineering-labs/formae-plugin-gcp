@@ -12,6 +12,22 @@ formae agent.
 
 ### Added
 
+- `GCP::CertificateManager::CertificateMap` — groups the certificates a load
+  balancer serves, selected per hostname by its entries. A target HTTPS proxy
+  points at a map rather than a single certificate, which is how one proxy
+  serves many domains.
+
+- `GCP::CertificateManager::DnsAuthorization` — proves control of a domain.
+  Creating one returns a CNAME to publish; only issuing a managed certificate
+  waits on that record resolving, so the authorization itself is immediate.
+
+- `GCP::CertificateManager::TrustConfig` — the certificate authorities a load
+  balancer will accept client certificates from, for mutual TLS. It must carry
+  at least one trust store or allowlisted certificate; Certificate Manager
+  rejects an empty one at create. Note that it appends a trailing newline to
+  every `pemCertificate` it stores, whatever was sent, so a PEM declared
+  without one drifts on every re-apply.
+
 - `GCP::Logging::LogBucket` — where log entries are actually retained. A sink
   routes entries into a bucket and a view is a window onto one, so this is what
   decides how long logs live and where.
