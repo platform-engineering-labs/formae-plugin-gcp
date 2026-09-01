@@ -11,11 +11,39 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 )
 
-// location is pinned to "global": Network Connectivity hubs live under
-// projects/{p}/locations/global/hubs and are not regional. The path and
-// native-ID builders use this const and deliberately ignore ctx.Location so a
-// target's configured region can never leak into a hub URL.
-const location = "global"
+// defaultLocation is where a Network Connectivity resource lives when it has no
+// region of its own. Hubs, internal ranges and policy-based routes are global;
+// service connection policies are regional.
+//
+// The builders below read ctx.Location and fall back to this. That is safe
+// rather than lax: a globally-scoped resource is registered with
+// base.ScopeGlobal, which clears ctx.Location, so a target's configured region
+// still cannot leak into a global URL - it simply arrives here as empty.
+const defaultLocation = "global"
+
+// globalResourceTypes are the collections that live under locations/global
+// whatever region the target is configured for. Keeping the list here rather
+// than inferring it from ctx.Location means a region can never leak into one of
+// their URLs even if the scope config changes: base.ScopeGlobal already clears
+// ctx.Location, and this is the second lock on the same door.
+var globalResourceTypes = map[string]bool{
+	"hubs":              true,
+	"internalRanges":    true,
+	"policyBasedRoutes": true,
+}
+
+// locationOf returns the location segment for a request: "global" for the
+// collections above, and the target's region for the rest. Service connection
+// policies are the only regional type in this API today.
+func locationOf(ctx base.PathContext) string {
+	if globalResourceTypes[ctx.ResourceType] {
+		return defaultLocation
+	}
+	if ctx.Location != "" {
+		return ctx.Location
+	}
+	return defaultLocation
+}
 
 // NetworkConnectivityAPI - Network Connectivity API v1. Hubs are global
 // resources. create/delete are long-running operations (return an Operation to
@@ -44,10 +72,10 @@ var NetworkConnectivityNativeID = base.NativeIDConfig{
 }
 
 // networkConnectivityPathBuilder builds
-// /projects/{project}/locations/global/{resourceType}[/{name}]. The location is
-// hard-pinned to "global"; ctx.Location is intentionally ignored.
+// /projects/{project}/locations/{location}/{resourceType}[/{name}], where the
+// location is ctx.Location for a regional type and "global" for the rest.
 func networkConnectivityPathBuilder(ctx base.PathContext) string {
-	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, location, ctx.ResourceType)
+	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, locationOf(ctx), ctx.ResourceType)
 	if ctx.ResourceName != "" {
 		path += "/" + ctx.ResourceName
 	}
@@ -66,13 +94,12 @@ func extractOperationName(response map[string]interface{}) string {
 
 // extractNetworkConnectivityNativeID builds the resource path. On async create
 // the response is an Operation (not the resource), so build from context —
-// buildPathContext has already set ResourceName from the declared id. The
-// location is hard-pinned to "global"; ctx.Location is ignored. Fall back to the
+// buildPathContext has already set ResourceName from the declared id. Fall back to the
 // operation's metadata.target, then to a direct resource response.
 func extractNetworkConnectivityNativeID(response map[string]interface{}, ctx base.PathContext) string {
 	if ctx.ResourceName != "" {
 		return fmt.Sprintf("projects/%s/locations/%s/%s/%s",
-			ctx.Project, location, ctx.ResourceType, ctx.ResourceName)
+			ctx.Project, locationOf(ctx), ctx.ResourceType, ctx.ResourceName)
 	}
 	if md, ok := response["metadata"].(map[string]interface{}); ok {
 		if target, ok := md["target"].(string); ok {

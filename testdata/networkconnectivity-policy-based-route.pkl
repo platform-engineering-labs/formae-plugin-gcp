@@ -1,0 +1,48 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/networkconnectivity/policyBasedRoute.pkl"
+import "./config/vars.pkl" as v
+
+// A policy-based route applies to a VPC, so the network comes first, referenced
+// through its resolvable so formae creates it first.
+//
+// nextHopOtherRoutes = DEFAULT_ROUTING sends matching traffic back to normal
+// routing. The alternative is an internal load balancer IP, which would mean
+// standing up a load balancer and its backends for a route that is never used.
+local net = new network.Network {
+  label = "plugin-sdk-test-nc-pbr-network"
+  name = "formae-test-nc-pbr-net-\(v.testRunID)"
+  description = "Test network for the policy-based route conformance test"
+  autoCreateSubnetworks = false
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new policyBasedRoute.PolicyBasedRoute {
+    label = "plugin-sdk-test-nc-policy-based-route"
+    name = "formae-test-nc-pbr-\(v.testRunID)"
+    network = net.res.selfLink
+    priority = 1000
+    filter = new policyBasedRoute.Filter {
+      protocolVersion = "IPV4"
+      srcRange = "10.96.0.0/24"
+      destRange = "10.96.1.0/24"
+      ipProtocol = "TCP"
+    }
+    nextHopOtherRoutes = "DEFAULT_ROUTING"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

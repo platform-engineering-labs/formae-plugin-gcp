@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/networkconnectivity/internalRange.pkl"
+import "./config/vars.pkl" as v
+
+// An internal range reserves IP space inside a VPC, so the network comes first.
+// Referenced through its resolvable, which is what orders the creates - a range
+// interpolated into a string would carry no edge.
+//
+// Both are free: a range is a reservation, not an allocation, and the network
+// has no subnets.
+local net = new network.Network {
+  label = "plugin-sdk-test-nc-ir-network"
+  name = "formae-test-nc-ir-net-\(v.testRunID)"
+  description = "Test network for the internal range conformance test"
+  autoCreateSubnetworks = false
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new internalRange.InternalRange {
+    label = "plugin-sdk-test-nc-internal-range"
+    name = "formae-test-nc-ir-\(v.testRunID)"
+    // The API echoes the selfLink form back on read, so declaring it this way
+    // round-trips; the relative form would not match what it reports.
+    network = net.res.selfLink
+    ipCidrRange = "10.97.0.0/24"
+    usage = "FOR_VPC"
+    peering = "FOR_SELF"
+    description = "Updated internal range description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

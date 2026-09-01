@@ -12,6 +12,31 @@ formae agent.
 
 ### Added
 
+- `GCP::NetworkConnectivity::InternalRange` — a reservation of internal IP space
+  in a VPC. It marks a CIDR range as spoken for so nothing else is allocated over
+  it; a subnet created later in the same space is rejected. Give it a range, or a
+  `prefixLength` and let the API pick a free block of that size.
+
+- `GCP::NetworkConnectivity::PolicyBasedRoute` — a route chosen by what the
+  traffic is, not only where it is going. An ordinary route matches the
+  destination; this also matches protocol and source range, which is how traffic
+  is steered through an appliance. Every field is fixed at creation, so a change
+  is a replacement.
+
+  It is the one type here that will not accept a network self link — it answers
+  `network uri ... is not in the form of projects/my-project/global/networks/my-network`
+  — and it reports back whatever form it was given. Since a reference to a
+  network resolves to a self link, the plugin cuts the request down and expands
+  the response back; without both halves the field disagrees with itself on every
+  re-apply and plans a replacement of the route already in place.
+
+- `GCP::NetworkConnectivity::ServiceConnectionPolicy` — permission, in advance,
+  for a managed service to place Private Service Connect endpoints in a
+  consumer's subnets. Regional, unlike the rest of this API, which lives under
+  `locations/global`. A patch may carry only `description`, `labels` and
+  `pscConfig`; anything else in the body enters the update mask and the API
+  refuses it.
+
 - The Replace phase is exercised for the first time. Every conformance case in
   this plugin reported replace as skipped, because a case only tests it when a
   `-replace.pkl` accompanies it and none existed - so a run reporting "8/8" was
