@@ -66,18 +66,14 @@ run_make() {
 # the SDK reads.
 TIMEOUT_ARG=""
 case "$TEST_CASE" in
-  cloudsql-instance|sql-database)
+  cloudsql-*|sql-database)
     # Cloud SQL provisions an instance per create (5-15 min each). The CRUD
     # lifecycle creates two (initial + OOB-delete re-apply) and discovery
-    # creates a third, so allow 30 min per operation. sql-database builds an
-    # instance before its own resource and pays the same cost.
-  cloudsql-*)
-    # Cloud SQL provisions an instance per create (5-15 min each). The CRUD
-    # lifecycle creates two (initial + OOB-delete re-apply) and discovery
-    # creates a third, so allow 30 min per operation. The user, database,
-    # ssl-cert and backup-run cases each build an instance as a prerequisite
-    # before their own resource starts, so they pay the same cost: measured
-    # locally, crud alone runs 20-29 min for each of them.
+    # creates a third, so allow 30 min per operation. Every case in this family
+    # builds an instance as a prerequisite before its own resource starts and
+    # pays the same cost: measured locally, crud alone runs 20-29 min for the
+    # user, database, ssl-cert and backup-run cases. sql-database is the same
+    # cost under a different name.
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;
@@ -107,17 +103,19 @@ case "$TEST_CASE" in
     ;;
   monitoring-metric-descriptor)
     # The OOB-delete step waits for sync to tombstone a descriptor deleted out
-    # of band, and the 2m default is far too short: sync only notices an absence
-    # once discovery has swept every registered type, and there are over a
-    # hundred of them.
+    # of band, and the 2m default is far too short. Two things make it slow: a
+    # deleted descriptor keeps answering a GET long after the delete returns
+    # success (observed still readable 15 minutes later), and sync only notices
+    # an absence once discovery has swept every registered type, of which there
+    # are over a hundred.
     #
-    # This raises the ceiling but does not make the case reliable. A run at 15m
-    # still timed out while the descriptor was already gone from the API -
-    # verified by listing it afterwards - so whether the case passes depends on
-    # where this type falls in the sweep, which is a property of formae's
-    # discovery cycle rather than of the plugin. The case passes in some runs
-    # and not others for that reason.
-    export FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    # 30m is the ceiling, not a guarantee. A run at 15m timed out while the
+    # descriptor was already gone from the API - verified by listing it
+    # afterwards - so whether the case passes depends on where this type falls
+    # in the sweep, which is a property of formae's discovery cycle rather than
+    # of the plugin. Nothing else about the case is slow: create, verify,
+    # extract, sync, destroy and discovery all finish in about two minutes.
+    export FORMAE_TEST_OOB_DELETE_TIMEOUT=30
     ;;
   apigateway-api|apigateway-api-config|apigateway-gateway)
     # Every API Gateway write is a long-running operation: an api takes minutes,
@@ -128,6 +126,7 @@ case "$TEST_CASE" in
     # undiscovered when it was really there.
     TIMEOUT_ARG="TIMEOUT=20"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=20 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   spanner-*)
     # A Spanner instance is provisioned compute, and the database and
     # backup-schedule cases each build one as a prerequisite before their own
@@ -186,15 +185,6 @@ case "$TEST_CASE" in
     # the zone for these tests only.
     #
     export GCP_LOCATION="$GCP_ZONE"
-    ;;
-  monitoring-metric-descriptor)
-    # A deleted custom metric descriptor keeps answering a GET long after the
-    # delete returns success. Observed: still readable 15 minutes later, so the
-    # out-of-band delete check needs a far longer window than the 2m default to
-    # see it leave inventory. Nothing else about the case is slow - create,
-    # verify, extract, sync, destroy and discovery all finish in about two
-    # minutes.
-    export FORMAE_TEST_OOB_DELETE_TIMEOUT=30
     ;;
   filestore-backup)
     # Deliberately NOT the zone override above. A backup is regional and the

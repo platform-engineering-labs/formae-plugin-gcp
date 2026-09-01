@@ -66,26 +66,6 @@ open class Versioning extends formae.SubResource {
     enabled: Boolean?
 }
 
-/// Uniform bucket-level access. When enabled, access is controlled only by IAM
-/// and the bucket rejects ACLs - so a `BucketAccessControl` or
-/// `DefaultObjectAccessControl` on such a bucket cannot be created.
-@gcp.SubResourceHint
-open class UniformBucketLevelAccess extends formae.SubResource {
-    @gcp.FieldHint
-    enabled: Boolean?
-}
-
-@gcp.SubResourceHint
-open class IamConfiguration extends formae.SubResource {
-    @gcp.FieldHint
-    uniformBucketLevelAccess: UniformBucketLevelAccess?
-
-    /// "inherited" or "enforced". Enforcing public access prevention blocks
-    /// making objects publicly readable.
-    @gcp.FieldHint { hasProviderDefault = true }
-    publicAccessPrevention: String?
-}
-
 @gcp.SubResourceHint
 open class Website extends formae.SubResource {
     mainPageSuffix: String?
@@ -129,7 +109,9 @@ open class BucketResolvable extends formae.Resolvable {
 
 /// Whether ACLs are disabled in favour of IAM alone. Managed folders require
 /// this to be enabled — GCS refuses to create one in a bucket that still has
-/// per-object ACLs.
+/// per-object ACLs. Conversely, when it is enabled the bucket rejects ACLs, so
+/// a `BucketAccessControl` or `DefaultObjectAccessControl` on such a bucket
+/// cannot be created.
 @gcp.SubResourceHint
 open class UniformBucketLevelAccess extends formae.SubResource {
     @gcp.FieldHint
@@ -207,7 +189,8 @@ open class Bucket extends formae.Resource {
     /// How access is controlled. GCS always reports this, so it is a provider
     /// default when a forma says nothing; set
     /// `uniformBucketLevelAccess.enabled` to turn ACLs off, which managed
-    /// folders require.
+    /// folders require. GCP's own default for new buckets has varied, and an
+    /// organisation policy can force uniform access on.
     @gcp.FieldHint { hasProviderDefault = true }
     iamConfiguration: IamConfiguration?
 
@@ -239,12 +222,6 @@ open class Bucket extends formae.Resource {
         hasProviderDefault = true
     }
     updated: String?
-
-    /// IAM configuration. Set `uniformBucketLevelAccess.enabled = false` to
-    /// keep ACLs usable on this bucket; GCP's own default for new buckets has
-    /// varied, and an organisation policy can force it on.
-    @gcp.FieldHint { hasProviderDefault = true }
-    iamConfiguration: IamConfiguration?
 
     @gcp.FieldHint
     versioning: Versioning?

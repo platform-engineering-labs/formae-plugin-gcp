@@ -6,25 +6,26 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/spanner/spannerInstance.pkl" as spannerInstance
+import "@gcp/spanner/instance_spanner.pkl" as instance
 import "./config/vars.pkl" as v
 
-// Unlike the rest of these fixtures, a Spanner instance is billed for as long
-// as it exists. 100 processing units is the smallest instance the API accepts -
-// a tenth of a node - which is why it is what this case asks for.
+// The replace companion of spanner-instance. Identical to it but for the id,
+// which is immutable: changing it plans a destroy and a create rather than an
+// update, and the case asserts the native ID changed. Still 100 processing
+// units, the floor, because a Spanner instance is billed while it exists.
 forma {
   v.stack
   v.target
 
-  new spannerInstance.Instance {
+  new instance.Instance {
     label = "plugin-sdk-test-spanner-instance"
-    project = v.gcpProject
-    // The id is immutable, so changing it forces a replace rather than an
-    // update: the old instance is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-spi2-\(v.testRunID)"
-    // The regional config matching the target keeps the data in one region.
+    name = "formae-test-spanner2-\(v.testRunID)"
     config = "regional-\(v.gcpRegion)"
-    displayName = "Plugin SDK conformance"
+    displayName = "Formae conformance"
     processingUnits = 100
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["managed-by"] = "formae"
+    }
   }
 }

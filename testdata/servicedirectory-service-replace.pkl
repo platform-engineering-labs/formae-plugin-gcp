@@ -7,14 +7,15 @@
 amends "@formae/forma.pkl"
 
 import "@gcp/servicedirectory/namespace.pkl"
-import "@gcp/servicedirectory/serviceDirectoryService.pkl" as service
+import "@gcp/servicedirectory/service_servicedirectory.pkl" as service
 import "./config/vars.pkl" as v
 
-// A service lives inside a namespace, so the namespace comes first.
+// The replace companion of servicedirectory-service. The namespace is the
+// prerequisite and does not move; the service id does, and it is immutable, so
+// the plan is a destroy and a create rather than an update.
 local ns = new namespace.Namespace {
   label = "plugin-sdk-test-sd-svc-namespace"
-  project = v.gcpProject
-  name = "formae-plugin-sdk-test-sd-sns-\(v.testRunID)"
+  name = "formae-test-sd-svc-ns-\(v.testRunID)"
 }
 
 forma {
@@ -25,14 +26,10 @@ forma {
 
   new service.Service {
     label = "plugin-sdk-test-sd-service"
-    project = v.gcpProject
-    // Resolvable -> the namespace exists before the service is created in it.
+    name = "formae-test-sd-svc2-\(v.testRunID)"
     namespace = ns.res.name
-    // A service id is immutable, so changing it forces a replace: the old
-    // service is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-sd-svc2-\(v.testRunID)"
     annotations = new Mapping {
-      ["purpose"] = "conformance"
+      ["environment"] = "test"
     }
   }
 }
