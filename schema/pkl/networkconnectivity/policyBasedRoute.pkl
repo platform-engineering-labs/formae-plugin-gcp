@@ -1,0 +1,122 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Connectivity PolicyBasedRoute
+///
+/// A route chosen by what the traffic *is*, not only where it is going. A
+/// normal route matches the destination; a policy-based route also matches
+/// protocol and source range, which is how traffic is steered through an
+/// appliance. Global (it lives under locations/global); create and delete are
+/// long-running operations, and every field is immutable — there is no PATCH.
+module gcp.networkconnectivity.policyBasedRoute
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkConnectivity::PolicyBasedRoute"
+
+/// What traffic the route applies to.
+@gcp.SubResourceHint
+open class Filter extends formae.SubResource {
+    /// IPV4 or IPV6. Required.
+    @gcp.FieldHint
+    protocolVersion: String
+
+    /// Source range in CIDR form. GCP reports "0.0.0.0/0" when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    srcRange: String?
+
+    /// Destination range in CIDR form. GCP reports "0.0.0.0/0" when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    destRange: String?
+
+    /// IP protocol the route matches, e.g. "TCP". Matches all when unset.
+    @gcp.FieldHint
+    ipProtocol: String?
+}
+
+/// Restricts the route to VMs carrying these network tags.
+@gcp.SubResourceHint
+open class VirtualMachine extends formae.SubResource {
+    @gcp.FieldHint
+    tags: Listing<String>?
+}
+
+open class PolicyBasedRouteResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PolicyBasedRouteResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class PolicyBasedRoute extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-route"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The VPC the route applies to. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String|formae.Resolvable
+
+    /// What traffic this route matches. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    filter: Filter
+
+    /// Lower wins against other policy-based routes. GCP defaults to 1000.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    priority: Int?
+
+    /// Send matching traffic back to normal routing rather than to an
+    /// appliance: DEFAULT_ROUTING. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    nextHopOtherRoutes: String?
+
+    /// The internal load balancer to send matching traffic to. Immutable, and
+    /// mutually exclusive with `nextHopOtherRoutes`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    nextHopIlbIp: String?
+
+    /// Restrict the route to VMs with particular tags. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    virtualMachine: VirtualMachine?
+
+    /// An optional description. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: PolicyBasedRouteResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,88 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Connectivity InternalRange
+///
+/// A reservation of internal IP space inside a VPC. It marks a CIDR range as
+/// spoken for so nothing else is allocated over it — a subnet created later in
+/// the same space is rejected. Global (it lives under locations/global); create
+/// and delete are long-running operations.
+module gcp.networkconnectivity.internalRange
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkConnectivity::InternalRange"
+
+open class InternalRangeResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InternalRangeResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class InternalRange extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-range"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The VPC the range is reserved in. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    network: String|formae.Resolvable
+
+    /// The range itself, in CIDR form. Give this or `prefixLength`, not both:
+    /// with a prefix length the API allocates a free block of that size and
+    /// reports the result here.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    ipCidrRange: String?
+
+    /// Ask the API to allocate a free block of this size rather than naming one.
+    @gcp.FieldHint
+    prefixLength: Int?
+
+    /// What the reservation is for: FOR_VPC, EXTERNAL_TO_VPC or FOR_MIGRATION.
+    @gcp.FieldHint
+    usage: String?
+
+    /// How the range behaves across peerings: FOR_SELF, FOR_PEER or
+    /// NOT_SHARED.
+    @gcp.FieldHint
+    peering: String?
+
+    /// Ranges the allocation must avoid when `prefixLength` is used.
+    @gcp.FieldHint
+    excludeCidrRanges: Listing<String>?
+
+    /// Candidate ranges the allocation may come from.
+    @gcp.FieldHint
+    targetCidrRange: Listing<String>?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: InternalRangeResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

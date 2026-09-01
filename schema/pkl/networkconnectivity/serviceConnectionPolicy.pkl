@@ -1,0 +1,85 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Connectivity ServiceConnectionPolicy
+///
+/// Permission, in advance, for a managed service to place Private Service
+/// Connect endpoints in a consumer's subnets. Without one, a service that
+/// offers PSC has nowhere in the VPC it is allowed to put an endpoint.
+///
+/// Regional, unlike the rest of this API — it lives under the target's region
+/// rather than locations/global. Create and delete are long-running operations.
+module gcp.networkconnectivity.serviceConnectionPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkConnectivity::ServiceConnectionPolicy"
+
+/// Where the service may place endpoints.
+@gcp.SubResourceHint
+open class PscConfig extends formae.SubResource {
+    /// The subnets endpoints may be allocated from. Full resource paths.
+    @gcp.FieldHint
+    subnetworks: Listing<String|formae.Resolvable>?
+
+    /// How many endpoints the service may create. GCP reports its own default
+    /// when unset.
+    @gcp.FieldHint { hasProviderDefault = true }
+    limit: String?
+
+    /// What to do when a subnet runs out of addresses.
+    @gcp.FieldHint { hasProviderDefault = true }
+    producerInstanceLocation: String?
+}
+
+open class ServiceConnectionPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ServiceConnectionPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ServiceConnectionPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-policy"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The VPC the policy governs.
+    @gcp.FieldHint
+    network: String|formae.Resolvable
+
+    /// Which managed service the policy is for, e.g. "gcp-memorystore-redis".
+    /// The value is defined by the producing service, not by this API.
+    @gcp.FieldHint
+    serviceClass: String
+
+    /// Where that service may place endpoints.
+    @gcp.FieldHint
+    pscConfig: PscConfig?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ServiceConnectionPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

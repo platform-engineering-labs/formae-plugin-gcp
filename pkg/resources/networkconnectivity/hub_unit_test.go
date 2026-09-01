@@ -106,3 +106,49 @@ func TestHubRegistered(t *testing.T) {
 		}
 	}
 }
+
+// The two global additions in this batch get the same guarantee hubs have: a
+// configured region must not reach their URL.
+func TestPathBuilderKeepsNewGlobalTypesGlobal(t *testing.T) {
+	for _, rt := range []string{"internalRanges", "policyBasedRoutes"} {
+		ctx := base.PathContext{
+			Project:      "p",
+			Region:       "europe-west1",
+			Location:     "europe-west1",
+			ResourceType: rt,
+			ResourceName: "x",
+		}
+		got := networkConnectivityPathBuilder(ctx)
+		want := "/projects/p/locations/global/" + rt + "/x"
+		if got != want {
+			t.Errorf("region leaked into %s path: got %q, want %q", rt, got, want)
+		}
+	}
+}
+
+// A service connection policy is the one regional type here, so the opposite
+// has to hold: pinning it to global would address the wrong collection and the
+// resource would read back as absent.
+func TestPathBuilderKeepsPolicyRegional(t *testing.T) {
+	ctx := base.PathContext{
+		Project:      "p",
+		Region:       "europe-central2",
+		Location:     "europe-central2",
+		ResourceType: "serviceConnectionPolicies",
+		ResourceName: "x",
+	}
+	got := networkConnectivityPathBuilder(ctx)
+	want := "/projects/p/locations/europe-central2/serviceConnectionPolicies/x"
+	if got != want {
+		t.Errorf("regional type was not regional: got %q, want %q", got, want)
+	}
+}
+
+// With no location at all the regional type still has to build a usable path
+// rather than an empty segment.
+func TestPathBuilderFallsBackToGlobal(t *testing.T) {
+	ctx := base.PathContext{Project: "p", ResourceType: "serviceConnectionPolicies", ResourceName: "x"}
+	if got, want := networkConnectivityPathBuilder(ctx), "/projects/p/locations/global/serviceConnectionPolicies/x"; got != want {
+		t.Errorf("empty location: got %q, want %q", got, want)
+	}
+}

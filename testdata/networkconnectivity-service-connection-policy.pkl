@@ -1,0 +1,59 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/networkconnectivity/serviceConnectionPolicy.pkl" as scp
+import "./config/vars.pkl" as v
+
+// A service connection policy names the subnets a managed service may place
+// Private Service Connect endpoints in, so the network and a subnet come first.
+//
+// It is the one regional type in this API - it lives under the target's region
+// rather than locations/global - and it is free: the policy is permission for
+// endpoints, not an endpoint.
+local net = new network.Network {
+  label = "plugin-sdk-test-nc-scp-network"
+  name = "formae-test-nc-scp-net-\(v.testRunID)"
+  description = "Test network for the service connection policy conformance test"
+  autoCreateSubnetworks = false
+}
+
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-nc-scp-subnet"
+  name = "formae-test-nc-scp-sub-\(v.testRunID)"
+  description = "Test subnetwork for the service connection policy conformance test"
+  network = net.res.selfLink
+  ipCidrRange = "10.95.0.0/24"
+  region = v.gcpRegion
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+
+  new scp.ServiceConnectionPolicy {
+    label = "plugin-sdk-test-nc-service-connection-policy"
+    name = "formae-test-nc-scp-\(v.testRunID)"
+    network = net.res.selfLink
+    // The value is defined by the producing service, not by this API.
+    serviceClass = "gcp-memorystore-redis"
+    pscConfig = new scp.PscConfig {
+      subnetworks = new Listing {
+        subnet.res.selfLink
+      }
+    }
+    description = "Test service connection policy for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}
