@@ -10,6 +10,22 @@ formae agent.
 
 ## [Unreleased]
 
+### Changed
+
+- Six nested classes now `extend formae.SubResource` instead of being plain
+  classes: `ApiGateway::ApiConfig`'s `ApiDocument` and `OpenApiDocument`,
+  `Compute::Instance`'s `AttachedDisk`, `MetadataItem` and `Metadata`, and
+  `Memcache::Instance`'s `NodeConfig`. Schema extraction only walks nested
+  classes that formally extend `SubResource`, so these classes' `@gcp.FieldHint`
+  annotations never reached the schema and `Metadata.items` never got the
+  sub-resource render path's absent/explicit-null/explicit-empty handling.
+  Both now apply. Two `hasProviderDefault` hints activate
+  (`AttachedDisk.deviceName`, `Metadata.fingerprint`, the latter also
+  `createOnly`), so a provider-populated value on either field is now tolerated
+  instead of reading as drift on every sync, and Compute's `GCP::Compute::Instance`
+  gains its first observable `disks.deviceName` / `metadata.fingerprint` paths in
+  conformance runs.
+
 ### Added
 
 - `GCP::NetworkConnectivity::InternalRange` — a reservation of internal IP space
