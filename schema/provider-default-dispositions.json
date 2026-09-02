@@ -162,6 +162,10 @@
       "disposition": "pending"
     },
     {
+      "key": "certificatemanager/certificate.pkl#Certificate.scope",
+      "disposition": "pending"
+    },
+    {
       "key": "certificatemanager/dnsAuthorization.pkl#DnsAuthorization.type",
       "disposition": "pending"
     },

@@ -1,0 +1,89 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Manager CertificateMapEntry
+///
+/// One row of a certificate map: which certificates to serve for a given
+/// hostname. A map without entries selects nothing, so this is what makes a map
+/// do anything.
+///
+/// Give either `hostname` or `matcher`, not both — `matcher = "PRIMARY"` is the
+/// fallback used when no hostname matches.
+module gcp.certificatemanager.certificateMapEntry
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateManager::CertificateMapEntry"
+
+open class CertificateMapEntryResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CertificateMapEntryResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::CertificateManager::CertificateMap"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty {
+            parentProperty = "certificateMap"
+            listParameter = "certificateMap"
+        }
+    }.toList()
+}
+open class CertificateMapEntry extends formae.Resource {
+    hidden parent = this
+
+    /// Short entry id. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The map this entry belongs to. A path component rather than a body
+    /// field: it is dropped from the request and lifted back out of the
+    /// returned path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    certificateMap: (String|formae.Resolvable)
+
+    /// The hostname this entry answers for. Immutable, and mutually exclusive
+    /// with `matcher`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    hostname: String?
+
+    /// "PRIMARY" — the fallback entry, used when no hostname matches.
+    /// Immutable, and mutually exclusive with `hostname`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    matcher: String?
+
+    /// The certificates to serve. Reported back with the project *number* in
+    /// place of the project id; the plugin rewrites it so the two forms agree.
+    @gcp.FieldHint
+    certificates: Listing<String|formae.Resolvable>?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: CertificateMapEntryResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

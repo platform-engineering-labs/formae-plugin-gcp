@@ -1,0 +1,113 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Certificate Manager Certificate
+///
+/// A TLS certificate a load balancer can serve. Two kinds, and exactly one of
+/// them must be given:
+///
+/// - `managed` — Google obtains and renews it, proving control of each domain
+///   through a `DnsAuthorization`. It carries no private key, so it is the kind
+///   a repository can describe.
+/// - `selfManaged` — a certificate and its private key, supplied by you.
+///
+/// Creation returns immediately; a managed certificate then sits in
+/// `PROVISIONING` until the authorizing DNS record resolves, which is a
+/// property of the domain rather than of this resource.
+module gcp.certificatemanager.certificate
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CertificateManager::Certificate"
+
+/// A certificate Google obtains and renews.
+@gcp.SubResourceHint
+open class ManagedCertificate extends formae.SubResource {
+    /// The domains the certificate covers. Immutable.
+    @gcp.FieldHint
+    domains: Listing<String>?
+
+    /// The authorizations proving control of those domains. Immutable, and
+    /// reported back with the project *number* in place of the project id -
+    /// the plugin rewrites it so the two forms agree.
+    @gcp.FieldHint
+    dnsAuthorizations: Listing<String|formae.Resolvable>?
+
+    /// Issue from a CA pool instead of publicly. Immutable, and mutually
+    /// exclusive with `dnsAuthorizations`.
+    @gcp.FieldHint
+    issuanceConfig: (String|formae.Resolvable)?
+}
+
+/// A certificate and private key you supply.
+@gcp.SubResourceHint
+open class SelfManagedCertificate extends formae.SubResource {
+    @gcp.FieldHint
+    pemCertificate: String?
+
+    @gcp.FieldHint { writeOnly = true }
+    pemPrivateKey: String?
+}
+
+open class CertificateResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CertificateResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Certificate extends formae.Resource {
+    hidden parent = this
+
+    /// Short certificate id. Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// A Google-managed certificate. Give this or `selfManaged`.
+    ///
+    /// The API calls this field `managed`. A forma cannot: `managed` is a fixed
+    /// property of `formae.Resource`, and a resource that redeclared it would
+    /// not evaluate. The plugin renames it on the way out and back on the way
+    /// in, so the API still sees `managed`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    managedCertificate: ManagedCertificate?
+
+    /// A certificate you supply, with its private key.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    selfManaged: SelfManagedCertificate?
+
+    /// Where the certificate may be used. GCP reports "DEFAULT" when unset.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    scope: String?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: CertificateResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

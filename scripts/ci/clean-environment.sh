@@ -1390,3 +1390,41 @@ fi
 
 echo ""
 echo "clean-environment.sh: Cleanup complete"
+
+
+# --- 15. Certificate Manager (certmanager-* tests). Delete in dependency order:
+#         an entry pins its map and its certificate, and a certificate pins the
+#         authorization that proves its domain, so anything deleted out of order
+#         is refused with "referenced by". Nothing here is billed; they are
+#         collected because they accumulate and because a certificate map with a
+#         stale entry is confusing to find later. ---
+echo "Cleaning GCP Certificate Manager resources..."
+CM_LOC="global"
+# An entry is addressed by its map, and "gcloud ... entries list" reports only
+# the short name, so walk the maps rather than parsing a path back out of it.
+CM_MAPS=$(gcloud certificate-manager maps list --location="$CM_LOC" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$CM_MAPS" ]; then
+    echo "$CM_MAPS" | while read -r cm_map; do
+        CM_ENTRIES=$(gcloud certificate-manager maps entries list --map="$cm_map" --location="$CM_LOC" --format="value(name)" 2>/dev/null || true)
+        [ -z "$CM_ENTRIES" ] && continue
+        echo "$CM_ENTRIES" | while read -r cm_entry; do
+            echo "  Deleting certificate map entry: $cm_entry (map: $cm_map)"
+            gcloud certificate-manager maps entries delete "$cm_entry" --map="$cm_map" --location="$CM_LOC" --quiet 2>/dev/null || true
+        done
+    done
+else
+    echo "  No certificate maps found"
+fi
+
+for cm_kind in "maps:certificate map" "certificates:certificate" "dns-authorizations:DNS authorization" "trust-configs:trust config"; do
+    cm_cmd="${cm_kind%%:*}"; cm_label="${cm_kind##*:}"
+    CM_ITEMS=$(gcloud certificate-manager "$cm_cmd" list --location="$CM_LOC" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$CM_ITEMS" ]; then
+        echo "$CM_ITEMS" | while read -r item; do
+            echo "  Deleting $cm_label: $(basename "$item")"
+            gcloud certificate-manager "$cm_cmd" delete "$(basename "$item")" --location="$CM_LOC" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No ${cm_label}s found"
+    fi
+done
