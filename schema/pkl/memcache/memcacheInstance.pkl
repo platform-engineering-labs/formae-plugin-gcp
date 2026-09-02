@@ -18,7 +18,7 @@ import "@formae/formae.pkl"
 const type = "GCP::Memcache::Instance"
 
 /// How much CPU and memory each node gets.
-class NodeConfig {
+class NodeConfig extends formae.SubResource {
     /// Virtual CPUs per node.
     @gcp.FieldHint
     cpuCount: Int?
