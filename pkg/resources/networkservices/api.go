@@ -1,0 +1,138 @@
+// © 2025 Platform Engineering Labs Inc.
+//
+// SPDX-License-Identifier: FSL-1.1-ALv2
+
+package networkservices
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+)
+
+// defaultLocation is where a Network Services resource lives when it has no
+// region of its own. Meshes and service LB policies are global; gateways are
+// regional.
+//
+// The builder below reads ctx.Location and falls back to this. That is safe
+// rather than lax: a globally-scoped resource is registered with
+// base.ScopeGlobal, which clears ctx.Location, so a target's configured region
+// still cannot leak into a global URL - it simply arrives here as empty.
+const defaultLocation = "global"
+
+// globalResourceTypes are the collections that live under locations/global
+// whatever region the target is configured for. Keeping the list here rather
+// than inferring it from ctx.Location means a region can never leak into one of
+// their URLs even if the scope config changes: base.ScopeGlobal already clears
+// ctx.Location, and this is the second lock on the same door.
+var globalResourceTypes = map[string]bool{
+	"meshes":            true,
+	"serviceLbPolicies": true,
+}
+
+// locationOf returns the location segment for a request: "global" for the
+// collections above, and the target's region for the rest. Gateways are the
+// only regional type in this batch.
+func locationOf(ctx base.PathContext) string {
+	if globalResourceTypes[ctx.ResourceType] {
+		return defaultLocation
+	}
+	if ctx.Location != "" {
+		return ctx.Location
+	}
+	return defaultLocation
+}
+
+// NetworkServicesAPI - Network Services API v1. create/update/delete are
+// long-running operations (return an Operation to poll); get/list return the
+// resource directly.
+var NetworkServicesAPI = base.APIConfig{
+	BaseURL:     "https://networkservices.googleapis.com/v1",
+	APIVersion:  "v1",
+	PathBuilder: networkServicesPathBuilder,
+	Pagination:  &base.PaginationConfig{PageSizeParam: "pageSize"},
+}
+
+// NetworkServicesOperations - asynchronous (LRO). create/update/delete return
+// an Operation; formae polls Status() until the operation reports done.
+var NetworkServicesOperations = base.OperationConfig{
+	Synchronous:            false,
+	OperationIDExtractor:   extractOperationName,
+	OperationURLBuilder:    func(_ base.PathContext, opID string) string { return opID },
+	NativeIDExtractor:      extractNetworkServicesNativeID,
+	OperationStatusChecker: checkOperationStatus,
+}
+
+// NetworkServicesNativeID - full path
+// "projects/{project}/locations/{location}/{collection}/{name}".
+var NetworkServicesNativeID = base.NativeIDConfig{
+	Format: base.FullPathFormat,
+}
+
+// networkServicesPathBuilder builds
+// /projects/{project}/locations/{location}/{resourceType}[/{name}], where the
+// location is ctx.Location for a regional type and "global" for the rest.
+func networkServicesPathBuilder(ctx base.PathContext) string {
+	path := fmt.Sprintf("/projects/%s/locations/%s/%s", ctx.Project, locationOf(ctx), ctx.ResourceType)
+	if ctx.ResourceName != "" {
+		path += "/" + ctx.ResourceName
+	}
+	return path
+}
+
+// extractOperationName returns the LRO operation name from a create/update/
+// delete response ("projects/{p}/locations/{l}/operations/{op}"). base.Status
+// GETs BaseURL + "/" + this to poll.
+func extractOperationName(response map[string]interface{}) string {
+	if name, ok := response["name"].(string); ok && strings.Contains(name, "/operations/") {
+		return name
+	}
+	return ""
+}
+
+// extractNetworkServicesNativeID builds the resource path. On async create the
+// response is an Operation (not the resource), so build from context -
+// buildPathContext has already set ResourceName from the declared id. Fall back
+// to the operation's metadata.target, then to a direct resource response.
+func extractNetworkServicesNativeID(response map[string]interface{}, ctx base.PathContext) string {
+	if ctx.ResourceName != "" {
+		return fmt.Sprintf("projects/%s/locations/%s/%s/%s",
+			ctx.Project, locationOf(ctx), ctx.ResourceType, ctx.ResourceName)
+	}
+	if md, ok := response["metadata"].(map[string]interface{}); ok {
+		if target, ok := md["target"].(string); ok {
+			if i := strings.Index(target, "projects/"); i >= 0 {
+				return target[i:]
+			}
+		}
+	}
+	// Direct resource response (get): "name" is the full path.
+	if name, ok := response["name"].(string); ok && !strings.Contains(name, "/operations/") {
+		if i := strings.Index(name, "projects/"); i >= 0 {
+			return name[i:]
+		}
+	}
+	return ""
+}
+
+// checkOperationStatus reports whether a polled Operation is done, mapping a
+// present "error" to a terminal failure.
+//
+// This API accepts a create, returns an operation, and can still fail it: the
+// resource never materialises and only the operation carries the reason. Never
+// treat an accepted POST as proof of creation.
+func checkOperationStatus(op map[string]interface{}) (bool, error) {
+	done, _ := op["done"].(bool)
+	if !done {
+		return false, nil
+	}
+	if errObj, ok := op["error"].(map[string]interface{}); ok {
+		msg, _ := errObj["message"].(string)
+		if msg == "" {
+			msg = "operation failed"
+		}
+		return true, fmt.Errorf("%s", msg)
+	}
+	return true, nil
+}

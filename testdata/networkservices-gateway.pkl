@@ -1,0 +1,38 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/gateway_networkservices.pkl" as gateway
+import "./config/vars.pkl" as v
+
+// type = OPEN_MESH deliberately, and it is the whole reason this case is safe
+// to run on a schedule: an OPEN_MESH gateway is pure configuration - a set of
+// ports the mesh proxies bind to - and costs nothing. The other variant,
+// SECURE_WEB_GATEWAY, provisions managed proxy capacity in a subnet and bills
+// per hour it exists, so it has no place in a conformance fixture.
+//
+// Regional: a gateway lands under the target's region, not locations/global.
+forma {
+  v.stack
+  v.target
+
+  new gateway.Gateway {
+    label = "plugin-sdk-test-ns-gateway"
+    name = "formae-test-ns-gw-\(v.testRunID)"
+    type = "OPEN_MESH"
+    ports = new Listing {
+      8080
+    }
+    scope = "formae-test-ns-scope"
+    description = "Test gateway for plugin SDK conformance tests"
+    ipVersion = "IPV4"
+    envoyHeaders = "NONE"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "./config/vars.pkl" as v
+
+// Everything a mesh has apart from its name is patchable, so the update moves
+// all three: the description, the interception port and the Envoy header
+// setting. `name` stays put - it is the resource's path, and the plugin drops
+// it from the update body so it never reaches the update mask.
+forma {
+  v.stack
+  v.target
+
+  new mesh.Mesh {
+    label = "plugin-sdk-test-ns-mesh"
+    name = "formae-test-ns-mesh-\(v.testRunID)"
+    description = "Updated test mesh description"
+    interceptionPort = 15002
+    envoyHeaders = "DEBUG_HEADERS"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

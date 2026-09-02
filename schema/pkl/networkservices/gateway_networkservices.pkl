@@ -1,0 +1,144 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services Gateway
+///
+/// Where traffic from outside enters a mesh. An OPEN_MESH gateway is pure
+/// configuration — a set of ports the proxies bind to — and costs nothing. A
+/// SECURE_WEB_GATEWAY provisions managed proxy capacity in a subnet and is
+/// billed per hour it exists; `network`, `subnetwork` and `routingMode` below
+/// apply only to that variant.
+///
+/// Regional — unlike a mesh, a gateway lives under the target's region. Create,
+/// update and delete are long-running operations.
+module gcp.networkservices.gateway
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::Gateway"
+
+open class GatewayResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: GatewayResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Gateway extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-gateway"). Immutable — it is the resource's path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// OPEN_MESH or SECURE_WEB_GATEWAY. Required.
+    ///
+    /// Immutable, and the API says so plainly: a patch carrying a changed type
+    /// is refused with "Gateway type can not be updated once created", so a
+    /// change here has to be a replacement.
+    ///
+    /// SECURE_WEB_GATEWAY provisions billable proxy capacity; OPEN_MESH does
+    /// not.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: String
+
+    /// The ports the gateway receives traffic on (1-65535). Required unless
+    /// `allPorts` is set.
+    ///
+    /// A gateway PATCH validates the whole resource, not only the fields it is
+    /// masking, so this has to be present on every update as well as on create
+    /// — omit it and the API answers "Gateway must have at least one port"
+    /// however narrow the update mask was.
+    @gcp.FieldHint
+    ports: Listing<Int>?
+
+    /// Listen on every port instead of naming them. Mutually exclusive with
+    /// `ports`.
+    @gcp.FieldHint
+    allPorts: Boolean?
+
+    /// Groups gateways whose configuration should be merged and presented to
+    /// the proxies as one. Max 64 characters.
+    ///
+    /// Immutable, but silently so — and that is the trap. The API accepts a
+    /// changed scope in the update mask, reports the operation as done and
+    /// successful, and keeps the old value. Marked createOnly so a change plans
+    /// a replacement, which is the only thing that actually moves it; left as a
+    /// normal field it would look applied and never be.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    scope: String?
+
+    /// Zero or one IPv4/IPv6 address to receive traffic on. An address is
+    /// assigned automatically when this is unset.
+    @gcp.FieldHint
+    addresses: Listing<String>?
+
+    /// IPV4 or IPV6.
+    @gcp.FieldHint
+    ipVersion: String?
+
+    /// Whether Envoy adds its internal debug headers to upstream requests:
+    /// NONE or DEBUG_HEADERS.
+    @gcp.FieldHint
+    envoyHeaders: String?
+
+    /// A ServerTlsPolicy governing how TLS traffic is terminated. TLS
+    /// termination is disabled when unset.
+    @gcp.FieldHint
+    serverTlsPolicy: (String|formae.Resolvable)?
+
+    /// Certificates the proxy may present, selected by SNI.
+    @gcp.FieldHint
+    certificateUrls: Listing<String|formae.Resolvable>?
+
+    /// A GatewaySecurityPolicy applied to traffic through this gateway.
+    /// SECURE_WEB_GATEWAY only.
+    @gcp.FieldHint
+    gatewaySecurityPolicy: (String|formae.Resolvable)?
+
+    /// The VPC this gateway serves. SECURE_WEB_GATEWAY only.
+    @gcp.FieldHint
+    network: (String|formae.Resolvable)?
+
+    /// The subnet the gateway's proxies are allocated in. SECURE_WEB_GATEWAY
+    /// only.
+    @gcp.FieldHint
+    subnetwork: (String|formae.Resolvable)?
+
+    /// EXPLICIT_ROUTING_MODE or NEXT_HOP_ROUTING_MODE. Required for, and
+    /// configurable only on, SECURE_WEB_GATEWAY.
+    @gcp.FieldHint
+    routingMode: String?
+
+    /// Accept traffic from clients outside the gateway's own region.
+    @gcp.FieldHint
+    allowGlobalAccess: Boolean?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: GatewayResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

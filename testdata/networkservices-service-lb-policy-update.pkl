@@ -1,0 +1,44 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/serviceLbPolicy.pkl" as slp
+import "./config/vars.pkl" as v
+
+// Every field on this type is patchable, so the update moves all of them.
+//
+// autoCapacityDrain.enable goes true -> false on purpose. That is the one round
+// trip in this batch the API gets wrong on its own: it omits a false `enable`
+// from its JSON, so the read-back is a bare `{}` and, left alone, the policy
+// would disagree with state on every reconcile forever. The plugin puts the
+// false back on read, and this fixture is what exercises that against the live
+// API rather than only in a unit test.
+forma {
+  v.stack
+  v.target
+
+  new slp.ServiceLbPolicy {
+    label = "plugin-sdk-test-ns-service-lb-policy"
+    name = "formae-test-ns-lbp-\(v.testRunID)"
+    loadBalancingAlgorithm = "WATERFALL_BY_ZONE"
+    autoCapacityDrain = new slp.AutoCapacityDrain {
+      enable = false
+    }
+    failoverConfig = new slp.FailoverConfig {
+      failoverHealthThreshold = 55
+    }
+    isolationConfig = new slp.IsolationConfig {
+      isolationGranularity = "REGION"
+      isolationMode = "STRICT"
+    }
+    description = "Updated test service LB policy description"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}
