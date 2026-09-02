@@ -24,28 +24,28 @@ import "./config/vars.pkl" as v
 // would read back as drift.
 local net = new network.Network {
   label = "plugin-sdk-test-rautoscale-net"
-  name = "formae-plugin-sdk-test-rautoscale-net-\(v.testRunID)"
+  name = "formae-test-rautoscale-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-rautoscale-subnet"
-  name = "formae-plugin-sdk-test-rautoscale-subnet-\(v.testRunID)"
+  name = "formae-test-rautoscale-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.96.0.0/24"
 }
 local rmig = new regionInstanceGroupManager.RegionInstanceGroupManager {
   label = "plugin-sdk-test-rautoscale-mig"
-  name = "formae-plugin-sdk-test-rautoscale-mig-\(v.testRunID)"
+  name = "formae-test-rautoscale-mig-\(v.testRunID)"
   description = "Regional MIG the autoscaler scales"
   region = v.gcpRegion
-  baseInstanceName = "formae-rauto-vm"
+  baseInstanceName = "formae-test-rauto-vm"
   instanceTemplate = tmpl.res.selfLink
   targetSize = 0
 }
 local tmpl = new instanceTemplate.InstanceTemplate {
   label = "plugin-sdk-test-rautoscale-template"
-  name = "formae-plugin-sdk-test-rautoscale-tmpl-\(v.testRunID)"
+  name = "formae-test-rautoscale-tmpl-\(v.testRunID)"
   description = "Blueprint for the regional MIG conformance test"
   properties = new instanceTemplate.InstanceProperties {
     machineType = "e2-micro"
@@ -79,7 +79,7 @@ forma {
 
   new regionAutoscaler.RegionAutoscaler {
     label = "plugin-sdk-test-region-autoscaler"
-    name = "formae-plugin-sdk-test-rautoscale-\(v.testRunID)"
+    name = "formae-test-rautoscale-\(v.testRunID)"
     description = "Test regional autoscaler for plugin SDK conformance tests"
     region = v.gcpRegion
     // Resolvable -> establishes MIG-before-autoscaler create ordering.

@@ -20,7 +20,7 @@ forma {
   new bqConnection.Connection {
     label = "plugin-sdk-test-bigquery-connection"
     project = v.gcpProject
-    name = "formae-plugin-sdk-test-bqconn-\(v.testRunID)"
+    name = "formae-test-bqconn-\(v.testRunID)"
     friendlyName = "Plugin SDK conformance connection (updated)"
     description = "Plugin SDK conformance connection"
     cloudResource = new bqConnection.CloudResourceProperties {}

@@ -29,7 +29,7 @@ forma {
 
   new database.Database {
     label = "plugin-sdk-test-spanner-database"
-    name = "formae-sp-db2-\(v.testRunID)"
+    name = "formae-test-sp-db2-\(v.testRunID)"
     instance = inst.res.name
   }
 }

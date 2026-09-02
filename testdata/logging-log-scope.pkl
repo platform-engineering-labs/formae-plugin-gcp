@@ -17,7 +17,7 @@ forma {
 
   new logScope.LogScope {
     label = "plugin-sdk-test-logging-log-scope"
-    name = "formae-plugin-sdk-test-scope-\(v.testRunID)"
+    name = "formae-test-scope-\(v.testRunID)"
     location = "global"
     description = "Test log scope for plugin SDK conformance tests"
     resourceNames = new Listing {

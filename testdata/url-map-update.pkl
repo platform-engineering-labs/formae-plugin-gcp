@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-um-healthcheck"
-    name = "formae-plugin-sdk-test-um-hc-\(v.testRunID)"
+    name = "formae-test-um-hc-\(v.testRunID)"
     type = "HTTP"
     checkIntervalSec = 10
     timeoutSec = 5
@@ -29,7 +29,7 @@ forma {
 
   local bs = new backendService.BackendService {
     label = "plugin-sdk-test-um-backend-service"
-    name = "formae-plugin-sdk-test-um-bs-\(v.testRunID)"
+    name = "formae-test-um-bs-\(v.testRunID)"
     loadBalancingScheme = "EXTERNAL_MANAGED"
     protocol = "HTTP"
     timeoutSec = 30
@@ -46,7 +46,7 @@ forma {
 
   new urlMap.UrlMap {
     label = "plugin-sdk-test-url-map"
-    name = "formae-plugin-sdk-test-um-\(v.testRunID)"          // Same (createOnly)
+    name = "formae-test-um-\(v.testRunID)"          // Same (createOnly)
     description = "Updated URL map for plugin SDK conformance tests"  // Changed (mutable)
     defaultService = bs.res.selfLink
   }

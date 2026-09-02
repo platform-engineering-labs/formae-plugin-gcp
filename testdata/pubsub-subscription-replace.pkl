@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 forma {
   local t = new topic.Topic {
     label = "plugin-sdk-test-sub-topic"
-    name = "formae-plugin-sdk-test-sub-topic-\(v.testRunID)"
+    name = "formae-test-sub-topic-\(v.testRunID)"
   }
 
   v.stack
@@ -28,7 +28,7 @@ forma {
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old subscription is destroyed and a new one takes its
     // place. The topic it reads from is a prerequisite and stays put.
-    name = "formae-plugin-sdk-test-sub-r2-\(v.testRunID)"
+    name = "formae-test-sub-r2-\(v.testRunID)"
     topic = t.res.name
     ackDeadlineSeconds = 30
     labels = new Mapping {

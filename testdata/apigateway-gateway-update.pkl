@@ -17,7 +17,7 @@ import "./config/vars.pkl" as v
 local parentApi = new api.Api {
   label = "plugin-sdk-test-agw-gw-api"
   project = v.gcpProject
-  name = "formae-plugin-sdk-test-agwg-\(v.testRunID)"
+  name = "formae-test-agwg-\(v.testRunID)"
   displayName = "Plugin SDK gateway api"
 }
 
@@ -26,7 +26,7 @@ local parentApi = new api.Api {
 local openapi = """
   swagger: '2.0'
   info:
-    title: formae-conformance-gateway
+    title: formae-test-anchor-gateway
     description: Plugin SDK conformance gateway config
     version: 1.0.0
   schemes:
@@ -50,7 +50,7 @@ local cfg = new apiConfig.ApiConfig {
   label = "plugin-sdk-test-agw-gw-config"
   project = v.gcpProject
   api = parentApi.res.name
-  name = "formae-plugin-sdk-test-agwgc-\(v.testRunID)"
+  name = "formae-test-agwgc-\(v.testRunID)"
   openapiDocuments = new Listing {
     new apiConfig.OpenApiDocument {
       document = new apiConfig.ApiDocument {
@@ -71,7 +71,7 @@ forma {
   new gateway.Gateway {
     label = "plugin-sdk-test-apigateway-gateway"
     project = v.gcpProject
-    name = "formae-plugin-sdk-test-agwgw-\(v.testRunID)"
+    name = "formae-test-agwgw-\(v.testRunID)"
     // API Gateway serves eleven regions and the target's is not one of them:
     // creating there answers "Location europe-central2 is not found or access
     // is unauthorized".

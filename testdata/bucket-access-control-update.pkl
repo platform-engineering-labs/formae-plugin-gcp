@@ -22,7 +22,7 @@ import "./config/vars.pkl" as v
 // no access anyone did not have.
 local b = new bucket.Bucket {
   label = "plugin-sdk-test-bac-bucket"
-  name = "formae-plugin-sdk-test-bac-\(v.testRunID)"
+  name = "formae-test-bac-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
   iamConfiguration = new bucket.IamConfiguration {

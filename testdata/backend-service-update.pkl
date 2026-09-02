@@ -13,7 +13,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-bs-healthcheck"
-    name = "formae-plugin-sdk-test-bs-hc-\(v.testRunID)"
+    name = "formae-test-bs-hc-\(v.testRunID)"
     type = "HTTP"
     checkIntervalSec = 10
     timeoutSec = 5
@@ -33,7 +33,7 @@ forma {
 
   new backendService.BackendService {
     label = "plugin-sdk-test-backend-service"
-    name = "formae-plugin-sdk-test-bs-\(v.testRunID)"          // Same (createOnly)
+    name = "formae-test-bs-\(v.testRunID)"          // Same (createOnly)
     description = "Updated backend service for plugin SDK conformance tests"  // Changed
     loadBalancingScheme = "EXTERNAL_MANAGED"                   // Same (createOnly)
     protocol = "HTTP"

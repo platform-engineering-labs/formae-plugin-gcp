@@ -18,7 +18,7 @@ import "./config/vars.pkl" as v
 // publish on a throwaway topic has no effect on anything else.
 local t = new topic.Topic {
   label = "plugin-sdk-test-iam-topic"
-  name = "formae-plugin-sdk-test-iam-topic-\(v.testRunID)"
+  name = "formae-test-iam-topic-\(v.testRunID)"
 }
 
 forma {

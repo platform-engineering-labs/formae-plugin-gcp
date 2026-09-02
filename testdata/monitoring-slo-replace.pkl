@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 // creates it first — the service id is a path component of the SLO.
 local svc = new customService.CustomService {
   label = "plugin-sdk-test-slo-service"
-  name = "formae-plugin-sdk-test-svc-\(v.testRunID)"
+  name = "formae-test-svc-\(v.testRunID)"
   displayName = "Formae conformance service"
 }
 
@@ -28,7 +28,7 @@ forma {
     label = "plugin-sdk-test-monitoring-slo"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-slo-r2-\(v.testRunID)"
+    name = "formae-test-slo-r2-\(v.testRunID)"
     service = svc.res.name
     displayName = "99% of API requests under 500ms"
     goal = 0.99

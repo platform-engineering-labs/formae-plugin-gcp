@@ -16,7 +16,7 @@ forma {
   new healthCheck.HealthCheck {
     label = "plugin-sdk-test-healthcheck"
     // A health check name is immutable, so changing it forces a replace.
-    name = "formae-plugin-sdk-test-hc2-\(v.testRunID)"
+    name = "formae-test-hc2-\(v.testRunID)"
     description = "Test health check for plugin SDK conformance tests"
     type = "TCP"
     checkIntervalSec = 10

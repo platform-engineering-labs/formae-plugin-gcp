@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // cannot be turned on afterwards.
 local bkt = new bucket.Bucket {
   label = "plugin-sdk-test-folder-bucket"
-  name = "formae-plugin-sdk-test-fld-\(v.testRunID)"
+  name = "formae-test-fld-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
   iamConfiguration = new bucket.IamConfiguration {
@@ -36,7 +36,7 @@ forma {
 
   new folder.Folder {
     label = "plugin-sdk-test-storage-folder"
-    name = "formae-data/"
+    name = "formae-test-data/"
     bucket = bkt.res.name
   }
 }

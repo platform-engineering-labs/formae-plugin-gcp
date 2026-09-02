@@ -25,7 +25,7 @@ forma {
     // The name is immutable, so changing it forces a replace rather than
     // an update. The prerequisites above are untouched: only the resource
     // under test is replaced.
-    name = "custom.googleapis.com/formae_plugin_sdk_test_r2/\(v.testRunID)"
+    name = "custom.googleapis.com/formae_test_r2/\(v.testRunID)"
     metricKind = "GAUGE"
     valueType = "DOUBLE"
     displayName = "formae plugin sdk test metric"

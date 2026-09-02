@@ -16,12 +16,12 @@ import "./config/vars.pkl" as v
 // formae creates them before the template.
 local net = new network.Network {
   label = "plugin-sdk-test-rtmpl-net"
-  name = "formae-plugin-sdk-test-rtmpl-net-\(v.testRunID)"
+  name = "formae-test-rtmpl-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-rtmpl-subnet"
-  name = "formae-plugin-sdk-test-rtmpl-subnet-\(v.testRunID)"
+  name = "formae-test-rtmpl-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.101.0.0/24"
@@ -36,7 +36,7 @@ forma {
 
   new regionInstanceTemplate.RegionInstanceTemplate {
     label = "plugin-sdk-test-region-instance-template"
-    name = "formae-plugin-sdk-test-rtmpl-\(v.testRunID)"
+    name = "formae-test-rtmpl-\(v.testRunID)"
     region = v.gcpRegion
     description = "Test regional instance template for plugin SDK conformance tests"
     properties = new regionInstanceTemplate.InstanceProperties {

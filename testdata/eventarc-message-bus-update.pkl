@@ -19,10 +19,10 @@ forma {
 
   new messageBus.MessageBus {
     label = "plugin-sdk-test-eventarc-message-bus"
-    name = "formae-plugin-sdk-test-mb-\(v.testRunID)"
+    name = "formae-test-mb-\(v.testRunID)"
     location = "europe-west1"
     labels = new Mapping {
-      ["managed-by"] = "formae-conformance"
+      ["managed-by"] = "formae-test-anchor"
       ["phase"] = "updated"
     }
   }

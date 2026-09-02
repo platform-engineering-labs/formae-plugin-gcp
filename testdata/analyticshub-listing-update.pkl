@@ -19,13 +19,13 @@ import "./config/vars.pkl" as v
 local ds = new dataset.Dataset {
   label = "plugin-sdk-test-ah-dataset"
   project = v.gcpProject
-  datasetId = "formae_plugin_sdk_test_ah_ds_\(v.testRunID)"
+  datasetId = "formae_test_ah_ds_\(v.testRunID)"
   location = v.gcpLocation
 }
 
 local exchange = new dataExchange.DataExchange {
   label = "plugin-sdk-test-ah-listing-exchange"
-  name = "formae_plugin_sdk_test_le_\(v.testRunID)"
+  name = "formae_test_le_\(v.testRunID)"
   location = v.gcpLocation
   displayName = "formae plugin sdk test listing exchange"
 }
@@ -39,7 +39,7 @@ forma {
 
   new listing.Listing {
     label = "plugin-sdk-test-analyticshub-listing"
-    name = "formae_plugin_sdk_test_li_\(v.testRunID)"
+    name = "formae_test_li_\(v.testRunID)"
     location = v.gcpLocation
     // Resolvables -> the dataset and the exchange exist first, and the plugin
     // expands the bare dataset id into the full path Analytics Hub wants.

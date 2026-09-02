@@ -22,13 +22,13 @@ import "./config/vars.pkl" as v
 // makes this among the slowest cases in the suite.
 local net = new network.Network {
   label = "plugin-sdk-test-mc-network"
-  name = "formae-plugin-sdk-test-mc-net-\(v.testRunID)"
+  name = "formae-test-mc-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
 local peerRange = new globalAddress.GlobalAddress {
   label = "plugin-sdk-test-mc-range"
-  name = "formae-plugin-sdk-test-mc-range-\(v.testRunID)"
+  name = "formae-test-mc-range-\(v.testRunID)"
   addressType = "INTERNAL"
   purpose = "VPC_PEERING"
   prefixLength = 16
@@ -54,7 +54,7 @@ forma {
   new memcacheInstance.Instance {
     label = "plugin-sdk-test-memcache-instance"
     project = v.gcpProject
-    name = "formae-plugin-sdk-test-mc-\(v.testRunID)"
+    name = "formae-test-mc-\(v.testRunID)"
     displayName = "Plugin SDK conformance"
     // Resolvable through the peering, not the network: the instance needs
     // private service access to exist, not merely the VPC, and naming the

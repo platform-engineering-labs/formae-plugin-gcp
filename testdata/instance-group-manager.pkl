@@ -18,19 +18,19 @@ import "./config/vars.pkl" as v
 // so a VM could never pull its image. The MIG object is what is under test.
 local net = new network.Network {
   label = "plugin-sdk-test-mig-net"
-  name = "formae-plugin-sdk-test-mig-net-\(v.testRunID)"
+  name = "formae-test-mig-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-mig-subnet"
-  name = "formae-plugin-sdk-test-mig-subnet-\(v.testRunID)"
+  name = "formae-test-mig-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.92.0.0/24"
 }
 local tmpl = new instanceTemplate.InstanceTemplate {
   label = "plugin-sdk-test-mig-template"
-  name = "formae-plugin-sdk-test-mig-tmpl-\(v.testRunID)"
+  name = "formae-test-mig-tmpl-\(v.testRunID)"
   description = "Blueprint for the MIG conformance test"
   properties = new instanceTemplate.InstanceProperties {
     machineType = "e2-micro"
@@ -62,10 +62,10 @@ forma {
 
   new instanceGroupManager.InstanceGroupManager {
     label = "plugin-sdk-test-instance-group-manager"
-    name = "formae-plugin-sdk-test-mig-\(v.testRunID)"
+    name = "formae-test-mig-\(v.testRunID)"
     description = "Test managed instance group for plugin SDK conformance tests"
     zone = v.gcpZone
-    baseInstanceName = "formae-mig-vm"
+    baseInstanceName = "formae-test-mig-vm"
     // Resolvable -> establishes template-before-MIG create ordering.
     instanceTemplate = tmpl.res.selfLink
     targetSize = 0

@@ -19,7 +19,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-gfr-healthcheck"
-    name = "formae-plugin-sdk-test-gfr-hc-\(v.testRunID)"
+    name = "formae-test-gfr-hc-\(v.testRunID)"
     type = "HTTP"
     checkIntervalSec = 10
     timeoutSec = 5
@@ -34,7 +34,7 @@ forma {
 
   local bs = new backendService.BackendService {
     label = "plugin-sdk-test-gfr-backend-service"
-    name = "formae-plugin-sdk-test-gfr-bs-\(v.testRunID)"
+    name = "formae-test-gfr-bs-\(v.testRunID)"
     loadBalancingScheme = "EXTERNAL_MANAGED"
     protocol = "HTTP"
     timeoutSec = 30
@@ -45,13 +45,13 @@ forma {
 
   local um = new urlMap.UrlMap {
     label = "plugin-sdk-test-gfr-url-map"
-    name = "formae-plugin-sdk-test-gfr-um-\(v.testRunID)"
+    name = "formae-test-gfr-um-\(v.testRunID)"
     defaultService = bs.res.selfLink
   }
 
   local thp = new targetHttpProxy.TargetHttpProxy {
     label = "plugin-sdk-test-gfr-target-http-proxy"
-    name = "formae-plugin-sdk-test-gfr-thp-\(v.testRunID)"
+    name = "formae-test-gfr-thp-\(v.testRunID)"
     urlMap = um.res.selfLink
   }
 
@@ -65,7 +65,7 @@ forma {
 
   new globalForwardingRule.GlobalForwardingRule {
     label = "plugin-sdk-test-global-forwarding-rule"
-    name = "formae-plugin-sdk-test-gfr-\(v.testRunID)"
+    name = "formae-test-gfr-\(v.testRunID)"
     description = "Test global forwarding rule for plugin SDK conformance tests"
     loadBalancingScheme = "EXTERNAL_MANAGED"
     IPProtocol = "TCP"

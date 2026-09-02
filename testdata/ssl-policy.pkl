@@ -18,7 +18,7 @@ forma {
 
   new sslPolicy.SslPolicy {
     label = "plugin-sdk-test-ssl-policy"
-    name = "formae-plugin-sdk-test-sslpol-\(v.testRunID)"
+    name = "formae-test-sslpol-\(v.testRunID)"
     description = "Test SSL policy for plugin SDK conformance tests"
     profile = "MODERN"
     minTlsVersion = "TLS_1_0"

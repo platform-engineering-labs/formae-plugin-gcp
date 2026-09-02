@@ -18,7 +18,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new regionHealthCheck.RegionHealthCheck {
     label = "plugin-sdk-test-region-hc"
-    name = "formae-plugin-sdk-test-rhc-\(v.testRunID)"
+    name = "formae-test-rhc-\(v.testRunID)"
     region = v.gcpRegion
     type = "HTTP"
     checkIntervalSec = 10
@@ -34,7 +34,7 @@ forma {
 
   local bs = new regionBackendService.RegionBackendService {
     label = "plugin-sdk-test-region-bs"
-    name = "formae-plugin-sdk-test-rbs-\(v.testRunID)"
+    name = "formae-test-rbs-\(v.testRunID)"
     region = v.gcpRegion
     loadBalancingScheme = "INTERNAL_MANAGED"
     protocol = "HTTP"
@@ -46,7 +46,7 @@ forma {
 
   local um = new regionUrlMap.RegionUrlMap {
     label = "plugin-sdk-test-region-um"
-    name = "formae-plugin-sdk-test-rum-\(v.testRunID)"
+    name = "formae-test-rum-\(v.testRunID)"
     region = v.gcpRegion
     defaultService = bs.res.selfLink
   }
@@ -60,7 +60,7 @@ forma {
 
   new regionTargetHttpProxy.RegionTargetHttpProxy {
     label = "plugin-sdk-test-region-thp"
-    name = "formae-plugin-sdk-test-rthp-\(v.testRunID)"
+    name = "formae-test-rthp-\(v.testRunID)"
     region = v.gcpRegion
     urlMap = um.res.selfLink
   }

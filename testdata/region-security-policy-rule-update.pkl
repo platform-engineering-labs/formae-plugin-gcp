@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 // 2147483647 — so nothing here fights the separately managed rule below.
 local policy = new regionSecurityPolicy.RegionSecurityPolicy {
   label = "plugin-sdk-test-rspr-policy"
-  name = "formae-plugin-sdk-test-rspr-\(v.testRunID)"
+  name = "formae-test-rspr-\(v.testRunID)"
   description = "Regional Cloud Armor policy owning the rule under test"
   // The API normalises CLOUD_ARMOR_REGIONAL to this on read.
   type = "CLOUD_ARMOR"

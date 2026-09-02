@@ -15,7 +15,7 @@ forma {
 
   new schema.Schema {
     label = "plugin-sdk-test-pubsub-schema"
-    name = "formae-plugin-sdk-test-schema-\(v.testRunID)"
+    name = "formae-test-schema-\(v.testRunID)"
     type = "AVRO"
     definition = #"{"type":"record","name":"Msg","fields":[{"name":"id","type":"string"}]}"#
   }

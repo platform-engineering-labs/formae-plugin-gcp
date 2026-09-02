@@ -23,7 +23,7 @@ local inst = new instance.Instance {
 
 local db = new database.Database {
   label = "plugin-sdk-test-spanner-bs-database"
-  name = "formae-sp-bs-\(v.testRunID)"
+  name = "formae-test-sp-bs-\(v.testRunID)"
   instance = inst.res.name
 }
 

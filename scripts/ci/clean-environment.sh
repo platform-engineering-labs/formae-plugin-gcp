@@ -36,18 +36,24 @@
 set -euo pipefail
 
 # Prefix used for test resources - should match what conformance tests create
-# Every fixture names what it creates "formae-<something>-<testRunID>", but only
-# some use the "formae-plugin-sdk-test-" form. 101 name literals in testdata/ use
-# a bare "formae-test-" instead, and a handful use neither ("formae-sp-",
-# "formae-thsp-", "formae-rrset-"). The sweeps matched "^formae-plugin-sdk" only,
-# so those never got collected - which is how eight SSL certificates reached the
-# global cap of ten and how thirteen Service Directory namespaces accumulated in
-# europe-central2. Leaked resources exhaust quotas, and a quota failure surfaces
-# as an unrelated case failing, so this is a correctness problem, not tidiness.
+# Every fixture names what it creates "formae-test-<abbrev>-<testRunID>", or
+# "formae_test_..." where the API demands underscores. That is now a rule rather
+# than a habit: the names were standardised across all 293 fixtures, and every
+# sweep below matches exactly that shape.
 #
-# Matching "^formae-" covers every family, including ones added later - the
-# enumeration is what drifted, so there is no enumeration any more.
-SWEEP_RE="${SWEEP_RE:-^formae-}"
+# It was not always so, and the drift cost real money. Sweeps matched whatever
+# prefix the fixtures happened to use when they were written - "^formae-plugin-sdk",
+# "^formae-test-instance", and two that read "^formae--test" with a doubled hyphen
+# and therefore matched nothing at all. Anything named differently was created by
+# a run and never collected by one: eight SSL certificates reaching a global cap
+# of ten, a hundred and fifty leaked secrets, and Bigtable instances - which hold
+# nodes and are billed per node-hour - left behind by every single run of
+# bigtable-app-profile, because that fixture calls its instance
+# "formae-test-btap-<runID>" and the sweep only looked for "^formae-test-instance".
+#
+# One shape, one pattern, no per-sweep guessing. "probe" is included so the
+# ad-hoc resources a live API probe leaves behind are collected too.
+SWEEP_RE="${SWEEP_RE:-^formae[-_](test|probe)[-_]}"
 
 # Names that match SWEEP_RE but must never be deleted. A "formae-" resource is
 # not always a leak: formae-byo-cert is a certificate someone installed in July
@@ -1221,7 +1227,7 @@ fi
 # nothing swept them and they outlived every run - and the credentials used to
 # create one often cannot delete it.
 echo "Cleaning GCP storage buckets..."
-BUCKETS=$(gcloud storage buckets list --filter="name~^formae--test OR name~^formae-probe-" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+BUCKETS=$(gcloud storage buckets list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$BUCKETS" ]; then
     echo "$BUCKETS" | while read -r bucket; do
         echo "  Deleting bucket: $bucket"
@@ -1231,9 +1237,18 @@ else
     echo "  No buckets found"
 fi
 
-# --- 9. Bigtable instances ---
+# --- 9. Bigtable instances. THE EXPENSIVE ONE: an instance holds nodes and is
+#         billed per node-hour for as long as it exists, so a leak here costs
+#         real money rather than clutter.
+#
+#         This filtered on "^formae-test-instance", which only matched the
+#         fixtures that happen to name their instance that way. bigtable-app-profile
+#         names its instance "formae-test-btap-<runID>", so every run of that case
+#         left a billed instance behind and no sweep ever collected it. Match the
+#         same "^formae-" every other sweep uses; deleting an instance takes its
+#         tables, backups and views with it. ---
 echo "Cleaning GCP Bigtable instances..."
-INSTANCES=$(gcloud bigtable instances list --filter="name~^formae-test-instance" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+INSTANCES=$(gcloud bigtable instances list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$INSTANCES" ]; then
     echo "$INSTANCES" | while read -r instance; do
         echo "  Deleting Bigtable instance: $instance"
@@ -1319,7 +1334,7 @@ fi
 # Not cleaned before => leaked secrets cause AlreadyExists on re-run. Deleting a
 # secret removes its versions, so this covers both test resource types.
 echo "Cleaning GCP Secret Manager secrets..."
-SECRETS=$(gcloud secrets list --filter="name~^formae--test" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+SECRETS=$(gcloud secrets list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SECRETS" ]; then
     echo "$SECRETS" | while read -r secret; do
         echo "  Deleting secret: $secret"
@@ -1341,7 +1356,12 @@ fi
 # depends on.
 echo "Cleaning GCP IAM service accounts..."
 SA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
-SA_SWEEP_RE="${SA_SWEEP_RE:-^formae-plugin-sdk-test-}"
+# The fixture now names itself "formae-test-sa-<runID>" like everything else, so
+# this is the standard shape anchored at the start of the email. The legacy
+# "sa-<8hex>@" form is kept so accounts leaked before the rename are still
+# collected - narrowing this to a prefix no fixture used is exactly how they
+# started leaking. KEEP_RE still guards the identities on top.
+SA_SWEEP_RE="${SA_SWEEP_RE:-^(formae[-_]test[-_]|sa-[0-9a-f]{8}@)}"
 SERVICE_ACCOUNTS=$(gcloud iam service-accounts list --format="value(email)" 2>/dev/null \
     | grep -E "$SA_SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SERVICE_ACCOUNTS" ]; then

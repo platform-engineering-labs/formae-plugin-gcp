@@ -13,7 +13,7 @@ import "./config/vars.pkl" as v
 forma {
   local t = new topic.Topic {
     label = "plugin-sdk-test-sub-topic"
-    name = "formae-plugin-sdk-test-sub-topic-\(v.testRunID)"
+    name = "formae-test-sub-topic-\(v.testRunID)"
   }
 
   v.stack
@@ -23,7 +23,7 @@ forma {
 
   new subscription.Subscription {
     label = "plugin-sdk-test-pubsub-subscription"
-    name = "formae-plugin-sdk-test-sub-\(v.testRunID)"   // Same (createOnly)
+    name = "formae-test-sub-\(v.testRunID)"   // Same (createOnly)
     topic = t.res.name                                   // Same (createOnly)
     ackDeadlineSeconds = 60                              // Changed (mutable)
     labels = new Mapping {

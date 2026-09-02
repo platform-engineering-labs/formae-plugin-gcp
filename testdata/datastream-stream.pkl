@@ -23,7 +23,7 @@ local source = new connectionProfile.ConnectionProfile {
   displayName = "Plugin SDK Test Stream Source"
   mysqlProfile = new connectionProfile.MysqlProfile {
     hostname = "10.255.255.1"
-    username = "formae-conformance"
+    username = "formae-test-anchor"
     password = "not-a-real-password"
     port = 3306
   }

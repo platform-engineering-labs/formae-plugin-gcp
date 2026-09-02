@@ -16,7 +16,7 @@ forma {
   // roleId allows letters/digits/underscores/periods (no hyphens).
   new role.Role {
     label = "plugin-sdk-test-role"
-    name = "formae_sdk_test_role_\(v.testRunID)"
+    name = "formae_test_role_\(v.testRunID)"
     title = "Formae SDK Test Role"
     description = "Test custom role for plugin SDK conformance tests"
     includedPermissions = new Listing {

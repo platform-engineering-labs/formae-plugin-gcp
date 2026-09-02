@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 // alone was inert; this pair is the usable unit.
 local neg = new globalNetworkEndpointGroup.GlobalNetworkEndpointGroup {
   label = "plugin-sdk-test-gnep-neg"
-  name = "formae-plugin-sdk-test-gnep-neg-\(v.testRunID)"
+  name = "formae-test-gnep-neg-\(v.testRunID)"
   description = "Internet NEG for the endpoint conformance test"
   networkEndpointType = "INTERNET_FQDN_PORT"
   defaultPort = 443

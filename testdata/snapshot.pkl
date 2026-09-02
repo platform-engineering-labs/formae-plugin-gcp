@@ -17,7 +17,7 @@ local src = new disk.Disk {
   label = "plugin-sdk-test-snapshot-disk"
   project = v.gcpProject
   zone = v.gcpZone
-  name = "formae-plugin-sdk-test-snap-disk-\(v.testRunID)"
+  name = "formae-test-snap-disk-\(v.testRunID)"
   description = "Source disk for the snapshot conformance test"
   sizeGb = 10
   type = "pd-standard"
@@ -32,7 +32,7 @@ forma {
 
   new snapshot.Snapshot {
     label = "plugin-sdk-test-snapshot"
-    name = "formae-plugin-sdk-test-snap-\(v.testRunID)"
+    name = "formae-test-snap-\(v.testRunID)"
     description = "Test snapshot for plugin SDK conformance tests"
     sourceDisk = src.res.selfLink
     labels = new Mapping {

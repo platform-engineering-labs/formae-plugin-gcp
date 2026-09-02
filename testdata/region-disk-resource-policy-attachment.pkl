@@ -17,7 +17,7 @@ local src = new regionDisk.RegionDisk {
   label = "plugin-sdk-test-rdrpa-disk"
   project = v.gcpProject
   region = v.gcpRegion
-  name = "formae-plugin-sdk-test-rdrpa-disk-\(v.testRunID)"
+  name = "formae-test-rdrpa-disk-\(v.testRunID)"
   description = "Regional disk the snapshot schedule is attached to"
   sizeGb = 10
   type = "pd-balanced"
@@ -30,7 +30,7 @@ local src = new regionDisk.RegionDisk {
 
 local policy = new resourcePolicy.ResourcePolicy {
   label = "plugin-sdk-test-rdrpa-policy"
-  name = "formae-plugin-sdk-test-rdrpa-pol-\(v.testRunID)"
+  name = "formae-test-rdrpa-pol-\(v.testRunID)"
   description = "Nightly snapshot schedule for the attachment test"
   region = v.gcpRegion
   snapshotSchedulePolicy = new resourcePolicy.SnapshotSchedulePolicy {

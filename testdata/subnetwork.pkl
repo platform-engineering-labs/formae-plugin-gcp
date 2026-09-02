@@ -10,7 +10,7 @@ import "@gcp/compute/network.pkl"
 import "@gcp/compute/subnetwork.pkl"
 import "./config/vars.pkl" as v
 
-local testNetworkName = "formae-plugin-sdk-test-net-\(v.testRunID)"
+local testNetworkName = "formae-test-net-\(v.testRunID)"
 
 // Parent network for the subnetwork. Referenced via its resolvable self-link so
 // formae orders creation and the stored network round-trips against the API's
@@ -34,7 +34,7 @@ forma {
   // Test subnetwork
   new subnetwork.Subnetwork {
     label = "plugin-sdk-test-subnetwork"
-    name = "formae-plugin-sdk-test-subnet-\(v.testRunID)"
+    name = "formae-test-subnet-\(v.testRunID)"
     description = "Test subnetwork for plugin SDK conformance tests"
     network = net.res.selfLink
     ipCidrRange = "10.0.0.0/24"

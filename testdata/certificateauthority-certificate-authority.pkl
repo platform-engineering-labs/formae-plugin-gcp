@@ -43,7 +43,7 @@ forma {
     config = new ca.CertificateConfig {
       subjectConfig = new ca.SubjectConfig {
         subject = new ca.Subject {
-          commonName = "formae-conformance-root"
+          commonName = "formae-test-root"
           organization = "formae plugin sdk test"
         }
       }

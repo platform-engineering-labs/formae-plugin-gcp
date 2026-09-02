@@ -16,7 +16,7 @@ forma {
 
   new dashboard.Dashboard {
     label = "plugin-sdk-test-monitoring-dashboard"
-    name = "formae-plugin-sdk-test-dash-\(v.testRunID)"
+    name = "formae-test-dash-\(v.testRunID)"
     displayName = "Formae conformance dashboard"
     gridLayout = new dashboard.GridLayout {
       columns = "2"

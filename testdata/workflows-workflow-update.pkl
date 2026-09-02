@@ -17,7 +17,7 @@ forma {
 
   new workflow.Workflow {
     label = "plugin-sdk-test-workflows-workflow"
-    name = "formae-plugin-sdk-test-wf-\(v.testRunID)"
+    name = "formae-test-wf-\(v.testRunID)"
     description = "Updated test workflow description"
     // Returns immediately; it calls nothing and needs no permissions.
     sourceContents = """

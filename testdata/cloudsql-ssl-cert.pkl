@@ -46,7 +46,7 @@ forma {
   // once, which the plugin drops rather than persisting.
   new sqlSslCert.SslCert {
     label = "plugin-sdk-test-sslcert"
-    commonName = "formae-conformance-client"
+    commonName = "formae-test-client"
     instance = inst.res.name
   }
 }

@@ -15,13 +15,13 @@ import "./config/vars.pkl" as v
 // which routes it accepts. No BGP peer is needed for the policy to exist.
 local net = new network.Network {
   label = "plugin-sdk-test-rrp-network"
-  name = "formae-plugin-sdk-test-rrp-net-\(v.testRunID)"
+  name = "formae-test-rrp-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
 local rt = new router.Router {
   label = "plugin-sdk-test-rrp-router"
-  name = "formae-plugin-sdk-test-rrp-rt-\(v.testRunID)"
+  name = "formae-test-rrp-rt-\(v.testRunID)"
   region = v.gcpRegion
   network = net.res.selfLink
 }
@@ -35,7 +35,7 @@ forma {
 
   new routerRoutePolicy.RouterRoutePolicy {
     label = "plugin-sdk-test-router-route-policy"
-    name = "formae-plugin-sdk-test-rrp-\(v.testRunID)"
+    name = "formae-test-rrp-\(v.testRunID)"
     // Resolvable -> the router exists before the update verb runs.
     router = rt.res.name
     region = v.gcpRegion

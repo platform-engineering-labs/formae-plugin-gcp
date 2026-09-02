@@ -18,7 +18,7 @@ forma {
 
   new networkEndpointGroup.NetworkEndpointGroup {
     label = "plugin-sdk-test-neg-psc"
-    name = "formae-plugin-sdk-test-negpsc-\(v.testRunID)"
+    name = "formae-test-negpsc-\(v.testRunID)"
     description = "PSC network endpoint group for plugin SDK conformance tests"
     networkEndpointType = "PRIVATE_SERVICE_CONNECT"
     // A regional Google API endpoint; nothing is published or billed by naming it.

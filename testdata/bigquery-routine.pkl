@@ -18,7 +18,7 @@ import "./config/vars.pkl" as v
 local ds = new dataset.Dataset {
   label = "plugin-sdk-test-routine-dataset"
   project = v.gcpProject
-  datasetId = "formae_plugin_sdk_test_rt_\(v.testRunID)"
+  datasetId = "formae_test_rt_\(v.testRunID)"
   location = v.gcpRegion
 }
 
@@ -33,7 +33,7 @@ forma {
     project = v.gcpProject
     // Resolvable -> the dataset exists before the routine is created in it.
     datasetId = ds.res.datasetId
-    routineId = "formae_plugin_sdk_test_fn_\(v.testRunID)"
+    routineId = "formae_test_fn_\(v.testRunID)"
     type = "SCALAR_FUNCTION"
     language = "SQL"
     description = "Test routine for plugin SDK conformance tests"

@@ -16,7 +16,7 @@ forma {
   new topic.Topic {
     label = "plugin-sdk-test-pubsub-topic"
     // A topic name is immutable, so changing it forces a replace.
-    name = "formae-plugin-sdk-test-topic2-\(v.testRunID)"
+    name = "formae-test-topic2-\(v.testRunID)"
     labels = new Mapping {
       ["environment"] = "test"
       ["managed-by"] = "formae"

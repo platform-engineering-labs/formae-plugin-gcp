@@ -10,7 +10,7 @@ import "@gcp/bigquery/dataset.pkl"
 import "@gcp/bigquery/table_bigquery.pkl" as table
 import "./config/vars.pkl" as v
 
-local testDatasetId = "formae_plugin_sdk_test_\(v.testRunID)"
+local testDatasetId = "formae_test_\(v.testRunID)"
 
 forma {
   v.stack
@@ -35,7 +35,7 @@ forma {
     label = "plugin-sdk-test-table"
     project = v.gcpProject
     datasetId = testDatasetId
-    tableId = "formae_plugin_sdk_test_table_\(v.testRunID)"
+    tableId = "formae_test_table_\(v.testRunID)"
     name = "Plugin SDK Test Table"
     description = "Test table for plugin SDK conformance tests"
     schema = new Listing {

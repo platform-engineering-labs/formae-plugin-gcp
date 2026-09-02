@@ -16,7 +16,7 @@ forma {
 
   new customService.CustomService {
     label = "plugin-sdk-test-monitoring-custom-service"
-    name = "formae-plugin-sdk-test-cs-\(v.testRunID)"
+    name = "formae-test-cs-\(v.testRunID)"
     displayName = "Formae conformance custom service"
   }
 }

@@ -18,7 +18,7 @@ forma {
     label = "plugin-sdk-test-route"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-route-r2-\(v.testRunID)"
+    name = "formae-test-route-r2-\(v.testRunID)"
     description = "Test route for plugin SDK conformance tests"
     // Full self-link URLs - the Compute API canonicalizes refs to this form.
     network = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"

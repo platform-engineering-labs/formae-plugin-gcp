@@ -16,7 +16,7 @@ import "./config/vars.pkl" as v
 local zone = new managedZone.ManagedZone {
   label = "plugin-sdk-test-rrset-zone"
   name = "formae-test-rrset-zone-\(v.testRunID)"
-  dnsName = "formae-rrset-\(v.testRunID).example.com."
+  dnsName = "formae-test-rrset-\(v.testRunID).example.com."
   description = "Zone serving the record set under test"
   visibility = "public"
 }
@@ -30,7 +30,7 @@ forma {
   // Name and type together identify the record set; both are fixed at creation.
   new resourceRecordSet.ResourceRecordSet {
     label = "plugin-sdk-test-dns-resource-record-set"
-    name = "www.formae-rrset-\(v.testRunID).example.com."
+    name = "www.formae-test-rrset-\(v.testRunID).example.com."
     managedZone = zone.res.name
     type = "A"
     ttl = 600

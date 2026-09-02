@@ -18,7 +18,7 @@ forma {
 
   new globalNetworkEndpointGroup.GlobalNetworkEndpointGroup {
     label = "plugin-sdk-test-global-network-endpoint-group"
-    name = "formae-plugin-sdk-test-gneg-\(v.testRunID)"
+    name = "formae-test-gneg-\(v.testRunID)"
     description = "Test internet NEG for plugin SDK conformance tests"
     networkEndpointType = "INTERNET_FQDN_PORT"
     defaultPort = 443
