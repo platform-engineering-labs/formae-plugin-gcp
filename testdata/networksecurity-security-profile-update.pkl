@@ -1,0 +1,41 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/securityProfile.pkl" as sp
+import "./config/vars.pkl" as v
+
+// Updates the overrides, description and labels. type is unchanged: it is
+// immutable, and the plugin drops it from the patch body so it cannot enter the
+// update mask.
+forma {
+  v.stack
+  v.target
+
+  new sp.SecurityProfile {
+    label = "plugin-sdk-test-ns-security-profile"
+    name = "formae-test-ns-sp-\(v.testRunID)"
+    type = "THREAT_PREVENTION"
+    threatPreventionProfile = new sp.ThreatPreventionProfile {
+      severityOverrides = new Listing {
+        new sp.SeverityOverride {
+          severity = "CRITICAL"
+          action = "ALERT"
+        }
+        new sp.SeverityOverride {
+          severity = "HIGH"
+          action = "ALERT"
+        }
+      }
+    }
+    description = "Updated test security profile description"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/securityProfile.pkl" as sp
+import "@gcp/networksecurity/securityProfileGroup.pkl" as spg
+import "./config/vars.pkl" as v
+
+// A group binds security profiles so a firewall policy rule can name one thing
+// instead of several, so the profile has to exist first.
+//
+// The profile is referenced through its resolvable, passed directly - that is
+// what orders the creates. Interpolating it into a string would read the same
+// and carry no dependency edge, and the group would race its own profile.
+//
+// Both are free: a profile and a group are policy, and nothing inspects traffic
+// until a firewall endpoint is attached. This fixture attaches none.
+local profile = new sp.SecurityProfile {
+  label = "plugin-sdk-test-ns-spg-profile"
+  name = "formae-test-ns-spg-sp-\(v.testRunID)"
+  type = "THREAT_PREVENTION"
+  description = "Test security profile backing the profile group conformance test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  profile
+
+  new spg.SecurityProfileGroup {
+    label = "plugin-sdk-test-ns-security-profile-group"
+    name = "formae-test-ns-spg-\(v.testRunID)"
+    // The API wants a full resource path here; the resolvable yields the short
+    // name and the plugin expands it on the way out and shortens it on the way
+    // back, so the declared value and the stored state agree.
+    threatPreventionProfile = profile.res.name
+    description = "Test security profile group for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

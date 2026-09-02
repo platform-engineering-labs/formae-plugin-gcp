@@ -1,0 +1,60 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security UrlList
+///
+/// A named list of URL patterns for a Secure Web Proxy policy to match on, so a
+/// rule names one list rather than repeating every pattern.
+///
+/// Regional — alone among the Network Security types, it lives under the
+/// target's region. Asked for locations/global the API rejects the call as an
+/// invalid location rather than returning nothing. Create, update and delete
+/// are long-running operations.
+module gcp.networksecurity.urlList
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::UrlList"
+
+open class UrlListResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: UrlListResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class UrlList extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-url-list"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The URL patterns, e.g. "example.com" or "*.example.org/path".
+    @gcp.FieldHint
+    values: Listing<String>?
+
+    /// An optional description. GCP reports this back as an empty string when
+    /// it was never set, so it carries a provider default rather than staying
+    /// absent.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    description: String?
+
+    hidden res: UrlListResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
