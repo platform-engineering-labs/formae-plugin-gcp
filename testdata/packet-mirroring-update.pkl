@@ -1,0 +1,127 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/compute/regionHealthCheck.pkl"
+import "@gcp/compute/regionBackendService.pkl"
+import "@gcp/compute/forwardingRule.pkl"
+import "@gcp/compute/packetMirroring.pkl"
+import "./config/vars.pkl" as v
+
+// Packet mirroring needs a collector to send the copies to, and the collector is
+// an internal passthrough load balancer flagged as a mirroring collector:
+//
+//   network -> subnet
+//           -> RegionHealthCheck -> RegionBackendService -> ForwardingRule
+//                                                            (isMirroringCollector)
+//           -> PacketMirroring
+//
+// Every reference is a resolvable self-link, so formae orders the creates and
+// the stored URLs are the same full form GCP reports back.
+//
+// The mirrored side names the subnet rather than instances, which is what keeps
+// this case free: a subnet mirrors every VM in it including ones that do not
+// exist yet, so no VM has to be booted to have something to mirror. The backend
+// service likewise has no backends - the collector rule only needs the LB to
+// exist.
+local net = new network.Network {
+  label = "plugin-sdk-test-pm-net"
+  name = "formae-plugin-sdk-test-pm-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-pm-subnet"
+  name = "formae-plugin-sdk-test-pm-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.99.0.0/24"
+}
+local hc = new regionHealthCheck.RegionHealthCheck {
+  label = "plugin-sdk-test-pm-hc"
+  name = "formae-plugin-sdk-test-pm-hc-\(v.testRunID)"
+  region = v.gcpRegion
+  type = "TCP"
+  tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
+    port = 80
+  }
+}
+local bes = new regionBackendService.RegionBackendService {
+  label = "plugin-sdk-test-pm-bes"
+  name = "formae-plugin-sdk-test-pm-bes-\(v.testRunID)"
+  region = v.gcpRegion
+  loadBalancingScheme = "INTERNAL"
+  protocol = "TCP"
+  network = net.res.selfLink
+  healthChecks = new Listing {
+    hc.res.selfLink
+  }
+}
+// A collector rule takes all ports and must be marked as one at creation - an
+// ordinary internal rule is refused by packetMirrorings.insert.
+local collector = new forwardingRule.ForwardingRule {
+  label = "plugin-sdk-test-pm-collector"
+  name = "formae-plugin-sdk-test-pm-fr-\(v.testRunID)"
+  region = v.gcpRegion
+  loadBalancingScheme = "INTERNAL"
+  IPProtocol = "TCP"
+  allPorts = true
+  isMirroringCollector = true
+  backendService = bes.res.selfLink
+  network = net.res.selfLink
+  subnetwork = subnet.res.selfLink
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  subnet
+  hc
+  bes
+  collector
+
+  new packetMirroring.PacketMirroring {
+    label = "plugin-sdk-test-packet-mirroring"
+    name = "formae-plugin-sdk-test-pm-\(v.testRunID)"
+    description = "Updated packet mirroring for plugin SDK conformance tests"
+    region = v.gcpRegion
+    network = new packetMirroring.PacketMirroringNetworkInfo {
+      url = net.res.selfLink
+    }
+    collectorIlb = new packetMirroring.PacketMirroringForwardingRuleInfo {
+      url = collector.res.selfLink
+    }
+    // The tag selector is gone. packetMirrorings.patch is a merge patch, so this
+    // only takes effect because the plugin sends an explicit empty tags list -
+    // without that the tag would survive the update and the read would disagree
+    // with this file.
+    mirroredResources = new packetMirroring.PacketMirroringMirroredResourceInfo {
+      subnetworks = new Listing {
+        new packetMirroring.PacketMirroringSubnetInfo {
+          url = subnet.res.selfLink
+        }
+      }
+    }
+    // direction is declared even though it is the GCP default: a filter given
+    // without one comes back carrying BOTH, and the declaration has to say so.
+    filter = new packetMirroring.PacketMirroringFilter {
+      cidrRanges = new Listing {
+        "10.0.0.0/8"
+      }
+      IPProtocols = new Listing {
+        "tcp"
+        "udp"
+      }
+      direction = "INGRESS"
+    }
+    priority = 900
+    enable = "FALSE"
+  }
+}

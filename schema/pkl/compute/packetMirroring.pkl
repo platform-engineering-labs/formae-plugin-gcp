@@ -1,0 +1,179 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute PacketMirroring (regional)
+///
+/// Copies traffic to and from selected VMs and sends it to an internal
+/// passthrough load balancer for inspection — an IDS, a flow recorder, a packet
+/// capture appliance. The mirrored side and the collector side are both named by
+/// self link: `mirroredResources` says whose traffic to copy, `collectorIlb`
+/// says where the copies go.
+///
+/// The collector must be an `INTERNAL` forwarding rule created with
+/// `isMirroringCollector = true`; an ordinary internal rule is refused. Both
+/// ends have to sit in the same `network`, which is why the network is named
+/// here as well as implied by the two references.
+///
+/// `mirroredResources` needs at least one of `instances`, `subnetworks` or
+/// `tags` — an empty selector is rejected with "Must specify at least one
+/// mirrored resource or tag". Mirroring a subnet (rather than named instances)
+/// is what lets a policy exist before the VMs it will cover do.
+///
+/// Updates are in-place, with two API behaviours the plugin compensates for:
+///
+///  * `network` is fixed once set. The API answers "Network cannot be changed"
+///    to a patch that carries it in any form other than the exact stored URL, so
+///    the plugin drops the field from update bodies entirely.
+///  * `packetMirrorings.patch` is a JSON merge patch, so a key left out of
+///    `mirroredResources` keeps its old value rather than being cleared —
+///    dropping every tag from a forma would otherwise leave the tags mirroring
+///    in place. The plugin fills the absent selectors with explicit empty lists
+///    on update so the patch says what the forma means.
+module gcp.compute.packetMirroring
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::PacketMirroring"
+
+/// Which direction of the mirrored VMs' traffic is copied.
+typealias MirroringDirection = "INGRESS"|"EGRESS"|"BOTH"
+
+/// Whether the policy is in force. A string enum, not a boolean — the API
+/// reports and accepts "TRUE"/"FALSE".
+typealias MirroringEnable = "TRUE"|"FALSE"
+
+/// The VPC network both the mirrored resources and the collector live in.
+@gcp.SubResourceHint
+open class PacketMirroringNetworkInfo extends formae.SubResource {
+    /// Self link of the network. Pass `network.res.selfLink`.
+    @gcp.FieldHint
+    url: (String|formae.Resolvable)?
+}
+
+/// The internal passthrough load balancer that receives the mirrored packets.
+@gcp.SubResourceHint
+open class PacketMirroringForwardingRuleInfo extends formae.SubResource {
+    /// Self link of a forwarding rule created with `isMirroringCollector = true`.
+    /// Pass `rule.res.selfLink`.
+    @gcp.FieldHint
+    url: (String|formae.Resolvable)?
+}
+
+/// A VM whose traffic is mirrored.
+@gcp.SubResourceHint
+open class PacketMirroringInstanceInfo extends formae.SubResource {
+    /// Self link of the instance. Pass `vm.res.selfLink`.
+    @gcp.FieldHint
+    url: (String|formae.Resolvable)?
+}
+
+/// A subnet whose VMs' traffic is mirrored — every VM in it, including ones
+/// created later.
+@gcp.SubResourceHint
+open class PacketMirroringSubnetInfo extends formae.SubResource {
+    /// Self link of the subnetwork. Pass `subnet.res.selfLink`.
+    @gcp.FieldHint
+    url: (String|formae.Resolvable)?
+}
+
+/// Whose traffic is copied. At least one of the three selectors must be
+/// non-empty; they are additive, not alternatives.
+@gcp.SubResourceHint
+open class PacketMirroringMirroredResourceInfo extends formae.SubResource {
+    @gcp.FieldHint
+    instances: Listing<PacketMirroringInstanceInfo>?
+
+    @gcp.FieldHint
+    subnetworks: Listing<PacketMirroringSubnetInfo>?
+
+    /// Network tags. A VM carrying one of these is mirrored.
+    @gcp.FieldHint
+    tags: Listing<String>?
+}
+
+/// Narrows which of the mirrored resources' packets are copied. Omitting the
+/// filter mirrors everything.
+@gcp.SubResourceHint
+open class PacketMirroringFilter extends formae.SubResource {
+    /// IP ranges of the *other* end of the connection.
+    @gcp.FieldHint
+    cidrRanges: Listing<String>?
+
+    /// Lowercase protocol names: "tcp", "udp", "icmp".
+    @gcp.FieldHint
+    IPProtocols: Listing<String>?
+
+    /// GCP fills BOTH when a filter is given without one.
+    @gcp.FieldHint
+    direction: MirroringDirection?
+}
+
+open class PacketMirroringResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: PacketMirroringResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: PacketMirroringResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: PacketMirroringResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class PacketMirroring extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    @gcp.FieldHint { createOnly = true }
+    region: gcp.Region
+
+    /// Fixed once set — a patch carrying it is refused with "Network cannot be
+    /// changed", so the plugin never sends it on update and a change here is a
+    /// replacement.
+    @gcp.FieldHint { createOnly = true }
+    network: PacketMirroringNetworkInfo
+
+    /// Where the mirrored packets go.
+    @gcp.FieldHint
+    collectorIlb: PacketMirroringForwardingRuleInfo
+
+    /// Whose traffic is copied.
+    @gcp.FieldHint
+    mirroredResources: PacketMirroringMirroredResourceInfo
+
+    /// Which packets are copied. GCP fills `{ direction = "BOTH" }` when this is
+    /// omitted, so declare `direction` whenever a filter is declared at all.
+    @gcp.FieldHint { hasProviderDefault = true }
+    filter: PacketMirroringFilter?
+
+    /// Order among the policies covering the same VM — lower wins. GCP fills
+    /// 1000.
+    @gcp.FieldHint { hasProviderDefault = true }
+    priority: Int?
+
+    /// GCP fills TRUE.
+    @gcp.FieldHint { hasProviderDefault = true }
+    enable: MirroringEnable?
+
+    hidden res: PacketMirroringResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

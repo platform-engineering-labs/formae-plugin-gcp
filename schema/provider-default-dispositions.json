@@ -690,6 +690,18 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/packetMirroring.pkl#PacketMirroring.enable",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/packetMirroring.pkl#PacketMirroring.filter",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/packetMirroring.pkl#PacketMirroring.priority",
+      "disposition": "pending"
+    },
+    {
       "key": "compute/regionAutoscaler.pkl#AutoscalingPolicy.coolDownPeriodSec",
       "disposition": "pending"
     },

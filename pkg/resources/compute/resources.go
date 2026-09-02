@@ -116,6 +116,9 @@ const (
 	ForwardingRuleResourceType                = "GCP::Compute::ForwardingRule"
 	TargetPoolResourceType                    = "GCP::Compute::TargetPool"
 	TargetInstanceResourceType                = "GCP::Compute::TargetInstance"
+
+	// Traffic inspection
+	PacketMirroringResourceType = "GCP::Compute::PacketMirroring"
 )
 
 // computeRegistry is the unified registry for all Compute resources
@@ -1247,6 +1250,27 @@ func init() {
 			},
 			RequestTransformer:  nil,
 			ResponseTransformer: base.RegionResponseTransformer,
+		},
+
+		// Packet Mirroring - regional traffic copy: mirrors selected VMs' packets
+		// to an internal passthrough LB for inspection. Patchable, but the body
+		// needs work first - see packetMirroringRequestTransformer for why
+		// "network" is dropped and why the mirrored-resource selectors are padded
+		// with empty lists. No optimistic locking: there is no fingerprint on
+		// this type.
+		{
+			ResourceType: PacketMirroringResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "packetMirrorings",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    true,
+				UpdateMethod:      base.UpdateMethodPatch,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  PacketMirroringRequestTransformer,
+			ResponseTransformer: PacketMirroringResponseTransformer,
 		},
 
 		// Target Pool - Classic target pool for network load balancers.
