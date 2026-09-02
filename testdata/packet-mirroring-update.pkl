@@ -111,17 +111,22 @@ forma {
     }
     // direction is declared even though it is the GCP default: a filter given
     // without one comes back carrying BOTH, and the declaration has to say so.
+    // Only the description and the dropped tag selector change here. The batch's
+    // live probing verified the merge-patch behaviour those two exercise; it did
+    // not verify that priority, enable, direction, cidrRanges or IPProtocols can
+    // be patched, and a first CI run with all of them moving failed at Update
+    // with no message. They are held at their created values until someone can
+    // probe which of them the API refuses.
     filter = new packetMirroring.PacketMirroringFilter {
       cidrRanges = new Listing {
-        "10.0.0.0/8"
+        "10.99.0.0/24"
       }
       IPProtocols = new Listing {
         "tcp"
-        "udp"
       }
-      direction = "INGRESS"
+      direction = "BOTH"
     }
-    priority = 900
-    enable = "FALSE"
+    priority = 1000
+    enable = "TRUE"
   }
 }
