@@ -171,6 +171,13 @@ formae agent.
   `services/-` both answer "Could not parse namespace name" - so a service walks
   the namespaces and an endpoint walks the services inside them.
 
+### Changed
+
+- Every `hasProviderDefault` schema annotation now carries a recorded
+  disposition in `schema/provider-default-dispositions.json`, enforced by a
+  unit test: new annotations fail CI until classified, and rows for removed
+  fields fail as stale. All current annotations start as `pending`;
+  classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
 - `GCP::SQL::Database` is discoverable. A database only exists underneath an
