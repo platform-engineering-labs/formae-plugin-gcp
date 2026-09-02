@@ -17,7 +17,7 @@ forma {
 
   new regionNetworkFirewallPolicy.RegionNetworkFirewallPolicy {
     label = "plugin-sdk-test-region-network-firewall-policy"
-    name = "formae-plugin-sdk-test-rnfp-\(v.testRunID)"
+    name = "formae-test-rnfp-\(v.testRunID)"
     region = v.gcpRegion
     description = "Test regional network firewall policy for plugin SDK conformance tests"
   }

@@ -19,7 +19,7 @@ forma {
 
   new network.Network {
     label = "plugin-sdk-test-network"
-    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    name = "formae-test-\(v.testRunID)"
     description = "Test network for plugin SDK tests"
     autoCreateSubnetworks = false
     networkFirewallPolicyEnforcementOrder = "AFTER_CLASSIC_FIREWALL"

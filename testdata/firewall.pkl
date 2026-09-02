@@ -10,7 +10,7 @@ import "@gcp/compute/network.pkl"
 import "@gcp/compute/firewall.pkl"
 import "./config/vars.pkl" as v
 
-local testNetworkName = "formae-plugin-sdk-test-fw-net-\(v.testRunID)"
+local testNetworkName = "formae-test-fw-net-\(v.testRunID)"
 
 forma {
   v.stack
@@ -30,7 +30,7 @@ forma {
   // Test firewall rule - allow SSH
   new firewall.Firewall {
     label = "plugin-sdk-test-firewall"
-    name = "formae-plugin-sdk-test-fw-\(v.testRunID)"
+    name = "formae-test-fw-\(v.testRunID)"
     description = "Test firewall for plugin SDK conformance tests"
     network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
     direction = "INGRESS"

@@ -20,12 +20,12 @@ forma {
     label = "plugin-sdk-test-neg"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-neg-r2-\(v.testRunID)"
+    name = "formae-test-neg-r2-\(v.testRunID)"
     description = "Test serverless NEG for plugin SDK conformance tests"
     networkEndpointType = "SERVERLESS"
     region = v.gcpRegion
     cloudRun = new networkEndpointGroup.CloudRun {
-      service = "formae-plugin-sdk-test-svc-\(v.testRunID)"
+      service = "formae-test-svc-\(v.testRunID)"
     }
   }
 }

@@ -19,14 +19,14 @@ import "./config/vars.pkl" as v
 // never attached to anything.
 local net = new network.Network {
   label = "plugin-sdk-test-address-network"
-  name = "formae-plugin-sdk-test-addr-net-\(v.testRunID)"
+  name = "formae-test-addr-net-\(v.testRunID)"
   description = "Test network for the address conformance test"
   autoCreateSubnetworks = false
 }
 
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-address-subnet"
-  name = "formae-plugin-sdk-test-addr-subnet-\(v.testRunID)"
+  name = "formae-test-addr-subnet-\(v.testRunID)"
   description = "Test subnetwork for the address conformance test"
   network = net.res.selfLink
   ipCidrRange = "10.24.0.0/24"
@@ -44,7 +44,7 @@ forma {
     label = "plugin-sdk-test-address"
     // An address name is immutable, so changing it forces a replace: the old
     // address is released and a new one reserved.
-    name = "formae-plugin-sdk-test-addr2-\(v.testRunID)"
+    name = "formae-test-addr2-\(v.testRunID)"
     description = "Test address for plugin SDK conformance tests"
     region = v.gcpRegion
     addressType = "INTERNAL"

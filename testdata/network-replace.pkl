@@ -21,7 +21,7 @@ forma {
   new network.Network {
     label = "plugin-sdk-test-network"
     // A network name is immutable, so changing it forces a replace.
-    name = "formae-plugin-sdk-test-n2-\(v.testRunID)"
+    name = "formae-test-n2-\(v.testRunID)"
     description = "Test network for plugin SDK tests"
     autoCreateSubnetworks = false
     networkFirewallPolicyEnforcementOrder = "AFTER_CLASSIC_FIREWALL"

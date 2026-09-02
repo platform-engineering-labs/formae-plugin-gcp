@@ -20,12 +20,12 @@ import "./config/vars.pkl" as v
 // source).
 local net = new network.Network {
   label = "plugin-sdk-test-mi-net"
-  name = "formae-plugin-sdk-test-mi-net-\(v.testRunID)"
+  name = "formae-test-mi-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-mi-subnet"
-  name = "formae-plugin-sdk-test-mi-subnet-\(v.testRunID)"
+  name = "formae-test-mi-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.99.0.0/24"
@@ -42,7 +42,7 @@ forma {
     label = "plugin-sdk-test-mi-bootdisk"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-mi-disk-\(v.testRunID)"
+    name = "formae-test-mi-disk-\(v.testRunID)"
     description = "Boot disk for the machine-image test VM"
     sizeGb = 10
     type = "pd-standard"
@@ -53,7 +53,7 @@ forma {
     label = "plugin-sdk-test-mi-vm"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-mi-vm-\(v.testRunID)"
+    name = "formae-test-mi-vm-\(v.testRunID)"
     machineType = "e2-micro"
     description = "VM captured by the machine image"
     disks = new Listing {
@@ -77,7 +77,7 @@ forma {
 
   new machineImage.MachineImage {
     label = "plugin-sdk-test-machine-image"
-    name = "formae-plugin-sdk-test-mi-\(v.testRunID)"
+    name = "formae-test-mi-\(v.testRunID)"
     description = "Test machine image for plugin SDK conformance tests"
     // Resolvable -> establishes VM-before-capture create ordering.
     sourceInstance = vm.res.selfLink

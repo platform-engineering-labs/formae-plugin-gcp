@@ -22,13 +22,13 @@ local region = "us-east4"
 
 local bus = new messageBus.MessageBus {
   label = "plugin-sdk-test-en-bus"
-  name = "formae-plugin-sdk-test-en-bus-\(v.testRunID)"
+  name = "formae-test-en-bus-\(v.testRunID)"
   location = region
 }
 
 local pipe = new pipeline.Pipeline {
   label = "plugin-sdk-test-en-pipeline"
-  name = "formae-plugin-sdk-test-en-pl-\(v.testRunID)"
+  name = "formae-test-en-pl-\(v.testRunID)"
   location = region
   destinations = new Listing {
     new pipeline.PipelineDestination {
@@ -46,7 +46,7 @@ forma {
 
   new enrollment.Enrollment {
     label = "plugin-sdk-test-eventarc-enrollment"
-    name = "formae-plugin-sdk-test-en-\(v.testRunID)"
+    name = "formae-test-en-\(v.testRunID)"
     location = region
     // Resolvables -> bus and pipeline exist first, and the plugin expands each
     // short name into the full path Eventarc wants.

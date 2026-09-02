@@ -21,7 +21,7 @@ import "./config/vars.pkl" as v
 // exists and is already an editor, so the grant adds no access anyone lacked.
 local b = new bucket.Bucket {
   label = "plugin-sdk-test-oac-bucket"
-  name = "formae-plugin-sdk-test-oac-\(v.testRunID)"
+  name = "formae-test-oac-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
   iamConfiguration = new bucket.IamConfiguration {

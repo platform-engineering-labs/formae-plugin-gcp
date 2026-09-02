@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // is attached, so nothing is billed for traffic.
 local net = new network.Network {
   label = "plugin-sdk-test-tvg-network"
-  name = "formae-plugin-sdk-test-tvg-net-\(v.testRunID)"
+  name = "formae-test-tvg-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
@@ -27,7 +27,7 @@ forma {
 
   new targetVpnGateway.TargetVpnGateway {
     label = "plugin-sdk-test-target-vpn-gateway"
-    name = "formae-plugin-sdk-test-tvg-\(v.testRunID)"
+    name = "formae-test-tvg-\(v.testRunID)"
     region = v.gcpRegion
     description = "Test classic VPN gateway for plugin SDK conformance tests"
     network = net.res.selfLink

@@ -21,7 +21,7 @@ local region = "europe-west3"
 
 local bus = new messageBus.MessageBus {
   label = "plugin-sdk-test-gas-bus"
-  name = "formae-plugin-sdk-test-gas-bus-\(v.testRunID)"
+  name = "formae-test-gas-bus-\(v.testRunID)"
   location = region
 }
 
@@ -33,7 +33,7 @@ forma {
 
   new googleApiSource.GoogleApiSource {
     label = "plugin-sdk-test-eventarc-google-api-source"
-    name = "formae-plugin-sdk-test-gas-\(v.testRunID)"
+    name = "formae-test-gas-\(v.testRunID)"
     location = region
     // Resolvable -> the bus exists first; the plugin expands this short name
     // into the full path Eventarc wants.

@@ -21,7 +21,7 @@ forma {
 
   new dataExchange.DataExchange {
     label = "plugin-sdk-test-analyticshub-data-exchange"
-    name = "formae_plugin_sdk_test_de_\(v.testRunID)"
+    name = "formae_test_de_\(v.testRunID)"
     location = v.gcpLocation
     displayName = "formae plugin sdk test exchange"
     description = "Created by the formae GCP plugin conformance suite."

@@ -22,14 +22,14 @@ import "./config/vars.pkl" as v
 // depending on a grant someone made by hand.
 local b = new bucket.Bucket {
   label = "plugin-sdk-test-notification-bucket"
-  name = "formae-plugin-sdk-test-notif-\(v.testRunID)"
+  name = "formae-test-notif-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
 }
 
 local t = new topic.Topic {
   label = "plugin-sdk-test-notification-topic"
-  name = "formae-plugin-sdk-test-notif-topic-\(v.testRunID)"
+  name = "formae-test-notif-topic-\(v.testRunID)"
 }
 
 local publisher = new iam.TopicIamMember {

@@ -17,7 +17,7 @@ forma {
 
   new httpsHealthCheck.HttpsHealthCheck {
     label = "plugin-sdk-test-https-health-check"
-    name = "formae-plugin-sdk-test-hhcs-\(v.testRunID)"
+    name = "formae-test-hhcs-\(v.testRunID)"
     description = "Updated legacy HTTPS health check description"
     port = 443
     requestPath = "/ready"

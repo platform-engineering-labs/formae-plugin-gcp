@@ -19,7 +19,7 @@ forma {
 
   new projectSink.ProjectSink {
     label = "plugin-sdk-test-logging-project-sink"
-    name = "formae-plugin-sdk-test-sink-\(v.testRunID)"
+    name = "formae-test-sink-\(v.testRunID)"
     description = "Test log sink for plugin SDK conformance tests"
     destination = "logging.googleapis.com/projects/\(v.gcpProject)/locations/global/buckets/_Default"
     filter = "severity>=\"ERROR\""

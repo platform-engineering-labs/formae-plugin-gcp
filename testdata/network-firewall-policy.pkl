@@ -18,7 +18,7 @@ forma {
 
   new networkFirewallPolicy.NetworkFirewallPolicy {
     label = "plugin-sdk-test-network-firewall-policy"
-    name = "formae-plugin-sdk-test-nfp-\(v.testRunID)"
+    name = "formae-test-nfp-\(v.testRunID)"
     description = "Test network firewall policy for plugin SDK conformance tests"
   }
 }

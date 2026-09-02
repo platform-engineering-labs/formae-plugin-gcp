@@ -21,12 +21,12 @@ import "./config/vars.pkl" as v
 // they round-trip against the API's returned full URLs (PLA-265).
 local net = new network.Network {
   label = "plugin-sdk-test-instance-net"
-  name = "formae-plugin-sdk-test-inst-net-\(v.testRunID)"
+  name = "formae-test-inst-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-instance-subnet"
-  name = "formae-plugin-sdk-test-inst-subnet-\(v.testRunID)"
+  name = "formae-test-inst-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.90.0.0/24"
@@ -38,7 +38,7 @@ forma {
     label = "plugin-sdk-test-instance-bootdisk"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-instance-disk-\(v.testRunID)"
+    name = "formae-test-instance-disk-\(v.testRunID)"
     description = "Boot disk for instance conformance test"
     sizeGb = 10
     type = "pd-standard"
@@ -56,7 +56,7 @@ forma {
     label = "plugin-sdk-test-instance"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-instance-\(v.testRunID)"
+    name = "formae-test-instance-\(v.testRunID)"
     machineType = "e2-micro"
     description = "Test instance for plugin SDK conformance tests"
     disks = new Listing {

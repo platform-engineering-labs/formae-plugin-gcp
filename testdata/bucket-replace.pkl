@@ -20,7 +20,7 @@ forma {
     label = "plugin-sdk-test-bucket"
     // A bucket name is immutable, so changing it forces a replace: the old
     // bucket is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-r2-\(v.testRunID)"
+    name = "formae-test-r2-\(v.testRunID)"
     location = v.gcpRegion
     storageClass = "STANDARD"
     versioning = new bucket.Versioning {

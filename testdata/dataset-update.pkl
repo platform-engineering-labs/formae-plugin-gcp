@@ -16,7 +16,7 @@ forma {
   new dataset.Dataset {
     label = "plugin-sdk-test-dataset"
     project = v.gcpProject
-    datasetId = "formae_plugin_sdk_test_\(v.testRunID)"           // Same (createOnly identifier)
+    datasetId = "formae_test_\(v.testRunID)"           // Same (createOnly identifier)
     location = v.gcpRegion                                        // Same (createOnly)
     name = "Plugin SDK Test Dataset (updated)"                    // Changed (mutable)
     description = "Updated dataset for plugin SDK conformance tests"  // Changed (mutable)

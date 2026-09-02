@@ -17,7 +17,7 @@ forma {
 
   new projectExclusion.ProjectExclusion {
     label = "plugin-sdk-test-logging-project-exclusion"
-    name = "formae-plugin-sdk-test-excl-\(v.testRunID)"
+    name = "formae-test-excl-\(v.testRunID)"
     description = "Updated log exclusion description"
     filter = "resource.type=\"gce_instance\" AND severity<\"ERROR\""
   }

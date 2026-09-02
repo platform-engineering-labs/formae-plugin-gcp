@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // exchange rejects them.
 local cleanRoom = new dataExchange.DataExchange {
   label = "plugin-sdk-test-ah-clean-room"
-  name = "formae_plugin_sdk_test_cr_\(v.testRunID)"
+  name = "formae_test_cr_\(v.testRunID)"
   location = v.gcpLocation
   displayName = "formae plugin sdk test clean room"
   sharingEnvironmentConfig = new dataExchange.SharingEnvironmentConfig {
@@ -31,7 +31,7 @@ forma {
 
   new queryTemplate.QueryTemplate {
     label = "plugin-sdk-test-analyticshub-query-template"
-    name = "formae_plugin_sdk_test_qt_\(v.testRunID)"
+    name = "formae_test_qt_\(v.testRunID)"
     location = v.gcpLocation
     dataExchange = cleanRoom.res.name
     displayName = "formae plugin sdk test query template"

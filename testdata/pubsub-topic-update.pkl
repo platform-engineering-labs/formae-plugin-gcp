@@ -15,7 +15,7 @@ forma {
 
   new topic.Topic {
     label = "plugin-sdk-test-pubsub-topic"
-    name = "formae-plugin-sdk-test-topic-\(v.testRunID)"   // Same (createOnly)
+    name = "formae-test-topic-\(v.testRunID)"   // Same (createOnly)
     labels = new Mapping {
       ["environment"] = "production"   // Changed (mutable)
       ["managed-by"] = "formae"

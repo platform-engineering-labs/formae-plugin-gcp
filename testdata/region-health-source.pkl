@@ -22,7 +22,7 @@ import "./config/vars.pkl" as v
 // the internet in this project.
 local hc = new regionHealthCheck.RegionHealthCheck {
   label = "plugin-sdk-test-hs-hc"
-  name = "formae-plugin-sdk-test-hs-hc-\(v.testRunID)"
+  name = "formae-test-hs-hc-\(v.testRunID)"
   region = v.gcpRegion
   type = "TCP"
   tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
@@ -31,7 +31,7 @@ local hc = new regionHealthCheck.RegionHealthCheck {
 }
 local bes = new regionBackendService.RegionBackendService {
   label = "plugin-sdk-test-hs-bes"
-  name = "formae-plugin-sdk-test-hs-bes-\(v.testRunID)"
+  name = "formae-test-hs-bes-\(v.testRunID)"
   region = v.gcpRegion
   loadBalancingScheme = "INTERNAL"
   protocol = "TCP"
@@ -41,7 +41,7 @@ local bes = new regionBackendService.RegionBackendService {
 }
 local policy = new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
   label = "plugin-sdk-test-hs-policy"
-  name = "formae-plugin-sdk-test-hs-hap-\(v.testRunID)"
+  name = "formae-test-hs-hap-\(v.testRunID)"
   region = v.gcpRegion
   policyType = "BACKEND_SERVICE_POLICY"
   healthyPercentThreshold = 60
@@ -57,7 +57,7 @@ forma {
 
   new regionHealthSource.RegionHealthSource {
     label = "plugin-sdk-test-region-health-source"
-    name = "formae-plugin-sdk-test-hs-\(v.testRunID)"
+    name = "formae-test-hs-\(v.testRunID)"
     description = "Test health source for plugin SDK conformance tests"
     region = v.gcpRegion
     sourceType = "BACKEND_SERVICE"

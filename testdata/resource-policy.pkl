@@ -17,7 +17,7 @@ forma {
 
   new resourcePolicy.ResourcePolicy {
     label = "plugin-sdk-test-resource-policy"
-    name = "formae-plugin-sdk-test-rp-\(v.testRunID)"
+    name = "formae-test-rp-\(v.testRunID)"
     description = "Test snapshot schedule for plugin SDK conformance tests"
     region = v.gcpRegion
     snapshotSchedulePolicy = new resourcePolicy.SnapshotSchedulePolicy {

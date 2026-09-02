@@ -19,12 +19,12 @@ import "./config/vars.pkl" as v
 // affects nothing else.
 local t = new topic.Topic {
   label = "plugin-sdk-test-subiam-topic"
-  name = "formae-plugin-sdk-test-subiam-topic-\(v.testRunID)"
+  name = "formae-test-subiam-topic-\(v.testRunID)"
 }
 
 local s = new subscription.Subscription {
   label = "plugin-sdk-test-subiam-subscription"
-  name = "formae-plugin-sdk-test-subiam-sub-\(v.testRunID)"
+  name = "formae-test-subiam-sub-\(v.testRunID)"
   topic = t.res.name
 }
 

@@ -26,13 +26,13 @@ import "./config/vars.pkl" as v
 // forwarding rule with no healthy backends is still a valid resource.
 local net = new network.Network {
   label = "plugin-sdk-test-chc-network"
-  name = "formae-plugin-sdk-test-chc-net-\(v.testRunID)"
+  name = "formae-test-chc-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
 local sub = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-chc-subnet"
-  name = "formae-plugin-sdk-test-chc-sub-\(v.testRunID)"
+  name = "formae-test-chc-sub-\(v.testRunID)"
   region = v.gcpRegion
   ipCidrRange = "10.43.0.0/24"
   network = net.res.selfLink
@@ -40,7 +40,7 @@ local sub = new subnetwork.Subnetwork {
 
 local hc = new regionHealthCheck.RegionHealthCheck {
   label = "plugin-sdk-test-chc-hc"
-  name = "formae-plugin-sdk-test-chc-hc-\(v.testRunID)"
+  name = "formae-test-chc-hc-\(v.testRunID)"
   region = v.gcpRegion
   type = "TCP"
   tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
@@ -50,7 +50,7 @@ local hc = new regionHealthCheck.RegionHealthCheck {
 
 local bes = new regionBackendService.RegionBackendService {
   label = "plugin-sdk-test-chc-bes"
-  name = "formae-plugin-sdk-test-chc-bes-\(v.testRunID)"
+  name = "formae-test-chc-bes-\(v.testRunID)"
   region = v.gcpRegion
   loadBalancingScheme = "INTERNAL"
   protocol = "TCP"
@@ -62,7 +62,7 @@ local bes = new regionBackendService.RegionBackendService {
 
 local fr = new forwardingRule.ForwardingRule {
   label = "plugin-sdk-test-chc-fr"
-  name = "formae-plugin-sdk-test-chc-fr-\(v.testRunID)"
+  name = "formae-test-chc-fr-\(v.testRunID)"
   region = v.gcpRegion
   loadBalancingScheme = "INTERNAL"
   IPProtocol = "TCP"
@@ -74,7 +74,7 @@ local fr = new forwardingRule.ForwardingRule {
 
 local policy = new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
   label = "plugin-sdk-test-chc-policy"
-  name = "formae-plugin-sdk-test-chc-hap-\(v.testRunID)"
+  name = "formae-test-chc-hap-\(v.testRunID)"
   region = v.gcpRegion
   policyType = "BACKEND_SERVICE_POLICY"
   healthyPercentThreshold = 60
@@ -82,7 +82,7 @@ local policy = new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
 
 local hs = new regionHealthSource.RegionHealthSource {
   label = "plugin-sdk-test-chc-health-source"
-  name = "formae-plugin-sdk-test-chc-hs-\(v.testRunID)"
+  name = "formae-test-chc-hs-\(v.testRunID)"
   region = v.gcpRegion
   sourceType = "BACKEND_SERVICE"
   healthAggregationPolicy = policy.res.selfLink
@@ -105,7 +105,7 @@ forma {
 
   new regionCompositeHealthCheck.RegionCompositeHealthCheck {
     label = "plugin-sdk-test-region-composite-health-check"
-    name = "formae-plugin-sdk-test-chc-\(v.testRunID)"
+    name = "formae-test-chc-\(v.testRunID)"
     description = "Test composite health check for plugin SDK conformance tests"
     region = v.gcpRegion
     healthSources = new Listing {

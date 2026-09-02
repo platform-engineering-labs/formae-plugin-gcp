@@ -16,7 +16,7 @@ forma {
 
   new route.Route {
     label = "plugin-sdk-test-route"
-    name = "formae-plugin-sdk-test-route-\(v.testRunID)"
+    name = "formae-test-route-\(v.testRunID)"
     description = "Test route for plugin SDK conformance tests"
     // Full self-link URLs - the Compute API canonicalizes refs to this form.
     network = "https://www.googleapis.com/compute/v1/projects/\(v.gcpProject)/global/networks/default"

@@ -19,19 +19,19 @@ import "./config/vars.pkl" as v
 // VM could never pull its image. The autoscaler object is what is under test.
 local net = new network.Network {
   label = "plugin-sdk-test-as-net"
-  name = "formae-plugin-sdk-test-as-net-\(v.testRunID)"
+  name = "formae-test-as-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-as-subnet"
-  name = "formae-plugin-sdk-test-as-subnet-\(v.testRunID)"
+  name = "formae-test-as-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.93.0.0/24"
 }
 local tmpl = new instanceTemplate.InstanceTemplate {
   label = "plugin-sdk-test-as-template"
-  name = "formae-plugin-sdk-test-as-tmpl-\(v.testRunID)"
+  name = "formae-test-as-tmpl-\(v.testRunID)"
   description = "Blueprint for the autoscaler conformance test"
   properties = new instanceTemplate.InstanceProperties {
     machineType = "e2-micro"
@@ -54,10 +54,10 @@ local tmpl = new instanceTemplate.InstanceTemplate {
 }
 local mig = new instanceGroupManager.InstanceGroupManager {
   label = "plugin-sdk-test-as-mig"
-  name = "formae-plugin-sdk-test-as-mig-\(v.testRunID)"
+  name = "formae-test-as-mig-\(v.testRunID)"
   description = "MIG the autoscaler scales"
   zone = v.gcpZone
-  baseInstanceName = "formae-as-vm"
+  baseInstanceName = "formae-test-as-vm"
   instanceTemplate = tmpl.res.selfLink
   targetSize = 0
 }
@@ -73,7 +73,7 @@ forma {
 
   new autoscaler.Autoscaler {
     label = "plugin-sdk-test-autoscaler"
-    name = "formae-plugin-sdk-test-as-\(v.testRunID)"
+    name = "formae-test-as-\(v.testRunID)"
     description = "Test autoscaler for plugin SDK conformance tests"
     zone = v.gcpZone
     // Resolvable -> establishes MIG-before-autoscaler create ordering.

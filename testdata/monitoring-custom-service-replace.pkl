@@ -18,7 +18,7 @@ forma {
     label = "plugin-sdk-test-monitoring-custom-service"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-cs-r2-\(v.testRunID)"
+    name = "formae-test-cs-r2-\(v.testRunID)"
     displayName = "Formae conformance custom service"
   }
 }

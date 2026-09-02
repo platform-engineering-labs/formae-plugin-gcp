@@ -21,7 +21,7 @@ forma {
 
   new nodeTemplate.NodeTemplate {
     label = "plugin-sdk-test-node-template"
-    name = "formae-plugin-sdk-test-nt-\(v.testRunID)"
+    name = "formae-test-nt-\(v.testRunID)"
     description = "Test sole-tenant node template for plugin SDK conformance tests"
     region = v.gcpRegion
     nodeType = "n1-node-96-624"

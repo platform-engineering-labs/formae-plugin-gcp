@@ -24,7 +24,7 @@ import "./config/vars.pkl" as v
 // no access anyone did not have.
 local b = new bucket.Bucket {
   label = "plugin-sdk-test-doac-bucket"
-  name = "formae-plugin-sdk-test-doac-\(v.testRunID)"
+  name = "formae-test-doac-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
   iamConfiguration = new bucket.IamConfiguration {

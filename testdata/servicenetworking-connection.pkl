@@ -14,12 +14,12 @@ import "./config/vars.pkl" as v
 // Consumer VPC + the reserved internal range the service producer peers into.
 local net = new network.Network {
   label = "plugin-sdk-test-psa-net"
-  name = "formae-plugin-sdk-test-psa-net-\(v.testRunID)"
+  name = "formae-test-psa-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local peerRange = new globalAddress.GlobalAddress {
   label = "plugin-sdk-test-psa-range"
-  name = "formae-plugin-sdk-test-psa-range-\(v.testRunID)"
+  name = "formae-test-psa-range-\(v.testRunID)"
   addressType = "INTERNAL"
   purpose = "VPC_PEERING"
   prefixLength = 16

@@ -18,7 +18,7 @@ forma {
 
   new regionSslPolicy.RegionSslPolicy {
     label = "plugin-sdk-test-region-ssl-policy"
-    name = "formae-plugin-sdk-test-rsslpol-\(v.testRunID)"
+    name = "formae-test-rsslpol-\(v.testRunID)"
     region = v.gcpRegion
     description = "Test regional SSL policy for plugin SDK conformance tests"
     profile = "MODERN"

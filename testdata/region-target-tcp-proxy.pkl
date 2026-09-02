@@ -21,7 +21,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new regionHealthCheck.RegionHealthCheck {
     label = "plugin-sdk-test-rttp-healthcheck"
-    name = "formae-plugin-sdk-test-rttp-hc-\(v.testRunID)"
+    name = "formae-test-rttp-hc-\(v.testRunID)"
     region = v.gcpRegion
     type = "TCP"
     checkIntervalSec = 10
@@ -36,7 +36,7 @@ forma {
 
   local bs = new regionBackendService.RegionBackendService {
     label = "plugin-sdk-test-rttp-backend-service"
-    name = "formae-plugin-sdk-test-rttp-bs-\(v.testRunID)"
+    name = "formae-test-rttp-bs-\(v.testRunID)"
     region = v.gcpRegion
     loadBalancingScheme = "INTERNAL_MANAGED"
     protocol = "TCP"
@@ -54,7 +54,7 @@ forma {
 
   new regionTargetTcpProxy.RegionTargetTcpProxy {
     label = "plugin-sdk-test-region-target-tcp-proxy"
-    name = "formae-plugin-sdk-test-rttp-\(v.testRunID)"
+    name = "formae-test-rttp-\(v.testRunID)"
     description = "Test regional target TCP proxy for plugin SDK conformance tests"
     region = v.gcpRegion
     // Resolvable -> the backend service exists before the proxy fronts it.

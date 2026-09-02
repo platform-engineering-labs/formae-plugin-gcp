@@ -15,7 +15,7 @@ forma {
 
   new securityPolicy.SecurityPolicy {
     label = "plugin-sdk-test-security-policy"
-    name = "formae-plugin-sdk-test-secpol-\(v.testRunID)"
+    name = "formae-test-secpol-\(v.testRunID)"
     description = "Test Cloud Armor policy for plugin SDK conformance tests"
     type = "CLOUD_ARMOR"
     rules = new Listing {

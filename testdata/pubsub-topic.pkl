@@ -15,7 +15,7 @@ forma {
 
   new topic.Topic {
     label = "plugin-sdk-test-pubsub-topic"
-    name = "formae-plugin-sdk-test-topic-\(v.testRunID)"
+    name = "formae-test-topic-\(v.testRunID)"
     labels = new Mapping {
       ["environment"] = "test"
       ["managed-by"] = "formae"

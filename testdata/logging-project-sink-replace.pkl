@@ -21,7 +21,7 @@ forma {
     label = "plugin-sdk-test-logging-project-sink"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-sink-r2-\(v.testRunID)"
+    name = "formae-test-sink-r2-\(v.testRunID)"
     description = "Test log sink for plugin SDK conformance tests"
     destination = "logging.googleapis.com/projects/\(v.gcpProject)/locations/global/buckets/_Default"
     filter = "severity>=\"ERROR\""

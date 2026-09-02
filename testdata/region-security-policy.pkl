@@ -15,7 +15,7 @@ forma {
 
   new regionSecurityPolicy.RegionSecurityPolicy {
     label = "plugin-sdk-test-region-security-policy"
-    name = "formae-plugin-sdk-test-rsecpol-\(v.testRunID)"
+    name = "formae-test-rsecpol-\(v.testRunID)"
     region = v.gcpRegion
     description = "Test regional Cloud Armor policy for plugin SDK conformance tests"
     type = "CLOUD_ARMOR"

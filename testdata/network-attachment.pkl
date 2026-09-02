@@ -15,12 +15,12 @@ import "./config/vars.pkl" as v
 // self-link so formae orders the creates and the stored URLs round-trip.
 local net = new network.Network {
   label = "plugin-sdk-test-natt-net"
-  name = "formae-plugin-sdk-test-natt-net-\(v.testRunID)"
+  name = "formae-test-natt-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-natt-subnet"
-  name = "formae-plugin-sdk-test-natt-subnet-\(v.testRunID)"
+  name = "formae-test-natt-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.94.0.0/24"
@@ -35,7 +35,7 @@ forma {
 
   new networkAttachment.NetworkAttachment {
     label = "plugin-sdk-test-network-attachment"
-    name = "formae-plugin-sdk-test-natt-\(v.testRunID)"
+    name = "formae-test-natt-\(v.testRunID)"
     description = "Test PSC network attachment for plugin SDK conformance tests"
     region = v.gcpRegion
     connectionPreference = "ACCEPT_AUTOMATIC"
