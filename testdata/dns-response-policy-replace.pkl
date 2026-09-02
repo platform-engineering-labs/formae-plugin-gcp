@@ -6,25 +6,19 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/dns/responsePolicy.pkl"
+import "@gcp/dns/responsePolicy.pkl" as responsePolicy
 import "./config/vars.pkl" as v
 
-// No network prerequisite: a response policy may attach to networks but does
-// not have to, and every fixture that builds one competes for a project-wide
-// cap of 30 networks that a full matrix already runs up against. dns-policy
-// keeps its network so the reference is still covered somewhere.
-
+// The replace companion of dns-response-policy. Identical to it but for the id,
+// which is immutable: changing it plans a destroy and a create rather than an
+// update, and the case asserts the native ID changed.
 forma {
   v.stack
   v.target
 
   new responsePolicy.ResponsePolicy {
     label = "plugin-sdk-test-dns-response-policy"
-    project = v.gcpProject
-    // The id field is responsePolicyName, not name.
-    // The id is immutable, so changing it forces a replace rather than an
-    // update: the old policy is destroyed and a new one takes its place.
-    responsePolicyName = "formae-plugin-sdk-test-dnsrp-r2-\(v.testRunID)"
-    description = "Plugin SDK conformance response policy"
+    name = "formae-test-dns-rp2-\(v.testRunID)"
+    description = "Test response policy for plugin SDK conformance tests"
   }
 }
