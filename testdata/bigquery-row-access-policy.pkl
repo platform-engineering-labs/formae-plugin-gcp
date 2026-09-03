@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigquery/dataset.pkl"
+import "@gcp/bigquery/table_bigquery.pkl" as table
+import "@gcp/bigquery/rowAccessPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// A row access policy applies to a table, which lives in a dataset, so both come
+// first and both are passed through their resolvables - that is what orders the
+// creates. Interpolating an id into a string would create no dependency edge.
+//
+// All three are free to hold. BigQuery bills bytes stored and bytes queried: an
+// empty dataset and a zero-row table store nothing, nothing queries them, and a
+// row access policy is metadata on the table rather than a copy of any rows.
+//
+// The predicate has to name a column this table actually has, so the table is
+// declared with a schema; a column BigQuery cannot find is rejected outright
+// ("Unrecognized name: ..."). The friendly name and every field description are
+// declared rather than left out because the table provisioner reports them back
+// as empty strings when they were never set.
+//
+// BigQuery ids take letters, digits and underscores only, so these names are
+// underscore-separated where most fixtures here are hyphenated. The sweep
+// pattern ^formae[-_](test|probe|plugin)[-_] matches the underscore form.
+local ds = new dataset.Dataset {
+  label = "plugin-sdk-test-rap-dataset"
+  project = v.gcpProject
+  datasetId = "formae_test_rap_\(v.testRunID)"
+  location = v.gcpRegion
+}
+
+local tbl = new table.Table {
+  label = "plugin-sdk-test-rap-table"
+  project = v.gcpProject
+  // Resolvable -> the dataset exists before the table is created in it.
+  datasetId = ds.res.datasetId
+  tableId = "formae_test_rap_tbl_\(v.testRunID)"
+  name = "Plugin SDK conformance row access policy table"
+  description = "Test table for the row access policy conformance test"
+  schema = new Listing {
+    new table.SchemaField {
+      name = "v"
+      type = "INTEGER"
+      mode = "NULLABLE"
+      description = "Numeric column the row access policy filters on"
+    }
+    new table.SchemaField {
+      name = "region"
+      type = "STRING"
+      mode = "NULLABLE"
+      description = "Region column the row access policy filters on"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  ds
+  tbl
+
+  new rowAccessPolicy.RowAccessPolicy {
+    label = "plugin-sdk-test-bigquery-row-access-policy"
+    project = v.gcpProject
+    // Resolvables -> the dataset, then the table, then the policy on it.
+    datasetId = ds.res.datasetId
+    tableId = tbl.res.tableId
+    name = "formae_test_rap_pol_\(v.testRunID)"
+    // The one mutable field, so it is what the -update fixture changes.
+    // BigQuery stores it verbatim: no whitespace normalising, no added parens,
+    // no upcased operators.
+    filterPredicate = "v > 0"
+  }
+}

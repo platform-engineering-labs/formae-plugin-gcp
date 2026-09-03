@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/firestore/database_firestore.pkl" as database
+import "./config/vars.pkl" as v
+
+// The update half of firestore-database: concurrencyMode moves from
+// PESSIMISTIC to OPTIMISTIC. Both are free — concurrency control is how
+// transactions take locks, not what they cost — and the change was verified
+// live against a Standard-edition Native database.
+//
+// concurrencyMode is the field to move because it is the one mutable field with
+// no strings attached. Of the others: locationId and databaseEdition are
+// immutable, appEngineIntegrationMode can only go to ENABLED where an App
+// Engine application exists, pointInTimeRecoveryEnablement is billable,
+// deleteProtectionState enabled would block the destroy that follows, and type
+// is refused by the API when a patch masks any other field alongside it.
+//
+// The rest of the declaration is identical to the base fixture, so this is an
+// update and not a replacement: nothing marked createOnly changes. That matters
+// more here than usual — a Firestore database id is held for about five minutes
+// after a delete ("Please retry in 285 seconds"), so a replacement that kept
+// the same id would destroy the database and then fail to recreate it.
+
+forma {
+  v.stack
+  v.target
+
+  new database.Database {
+    label = "plugin-sdk-test-firestore-database"
+    name = "formae-test-fs-db-\(v.testRunID)"
+    locationId = v.gcpRegion
+    type = "FIRESTORE_NATIVE"
+    concurrencyMode = "OPTIMISTIC"
+    appEngineIntegrationMode = "DISABLED"
+    pointInTimeRecoveryEnablement = "POINT_IN_TIME_RECOVERY_DISABLED"
+    deleteProtectionState = "DELETE_PROTECTION_DISABLED"
+    databaseEdition = "STANDARD"
+  }
+}

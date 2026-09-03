@@ -1,0 +1,80 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/cloudbuild/buildTrigger.pkl"
+import "./config/vars.pkl" as v
+
+// Free to hold, and — more to the point — free to create.
+//
+// A BuildTrigger is configuration, not compute: it says when a build runs and
+// what it runs, and creating one queues nothing. That was checked rather than
+// assumed. The project's builds collection was listed before the first probe
+// trigger was created and again after seven of them, and was empty both times.
+//
+// This trigger also cannot start a build even by accident, in two independent
+// ways. It is `disabled`, which stops it firing at all. And its only source is
+// a `sourceToBuild` URL, which is not an event: there is no webhook, no Pub/Sub
+// subscription and no repository connection, so nothing exists that could fire
+// it. A build would need an explicit triggers.run, which formae never issues.
+//
+// The service account is the project's Compute Engine default — the same one
+// testdata/eventarc-trigger.pkl names, and for the same reason: it exists in
+// every project and the test identity can already act as it. A service account
+// is not optional here. A project without the legacy Cloud Build account, which
+// is every project created in the last couple of years, rejects a trigger that
+// names none with a bare HTTP 400 and no field named.
+forma {
+  v.stack
+  v.target
+
+  new buildTrigger.BuildTrigger {
+    label = "plugin-sdk-test-cloudbuild-build-trigger"
+    name = "formae-test-cb-trigger-\(v.testRunID)"
+    description = "Updated build trigger description"
+
+    // Disabled, so it cannot fire. See the header.
+    disabled = true
+
+    serviceAccount = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+
+    // A URL, not a connection. The event-driven source forms all need
+    // something outside the project — an authorized GitHub connection, a
+    // Secret Manager webhook token, a Cloud Source Repositories repo — and are
+    // therefore not declarable in a conformance test.
+    sourceToBuild = new buildTrigger.GitRepoSource {
+      uri = "https://github.com/GoogleCloudPlatform/cloud-build-samples"
+      ref = "refs/heads/main"
+      repoType = "GITHUB"
+    }
+
+    // The build is declared inline rather than read from a cloudbuild.yaml in
+    // the repo, so the fixture depends on nothing in that repository.
+    build = new buildTrigger.Build {
+      steps = new Listing {
+        new buildTrigger.BuildStep {
+          id = "print-version"
+          name = "gcr.io/cloud-builders/gcloud"
+          args = new Listing { "version" }
+        }
+      }
+      timeout = "900s"
+      options = new buildTrigger.BuildOptions {
+        // Required of any build that runs as a user-specified service account
+        // and names no logs bucket. Harmless on a trigger that never runs, and
+        // it is the configuration a real build would need.
+        logging = "CLOUD_LOGGING_ONLY"
+      }
+    }
+
+    tags = new Listing { "plugin-sdk-test" }
+
+    substitutions = new Mapping {
+      ["_ENVIRONMENT"] = "staging"
+    }
+  }
+}

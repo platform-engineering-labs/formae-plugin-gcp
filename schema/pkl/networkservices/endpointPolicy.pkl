@@ -1,0 +1,148 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services EndpointPolicy
+///
+/// Which configuration a mesh endpoint receives: match a set of workloads by
+/// their metadata labels, then hand them a TLS posture and an authorization
+/// policy. This is the type that ties a Cloud Service Mesh to the Network
+/// Security policies — the three policy references below all point at types
+/// this plugin already ships.
+///
+/// Nothing is provisioned. The policy is configuration handed to sidecars that
+/// already exist, so it is free to hold.
+///
+/// Global; create, update and delete are long-running operations.
+module gcp.networkservices.endpointPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::EndpointPolicy"
+
+/// What kind of endpoint the policy configures. Required.
+typealias EndpointPolicyType = "ENDPOINT_POLICY_TYPE_UNSPECIFIED"|"SIDECAR_PROXY"|"GRPC_SERVER"
+
+/// Whether an endpoint must carry all the labels below or merely one of them.
+typealias MetadataLabelMatchCriteria = "METADATA_LABEL_MATCH_CRITERIA_UNSPECIFIED"|"MATCH_ANY"|"MATCH_ALL"
+
+/// One label an endpoint must carry to match.
+@gcp.SubResourceHint
+open class MetadataLabel extends formae.SubResource {
+    @gcp.FieldHint
+    labelName: String
+
+    @gcp.FieldHint
+    labelValue: String
+}
+
+/// The label set an endpoint is matched on.
+@gcp.SubResourceHint
+open class MetadataLabelMatcher extends formae.SubResource {
+    @gcp.FieldHint
+    metadataLabelMatchCriteria: MetadataLabelMatchCriteria?
+
+    @gcp.FieldHint
+    metadataLabels: Listing<MetadataLabel>?
+}
+
+/// How endpoints are selected. The API requires `metadataLabelMatcher` to be
+/// present — a patch without it is refused with "MetadataLabelMatcher must be
+/// provided" — so it is not optional here.
+@gcp.SubResourceHint
+open class EndpointMatcher extends formae.SubResource {
+    @gcp.FieldHint
+    metadataLabelMatcher: MetadataLabelMatcher
+}
+
+/// Which of the matched endpoint's ports the policy applies to.
+@gcp.SubResourceHint
+open class TrafficPortSelector extends formae.SubResource {
+    /// Ports as strings, e.g. "8080" — the API models them as strings, not
+    /// integers, and echoes them back that way.
+    @gcp.FieldHint
+    ports: Listing<String>?
+}
+
+open class EndpointPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: EndpointPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class EndpointPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-endpoint-policy"). Immutable — it is the resource
+    /// path, and travels as ?endpointPolicyId= on create.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// What kind of endpoint this configures. Required, and genuinely mutable —
+    /// SIDECAR_PROXY was patched to GRPC_SERVER live and read back changed, so
+    /// it is deliberately not marked createOnly.
+    ///
+    /// It is also required on every PATCH, not just on create: this API
+    /// validates the resource from the request body alone, and a patch that
+    /// omits it is refused with "EndpointPolicy type must be one of
+    /// SIDECAR_PROXY or GRPC_SERVER, not ENDPOINT_POLICY_TYPE_UNSPECIFIED".
+    /// Being non-optional here is what guarantees it always rides along.
+    @gcp.FieldHint
+    type: EndpointPolicyType
+
+    /// Which endpoints the policy applies to. Required, and — like `type` —
+    /// required on every PATCH as well as on create.
+    @gcp.FieldHint
+    endpointMatcher: EndpointMatcher
+
+    /// Which of the matched endpoints' ports to apply the policy to.
+    @gcp.FieldHint
+    trafficPortSelector: TrafficPortSelector?
+
+    /// The `GCP::NetworkSecurity::AuthorizationPolicy` deciding who may talk to
+    /// these endpoints.
+    ///
+    /// Declared as a resolvable so a forma can pass the policy directly and
+    /// have formae order the creates. A resolvable yields the short name; this
+    /// API wants and reports the full path
+    /// `projects/{p}/locations/global/authorizationPolicies/{name}`, so the
+    /// plugin expands it on the way out and shortens it on the way back.
+    @gcp.FieldHint
+    authorizationPolicy: (String|formae.Resolvable)?
+
+    /// The `GCP::NetworkSecurity::ServerTlsPolicy` these endpoints serve TLS
+    /// with. Same short-name/full-path translation as above.
+    @gcp.FieldHint
+    serverTlsPolicy: (String|formae.Resolvable)?
+
+    /// The `GCP::NetworkSecurity::ClientTlsPolicy` these endpoints use when
+    /// they originate TLS. Same translation.
+    @gcp.FieldHint
+    clientTlsPolicy: (String|formae.Resolvable)?
+
+    /// An optional description. Absent rather than empty when never set, so no
+    /// provider default.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format. See mesh.pkl for the
+    /// label-clearing behaviour this API's PATCH has.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: EndpointPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

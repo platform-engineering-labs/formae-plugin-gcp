@@ -1,0 +1,166 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Dataform ReleaseConfig
+///
+/// A named compilation target for a repository: which Git commitish to compile,
+/// and what to override in the compilation settings while doing it.
+///
+/// Free as declared here. `cronSchedule` is the one field that would have the
+/// service compile on its own, and without it a release config compiles nothing
+/// — creating one produced no compilation results at all when probed live.
+/// Compilation is also where the money starts: a compilation result is what a
+/// workflow invocation executes as BigQuery jobs.
+///
+/// `gitCommitish` is required but is not validated against the remote. A
+/// repository with no Git remote at all accepts `gitCommitish = "main"`, which
+/// is what makes a release config declarable on an unconnected repository.
+///
+/// Nested under its repository, which is a path component rather than a body
+/// field: the API answers a create carrying it with HTTP 400 "Unknown name
+/// \"repository\" at 'release_config': Cannot find field". The plugin drops it
+/// from every request and lifts it back out of the path the API reports.
+///
+/// Declare the repository through its resolvable — that reference is also the
+/// teardown order, and a repository with release configs under it refuses to
+/// delete. Create, patch and delete are all synchronous.
+module gcp.dataform.releaseConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Dataform::ReleaseConfig"
+
+/// Compilation settings that override what `dataform.json` in the repository
+/// says, for the compilations this release config produces.
+///
+/// Immutable as a whole, and immutable by field mask rather than by value: a
+/// PATCH whose updateMask names `codeCompilationConfig` is refused with
+/// "immutable fields: [code_compilation_config]" even when nothing inside it
+/// changed. The plugin drops it from every update body, so a change here is a
+/// replacement.
+///
+/// Two of the API's own fields are absent on purpose. `pipelineConfig`
+/// describes non-Dataform pipeline types, and `defaultNotebookRuntimeOptions`
+/// points at a Colab Enterprise runtime template and a GCS output bucket —
+/// neither was probed, and a declared field the plugin has never round-tripped
+/// is a defect waiting for its first user.
+@gcp.SubResourceHint
+open class CodeCompilationConfig extends formae.SubResource {
+    /// The Google Cloud project compiled code writes to.
+    @gcp.FieldHint
+    defaultDatabase: String?
+
+    /// The default BigQuery dataset compiled code writes to.
+    @gcp.FieldHint
+    defaultSchema: String?
+
+    /// The BigQuery location to compile for, e.g. "europe-central2". The API
+    /// uses "US" when unset.
+    @gcp.FieldHint
+    defaultLocation: String?
+
+    /// The BigQuery dataset assertions are written to.
+    @gcp.FieldHint
+    assertionSchema: String?
+
+    /// Appended to every project name compiled code refers to.
+    @gcp.FieldHint
+    databaseSuffix: String?
+
+    /// Appended to every dataset name compiled code refers to.
+    @gcp.FieldHint
+    schemaSuffix: String?
+
+    /// Prepended to every table name compiled code produces.
+    @gcp.FieldHint
+    tablePrefix: String?
+
+    /// Prepended to the names Dataform gives its built-in assertions.
+    @gcp.FieldHint
+    builtinAssertionNamePrefix: String?
+
+    /// Variables made available to the project's code during compilation.
+    @gcp.FieldHint
+    vars: Mapping<String, String>?
+}
+
+open class ReleaseConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ReleaseConfigResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::Dataform::Repository"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty {
+            parentProperty = "repository"
+            listParameter = "repository"
+        }
+    }.toList()
+}
+open class ReleaseConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "production"). Immutable — it is sent as
+    /// ?releaseConfigId= at creation and is the path afterwards.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The repository this release config belongs to. A path component rather
+    /// than a body field: it is dropped from the request and recovered from the
+    /// returned path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    repository: (String|formae.Resolvable)
+
+    /// The Git commit, tag or branch to compile — e.g. "main", "v1.0",
+    /// "12ade345". Required, mutable, and not validated on write: the API
+    /// accepts a branch name on a repository that has no Git remote at all.
+    @gcp.FieldHint
+    gitCommitish: String
+
+    /// A cron schedule for compiling automatically, e.g. "0 6 * * *".
+    ///
+    /// Leave this out unless you mean it. A schedule has the service create
+    /// compilation results on its own, and a compilation result is what a
+    /// workflow invocation later executes as BigQuery jobs. Projects that
+    /// enforce strict actAs checks refuse it outright with "Automatic release is
+    /// not supported in first-party repositories that enabled
+    /// strictActAsChecks".
+    @gcp.FieldHint
+    cronSchedule: String?
+
+    /// The time zone `cronSchedule` is interpreted in, as a tz database name
+    /// e.g. "Europe/Berlin". Accepted without a `cronSchedule`. Mutable.
+    @gcp.FieldHint
+    timeZone: String?
+
+    /// Stops automatic creation of compilation results without removing the
+    /// schedule. Mutable, and absent from a read when it was never set.
+    @gcp.FieldHint
+    disabled: Boolean?
+
+    /// Compilation settings for this release config. Immutable — see
+    /// `CodeCompilationConfig`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    codeCompilationConfig: CodeCompilationConfig?
+
+    hidden res: ReleaseConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

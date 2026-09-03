@@ -1,0 +1,117 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Parameter Manager ParameterVersion
+///
+/// One revision of a parameter's contents. This is the resource that holds the
+/// actual data; the parent `Parameter` is only the container. Free to keep.
+///
+/// The payload is immutable — the API answers a PATCH carrying it with 400
+/// IMMUTABLE_FIELD — so a `data` change plans a replace, which adds a new
+/// version and removes the old one. `disabled` is the one field a patch can
+/// move.
+///
+/// A parameter that still has versions refuses to delete with HTTP 400
+/// FAILED_PRECONDITION and this API's delete takes no force flag, so the
+/// versions have to go first. Pass the parent through its resolvable
+/// (`parameter = p.res.name`) and formae gets that order right; interpolating
+/// its name into a string carries no edge and the teardown fails.
+///
+/// Global only, for the reason spelled out in parameter.pkl: a region is served
+/// by its own host and asking the plain host for one answers a 403 that reads
+/// like a missing IAM grant.
+module gcp.parametermanager.parameterVersion
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ParameterManager::ParameterVersion"
+
+open class ParameterVersionResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ParameterVersionResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::ParameterManager::Parameter"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty {
+            parentProperty = "parameter"
+            listParameter = "parameter"
+        }
+    }.toList()
+}
+open class ParameterVersion extends formae.Resource {
+    hidden parent = this
+
+    /// Short version id (e.g. "v1"). Immutable — a PATCH that names it is
+    /// refused with 400 IMMUTABLE_FIELD.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The parameter this version belongs to, by short id. A path component
+    /// rather than a body field: the API rejects it as an unknown field, so it
+    /// is dropped from the request and lifted back out of the returned path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    parameter: (String|formae.Resolvable)
+
+    /// The version's contents, as a UTF-8 string. The plugin base64 encodes it
+    /// into the API's `payload.data`, so a forma never hand-writes base64 —
+    /// the same contract as `GCP::SecretManager::SecretVersion`'s `data`.
+    ///
+    /// Write-only, and here that is a security control rather than a
+    /// convenience. This payload is user data and may be a secret; unlike
+    /// Secret Manager, whose API withholds secret material, Parameter Manager
+    /// hands it back — a GET defaults to `view=FULL` and answers with
+    /// `payload.data`, and so does the create response. The plugin strips the
+    /// payload from every response so it cannot reach stored state, and never
+    /// calls `versions:render` (which would additionally resolve any Secret
+    /// Manager references inside it) from any read path. Wrap the value
+    /// (`formae.value(...).opaque`) to keep it out of plans as well.
+    ///
+    /// Optional in the type but required on create: the API refuses an empty
+    /// payload with 400 PAYLOAD_EMPTY, while a *discovered* version can never
+    /// carry one, and a required field discovery cannot fill would keep the
+    /// resource out of inventory entirely.
+    ///
+    /// If the parent parameter's `format` is YAML or JSON the API validates the
+    /// payload against it and rejects a version that does not parse.
+    @gcp.FieldHint {
+        createOnly = true
+        writeOnly = true
+        requiredOnCreate = true
+    }
+    data: (String|formae.Value|formae.SecretValue)?
+
+    /// Turn the version into metadata only: a disabled version keeps its
+    /// contents but no longer serves them. The only mutable field on the type.
+    ///
+    /// Two things about it, both established against the live API. It carries a
+    /// provider default because the API omits it entirely when false rather
+    /// than reporting `false`. And it is ignored on create — a create sending
+    /// `disabled = true` answers 200 and the version is nonetheless enabled —
+    /// so it only takes effect through a patch. Declare it true on a create and
+    /// the first reconcile will read the version as enabled and issue the patch
+    /// that fixes it.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    disabled: Boolean?
+
+    hidden res: ParameterVersionResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

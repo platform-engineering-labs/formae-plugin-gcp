@@ -1,0 +1,33 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the description, the interception port and the Envoy header setting.
+// All three were patched live and read back changed, so none is create-only.
+//
+// The labels are restated rather than dropped on purpose: this API clears a
+// resource's labels on any PATCH whose update mask does not name them, so a
+// fixture that omitted them here would be asserting a label change it did not
+// mean to make.
+forma {
+  v.stack
+  v.target
+
+  new mesh.Mesh {
+    label = "plugin-sdk-test-ns-mesh"
+    name = "formae-test-ns-mesh-\(v.testRunID)"
+    interceptionPort = 15002
+    envoyHeaders = "NONE"
+    description = "Updated test mesh description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

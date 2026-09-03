@@ -283,6 +283,15 @@ func (b *BaseResource) performUpdate(
 	})
 	if err != nil {
 		transportErr := transport.WrapError(err, "failed to update resource")
+		// A transient update failure is reported as NotStabilized so formae core
+		// retries, the same treatment the delete path already gives one. Firestore
+		// answers a patch issued while a create is still settling with 409 ABORTED
+		// "There are concurrent database changes, please try again." - which is a
+		// request to retry, not a rejection of the request.
+		if b.OperationConfig.RetryableError != nil && b.OperationConfig.RetryableError(err) {
+			return b.updateFailureResult(request.NativeID,
+				resource.OperationErrorCodeNotStabilized, transportErr.Message), nil
+		}
 		return b.updateFailureResult(request.NativeID,
 			transport.ToResourceErrorCode(transportErr.Code),
 			transportErr.Message), nil
@@ -397,6 +406,15 @@ func (b *BaseResource) updateWithOptimisticLocking(
 	})
 	if err != nil {
 		transportErr := transport.WrapError(err, "failed to update resource")
+		// A transient update failure is reported as NotStabilized so formae core
+		// retries, the same treatment the delete path already gives one. Firestore
+		// answers a patch issued while a create is still settling with 409 ABORTED
+		// "There are concurrent database changes, please try again." - which is a
+		// request to retry, not a rejection of the request.
+		if b.OperationConfig.RetryableError != nil && b.OperationConfig.RetryableError(err) {
+			return b.updateFailureResult(request.NativeID,
+				resource.OperationErrorCodeNotStabilized, transportErr.Message), nil
+		}
 		return b.updateFailureResult(request.NativeID,
 			transport.ToResourceErrorCode(transportErr.Code),
 			transportErr.Message), nil

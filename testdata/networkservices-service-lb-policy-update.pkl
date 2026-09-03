@@ -1,0 +1,45 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/serviceLbPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the algorithm, the failover threshold and the isolation mode - every
+// one of them patchable, verified live.
+//
+// autoCapacityDrain deliberately stays enabled rather than being flipped off.
+// Setting `enable = false` would read back as an empty object: this API drops
+// false booleans from its JSON, so the declared `false` and the absent field
+// would disagree on every sync from then on. See serviceLbPolicy.pkl.
+//
+// The labels are restated rather than dropped on purpose: this API clears a
+// resource's labels on any PATCH whose update mask does not name them.
+forma {
+  v.stack
+  v.target
+
+  new serviceLbPolicy.ServiceLbPolicy {
+    label = "plugin-sdk-test-ns-service-lb-policy"
+    name = "formae-test-ns-slb-\(v.testRunID)"
+    loadBalancingAlgorithm = "WATERFALL_BY_REGION"
+    autoCapacityDrain = new serviceLbPolicy.AutoCapacityDrain {
+      enable = true
+    }
+    failoverConfig = new serviceLbPolicy.FailoverConfig {
+      failoverHealthThreshold = 50
+    }
+    isolationConfig = new serviceLbPolicy.IsolationConfig {
+      isolationGranularity = "REGION"
+      isolationMode = "STRICT"
+    }
+    description = "Updated test service LB policy description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

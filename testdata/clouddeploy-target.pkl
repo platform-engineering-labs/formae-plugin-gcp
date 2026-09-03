@@ -1,0 +1,55 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/clouddeploy/customTargetType.pkl" as customTargetType
+import "@gcp/clouddeploy/target.pkl" as target
+import "./config/vars.pkl" as v
+
+// A target is a description of a deploy destination, not the destination: it
+// provisions nothing, and Cloud Deploy does not even check that the runtime it
+// names exists. Both resources here are configuration and free to hold.
+//
+// The custom target type is referenced through its resolvable, which is what
+// orders the creates - and it is also the reference worth exercising live. The
+// resolvable yields the type's short name; the API documents this field as a
+// full path, so the plugin expands it on the way out and shortens it again on
+// the way back, and this case is what pins that round trip against the real
+// API.
+local ctt = new customTargetType.CustomTargetType {
+  label = "plugin-sdk-test-cd-tgt-custom-target-type"
+  name = "formae-test-cd-tgt-ctt-\(v.testRunID)"
+  description = "Custom target type the target under test points at"
+  customActions = new customTargetType.CustomTargetSkaffoldActions {
+    deployAction = "deploy-formae-test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  ctt
+
+  new target.Target {
+    label = "plugin-sdk-test-clouddeploy-target"
+    name = "formae-test-cd-tgt-\(v.testRunID)"
+    description = "Test target for plugin SDK conformance tests"
+    customTarget = new target.CustomTarget {
+      customTargetType = ctt.res.name
+    }
+    deployParameters = new Mapping {
+      ["formae-test-parameter"] = "initial"
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+    annotations = new Mapping {
+      ["formae-test"] = "target"
+    }
+  }
+}

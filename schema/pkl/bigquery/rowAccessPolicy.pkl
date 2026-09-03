@@ -1,0 +1,122 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP BigQuery Row Access Policy
+///
+/// Row-level access control on one table: a SQL boolean expression that decides
+/// which rows a principal may see. It is what lets a single shared table serve
+/// each tenant only its own rows, instead of a view per tenant.
+///
+/// A policy stores nothing and costs nothing to hold - BigQuery bills bytes
+/// stored and bytes scanned, and a policy is metadata on the table.
+///
+/// Three things about this API shape the type, and each of them is unusual:
+///
+///  1. The identity is a composite. BigQuery has no `name` here: a policy is
+///     addressed by `rowAccessPolicyReference{projectId,datasetId,tableId,policyId}`,
+///     which every request body must carry and which must agree with the URL
+///     segment by segment. The four flat properties below are assembled into
+///     that object on the way out and flattened back on the way in, so a forma
+///     declares the same shape as the sibling BigQuery types.
+///  2. Update is a PUT, a full replacement, not a PATCH, and it takes no
+///     update mask.
+///  3. `grantees` cannot be declared - see the note below.
+///
+/// The policy is created on a table, so declare the table (and the dataset above
+/// it) and pass them through their resolvables, which is what orders the creates.
+module gcp.bigquery.rowAccessPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BigQuery::RowAccessPolicy"
+
+open class RowAccessPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RowAccessPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RowAccessPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// The policy id, which BigQuery calls `policyId`. Letters, digits and
+    /// underscores only, up to 256 characters - no hyphens, unlike most GCP
+    /// names. Immutable, and a path component rather than a body field.
+    ///
+    /// Named `name` rather than `policyId` because that is the property the
+    /// resource framework builds a URL from; the four sibling BigQuery types
+    /// each identify by their own `*Id` because they predate that framework and
+    /// route by hand.
+    @gcp.FieldHint { createOnly = true }
+    name: String
+
+    /// Id of the dataset holding the table. A path component, not a body field -
+    /// pass `dataset.res.datasetId` so formae creates the dataset first.
+    @gcp.FieldHint { createOnly = true }
+    datasetId: (String|formae.Resolvable)
+
+    /// Id of the table the policy applies to. A path component, not a body
+    /// field - pass `table.res.tableId` so formae creates the table first.
+    @gcp.FieldHint { createOnly = true }
+    tableId: (String|formae.Resolvable)
+
+    /// GCP project holding the dataset. Must be the target's project: the URL is
+    /// built from the target and the API rejects a body that names a different
+    /// one with "Project ID in URL path and content do not match."
+    @gcp.FieldHint { createOnly = true }
+    project: String
+
+    /// A SQL boolean expression naming the rows this policy admits, in the form
+    /// a WHERE clause takes: `region = "EU"`, `v > 0`,
+    /// `date_field = CAST('2019-9-27' as DATE)`. It may reference only this
+    /// table's own columns - other tables, routines and temporary functions are
+    /// rejected, and a column the table does not have is rejected as
+    /// "Unrecognized name".
+    ///
+    /// The only mutable field on the type, and BigQuery stores it verbatim: a
+    /// predicate sent with a double space comes back with the double space. What
+    /// looks like rewriting in a request log - `v \u003e 0` where `v > 0`
+    /// was declared - is JSON escaping of the comparison operators, applied by
+    /// both ends, and it decodes back to exactly what was declared.
+    @gcp.FieldHint
+    filterPredicate: String
+
+    // `grantees` is deliberately absent, and its absence makes this type less
+    // expressive than the API.
+    //
+    // BigQuery's discovery document marks it "Optional. Input only", and that is
+    // exactly what it is: a policy created with
+    // grantees = ["serviceAccount:..."] returns 200 and neither `get` nor `list`
+    // ever reports the field again - verified against the live API, on both
+    // methods. A field the API accepts and never returns cannot be declared: it
+    // would read as drift on every single sync.
+    //
+    // There is a read path, but not one this type can use. The grantees become
+    // members of a roles/bigquery.filteredDataViewer binding on the policy's own
+    // IAM policy, readable only through a separate
+    // rowAccessPolicies.getIamPolicy POST - a different method with a different
+    // response type, not part of reading the resource.
+    //
+    // One consequence is worth knowing before granting access out of band: the
+    // update is a PUT, and a PUT that carries no grantees clears that binding.
+    // Measured live - a policy whose IAM policy held one filteredDataViewer
+    // member had an empty IAM policy immediately after an update that changed
+    // only the predicate. So a policy managed by formae grants row access to
+    // nobody until someone binds roles/bigquery.filteredDataViewer on it, and
+    // the next update to the predicate unbinds them again.
+
+    hidden res: RowAccessPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

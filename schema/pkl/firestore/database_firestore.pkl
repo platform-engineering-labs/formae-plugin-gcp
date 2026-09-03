@@ -1,0 +1,168 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Firestore Database
+///
+/// A Firestore database: the container documents, indexes and fields live in.
+/// A project may hold many, each addressed by its own id, so this is a normal
+/// creatable resource rather than the per-project singleton Firestore started
+/// out as.
+///
+/// An empty database provisions nothing and reserves no capacity — Firestore
+/// bills for stored bytes and for read/write/delete operations, of which a
+/// database with no documents has none. That is what makes it declarable in a
+/// test suite.
+///
+/// Create, update and delete all answer with a long-running operation, and all
+/// three are already finished when they answer: the create's operation carries
+/// `done: true` and the new database in one response, measured at about a
+/// second. The type is registered synchronous for a harder reason than speed —
+/// see FirestoreSyncOperations in the provisioner: the operation a PATCH names
+/// cannot be fetched at all ("Operation does not exist"), and the one a DELETE
+/// names never reports done.
+module gcp.firestore.database
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Firestore::Database"
+
+/// FIRESTORE_NATIVE is the document database; DATASTORE_MODE serves the same
+/// storage through the older Cloud Datastore API.
+typealias DatabaseType = "FIRESTORE_NATIVE"|"DATASTORE_MODE"
+
+/// PESSIMISTIC takes read locks and is the default the server picks for a
+/// Standard-edition Native database; OPTIMISTIC retries on conflict.
+/// OPTIMISTIC_WITH_ENTITY_GROUPS exists only for Datastore-mode databases.
+typealias ConcurrencyMode = "OPTIMISTIC"|"PESSIMISTIC"|"OPTIMISTIC_WITH_ENTITY_GROUPS"
+
+typealias AppEngineIntegrationMode = "ENABLED"|"DISABLED"
+
+typealias PointInTimeRecoveryEnablement =
+  "POINT_IN_TIME_RECOVERY_ENABLED"|"POINT_IN_TIME_RECOVERY_DISABLED"
+
+typealias DeleteProtectionState =
+  "DELETE_PROTECTION_ENABLED"|"DELETE_PROTECTION_DISABLED"
+
+/// STANDARD is Firestore; ENTERPRISE is the MongoDB-compatible edition, which
+/// is a different product with its own pricing.
+typealias DatabaseEdition = "STANDARD"|"ENTERPRISE"
+
+open class DatabaseResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DatabaseResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Database extends formae.Resource {
+    hidden parent = this
+
+    /// Short id, 4-63 characters of lowercase letters, digits and hyphens,
+    /// starting with a letter (e.g. "my-database"). Sent as the `databaseId`
+    /// query parameter on create, never in the body, and reported back as the
+    /// full `projects/{p}/databases/{id}` path, which the provisioner shortens
+    /// again.
+    ///
+    /// Immutable, and a deleted id is not immediately free: for about five
+    /// minutes after a delete the API refuses to reuse it with "Database ID
+    /// '...' is not available in project '...'. Please retry in 285 seconds."
+    /// So a replacement that keeps the same id fails; give the new database a
+    /// new id.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Where the database lives. Firestore's location list is its own — it
+    /// includes multi-regions ("eur3", "nam5", "nam7") alongside ordinary
+    /// regions, and it is not the plugin's Region set, which is why this is a
+    /// plain String. `GET projects/{p}/locations` on the Firestore endpoint is
+    /// the authoritative list.
+    ///
+    /// Immutable: a PATCH answers "Changing database location is not
+    /// supported".
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    locationId: String
+
+    /// FIRESTORE_NATIVE or DATASTORE_MODE. Required on create.
+    ///
+    /// Mutable, but only on its own: a PATCH that changes `type` while masking
+    /// any other field is refused with "Updating database type and other
+    /// fields together is not supported". A reconcile masks every declared
+    /// field, so changing `type` in a forma alongside nothing else still masks
+    /// `concurrencyMode` and friends and will be rejected — change it with a
+    /// patch that touches only this field. It is deliberately not marked
+    /// createOnly: that would make formae replace the database instead, which
+    /// means destroying it and then failing to recreate it under the same id
+    /// (see `name`).
+    @gcp.FieldHint
+    type: DatabaseType
+
+    /// Concurrency control for transactions. The server picks one when this is
+    /// omitted — PESSIMISTIC for a Standard-edition Native database — so it
+    /// carries a provider default. Mutable.
+    ///
+    /// Changing `type` resets this: a database switched to FIRESTORE_NATIVE
+    /// came back PESSIMISTIC without being asked.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    concurrencyMode: ConcurrencyMode?
+
+    /// Whether the App Engine application in the same project shares this
+    /// database's lifecycle. The server reports DISABLED for a database created
+    /// without it, hence the provider default.
+    ///
+    /// ENABLED is only meaningful where an App Engine application exists; in a
+    /// project without one the API answers "Setting app_engine_integration_mode
+    /// as ENABLED is not supported".
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    appEngineIntegrationMode: AppEngineIntegrationMode?
+
+    /// Point-in-time recovery. **Billable** — PITR keeps seven days of prior
+    /// versions and is charged for that retained data, so leave it unset unless
+    /// you want to pay for it. The server reports
+    /// POINT_IN_TIME_RECOVERY_DISABLED for a database created without it.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    pointInTimeRecoveryEnablement: PointInTimeRecoveryEnablement?
+
+    /// Whether the API refuses to delete this database. The server reports
+    /// DELETE_PROTECTION_DISABLED for a database created without it — verified
+    /// live, and worth knowing, because with it enabled a delete is refused
+    /// outright ("Cannot delete the database because delete protection state is
+    /// set to DELETE_PROTECTION_ENABLED") and formae cannot destroy the stack
+    /// without a patch turning it off first. Mutable.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    deleteProtectionState: DeleteProtectionState?
+
+    /// STANDARD or ENTERPRISE. Immutable — a PATCH answers "Changing the
+    /// edition of a database is not supported" — and defaulted to STANDARD by
+    /// the server.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    databaseEdition: DatabaseEdition?
+
+    hidden res: DatabaseResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

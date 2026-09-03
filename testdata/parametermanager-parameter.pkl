@@ -1,0 +1,34 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/parametermanager/parameter.pkl"
+import "./config/vars.pkl" as v
+
+// A parameter is a named container; it stores nothing until a version is added
+// under it, and both are free to hold. No CMEK, so no KMS key version has to
+// exist - a key version bills every month.
+//
+// Global, whatever region the target names. Parameter Manager serves each
+// region from its own host and locations/global only from the plain host;
+// asking the plain host for a region answers a 403 that reads like a missing
+// IAM grant. The plugin always addresses locations/global.
+//
+// No labels here on purpose. Every call in this API is synchronous, so the
+// create response is what lands in state - and a create's labels are absent
+// from that response and present only in the next GET. The -update companion is
+// what adds them, because an update does read the resource back.
+forma {
+  v.stack
+  v.target
+
+  new parameter.Parameter {
+    label = "plugin-sdk-test-pm-parameter"
+    name = "formae-test-pm-param-\(v.testRunID)"
+    format = "JSON"
+  }
+}

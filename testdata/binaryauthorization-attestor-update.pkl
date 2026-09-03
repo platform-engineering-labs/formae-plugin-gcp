@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/binaryauthorization/attestor.pkl"
+import "./config/vars.pkl" as v
+
+// Updates description and adds a second public key - the two mutable halves of
+// an attestor. noteReference is left alone on purpose: the API answers a
+// changed note with HTTP 400 "note reference may not be updated", so it is
+// declared createOnly and a change there is a replacement, not an update.
+forma {
+  v.stack
+  v.target
+
+  new attestor.Attestor {
+    label = "plugin-sdk-test-ba-attestor"
+    name = "formae-test-ba-att-\(v.testRunID)"
+    description = "Updated test attestor description"
+    userOwnedGrafeasNote = new attestor.UserOwnedGrafeasNote {
+      noteReference = "projects/\(v.gcpProject)/notes/formae-test-ba-att-\(v.testRunID)"
+      publicKeys = new Listing {
+        new attestor.AttestorPublicKey {
+          id = "formae-test-key-1"
+          comment = "Conformance test key"
+          pkixPublicKey = new attestor.AttestorPkixPublicKey {
+            publicKeyPem = """
+              -----BEGIN PUBLIC KEY-----
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwRG2MNw3cvlHTsxxnD1OFAszpfJh
+              jX4M+a6clRmtNY4f2NZTIYEAWqcgxkGdE1he1+x4W3o11l2XZ6GYOFUdQQ==
+              -----END PUBLIC KEY-----
+              """
+            signatureAlgorithm = "ECDSA_P256_SHA256"
+          }
+        }
+        new attestor.AttestorPublicKey {
+          id = "formae-test-key-2"
+          comment = "Second conformance test key"
+          pkixPublicKey = new attestor.AttestorPkixPublicKey {
+            publicKeyPem = """
+              -----BEGIN PUBLIC KEY-----
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMsK0Z8LLSNZWAG0rsZxRfNcbBpoY
+              OTT1/RyGrnCNlA5J7NSOpD9+MsNtd4O6mwH+wNXag558InFrl6QdGQnbbA==
+              -----END PUBLIC KEY-----
+              """
+            signatureAlgorithm = "ECDSA_P256_SHA256"
+          }
+        }
+      }
+    }
+  }
+}

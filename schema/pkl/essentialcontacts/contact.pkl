@@ -39,7 +39,14 @@ open class Contact extends formae.Resource {
 
     /// The email address to send notifications to. Does not need to be a Google
     /// Account.
-    @gcp.FieldHint
+    ///
+    /// Immutable. `contacts.patch` accepts an updateMask of
+    /// `notificationCategorySubscriptions` and `languageTag` and refuses one
+    /// naming `email` - "Request contains an invalid argument" - so a new
+    /// address is a new contact, not an edit.
+    @gcp.FieldHint {
+        createOnly = true
+    }
     email: String
 
     /// The categories of notifications the contact receives, e.g. ["ALL"].

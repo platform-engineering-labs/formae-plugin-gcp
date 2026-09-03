@@ -1,0 +1,161 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Deploy DeliveryPipeline
+///
+/// The promotion flow: an ordered list of stages, each naming a `Target`, that
+/// a release walks from the first to the last. The pipeline itself is
+/// configuration — it holds no compute, and a pipeline with no release has
+/// nothing to promote — so it is free to declare.
+///
+/// A stage names its target by **short id**, not by path. The full path is not
+/// merely unnecessary, it is rejected: the API answers a create carrying one
+/// with a *done* operation whose error reads `"projects/.../targets/x" is not a
+/// valid resource ID for resource type "stage.targetId"`, and the pipeline is
+/// never created. A Target resolvable yields that short id, so `targetId` takes
+/// one directly and needs no translation in either direction.
+///
+/// A target named by a stage need not exist; Cloud Deploy reports the ones that
+/// do not in an output-only `condition` block, which this schema does not
+/// declare.
+///
+/// Deleting a pipeline that has nested resources — releases, rollouts or an
+/// automation — is refused with "has nested resources. If the API supports
+/// cascading delete, set 'force' to true". The plugin does not send `force`:
+/// the nested resources include the deploy history, which a reconcile has no
+/// business destroying silently. Declare an `Automation` with its
+/// `deliveryPipeline` pointing here and formae destroys the automation first.
+///
+/// Regional. Create, update and delete are long-running operations.
+module gcp.clouddeploy.deliveryPipeline
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudDeploy::DeliveryPipeline"
+
+/// Deploy parameters applied to a stage's target.
+@gcp.SubResourceHint
+open class StageDeployParameters extends formae.SubResource {
+    /// The parameters themselves, substituted into the rendered manifests.
+    @gcp.FieldHint
+    values: Mapping<String, String>
+
+    /// Restrict these parameters to targets carrying these labels. Applied to
+    /// every target in the stage when absent.
+    @gcp.FieldHint
+    matchTargetLabels: Mapping<String, String>?
+}
+
+/// A single deploy, optionally verified afterwards.
+///
+/// The `predeploy` and `postdeploy` hook blocks are not declared: they name
+/// Skaffold custom actions that only a rollout executes, and they were not
+/// exercised against the live API.
+@gcp.SubResourceHint
+open class StandardStrategy extends formae.SubResource {
+    /// Run the Skaffold `verify` step after the deploy.
+    ///
+    /// Set it to `true` or leave it out — `false` is the protobuf default and
+    /// the API drops it from the response, so a forma declaring `false` would
+    /// read as a field that never arrives.
+    @gcp.FieldHint
+    verify: Boolean?
+}
+
+/// How a rollout to a stage proceeds.
+///
+/// Only the standard strategy is declared. `canary` is a progressive
+/// traffic-splitting deploy whose configuration is meaningful only against a
+/// live runtime, and it was not exercised.
+@gcp.SubResourceHint
+open class Strategy extends formae.SubResource {
+    @gcp.FieldHint
+    standard: StandardStrategy?
+}
+
+/// One step of the promotion flow.
+@gcp.SubResourceHint
+open class Stage extends formae.SubResource {
+    /// The target this stage deploys to, by **short** id — a Target resolvable
+    /// yields exactly that. A full resource path is rejected outright; see the
+    /// module comment.
+    @gcp.FieldHint
+    targetId: (String|formae.Resolvable)?
+
+    /// Skaffold profiles to use when rendering for this stage.
+    @gcp.FieldHint
+    profiles: Listing<String>?
+
+    /// How a rollout to this stage proceeds.
+    @gcp.FieldHint
+    strategy: Strategy?
+
+    /// Deploy parameters for this stage's target.
+    @gcp.FieldHint
+    deployParameters: Listing<StageDeployParameters>?
+}
+
+/// The stages, in promotion order.
+@gcp.SubResourceHint
+open class SerialPipeline extends formae.SubResource {
+    /// Ordering is the promotion flow: a release starts at the first stage and
+    /// is promoted along the list.
+    @gcp.FieldHint
+    stages: Listing<Stage>?
+}
+
+open class DeliveryPipelineResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DeliveryPipelineResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class DeliveryPipeline extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-app"). Immutable — it is the path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The stages a release is promoted through.
+    @gcp.FieldHint
+    serialPipeline: SerialPipeline?
+
+    /// Stop accepting new releases and rollouts. In-progress ones finish.
+    ///
+    /// Set it to `true` or leave it out — `false` is the protobuf default and
+    /// the API drops it from the response, so a forma declaring `false` would
+    /// read as a field that never arrives.
+    @gcp.FieldHint
+    suspended: Boolean?
+
+    /// An optional description. Max 255 characters.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Optional user annotations. Unlike labels these are never read by Cloud
+    /// Deploy itself.
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    hidden res: DeliveryPipelineResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

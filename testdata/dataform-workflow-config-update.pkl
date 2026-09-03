@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl" as repository
+import "@gcp/dataform/releaseConfig.pkl"
+import "@gcp/dataform/workflowConfig.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the time zone, which is mutable. invocationConfig is unchanged and is
+// dropped from the update body by the plugin: the API refuses a field mask
+// naming it with "immutable fields: [invocation_config]" even when the object
+// has not changed, and nothing in its discovery document says the field is
+// immutable at all.
+//
+// Still no cronSchedule and still disabled, so still nothing is invoked and
+// nothing bills.
+local repo = new repository.Repository {
+  label = "plugin-sdk-test-df-wc-repository"
+  name = "formae-test-df-wcr-\(v.testRunID)"
+  displayName = "Repository owning the workflow config under test"
+}
+
+local release = new releaseConfig.ReleaseConfig {
+  label = "plugin-sdk-test-df-wc-release-config"
+  name = "formae-test-df-wcrc-\(v.testRunID)"
+  repository = repo.res.name
+  gitCommitish = "main"
+  disabled = true
+}
+
+forma {
+  v.stack
+  v.target
+
+  repo
+  release
+
+  new workflowConfig.WorkflowConfig {
+    label = "plugin-sdk-test-df-workflow-config"
+    name = "formae-test-df-wc-\(v.testRunID)"
+    repository = repo.res.name
+    releaseConfig = release.res.name
+    timeZone = "UTC"
+    disabled = true
+    invocationConfig = new {
+      serviceAccount = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+      includedTags = new Listing { "nightly" }
+      transitiveDependenciesIncluded = true
+      queryPriority = "BATCH"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/binaryauthorization/platformPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// A platform policy is a document of image checks a GKE cluster opts into by
+// name. Free to hold, and inert: nothing evaluates these checks unless a
+// cluster is configured to use this policy, and there is no cluster here. It is
+// not the project-wide projects/{p}/policy - that one is a singleton with no
+// create and no delete, and it is not modelled by this plugin.
+//
+// The checks chosen here are the two that need nothing outside the policy: an
+// upload-age limit and a trusted-directory pattern. The vulnerability, SLSA,
+// Sigstore and SimpleSigning checks would each name Container Analysis projects
+// or key material without making the policy any more mutable, so they are
+// exercised in the type's unit test rather than against the live API on every
+// run.
+forma {
+  v.stack
+  v.target
+
+  new platformPolicy.PlatformPolicy {
+    label = "plugin-sdk-test-ba-platform-policy"
+    name = "formae-test-ba-pp-\(v.testRunID)"
+    description = "Test platform policy for plugin SDK conformance tests"
+    gkePolicy = new platformPolicy.GkePolicy {
+      imageAllowlist = new platformPolicy.ImageAllowlist {
+        allowPattern = new Listing {
+          "gcr.io/formae-test/**"
+        }
+      }
+      checkSets = new Listing {
+        // A single, unscoped check set. The API enforces that the last set in
+        // the list has no scope, so a lone set must be the catch-all.
+        new platformPolicy.CheckSet {
+          displayName = "formae-test-default"
+          checks = new Listing {
+            new platformPolicy.Check {
+              displayName = "formae-test-freshness"
+              imageFreshnessCheck = new platformPolicy.ImageFreshnessCheck {
+                maxUploadAgeDays = 30
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

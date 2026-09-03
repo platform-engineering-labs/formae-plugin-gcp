@@ -1,0 +1,174 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Deploy Target
+///
+/// Where a deploy lands. Give exactly one destination: `run` for a Cloud Run
+/// location, `gke` for a GKE cluster, `multiTarget` to fan out across several
+/// targets, or `customTarget` to hand the work to a `CustomTargetType`.
+///
+/// A target is a *description* of a destination, never the destination itself —
+/// it provisions nothing, and the API does not check that the runtime it names
+/// exists (a target pointing at a GKE cluster that does not exist was created
+/// and read back unchanged against the live API). A missing runtime surfaces
+/// later, as a condition on the pipeline that references the target.
+///
+/// Two fields the API reports are deliberately absent from this schema:
+///
+///  - `executionConfigs`. Cloud Deploy fills it in on every target whether or
+///    not it was sent, and rewrites what *was* sent: an execution config
+///    carrying only `usages` and `serviceAccount` comes back with
+///    `artifactStorage`, `executionTimeout` and a `defaultPool` mirror of the
+///    same service account. Those additions are nested, so no `hasProviderDefault`
+///    can reach them, and stripping them would then erase a value the forma had
+///    declared. Declaring the field cannot be made to round-trip either way, so
+///    it is left out and the project defaults apply. Its `privatePool.workerPool`
+///    would also name a billable Cloud Build worker pool.
+///  - `associatedEntities`, which was not exercised against the live API.
+///
+/// Regional. Create, update and delete are long-running operations.
+module gcp.clouddeploy.target
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudDeploy::Target"
+
+/// A Cloud Run destination.
+@gcp.SubResourceHint
+open class CloudRunLocation extends formae.SubResource {
+    /// The Cloud Run location, as a full path:
+    /// "projects/{project}/locations/{location}". Reported back exactly as
+    /// sent, project id included — Cloud Deploy does not rewrite it to the
+    /// project number the way Certificate Manager does — so this round-trips
+    /// as written.
+    @gcp.FieldHint
+    location: String
+}
+
+/// A GKE destination.
+@gcp.SubResourceHint
+open class GkeCluster extends formae.SubResource {
+    /// The cluster, as a full path:
+    /// "projects/{project}/locations/{location}/clusters/{cluster}".
+    ///
+    /// A plain String rather than a resolvable: a `GCP::Container::Cluster`
+    /// resolvable yields the cluster's short name, and this field is echoed
+    /// verbatim rather than resolved, so a short name would be stored happily
+    /// and point at nothing. The plugin does not expand it, because expanding
+    /// it correctly needs the cluster's own location — which may be a zone —
+    /// and that could not be verified live without creating a cluster, which
+    /// bills.
+    @gcp.FieldHint
+    cluster: String?
+
+    /// Reach the control plane on its private IP. Mutually exclusive with
+    /// `dnsEndpoint`.
+    @gcp.FieldHint
+    internalIp: Boolean?
+
+    /// Reach the control plane through its DNS endpoint.
+    @gcp.FieldHint
+    dnsEndpoint: Boolean?
+
+    /// A proxy to reach the Kubernetes API through.
+    @gcp.FieldHint
+    proxyUrl: String?
+}
+
+/// Several targets deployed to at once.
+@gcp.SubResourceHint
+open class MultiTarget extends formae.SubResource {
+    /// The targets to fan out to, by *short* id — which is exactly what a
+    /// Target resolvable yields, so these round-trip untranslated.
+    @gcp.FieldHint
+    targetIds: Listing<String|formae.Resolvable>
+}
+
+/// A destination handled by a CustomTargetType.
+@gcp.SubResourceHint
+open class CustomTarget extends formae.SubResource {
+    /// The custom target type. Declared as its short name — or a
+    /// CustomTargetType resolvable, which yields that — and expanded by the
+    /// plugin to the full path
+    /// "projects/{project}/locations/{location}/customTargetTypes/{id}" the API
+    /// documents, then shortened again on read so the two forms agree.
+    ///
+    /// Declaring a full path here instead works on the wire but will be stored
+    /// short, so use the short form.
+    @gcp.FieldHint
+    customTargetType: String|formae.Resolvable
+}
+
+open class TargetResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: TargetResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Target extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "prod"). Immutable — it is the path. This is also the
+    /// value a `DeliveryPipeline` stage names the target by.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// A Cloud Run destination.
+    @gcp.FieldHint
+    run: CloudRunLocation?
+
+    /// A GKE destination.
+    @gcp.FieldHint
+    gke: GkeCluster?
+
+    /// Several targets at once.
+    @gcp.FieldHint
+    multiTarget: MultiTarget?
+
+    /// A destination a CustomTargetType knows how to deploy to.
+    @gcp.FieldHint
+    customTarget: CustomTarget?
+
+    /// Whether a rollout to this target waits for an explicit approval.
+    ///
+    /// Set it to `true` or leave it out. `false` is the protobuf default, so
+    /// the API drops it from the response entirely, and a forma declaring
+    /// `false` would read as a field that never arrives.
+    @gcp.FieldHint
+    requireApproval: Boolean?
+
+    /// Deploy parameters substituted into the manifests rendered for this
+    /// target.
+    @gcp.FieldHint
+    deployParameters: Mapping<String, String>?
+
+    /// An optional description. Max 255 characters.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Optional user annotations. Unlike labels these are never read by Cloud
+    /// Deploy itself.
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    hidden res: TargetResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,88 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/clouddeploy/target.pkl" as target
+import "@gcp/clouddeploy/deliveryPipeline.pkl" as deliveryPipeline
+import "@gcp/clouddeploy/automation.pkl" as automation
+import "./config/vars.pkl" as v
+
+// An automation promotes releases without a human. With no release on the
+// pipeline it has nothing to act on and does nothing at all, which is what
+// makes all three resources here free to hold - none of them holds compute, and
+// this case never creates a release or a rollout.
+//
+// The pipeline is referenced through its resolvable, which both orders the
+// creates and gets the destroy order right: Cloud Deploy refuses to delete a
+// pipeline that still has an automation under it.
+//
+// serviceAccount is the one thing outside Cloud Deploy that must exist. It is
+// validated against IAM at create time, so it names the project's default
+// compute service account - present in any project with the Compute API on, and
+// addressed by project number, which is how that account is spelled.
+local tgt = new target.Target {
+  label = "plugin-sdk-test-cd-auto-target"
+  name = "formae-test-cd-auto-tgt-\(v.testRunID)"
+  description = "Target the automation under test promotes to"
+  run = new target.CloudRunLocation {
+    location = "projects/\(v.gcpProject)/locations/\(v.gcpRegion)"
+  }
+}
+
+local dp = new deliveryPipeline.DeliveryPipeline {
+  label = "plugin-sdk-test-cd-auto-pipeline"
+  name = "formae-test-cd-auto-dp-\(v.testRunID)"
+  description = "Pipeline the automation under test hangs off"
+  serialPipeline = new deliveryPipeline.SerialPipeline {
+    stages = new Listing {
+      new deliveryPipeline.Stage {
+        targetId = tgt.res.name
+      }
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  tgt
+  dp
+
+  new automation.Automation {
+    label = "plugin-sdk-test-clouddeploy-automation"
+    name = "formae-test-cd-auto-\(v.testRunID)"
+    deliveryPipeline = dp.res.name
+    serviceAccount = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+    description = "Updated automation description"
+    selector = new automation.AutomationResourceSelector {
+      targets = new Listing {
+        new automation.TargetAttribute {
+          id = tgt.res.name
+        }
+      }
+    }
+    rules = new Listing {
+      new automation.AutomationRule {
+        promoteReleaseRule = new automation.PromoteReleaseRule {
+          id = "formae-test-promote"
+          wait = "7200s"
+        }
+      }
+    }
+    // Suspending the automation is the other field this update exercises.
+    // Only ever set it to true: false is the protobuf default, so the API drops
+    // it from the response and a declared false would read as a missing field.
+    suspended = true
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+    annotations = new Mapping {
+      ["formae-test"] = "automation"
+    }
+  }
+}

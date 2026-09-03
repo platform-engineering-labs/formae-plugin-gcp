@@ -1,0 +1,242 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services GrpcRoute
+///
+/// gRPC routing for a Cloud Service Mesh. The same shape as an HttpRoute, but
+/// matched on gRPC service and method rather than URL path, and carrying
+/// gRPC-shaped retry and fault-injection policies.
+///
+/// A rule requires an action, but an action does not require a destination — so
+/// a fault-injection or timeout-only action keeps a route free of any backend.
+/// A rule with no action at all is refused: "RouteRule requires an action".
+///
+/// Hostnames are claimed exclusively per mesh, across route kinds — an
+/// HttpRoute already holding a hostname makes a GrpcRoute claiming it fail, and
+/// because create is a long-running operation the refusal arrives on the polled
+/// operation rather than on the POST.
+///
+/// Global; create, update and delete are long-running operations.
+module gcp.networkservices.grpcRoute
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::GrpcRoute"
+
+/// Whether a match is literal or a regular expression.
+typealias GrpcMatchType = "TYPE_UNSPECIFIED"|"EXACT"|"REGULAR_EXPRESSION"
+
+/// Which gRPC method a rule matches.
+@gcp.SubResourceHint
+open class MethodMatch extends formae.SubResource {
+    @gcp.FieldHint
+    type: GrpcMatchType?
+
+    /// The fully-qualified service name, e.g. "helloworld.Greeter".
+    @gcp.FieldHint
+    grpcService: String?
+
+    /// The method's short name, e.g. "SayHello".
+    @gcp.FieldHint
+    grpcMethod: String?
+
+    @gcp.FieldHint
+    caseSensitive: Boolean?
+}
+
+/// One metadata predicate.
+@gcp.SubResourceHint
+open class GrpcHeaderMatch extends formae.SubResource {
+    @gcp.FieldHint
+    type: GrpcMatchType?
+
+    @gcp.FieldHint
+    key: String
+
+    @gcp.FieldHint
+    value: String
+}
+
+/// The predicate a rule matches calls on.
+@gcp.SubResourceHint
+open class GrpcRouteMatch extends formae.SubResource {
+    @gcp.FieldHint
+    method: MethodMatch?
+
+    @gcp.FieldHint
+    headers: Listing<GrpcHeaderMatch>?
+}
+
+/// One backend a rule forwards to, and its share of the traffic.
+@gcp.SubResourceHint
+open class GrpcRouteDestination extends formae.SubResource {
+    /// The `GCP::Compute::BackendService` to forward to. Echoed back exactly as
+    /// given, so a backend service's `selfLink` resolvable round-trips without
+    /// translation.
+    @gcp.FieldHint
+    serviceName: (String|formae.Resolvable)?
+
+    @gcp.FieldHint
+    weight: Int?
+}
+
+/// Hold a proportion of calls back before forwarding them.
+@gcp.SubResourceHint
+open class GrpcFaultInjectionDelay extends formae.SubResource {
+    /// A duration, e.g. "5s".
+    @gcp.FieldHint
+    fixedDelay: String?
+
+    /// Percentage (0–100) of calls to delay.
+    @gcp.FieldHint
+    percentage: Int?
+}
+
+/// Fail a proportion of calls outright before forwarding them.
+@gcp.SubResourceHint
+open class GrpcFaultInjectionAbort extends formae.SubResource {
+    @gcp.FieldHint
+    httpStatus: Int?
+
+    /// Percentage (0–100) of calls to abort.
+    @gcp.FieldHint
+    percentage: Int?
+}
+
+/// Deliberate failure injected to test how callers cope. An action carrying
+/// only this needs no backend, which is what makes a GrpcRoute declarable with
+/// nothing but a mesh behind it.
+@gcp.SubResourceHint
+open class GrpcFaultInjectionPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    delay: GrpcFaultInjectionDelay?
+
+    @gcp.FieldHint
+    abort: GrpcFaultInjectionAbort?
+}
+
+/// When and how often to retry a failed attempt.
+@gcp.SubResourceHint
+open class GrpcRetryPolicy extends formae.SubResource {
+    /// Conditions to retry on, e.g. "unavailable", "cancelled",
+    /// "resource-exhausted".
+    @gcp.FieldHint
+    retryConditions: Listing<String>?
+
+    @gcp.FieldHint
+    numRetries: Int?
+}
+
+/// Keep a client on the backend it first reached, by cookie.
+@gcp.SubResourceHint
+open class GrpcStatefulSessionAffinityPolicy extends formae.SubResource {
+    /// A duration, e.g. "3600s". Required when the policy is given at all.
+    @gcp.FieldHint
+    cookieTtl: String
+}
+
+/// What to do with a matched call. Required on every rule.
+@gcp.SubResourceHint
+open class GrpcRouteAction extends formae.SubResource {
+    @gcp.FieldHint
+    destinations: Listing<GrpcRouteDestination>?
+
+    @gcp.FieldHint
+    faultInjectionPolicy: GrpcFaultInjectionPolicy?
+
+    /// A duration, e.g. "10s".
+    @gcp.FieldHint
+    timeout: String?
+
+    @gcp.FieldHint
+    retryPolicy: GrpcRetryPolicy?
+
+    @gcp.FieldHint
+    statefulSessionAffinity: GrpcStatefulSessionAffinityPolicy?
+
+    /// A duration, e.g. "30s".
+    @gcp.FieldHint
+    idleTimeout: String?
+}
+
+/// One rule: a set of predicates and the action to take when one matches.
+@gcp.SubResourceHint
+open class GrpcRouteRule extends formae.SubResource {
+    /// Omit this and the rule matches everything, which is how a catch-all
+    /// default is written.
+    @gcp.FieldHint
+    matches: Listing<GrpcRouteMatch>?
+
+    /// Required — a rule with no action is refused outright.
+    @gcp.FieldHint
+    action: GrpcRouteAction
+}
+
+open class GrpcRouteResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: GrpcRouteResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class GrpcRoute extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-grpc-route"). Immutable — it is the resource path,
+    /// and travels as ?grpcRouteId= on create.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The hostnames this route claims. At least one is required, and each is
+    /// exclusive within a mesh — see the module comment.
+    ///
+    /// Required on every PATCH as well as on create: this API validates the
+    /// resource from the request body alone, so being non-optional here is what
+    /// guarantees they always ride along.
+    @gcp.FieldHint
+    hostnames: Listing<String>
+
+    /// The routing rules, in order. At least one is required, and — like
+    /// `hostnames` — required on every PATCH too.
+    @gcp.FieldHint
+    rules: Listing<GrpcRouteRule>
+
+    /// The `GCP::NetworkServices::Mesh` scopes this route attaches to.
+    ///
+    /// Declared as resolvables so a forma can pass a mesh directly and have
+    /// formae order the creates. A resolvable yields the short name and the
+    /// short form is refused, so the plugin expands each entry to
+    /// `projects/{p}/locations/global/meshes/{name}` on the way out and
+    /// shortens it on the way back.
+    ///
+    /// The sibling `gateways` field is deliberately absent: a gateway bills, so
+    /// its round trip could not be verified.
+    @gcp.FieldHint
+    meshes: Listing<String|formae.Resolvable>?
+
+    /// An optional description. Absent rather than empty when never set, so no
+    /// provider default.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format. See mesh.pkl for the
+    /// label-clearing behaviour this API's PATCH has.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: GrpcRouteResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

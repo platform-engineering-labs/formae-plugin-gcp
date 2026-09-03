@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "@gcp/networkservices/tcpRoute.pkl"
+import "./config/vars.pkl" as v
+
+// A TCP route needs a mesh to attach to, so the mesh comes first, passed as a
+// resolvable directly - that is what creates the dependency edge and orders the
+// creates.
+//
+// Both are free. A mesh allocates nothing until a workload joins it, and this
+// route's action is `originalDestination`: the connection is handed through to
+// wherever it was already headed, so the route names no backend service and
+// there is nothing to provision behind it.
+//
+// The update changes the matched port and lengthens the idle timeout. The
+// 0.0.0.0/0 match stays: the API allows the `originalDestination` passthrough
+// only when at least one match covers everything, so narrowing it here would
+// have the patch refused rather than applied.
+//
+// Every field of the route is restated, not just the changed ones. This API
+// validates a PATCH from the request body alone rather than merging it over
+// stored state, so a patch that dropped `rules` is refused with "must specify
+// at-least one RouteRule" even though the stored route has one. The labels are
+// restated because an unmasked `labels` is cleared outright.
+local net = new mesh.Mesh {
+  label = "plugin-sdk-test-ns-tcpr-mesh"
+  name = "formae-test-ns-tcpr-mesh-\(v.testRunID)"
+  description = "Mesh for the TCP route conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new tcpRoute.TcpRoute {
+    label = "plugin-sdk-test-ns-tcp-route"
+    name = "formae-test-ns-tcpr-\(v.testRunID)"
+    meshes = new Listing {
+      net.res.name
+    }
+    rules = new Listing {
+      new tcpRoute.TcpRouteRule {
+        matches = new Listing {
+          new tcpRoute.TcpRouteMatch {
+            address = "0.0.0.0/0"
+            port = "9090"
+          }
+        }
+        action = new tcpRoute.TcpRouteAction {
+          originalDestination = true
+          idleTimeout = "120s"
+        }
+      }
+    }
+    description = "Updated test TCP route description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}
