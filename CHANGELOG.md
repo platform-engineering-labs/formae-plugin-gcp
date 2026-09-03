@@ -28,6 +28,43 @@ formae agent.
 
 ### Added
 
+- `GCP::NetworkServices::Mesh` — the config root of a service mesh. A mesh
+  carries almost nothing itself: it is the thing routes point at, and the
+  sidecars that share one are handed a single routing table assembled from every
+  route that names it. Global, and free. Every field except the name is
+  patchable.
+
+- `GCP::NetworkServices::Gateway` — where traffic from outside enters a mesh.
+  Regional, unlike the rest of this service.
+
+  `type` is immutable and the API says so plainly, refusing a changed one with
+  `Gateway type can not be updated once created`. `scope` is immutable too, but
+  silently: the API accepts a changed scope in the update mask, reports the
+  operation as done and successful, and keeps the old value. Both are dropped
+  from the update body and marked `createOnly`, so a change to either plans a
+  replacement — the only thing that actually moves them. Left alone, a changed
+  scope would look applied and never be.
+
+  A gateway PATCH also validates the whole resource rather than only the fields
+  it is masking, so `ports` has to be present on every update: omit it and the
+  API answers `Gateway must have at least one port` however narrow the mask was.
+
+  Note on cost: `type = "SECURE_WEB_GATEWAY"` provisions managed proxy capacity
+  in a subnet and is billed per hour it exists. `type = "OPEN_MESH"`, which the
+  conformance fixture uses, is pure configuration and costs nothing.
+
+- `GCP::NetworkServices::ServiceLbPolicy` — how a backend service spreads
+  traffic across regions, and what it does when one turns unhealthy. Attached by
+  the backend service that wants it, not from here. Global, and free.
+
+  `autoCapacityDrain` is a message whose only field is a bool, and the API omits
+  that bool from its JSON when it is false: send `{"enable": false}` and the
+  read-back is `{}`. A policy that turned the drain off would then disagree with
+  state on every reconcile and never settle, so the plugin puts the omitted
+  false back on read. The field is nested, so it cannot be marked
+  `hasProviderDefault` — schema hints are emitted for top-level fields only —
+  and `enable` is required in the schema instead, which is what makes restoring
+  it unambiguous: the block reaches a forma only when someone wrote `enable`.
 - `GCP::CertificateManager::Certificate` — a TLS certificate a load balancer can
   serve. A *managed* one is obtained and renewed by Google against a
   `DnsAuthorization` and carries no private key, which is the kind a repository

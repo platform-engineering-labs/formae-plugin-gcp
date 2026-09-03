@@ -1,0 +1,41 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/serviceLbPolicy.pkl" as slp
+import "./config/vars.pkl" as v
+
+// A service LB policy is settings, not capacity: it says how a backend service
+// should spread traffic and what to do when a region turns unhealthy. Nothing
+// is attached here - a backend service picks the policy up itself - so the case
+// needs no prerequisites and is free.
+//
+// Global, like a mesh.
+forma {
+  v.stack
+  v.target
+
+  new slp.ServiceLbPolicy {
+    label = "plugin-sdk-test-ns-service-lb-policy"
+    name = "formae-test-ns-lbp-\(v.testRunID)"
+    loadBalancingAlgorithm = "SPRAY_TO_REGION"
+    autoCapacityDrain = new slp.AutoCapacityDrain {
+      enable = true
+    }
+    failoverConfig = new slp.FailoverConfig {
+      failoverHealthThreshold = 70
+    }
+    isolationConfig = new slp.IsolationConfig {
+      isolationGranularity = "REGION"
+      isolationMode = "NEAREST"
+    }
+    description = "Test service LB policy for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

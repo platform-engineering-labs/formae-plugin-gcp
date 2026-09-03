@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/gateway_networkservices.pkl" as gateway
+import "./config/vars.pkl" as v
+
+// The update moves only what a gateway patch will actually move: description,
+// labels, ports, ipVersion and envoyHeaders.
+//
+// `type` and `scope` are deliberately identical to the create fixture. Both are
+// immutable, and they fail differently: a changed type is refused outright
+// ("Gateway type can not be updated once created"), while a changed scope is
+// accepted, reported as a successful operation, and silently ignored. Changing
+// either here would test a replacement rather than an update - which is what
+// their createOnly hints make formae plan.
+//
+// `ports` is repeated rather than left out because a gateway PATCH validates
+// the whole resource, not just the fields it masks: without a port the API
+// answers "Gateway must have at least one port" however narrow the mask was.
+forma {
+  v.stack
+  v.target
+
+  new gateway.Gateway {
+    label = "plugin-sdk-test-ns-gateway"
+    name = "formae-test-ns-gw-\(v.testRunID)"
+    type = "OPEN_MESH"
+    ports = new Listing {
+      8080
+      8443
+    }
+    scope = "formae-test-ns-scope"
+    description = "Updated test gateway description"
+    ipVersion = "IPV4"
+    envoyHeaders = "DEBUG_HEADERS"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

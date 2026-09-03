@@ -1,0 +1,110 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services ServiceLbPolicy
+///
+/// How a backend service spreads traffic across regions, and what it does when
+/// a region turns unhealthy. The policy is attached by the backend service that
+/// wants it, not from here, so one on its own changes nothing.
+///
+/// Global — it lives under locations/global. Create, update and delete are
+/// long-running operations.
+module gcp.networkservices.serviceLbPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::ServiceLbPolicy"
+
+/// Drain an unhealthy instance group or network endpoint group instead of
+/// leaving it in rotation.
+@gcp.SubResourceHint
+open class AutoCapacityDrain extends formae.SubResource {
+    /// Whether to drain. Required rather than optional, though the API treats
+    /// it as optional: it is the only field this block has, so a block without
+    /// it says nothing.
+    ///
+    /// It also makes the round trip unambiguous. The API omits this from its
+    /// JSON when it is false, so `{enable: false}` reads back as `{}`; the
+    /// plugin puts the false back on read. Requiring the field here is what
+    /// makes that safe — the block appears in a forma only when someone wrote
+    /// `enable`, so restoring it can never invent a value.
+    @gcp.FieldHint
+    enable: Boolean
+}
+
+/// When to start shifting traffic to failover backends.
+@gcp.SubResourceHint
+open class FailoverConfig extends formae.SubResource {
+    /// The percentage of healthy capacity below which failover begins (1-99).
+    @gcp.FieldHint
+    failoverHealthThreshold: Int?
+}
+
+/// Keep traffic within a boundary rather than spilling it to the next region.
+@gcp.SubResourceHint
+open class IsolationConfig extends formae.SubResource {
+    /// How wide the boundary is. REGION is the only granularity today.
+    @gcp.FieldHint
+    isolationGranularity: String?
+
+    /// How hard the boundary is: NEAREST spills over when it has to, STRICT
+    /// fails instead.
+    @gcp.FieldHint
+    isolationMode: String?
+}
+
+open class ServiceLbPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ServiceLbPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ServiceLbPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-lb-policy"). Immutable — it is the resource's path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// How traffic is spread: SPRAY_TO_WORLD, SPRAY_TO_REGION,
+    /// WATERFALL_BY_REGION or WATERFALL_BY_ZONE.
+    @gcp.FieldHint
+    loadBalancingAlgorithm: String?
+
+    /// Drain unhealthy backends rather than leaving them in rotation.
+    @gcp.FieldHint
+    autoCapacityDrain: AutoCapacityDrain?
+
+    /// When to start shifting traffic to failover backends.
+    @gcp.FieldHint
+    failoverConfig: FailoverConfig?
+
+    /// Keep traffic inside a boundary rather than spilling it onward.
+    @gcp.FieldHint
+    isolationConfig: IsolationConfig?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ServiceLbPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

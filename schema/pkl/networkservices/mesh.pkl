@@ -1,0 +1,66 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services Mesh
+///
+/// The config root of a service mesh. A mesh carries almost nothing itself: it
+/// is the thing routes point at, and the sidecars that share a mesh are handed
+/// one routing table assembled from every route that names it. Deleting a mesh
+/// with routes still attached is what breaks, not creating an empty one.
+///
+/// Global — it lives under locations/global. Create, update and delete are
+/// long-running operations.
+module gcp.networkservices.mesh
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::Mesh"
+
+open class MeshResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MeshResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Mesh extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-mesh"). Immutable — it is the resource's path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The port the sidecar listens on for redirected traffic (1-65535). Unset
+    /// means the proxy is addressed directly rather than by interception.
+    @gcp.FieldHint
+    interceptionPort: Int?
+
+    /// Whether Envoy adds its internal debug headers to upstream requests:
+    /// NONE or DEBUG_HEADERS.
+    @gcp.FieldHint
+    envoyHeaders: String?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: MeshResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
