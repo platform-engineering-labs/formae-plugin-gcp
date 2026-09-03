@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/apikeys/key.pkl"
+import "./config/vars.pkl" as v
+
+// Updates displayName, restrictions and annotations - the three mutable fields,
+// and exactly the three the API's own update mask documentation lists.
+//
+// This type has no -replace.pkl companion, and cannot have one: delete is a
+// soft delete that reserves the id for thirty days, so recreating the key under
+// the same name inside that window is refused with "A key with this id already
+// exists" (reported as an error on the completed create operation, not on the
+// HTTP call). name and serviceAccountEmail are the immutable fields, and both
+// are refused in an update mask by name.
+//
+// The key stays useless: the method restriction narrows it further, and the
+// second allowed address is also in TEST-NET-3.
+forma {
+  v.stack
+  v.target
+
+  new key.Key {
+    label = "plugin-sdk-test-ak-key"
+    name = "formae-test-ak-key-\(v.testRunID)"
+    displayName = "Formae conformance test key (updated)"
+    restrictions = new key.Restrictions {
+      apiTargets = new Listing {
+        new key.ApiTarget {
+          service = "translate.googleapis.com"
+          methods = new Listing {
+            "google.cloud.translate.v2.TranslateService.*"
+          }
+        }
+      }
+      serverKeyRestrictions = new key.ServerKeyRestrictions {
+        allowedIps = new Listing {
+          "203.0.113.4"
+          "203.0.113.5"
+        }
+      }
+    }
+    annotations = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

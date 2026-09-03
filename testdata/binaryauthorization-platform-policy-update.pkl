@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/binaryauthorization/platformPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Updates the description, widens the policy-level allowlist and prepends a
+// namespace-scoped check set - everything about a platform policy except its
+// name is mutable, and update is replacePlatformPolicy, a PUT that swaps the
+// whole document.
+//
+// The scoped set comes FIRST and the unscoped one stays last, which is not a
+// stylistic choice: the API refuses any list whose final set carries a scope
+// ("When CheckSets are not empty, the last CheckSet must have empty scope") and
+// requires decreasing specificity down the list.
+forma {
+  v.stack
+  v.target
+
+  new platformPolicy.PlatformPolicy {
+    label = "plugin-sdk-test-ba-platform-policy"
+    name = "formae-test-ba-pp-\(v.testRunID)"
+    description = "Updated test platform policy description"
+    gkePolicy = new platformPolicy.GkePolicy {
+      imageAllowlist = new platformPolicy.ImageAllowlist {
+        allowPattern = new Listing {
+          "gcr.io/formae-test/**"
+          "gcr.io/formae-test-second/**"
+        }
+      }
+      checkSets = new Listing {
+        new platformPolicy.CheckSet {
+          displayName = "formae-test-scoped"
+          scope = new platformPolicy.CheckSetScope {
+            kubernetesNamespace = "formae-test-ns"
+          }
+          imageAllowlist = new platformPolicy.ImageAllowlist {
+            allowPattern = new Listing {
+              "gcr.io/formae-test-exempt/**"
+            }
+          }
+          checks = new Listing {
+            new platformPolicy.Check {
+              displayName = "formae-test-trusted-dir"
+              trustedDirectoryCheck = new platformPolicy.TrustedDirectoryCheck {
+                trustedDirPatterns = new Listing {
+                  "gcr.io/formae-test"
+                }
+              }
+            }
+          }
+        }
+        new platformPolicy.CheckSet {
+          displayName = "formae-test-default"
+          checks = new Listing {
+            new platformPolicy.Check {
+              displayName = "formae-test-freshness"
+              imageFreshnessCheck = new platformPolicy.ImageFreshnessCheck {
+                maxUploadAgeDays = 60
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

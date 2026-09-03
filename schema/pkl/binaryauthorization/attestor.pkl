@@ -1,0 +1,148 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Binary Authorization Attestor
+///
+/// An attestor is a named set of public keys plus the Grafeas note the
+/// attestations they sign are recorded against. A Binary Authorization
+/// admission rule names attestors; the attestor itself admits nothing, blocks
+/// nothing and provisions nothing — it holds key material, so it is free to
+/// hold.
+///
+/// The note lives in the Container Analysis API, which this plugin does not
+/// ship. That is survivable because Binary Authorization does not resolve
+/// `noteReference` when the attestor is created: an attestor pointing at a note
+/// that does not exist (in a project where Container Analysis is not even
+/// enabled) is accepted. Attestations cannot then be *read* through it until
+/// the note exists and its service agent has been granted
+/// `containeranalysis.notes.occurrences.viewer` — but the attestor is a valid,
+/// declarable resource before any of that.
+///
+/// Project-scoped and unlocated: `projects/{project}/attestors/{attestor}`.
+/// Create, update and delete are all synchronous — this API has no long-running
+/// operations at all — and update is a PUT that replaces the whole resource, so
+/// omitting an optional field really does clear it.
+module gcp.binaryauthorization.attestor
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BinaryAuthorization::Attestor"
+
+/// A raw PKIX SubjectPublicKeyInfo public key.
+///
+/// `keyId` is deliberately absent. The API documents it as optional and, inside
+/// a wrapper that has its own notion of key id — which `AttestorPublicKey.id`
+/// is — as defaulting to the wrapper's value. A field the API may fill in for
+/// itself, nested one level down where `hasProviderDefault` cannot reach, reads
+/// as drift on every sync. Set `AttestorPublicKey.id` instead; it is the id
+/// signatures must carry.
+@gcp.SubResourceHint
+open class AttestorPkixPublicKey extends formae.SubResource {
+    /// The public key, PEM-encoded (RFC 7468). Echoed back byte for byte,
+    /// including or omitting a trailing newline exactly as given.
+    @gcp.FieldHint
+    publicKeyPem: String
+
+    /// How signatures made with this key are verified, e.g.
+    /// "ECDSA_P256_SHA256", "RSA_SIGN_PKCS1_2048_SHA256", "ML_DSA_65". It must
+    /// match the algorithm encoded in `publicKeyPem`.
+    @gcp.FieldHint
+    signatureAlgorithm: String
+}
+
+/// One public key an attestor verifies attestations with.
+///
+/// `asciiArmoredPgpPublicKey` is deliberately absent: with a PGP key the API
+/// computes `id` from the key's OpenPGP fingerprint and overwrites whatever the
+/// caller sent, so the declared and stored ids could never agree. Only PKIX
+/// keys are declarable here.
+@gcp.SubResourceHint
+open class AttestorPublicKey extends formae.SubResource {
+    /// The id signatures verified by this key must carry, as an RFC 3986 URI.
+    ///
+    /// Required rather than optional, though the API treats it as optional:
+    /// left blank the API computes one from the key's DER digest and returns it
+    /// as "ni:///sha-256;<base64>" (verified live). That value is nested, so no
+    /// schema hint can excuse it, and a forma that omitted the field would read
+    /// as drift for the life of the attestor.
+    @gcp.FieldHint
+    id: String
+
+    /// The key material.
+    @gcp.FieldHint
+    pkixPublicKey: AttestorPkixPublicKey
+
+    /// An optional descriptive comment. May be updated.
+    @gcp.FieldHint
+    comment: String?
+}
+
+/// How attestations are read: the Grafeas note they are recorded against, and
+/// the keys that must have signed them.
+@gcp.SubResourceHint
+open class UserOwnedGrafeasNote extends formae.SubResource {
+    /// The Grafeas note, as "projects/{project}/notes/{note}" — a project id,
+    /// never a project number. Immutable: the API answers a changed note with
+    /// HTTP 400 "note reference may not be updated", so a change here plans a
+    /// replacement rather than failing an update.
+    ///
+    /// A full path rather than a short name because a note is not a resource
+    /// this plugin ships, so there is nothing to resolve against and nothing
+    /// to shorten to; the API echoes the path back exactly as sent.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    noteReference: String
+
+    /// The keys that verify attestations signed by this attestor. May be
+    /// updated. An attestor with no keys reports that no valid attestation
+    /// exists for any image.
+    @gcp.FieldHint
+    publicKeys: Listing<AttestorPublicKey>?
+}
+
+open class AttestorResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AttestorResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Attestor extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-attestor"). Sent as ?attestorId= on create, and the
+    /// path thereafter. Immutable — the API states plainly that the resource
+    /// name may not be updated.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// How this attestor's attestations are read. Required in practice: an
+    /// attestor with no note is rejected as "Attestor type not set", and one
+    /// with an empty note as "note reference '' is not valid".
+    @gcp.FieldHint
+    userOwnedGrafeasNote: UserOwnedGrafeasNote
+
+    /// An optional descriptive comment. May be updated, and — because update is
+    /// a full-replacing PUT — omitting it really does clear it. The API leaves
+    /// the field out of a read when it is unset rather than reporting an empty
+    /// string, so no provider default is needed.
+    @gcp.FieldHint
+    description: String?
+
+    hidden res: AttestorResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
