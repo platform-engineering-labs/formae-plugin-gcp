@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/serviceLbPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// How a global load balancer would spread traffic across backend regions. It is
+// pure configuration: a policy enforces nothing until a backend service names
+// it, and there is no backend service here, so this provisions nothing and is
+// free to hold.
+//
+// All three nested config objects are declared, because they are the point of
+// the type and they round-trip exactly - create, GET and PATCH all echoed them
+// back unchanged.
+forma {
+  v.stack
+  v.target
+
+  new serviceLbPolicy.ServiceLbPolicy {
+    label = "plugin-sdk-test-ns-service-lb-policy"
+    name = "formae-test-ns-slb-\(v.testRunID)"
+    loadBalancingAlgorithm = "SPRAY_TO_REGION"
+    autoCapacityDrain = new serviceLbPolicy.AutoCapacityDrain {
+      enable = true
+    }
+    failoverConfig = new serviceLbPolicy.FailoverConfig {
+      failoverHealthThreshold = 70
+    }
+    isolationConfig = new serviceLbPolicy.IsolationConfig {
+      isolationGranularity = "REGION"
+      isolationMode = "NEAREST"
+    }
+    description = "Test service LB policy for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

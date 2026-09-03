@@ -1,0 +1,102 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/authorizationPolicy.pkl"
+import "@gcp/networksecurity/serverTlsPolicy.pkl"
+import "@gcp/networkservices/endpointPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// An endpoint policy is what ties a Cloud Service Mesh to the Network Security
+// policies, so the case stands both halves up and wires them together.
+//
+// Everything here is free. An endpoint policy allocates nothing - it is
+// configuration handed to sidecars, and there are no sidecars. An authorization
+// policy is a rule list that only a mesh's proxies enforce. A server TLS policy
+// with allowOpen needs no certificate. None of the three provisions capacity.
+//
+// The update changes the endpoint type, the match criteria, the matched label
+// value and the selected ports. `type` is genuinely mutable here - SIDECAR_PROXY
+// to GRPC_SERVER was applied live and read back changed - which is why it is not
+// marked createOnly.
+//
+// Note that this API validates a PATCH from the request body alone rather than
+// merging it over stored state, so `type` and `endpointMatcher` must both be
+// restated on every update or the call is refused outright. The labels are
+// restated for the same class of reason: an unmasked `labels` is cleared.
+//
+// Note the shape of the round trip these two exercise: a resolvable yields the
+// short name, while the API demands and reports the full
+// projects/{p}/locations/global/{collection}/{name} path. The plugin expands on
+// the way out and shortens on the way back - see endpoint_policy.go.
+local authz = new authorizationPolicy.AuthorizationPolicy {
+  label = "plugin-sdk-test-ns-ep-authz"
+  name = "formae-test-ns-ep-authz-\(v.testRunID)"
+  action = "ALLOW"
+  rules = new Listing {
+    new authorizationPolicy.Rule {
+      sources = new Listing {
+        new authorizationPolicy.Source {
+          ipBlocks = new Listing {
+            "10.0.0.0/8"
+          }
+        }
+      }
+    }
+  }
+  description = "Authorization policy for the endpoint policy conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+local serverTls = new serverTlsPolicy.ServerTlsPolicy {
+  label = "plugin-sdk-test-ns-ep-server-tls"
+  name = "formae-test-ns-ep-stp-\(v.testRunID)"
+  allowOpen = true
+  description = "Server TLS policy for the endpoint policy conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  authz
+  serverTls
+
+  new endpointPolicy.EndpointPolicy {
+    label = "plugin-sdk-test-ns-endpoint-policy"
+    name = "formae-test-ns-ep-\(v.testRunID)"
+    type = "GRPC_SERVER"
+    endpointMatcher = new endpointPolicy.EndpointMatcher {
+      metadataLabelMatcher = new endpointPolicy.MetadataLabelMatcher {
+        metadataLabelMatchCriteria = "MATCH_ALL"
+        metadataLabels = new Listing {
+          new endpointPolicy.MetadataLabel {
+            labelName = "app"
+            labelValue = "conformance-updated"
+          }
+        }
+      }
+    }
+    trafficPortSelector = new endpointPolicy.TrafficPortSelector {
+      ports = new Listing {
+        "9090"
+        "9091"
+      }
+    }
+    authorizationPolicy = authz.res.name
+    serverTlsPolicy = serverTls.res.name
+    description = "Updated test endpoint policy description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

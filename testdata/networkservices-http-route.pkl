@@ -1,0 +1,75 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "@gcp/networkservices/httpRoute.pkl"
+import "./config/vars.pkl" as v
+
+// An HTTP route needs a mesh to attach to, so the mesh comes first, passed as a
+// resolvable directly - that is what creates the dependency edge and orders the
+// creates. Interpolating the mesh name into a string would build the same
+// request and no edge at all, and the route could then be attempted first.
+//
+// Both are free. A mesh allocates nothing until a workload joins it, and this
+// route's action is a redirect: it names no backend service, so there is
+// nothing to provision behind it and no health check to stand up.
+//
+// The hostname carries the test run id because a hostname is claimed
+// exclusively within a mesh, across every route kind. Two concurrent runs
+// sharing one would make the loser's create fail - and because create is a
+// long-running operation, it would fail on the polled operation rather than on
+// the POST.
+local net = new mesh.Mesh {
+  label = "plugin-sdk-test-ns-hr-mesh"
+  name = "formae-test-ns-hr-mesh-\(v.testRunID)"
+  description = "Mesh for the HTTP route conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new httpRoute.HttpRoute {
+    label = "plugin-sdk-test-ns-http-route"
+    name = "formae-test-ns-hr-\(v.testRunID)"
+    hostnames = new Listing {
+      "formae-test-hr-\(v.testRunID).example.com"
+    }
+    meshes = new Listing {
+      net.res.name
+    }
+    rules = new Listing {
+      new httpRoute.HttpRouteRule {
+        matches = new Listing {
+          new httpRoute.HttpRouteMatch {
+            prefixMatch = "/api"
+          }
+        }
+        action = new httpRoute.HttpRouteAction {
+          redirect = new httpRoute.HttpRouteRedirect {
+            hostRedirect = "redirected.example.com"
+            // Note the _DEFAULT suffix: this is the 301, and a plain
+            // "MOVED_PERMANENTLY" is refused with HTTP 400.
+            responseCode = "MOVED_PERMANENTLY_DEFAULT"
+            httpsRedirect = true
+            stripQuery = true
+          }
+        }
+      }
+    }
+    description = "Test HTTP route for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

@@ -1,0 +1,69 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "@gcp/networkservices/tcpRoute.pkl"
+import "./config/vars.pkl" as v
+
+// A TCP route needs a mesh to attach to, so the mesh comes first, passed as a
+// resolvable directly - that is what creates the dependency edge and orders the
+// creates.
+//
+// Both are free. A mesh allocates nothing until a workload joins it, and this
+// route's action is `originalDestination`: the connection is handed through to
+// wherever it was already headed, so the route names no backend service and
+// there is nothing to provision behind it.
+//
+// The 0.0.0.0/0 match is not laziness, it is a requirement. The API allows
+// passthrough only when at least one of the rule's matches covers everything: a
+// match on a narrower CIDR is refused with "original_destination is allowed
+// when at least one address match is */0". Matching everything is harmless
+// here, because no workload has joined the mesh for the rule to apply to.
+local net = new mesh.Mesh {
+  label = "plugin-sdk-test-ns-tcpr-mesh"
+  name = "formae-test-ns-tcpr-mesh-\(v.testRunID)"
+  description = "Mesh for the TCP route conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new tcpRoute.TcpRoute {
+    label = "plugin-sdk-test-ns-tcp-route"
+    name = "formae-test-ns-tcpr-\(v.testRunID)"
+    meshes = new Listing {
+      net.res.name
+    }
+    rules = new Listing {
+      new tcpRoute.TcpRouteRule {
+        matches = new Listing {
+          new tcpRoute.TcpRouteMatch {
+            address = "0.0.0.0/0"
+            // Ports are strings in this API, not integers, and are echoed back
+            // that way.
+            port = "8080"
+          }
+        }
+        action = new tcpRoute.TcpRouteAction {
+          originalDestination = true
+          idleTimeout = "60s"
+        }
+      }
+    }
+    description = "Test TCP route for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

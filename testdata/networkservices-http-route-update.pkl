@@ -1,0 +1,78 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "@gcp/networkservices/httpRoute.pkl"
+import "./config/vars.pkl" as v
+
+// An HTTP route needs a mesh to attach to, so the mesh comes first, passed as a
+// resolvable directly - that is what creates the dependency edge and orders the
+// creates. Interpolating the mesh name into a string would build the same
+// request and no edge at all, and the route could then be attempted first.
+//
+// Both are free. A mesh allocates nothing until a workload joins it, and this
+// route's action is a redirect: it names no backend service, so there is
+// nothing to provision behind it and no health check to stand up.
+//
+// The update adds a second hostname and rewrites the rule: a different path
+// prefix, a different redirect target and a different response code.
+//
+// Every field of the route is restated, not just the changed ones. This API
+// validates a PATCH from the request body alone rather than merging it over
+// stored state, so a patch that dropped `hostnames` would be refused with
+// "HTTPRoute must specify at least 1 hostname." even though the stored route
+// has one. The labels are restated for a related reason: an unmasked `labels`
+// is cleared outright.
+local net = new mesh.Mesh {
+  label = "plugin-sdk-test-ns-hr-mesh"
+  name = "formae-test-ns-hr-mesh-\(v.testRunID)"
+  description = "Mesh for the HTTP route conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new httpRoute.HttpRoute {
+    label = "plugin-sdk-test-ns-http-route"
+    name = "formae-test-ns-hr-\(v.testRunID)"
+    hostnames = new Listing {
+      "formae-test-hr-\(v.testRunID).example.com"
+      "formae-test-hr2-\(v.testRunID).example.com"
+    }
+    meshes = new Listing {
+      net.res.name
+    }
+    rules = new Listing {
+      new httpRoute.HttpRouteRule {
+        matches = new Listing {
+          new httpRoute.HttpRouteMatch {
+            prefixMatch = "/v2"
+          }
+        }
+        action = new httpRoute.HttpRouteAction {
+          redirect = new httpRoute.HttpRouteRedirect {
+            hostRedirect = "elsewhere.example.com"
+            responseCode = "FOUND"
+            httpsRedirect = true
+            stripQuery = true
+          }
+        }
+      }
+    }
+    description = "Updated test HTTP route description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

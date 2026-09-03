@@ -1,0 +1,76 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networkservices/mesh.pkl"
+import "@gcp/networkservices/grpcRoute.pkl"
+import "./config/vars.pkl" as v
+
+// A gRPC route needs a mesh to attach to, so the mesh comes first, passed as a
+// resolvable directly - that is what creates the dependency edge and orders the
+// creates.
+//
+// Both are free. A mesh allocates nothing until a workload joins it, and this
+// route's action injects a fault rather than naming a destination: a gRPC
+// route's rule requires an action but the action does not require a
+// destination, so there is no backend service and no health check behind this.
+// (A rule with no action at all is refused - "RouteRule requires an action".)
+//
+// The hostname carries the test run id because a hostname is claimed
+// exclusively within a mesh, across every route kind.
+local net = new mesh.Mesh {
+  label = "plugin-sdk-test-ns-gr-mesh"
+  name = "formae-test-ns-gr-mesh-\(v.testRunID)"
+  description = "Mesh for the gRPC route conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+
+  new grpcRoute.GrpcRoute {
+    label = "plugin-sdk-test-ns-grpc-route"
+    name = "formae-test-ns-gr-\(v.testRunID)"
+    hostnames = new Listing {
+      "formae-test-gr-\(v.testRunID).example.com"
+    }
+    meshes = new Listing {
+      net.res.name
+    }
+    rules = new Listing {
+      new grpcRoute.GrpcRouteRule {
+        matches = new Listing {
+          new grpcRoute.GrpcRouteMatch {
+            method = new grpcRoute.MethodMatch {
+              type = "EXACT"
+              grpcService = "helloworld.Greeter"
+              grpcMethod = "SayHello"
+            }
+          }
+        }
+        action = new grpcRoute.GrpcRouteAction {
+          faultInjectionPolicy = new grpcRoute.GrpcFaultInjectionPolicy {
+            abort = new grpcRoute.GrpcFaultInjectionAbort {
+              httpStatus = 503
+              percentage = 100
+            }
+          }
+          timeout = "10s"
+        }
+      }
+    }
+    description = "Test gRPC route for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

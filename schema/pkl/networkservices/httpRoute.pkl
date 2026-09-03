@@ -1,0 +1,429 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services HttpRoute
+///
+/// Layer-7 HTTP routing for a Cloud Service Mesh: match a request on host,
+/// path, header or query parameter, then redirect it, rewrite it, mirror it,
+/// inject a fault into it, answer it directly, or forward it to a backend
+/// service.
+///
+/// A route is configuration attached to a mesh; it provisions nothing. An
+/// action that names no backend — a redirect, a direct response, a fault —
+/// keeps a route free of any prerequisite beyond the mesh itself.
+///
+/// One thing to know before naming hostnames: they are claimed exclusively per
+/// mesh, across route kinds. A second route claiming a hostname already in use
+/// in the same mesh is refused with "cannot use host:… as it is in use by
+/// route:…", and — because create is a long-running operation — that refusal
+/// arrives on the polled operation, not on the POST.
+///
+/// Global; create, update and delete are long-running operations.
+module gcp.networkservices.httpRoute
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::HttpRoute"
+
+/// The status a redirect answers with. `MOVED_PERMANENTLY_DEFAULT` is the 301;
+/// note the `_DEFAULT` suffix — a plain "MOVED_PERMANENTLY" is refused 400.
+typealias RedirectResponseCode = "RESPONSE_CODE_UNSPECIFIED"|
+  "MOVED_PERMANENTLY_DEFAULT"|
+  "FOUND"|
+  "SEE_OTHER"|
+  "TEMPORARY_REDIRECT"|
+  "PERMANENT_REDIRECT"
+
+/// An inclusive-exclusive integer range for a header match.
+@gcp.SubResourceHint
+open class HeaderMatchIntegerRange extends formae.SubResource {
+    @gcp.FieldHint
+    start: Int?
+
+    @gcp.FieldHint
+    end: Int?
+}
+
+/// One header predicate. Give exactly one of the match forms.
+@gcp.SubResourceHint
+open class HeaderMatch extends formae.SubResource {
+    /// The header name to match on.
+    @gcp.FieldHint
+    header: String?
+
+    @gcp.FieldHint
+    exactMatch: String?
+
+    @gcp.FieldHint
+    regexMatch: String?
+
+    @gcp.FieldHint
+    prefixMatch: String?
+
+    @gcp.FieldHint
+    suffixMatch: String?
+
+    /// Match on the header merely being present, whatever its value.
+    @gcp.FieldHint
+    presentMatch: Boolean?
+
+    @gcp.FieldHint
+    rangeMatch: HeaderMatchIntegerRange?
+
+    /// Invert the result of whichever match form is set.
+    @gcp.FieldHint
+    invertMatch: Boolean?
+}
+
+/// One query-parameter predicate. Give exactly one of the match forms.
+@gcp.SubResourceHint
+open class QueryParameterMatch extends formae.SubResource {
+    @gcp.FieldHint
+    queryParameter: String?
+
+    @gcp.FieldHint
+    exactMatch: String?
+
+    @gcp.FieldHint
+    regexMatch: String?
+
+    @gcp.FieldHint
+    presentMatch: Boolean?
+}
+
+/// The predicate a rule matches requests on. Give one of the three path forms.
+@gcp.SubResourceHint
+open class HttpRouteMatch extends formae.SubResource {
+    @gcp.FieldHint
+    fullPathMatch: String?
+
+    @gcp.FieldHint
+    prefixMatch: String?
+
+    @gcp.FieldHint
+    regexMatch: String?
+
+    @gcp.FieldHint
+    ignoreCase: Boolean?
+
+    @gcp.FieldHint
+    headers: Listing<HeaderMatch>?
+
+    @gcp.FieldHint
+    queryParameters: Listing<QueryParameterMatch>?
+}
+
+/// Headers to set, add or remove on a request or a response.
+@gcp.SubResourceHint
+open class HeaderModifier extends formae.SubResource {
+    /// Overwrite these headers, discarding any existing value.
+    @gcp.FieldHint
+    set: Mapping<String, String>?
+
+    /// Append these headers, keeping any existing value.
+    @gcp.FieldHint
+    add: Mapping<String, String>?
+
+    @gcp.FieldHint
+    remove: Listing<String>?
+}
+
+/// One backend a rule forwards to, and its share of the traffic.
+@gcp.SubResourceHint
+open class HttpRouteDestination extends formae.SubResource {
+    /// The `GCP::Compute::BackendService` to forward to.
+    ///
+    /// The API echoes this back byte-for-byte in whatever form it was given, so
+    /// passing a backend service's `selfLink` resolvable directly round-trips
+    /// exactly and needs no translation — unlike `meshes` below.
+    @gcp.FieldHint
+    serviceName: (String|formae.Resolvable)?
+
+    /// This destination's share of the traffic, relative to its siblings.
+    @gcp.FieldHint
+    weight: Int?
+
+    @gcp.FieldHint
+    requestHeaderModifier: HeaderModifier?
+
+    @gcp.FieldHint
+    responseHeaderModifier: HeaderModifier?
+}
+
+/// Answer with a redirect instead of forwarding.
+@gcp.SubResourceHint
+open class HttpRouteRedirect extends formae.SubResource {
+    @gcp.FieldHint
+    hostRedirect: String?
+
+    @gcp.FieldHint
+    pathRedirect: String?
+
+    @gcp.FieldHint
+    prefixRewrite: String?
+
+    @gcp.FieldHint
+    responseCode: RedirectResponseCode?
+
+    /// Redirect to https regardless of the scheme the request arrived on.
+    @gcp.FieldHint
+    httpsRedirect: Boolean?
+
+    @gcp.FieldHint
+    stripQuery: Boolean?
+
+    @gcp.FieldHint
+    portRedirect: Int?
+}
+
+/// Hold a proportion of requests back before forwarding them.
+@gcp.SubResourceHint
+open class FaultInjectionDelay extends formae.SubResource {
+    /// A duration, e.g. "5s".
+    @gcp.FieldHint
+    fixedDelay: String?
+
+    /// Percentage (0–100) of requests to delay.
+    @gcp.FieldHint
+    percentage: Int?
+}
+
+/// Fail a proportion of requests outright before forwarding them.
+@gcp.SubResourceHint
+open class FaultInjectionAbort extends formae.SubResource {
+    @gcp.FieldHint
+    httpStatus: Int?
+
+    /// Percentage (0–100) of requests to abort.
+    @gcp.FieldHint
+    percentage: Int?
+}
+
+/// Deliberate failure injected to test how callers cope.
+@gcp.SubResourceHint
+open class FaultInjectionPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    delay: FaultInjectionDelay?
+
+    @gcp.FieldHint
+    abort: FaultInjectionAbort?
+}
+
+/// Rewrite the request before forwarding it.
+@gcp.SubResourceHint
+open class URLRewrite extends formae.SubResource {
+    @gcp.FieldHint
+    pathPrefixRewrite: String?
+
+    @gcp.FieldHint
+    hostRewrite: String?
+}
+
+/// When and how often to retry a failed attempt.
+@gcp.SubResourceHint
+open class HttpRouteRetryPolicy extends formae.SubResource {
+    /// Conditions to retry on, e.g. "5xx", "connect-failure", "reset".
+    @gcp.FieldHint
+    retryConditions: Listing<String>?
+
+    @gcp.FieldHint
+    numRetries: Int?
+
+    /// A duration, e.g. "1s".
+    @gcp.FieldHint
+    perTryTimeout: String?
+}
+
+/// Send a copy of the traffic somewhere else, ignoring the response.
+@gcp.SubResourceHint
+open class RequestMirrorPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    destination: HttpRouteDestination?
+
+    /// Percentage (0–100) of requests to mirror.
+    @gcp.FieldHint
+    mirrorPercent: Number?
+}
+
+/// Cross-origin resource sharing, applied by the proxy.
+@gcp.SubResourceHint
+open class CorsPolicy extends formae.SubResource {
+    @gcp.FieldHint
+    allowOrigins: Listing<String>?
+
+    @gcp.FieldHint
+    allowOriginRegexes: Listing<String>?
+
+    @gcp.FieldHint
+    allowMethods: Listing<String>?
+
+    @gcp.FieldHint
+    allowHeaders: Listing<String>?
+
+    @gcp.FieldHint
+    exposeHeaders: Listing<String>?
+
+    /// A duration in seconds, as a string.
+    @gcp.FieldHint
+    maxAge: String?
+
+    @gcp.FieldHint
+    allowCredentials: Boolean?
+
+    /// Turn the policy off without deleting it.
+    @gcp.FieldHint
+    disabled: Boolean?
+}
+
+/// Keep a client on the backend it first reached, by cookie.
+@gcp.SubResourceHint
+open class StatefulSessionAffinityPolicy extends formae.SubResource {
+    /// A duration, e.g. "3600s". Required when the policy is given at all.
+    @gcp.FieldHint
+    cookieTtl: String
+}
+
+/// Answer from the proxy itself, forwarding nothing.
+@gcp.SubResourceHint
+open class HttpDirectResponse extends formae.SubResource {
+    @gcp.FieldHint
+    status: Int
+
+    @gcp.FieldHint
+    stringBody: String?
+
+    /// A base64-encoded body.
+    @gcp.FieldHint
+    bytesBody: String?
+}
+
+/// What to do with a matched request. Give one of the terminal actions —
+/// `destinations`, `redirect` or `directResponse`.
+@gcp.SubResourceHint
+open class HttpRouteAction extends formae.SubResource {
+    @gcp.FieldHint
+    destinations: Listing<HttpRouteDestination>?
+
+    @gcp.FieldHint
+    redirect: HttpRouteRedirect?
+
+    @gcp.FieldHint
+    directResponse: HttpDirectResponse?
+
+    @gcp.FieldHint
+    faultInjectionPolicy: FaultInjectionPolicy?
+
+    @gcp.FieldHint
+    requestHeaderModifier: HeaderModifier?
+
+    @gcp.FieldHint
+    responseHeaderModifier: HeaderModifier?
+
+    @gcp.FieldHint
+    urlRewrite: URLRewrite?
+
+    /// A duration, e.g. "10s".
+    @gcp.FieldHint
+    timeout: String?
+
+    @gcp.FieldHint
+    retryPolicy: HttpRouteRetryPolicy?
+
+    @gcp.FieldHint
+    requestMirrorPolicy: RequestMirrorPolicy?
+
+    @gcp.FieldHint
+    corsPolicy: CorsPolicy?
+
+    @gcp.FieldHint
+    statefulSessionAffinity: StatefulSessionAffinityPolicy?
+
+    /// A duration, e.g. "30s".
+    @gcp.FieldHint
+    idleTimeout: String?
+}
+
+/// One rule: a set of predicates and the action to take when one matches.
+@gcp.SubResourceHint
+open class HttpRouteRule extends formae.SubResource {
+    /// Omit this and the rule matches everything, which is how a catch-all
+    /// default is written.
+    @gcp.FieldHint
+    matches: Listing<HttpRouteMatch>?
+
+    @gcp.FieldHint
+    action: HttpRouteAction?
+}
+
+open class HttpRouteResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: HttpRouteResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class HttpRoute extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-http-route"). Immutable — it is the resource path,
+    /// and travels as ?httpRouteId= on create.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The hostnames this route claims, e.g. "api.example.com". At least one is
+    /// required, and each is exclusive within a mesh — see the module comment.
+    ///
+    /// Required on every PATCH as well as on create: this API validates the
+    /// resource from the request body alone, and a patch that omits them is
+    /// refused with "HTTPRoute must specify at least 1 hostname." even though
+    /// the stored route has some. Being non-optional here is what guarantees
+    /// they always ride along.
+    @gcp.FieldHint
+    hostnames: Listing<String>
+
+    /// The routing rules, in order. At least one is required, and — like
+    /// `hostnames` — required on every PATCH too.
+    @gcp.FieldHint
+    rules: Listing<HttpRouteRule>
+
+    /// The `GCP::NetworkServices::Mesh` scopes this route attaches to.
+    ///
+    /// Declared as resolvables so a forma can pass a mesh directly and have
+    /// formae order the creates. A resolvable yields the short name, and the
+    /// short form is refused here — "mesh … referenced by HttpRoute …", HTTP
+    /// 400 — so the plugin expands each entry to
+    /// `projects/{p}/locations/global/meshes/{name}` on the way out and
+    /// shortens it on the way back.
+    ///
+    /// The sibling `gateways` field is deliberately absent from this schema: a
+    /// gateway allocates Envoy proxies and so bills, which means its round trip
+    /// could not be verified, and an unverified field reads as drift forever.
+    @gcp.FieldHint
+    meshes: Listing<String|formae.Resolvable>?
+
+    /// An optional description. Absent rather than empty when never set, so no
+    /// provider default.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format. See mesh.pkl for the
+    /// label-clearing behaviour this API's PATCH has.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: HttpRouteResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

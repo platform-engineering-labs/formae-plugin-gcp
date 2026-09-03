@@ -1,0 +1,125 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services ServiceLbPolicy
+///
+/// How a global load balancer spreads traffic across backend regions: the
+/// spray-or-waterfall algorithm, whether to drain an unhealthy region
+/// automatically, the health floor that triggers failover, and how strictly to
+/// keep traffic inside its own region.
+///
+/// The policy is configuration only. It enforces nothing until a backend
+/// service names it, and it provisions nothing, so it is free to hold.
+///
+/// Global; create, update and delete are long-running operations.
+module gcp.networkservices.serviceLbPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::ServiceLbPolicy"
+
+/// How traffic is spread over the backends' regions.
+typealias LoadBalancingAlgorithm = "LOAD_BALANCING_ALGORITHM_UNSPECIFIED"|
+  "SPRAY_TO_WORLD"|
+  "SPRAY_TO_REGION"|
+  "WATERFALL_BY_REGION"|
+  "WATERFALL_BY_ZONE"
+
+/// The unit traffic isolation is measured in.
+typealias IsolationGranularity = "ISOLATION_GRANULARITY_UNSPECIFIED"|"REGION"
+
+/// How hard the isolation boundary is: NEAREST spills over when a region has
+/// no healthy capacity, STRICT does not.
+typealias IsolationMode = "ISOLATION_MODE_UNSPECIFIED"|"NEAREST"|"STRICT"
+
+/// Whether to take a region out of rotation on its own when its backends go
+/// unhealthy.
+@gcp.SubResourceHint
+open class AutoCapacityDrain extends formae.SubResource {
+    /// Set this to `true` to enable draining, or leave it unset. Do not declare
+    /// it as `false`: this API renders its JSON the proto3 way and omits false
+    /// booleans, so `{"enable": false}` is read back as `{}` — verified live.
+    /// A declared `false` would therefore disagree with the reported state on
+    /// every sync, which reads as permanent drift. The same caution applies to
+    /// every other boolean in this API.
+    @gcp.FieldHint
+    enable: Boolean?
+}
+
+/// The health floor below which traffic fails over out of a region.
+@gcp.SubResourceHint
+open class FailoverConfig extends formae.SubResource {
+    /// Percentage (1–99) of healthy backends a region must keep to go on
+    /// serving its own traffic.
+    @gcp.FieldHint
+    failoverHealthThreshold: Int?
+}
+
+/// How strictly traffic is kept in the region it arrived in.
+@gcp.SubResourceHint
+open class IsolationConfig extends formae.SubResource {
+    @gcp.FieldHint
+    isolationGranularity: IsolationGranularity?
+
+    @gcp.FieldHint
+    isolationMode: IsolationMode?
+}
+
+open class ServiceLbPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ServiceLbPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ServiceLbPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-lb-policy"). Immutable — it is the resource path, and
+    /// travels as ?serviceLbPolicyId= on create.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// How traffic is spread over regions. Mutable: SPRAY_TO_REGION was
+    /// patched to WATERFALL_BY_REGION live and read back changed.
+    @gcp.FieldHint
+    loadBalancingAlgorithm: LoadBalancingAlgorithm?
+
+    /// Automatic capacity draining. Mutable.
+    @gcp.FieldHint
+    autoCapacityDrain: AutoCapacityDrain?
+
+    /// The failover health floor. Mutable.
+    @gcp.FieldHint
+    failoverConfig: FailoverConfig?
+
+    /// Regional traffic isolation. Mutable.
+    @gcp.FieldHint
+    isolationConfig: IsolationConfig?
+
+    /// An optional description. Absent rather than empty when never set, so no
+    /// provider default.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format. See mesh.pkl for the
+    /// label-clearing behaviour this API's PATCH has.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ServiceLbPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
