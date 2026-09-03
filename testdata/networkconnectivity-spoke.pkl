@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/network.pkl"
+import "@gcp/networkconnectivity/hub.pkl"
+import "@gcp/networkconnectivity/spoke.pkl"
+import "./config/vars.pkl" as v
+
+// A spoke attaches a network to a hub, so both have to exist first. Each is
+// referenced through its resolvable, which is what orders the creates - a name
+// interpolated into a string would carry no edge and the spoke would race its
+// own prerequisites.
+//
+// All three are free to hold: a hub is a control-plane object, an empty VPC
+// costs nothing, and a VPC spoke provisions no underlay of its own. The other
+// spoke kinds do - VPN tunnels, interconnect attachments and router appliances
+// all bill by the hour - which is why this plugin exposes only this one.
+//
+// Exactly one network, on purpose: the project's VPC quota is 30 and a full
+// conformance matrix runs it down, so every fixture that needs a network keeps
+// to a single one.
+local net = new network.Network {
+  label = "plugin-sdk-test-nc-spk-network"
+  name = "formae-test-nc-spk-net-\(v.testRunID)"
+  description = "Test network for the network connectivity spoke conformance test"
+  autoCreateSubnetworks = false
+}
+
+local h = new hub.Hub {
+  label = "plugin-sdk-test-nc-spk-hub"
+  name = "formae-test-nc-spk-hub-\(v.testRunID)"
+  description = "Test hub for the network connectivity spoke conformance test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  net
+  h
+
+  new spoke.Spoke {
+    label = "plugin-sdk-test-nc-spoke"
+    name = "formae-test-nc-spk-\(v.testRunID)"
+    // The hub resolvable yields the hub's short id; the plugin expands it to
+    // the full path the API wants and shortens it again on read.
+    hub = h.res.name
+    linkedVpcNetwork = new spoke.LinkedVpcNetwork {
+      // The API echoes the selfLink form back on read, so declaring it this
+      // way round-trips; the relative form would not match what it reports.
+      uri = net.res.selfLink
+    }
+    description = "Test spoke for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

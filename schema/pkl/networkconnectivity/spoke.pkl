@@ -1,0 +1,133 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Connectivity Spoke
+///
+/// What actually attaches to a Network Connectivity Center hub. A hub on its
+/// own connects nothing; a spoke links one network resource into the hub's
+/// mesh, and the hub then propagates that resource's routes to every other
+/// spoke it has accepted.
+///
+/// This module exposes only the VPC-network spoke — `linkedVpcNetwork`. The
+/// other spoke kinds (`linkedVpnTunnels`, `linkedInterconnectAttachments`,
+/// `linkedRouterApplianceInstances`, `gateway`) are deliberately left out:
+/// each of them requires an underlay that bills by the hour, so a conformance
+/// run over them would cost money to hold. A VPC spoke, by contrast, is free —
+/// it attaches a network that already exists and provisions nothing.
+///
+/// Global (it lives under locations/global, like the hub it joins). Create,
+/// patch and delete are all long-running operations.
+module gcp.networkconnectivity.spoke
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkConnectivity::Spoke"
+
+/// The VPC network this spoke links into the hub.
+@gcp.SubResourceHint
+open class LinkedVpcNetwork extends formae.SubResource {
+    /// The network itself. The API echoes back exactly the Compute self link
+    /// form ("https://www.googleapis.com/compute/v1/projects/{p}/global/networks/{n}"),
+    /// so pass a network's `selfLink` resolvable and the value round-trips
+    /// without any rewriting.
+    @gcp.FieldHint
+    uri: String|formae.Resolvable
+
+    /// Restrict propagation to these IP ranges instead of the whole network.
+    @gcp.FieldHint
+    includeExportRanges: Listing<String>?
+
+    /// Withhold these IP ranges from propagation.
+    @gcp.FieldHint
+    excludeExportRanges: Listing<String>?
+}
+
+open class SpokeResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SpokeResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Spoke extends formae.Resource {
+    hidden parent = this
+
+    /// Short spoke id (e.g. "my-spoke"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The hub to attach to. Declare it as a Hub resolvable, which yields the
+    /// hub's short id; the plugin expands that to the full
+    /// "projects/{p}/locations/global/hubs/{name}" path the API requires and
+    /// shortens it again on read. Immutable — a spoke cannot be moved between
+    /// hubs.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    hub: String|formae.Resolvable
+
+    /// The VPC network to link. Immutable: which network a spoke carries is
+    /// fixed when it is created.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    linkedVpcNetwork: LinkedVpcNetwork
+
+    /// An optional description. One of only two mutable fields on a spoke.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format. The other mutable field.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Which kind of spoke this is, e.g. VPC_NETWORK. Output only: the API
+    /// derives it from whichever linked-* field was set at creation.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    spokeType: String?
+
+    /// Lifecycle state, e.g. ACTIVE or CREATING. Server-owned.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    state: String?
+
+    /// Server-assigned identifier, stable for the life of the spoke and reused
+    /// by nothing else even after it is deleted.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    uniqueId: String?
+
+    /// The hub route group the spoke landed in. Assigned by the hub — a
+    /// PRESET-topology hub puts every spoke in its "default" group.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    group: String?
+
+    /// Server-assigned concurrency token, bumped on every patch. Never sent
+    /// back on a write.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    etag: String?
+
+    hidden res: SpokeResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
