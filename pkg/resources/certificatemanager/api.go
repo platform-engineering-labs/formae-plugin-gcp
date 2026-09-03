@@ -29,6 +29,21 @@ var CertificateManagerOperations = base.OperationConfig{
 	OperationURLBuilder:    func(_ base.PathContext, opID string) string { return opID },
 	NativeIDExtractor:      extractCertificateManagerNativeID,
 	OperationStatusChecker: checkOperationStatus,
+
+	// A certificate's delete is a long-running operation, so the certificate can
+	// still be referencing its authorization when the authorization's own delete
+	// arrives - Destroy walks the dependency order, it does not wait for the
+	// API to finish. The answer is
+	//
+	//	can't delete dns authorization that is referenced by a certificate
+	//
+	// which is a race, not a refusal: it stops being true as soon as the
+	// certificate is gone. Reporting it as retryable lets formae re-run the
+	// delete until it succeeds, the same way Cloud SQL handles a database whose
+	// sessions have not yet been reaped.
+	RetryableError: func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "referenced by a certificate")
+	},
 }
 
 // CertificateManagerNativeID - the full resource path, in one of two shapes:
@@ -51,10 +66,30 @@ const certificateManagerLocation = "global"
 
 // certificateManagerPathBuilder builds
 // /projects/{p}/locations/global[/{parentType}/{parent}]/{resourceType}[/{name}].
+// parentCollectionOf names the collection a nested type hangs off, for the one
+// case where PathContext cannot say: a List with no parent.
+var parentCollectionOf = map[string]string{
+	"certificateMapEntries": "certificateMaps",
+}
+
 func certificateManagerPathBuilder(ctx base.PathContext) string {
 	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, certificateManagerLocation)
-	if ctx.ParentType != "" && ctx.ParentResource != "" {
+	switch {
+	case ctx.ParentType != "" && ctx.ParentResource != "":
 		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	case parentCollectionOf[ctx.ResourceType] != "":
+		// A List with no parent: discovery calls it with nothing to walk from,
+		// and PathContext carries no ParentType then either, so the parent has
+		// to come from the resource type itself. Without this the URL is
+		// ".../locations/global/certificateMapEntries", which addresses a
+		// collection that does not exist - the entries are never listed and the
+		// resource never appears in inventory.
+		//
+		// Certificate Manager accepts "-" as a wildcard parent, enumerating
+		// entries across every map in one call. That is cheaper than walking the
+		// maps, which is what the same problem needed in Service Directory and
+		// Cloud SQL, where no wildcard is offered.
+		path += fmt.Sprintf("/%s/-", parentCollectionOf[ctx.ResourceType])
 	}
 	path += "/" + ctx.ResourceType
 	if ctx.ResourceName != "" {

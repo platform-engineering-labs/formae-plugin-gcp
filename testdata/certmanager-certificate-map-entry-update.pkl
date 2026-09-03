@@ -1,0 +1,68 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificatemanager/certificateMap.pkl" as certificateMap
+import "@gcp/certificatemanager/dnsAuthorization.pkl" as dnsAuthorization
+import "@gcp/certificatemanager/certificate.pkl" as certificate
+import "@gcp/certificatemanager/certificateMapEntry.pkl" as certificateMapEntry
+import "./config/vars.pkl" as v
+
+// An entry is a row of a map - which certificates to serve for a hostname - so
+// it needs the map above it and a certificate to point at. All three are
+// referenced through their resolvables, which is what orders the creates.
+//
+// The certificate is managed and stays in PROVISIONING, and the entry stays
+// PENDING with it, because example.com is not ours. Neither state blocks any
+// phase this case exercises.
+local auth = new dnsAuthorization.DnsAuthorization {
+  label = "plugin-sdk-test-cme-dns-auth"
+  name = "formae-test-cme-da-\(v.testRunID)"
+  domain = "formae-test-cme-\(v.testRunID).example.com"
+}
+
+local cert = new certificate.Certificate {
+  label = "plugin-sdk-test-cme-certificate"
+  name = "formae-test-cme-cert-\(v.testRunID)"
+  managedCertificate = new certificate.ManagedCertificate {
+    domains = new Listing {
+      "formae-test-cme-\(v.testRunID).example.com"
+    }
+    dnsAuthorizations = new Listing {
+      auth.res.name
+    }
+  }
+}
+
+local map = new certificateMap.CertificateMap {
+  label = "plugin-sdk-test-cme-map"
+  name = "formae-test-cme-map-\(v.testRunID)"
+  description = "Map owning the entry under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  auth
+  cert
+  map
+
+  new certificateMapEntry.CertificateMapEntry {
+    label = "plugin-sdk-test-certmanager-certificate-map-entry"
+    name = "formae-test-cme-\(v.testRunID)"
+    certificateMap = map.res.name
+    hostname = "formae-test-cme-\(v.testRunID).example.com"
+    certificates = new Listing {
+      cert.res.name
+    }
+    description = "Updated certificate map entry description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

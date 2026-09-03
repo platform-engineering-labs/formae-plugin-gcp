@@ -28,6 +28,34 @@ formae agent.
 
 ### Added
 
+- `GCP::CertificateManager::Certificate` — a TLS certificate a load balancer can
+  serve. A *managed* one is obtained and renewed by Google against a
+  `DnsAuthorization` and carries no private key, which is the kind a repository
+  can describe; `selfManaged` is the other half of the type. Creation returns
+  immediately and a managed certificate then sits in `PROVISIONING` until the
+  authorizing DNS record resolves, which is a property of the domain rather than
+  of the resource.
+
+  The API field is `managed`. A forma cannot use that name — `managed` is a fixed
+  property of `formae.Resource` — so the schema calls it `managedCertificate` and
+  the plugin renames it in both directions.
+
+- `GCP::CertificateManager::CertificateMapEntry` — one row of a certificate map:
+  which certificates to serve for a hostname. Give either `hostname` or
+  `matcher`, where `matcher = "PRIMARY"` is the fallback when no hostname
+  matches.
+
+  A forma names the certificates and authorizations it points at by short id,
+  because that is all a reference can yield, while the API wants a full path on
+  the way in and answers with one — carrying the project *number* where the forma
+  used the project id. Both fields are immutable, so the plugin expands the
+  request and shortens the response; with only one half, every re-apply would
+  plan a replacement of a certificate that a map entry still references, and the
+  delete would then be refused.
+
+  Deleting a `DnsAuthorization` while a certificate still references it is
+  likewise reported as retryable rather than fatal: the certificate's own delete
+  is a long-running operation, so the refusal is a race that clears itself.
 - `GCP::NetworkSecurity::AddressGroup` — a named, reusable set of IP addresses and
   CIDR blocks that firewall policy and Cloud Armor rules match against, so a rule
   names one group instead of restating every address. Global, and free: a group

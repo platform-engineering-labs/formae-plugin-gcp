@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/certificatemanager/dnsAuthorization.pkl" as dnsAuthorization
+import "@gcp/certificatemanager/certificate.pkl" as certificate
+import "./config/vars.pkl" as v
+
+// A managed certificate, so the case carries no private key. Google proves
+// control of the domain through the authorization below, which is why that comes
+// first - referenced through its resolvable, which is what orders the creates.
+//
+// The certificate never becomes ACTIVE: example.com is not ours, so the CNAME
+// the authorization asks for never resolves and it sits in PROVISIONING. That is
+// a property of the domain, not of the resource, and every phase this case
+// exercises - create, read, update, delete - works regardless.
+local auth = new dnsAuthorization.DnsAuthorization {
+  label = "plugin-sdk-test-cert-dns-auth"
+  name = "formae-test-cert-da-\(v.testRunID)"
+  domain = "formae-test-cert-\(v.testRunID).example.com"
+  description = "Authorization for the certificate under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  auth
+
+  new certificate.Certificate {
+    label = "plugin-sdk-test-certmanager-certificate"
+    name = "formae-test-cert-\(v.testRunID)"
+    managedCertificate = new certificate.ManagedCertificate {
+      domains = new Listing {
+        "formae-test-cert-\(v.testRunID).example.com"
+      }
+      // Certificate Manager reports this back with the project number in place
+      // of the project id; the plugin rewrites it so the two forms agree.
+      dnsAuthorizations = new Listing {
+        auth.res.name
+      }
+    }
+    description = "Test certificate for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}
