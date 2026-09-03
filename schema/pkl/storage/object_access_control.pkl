@@ -99,11 +99,14 @@ open class ObjectAccessControl extends formae.Resource {
     }
     entityId: String?
 
-    /// The content generation of the object, if applied to an object (output only)
+    /// The content generation of the object, if applied to an object (output only).
+    /// The JSON API reports int64 as a string, and declaring it Int made the
+    /// extracted forma disagree with the read on type alone - a re-apply of an
+    /// unchanged ACL planned a replace of this field.
     @gcp.FieldHint {
         hasProviderDefault = true
     }
-    generation: Int?
+    generation: String?
 
     /// The project team associated with the entity (output only)
     @gcp.FieldHint {

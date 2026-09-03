@@ -36,5 +36,12 @@ forma {
     dataExchange = cleanRoom.res.name
     displayName = "formae plugin sdk test query template"
     description = "Created by the formae GCP plugin conformance suite."
+    // Required: without it the API answers "Query template routine must be
+    // provided." A routine is still not enough on its own - see the entry for
+    // this case in testdata/on-demand-cases.txt.
+    routine = new queryTemplate.Routine {
+      routineType = "TABLE_VALUED_FUNCTION"
+      definitionBody = "SELECT 1 AS n"
+    }
   }
 }

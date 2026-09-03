@@ -8,7 +8,7 @@
 # Two reasons this cannot ride along with the generic sweep in
 # clean-environment.sh: gcloud has no analytics-hub surface, and Analytics Hub
 # ids allow only letters, digits and underscores - so these resources are named
-# "formae_plugin_sdk_test_..." and the "formae-plugin-sdk" grep every other
+# with underscores ("formae_test_le_...") and the hyphenated grep every other
 # sweep uses would never match them.
 set -uo pipefail
 
@@ -27,7 +27,7 @@ names_in() { # full collection URL, items key -> test-owned resource names
     curl -s -H "Authorization: Bearer ${TOKEN}" "$1" \
         | grep -o '"name": *"[^"]*"' \
         | sed -E 's/.*"(projects\/[^"]*)".*/\1/' \
-        | grep "formae_plugin_sdk_test" || true
+        | grep -E 'formae_(test|probe|plugin)_' || true
 }
 
 delete() {

@@ -150,11 +150,24 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
-  url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule)
+  url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule|target-https-proxy|target-ssl-proxy|ssl-certificate)
     # Load-balancer chains create 3-5 dependent resources serially
     # (health-check -> backend-service -> url-map -> proxy -> rule). The CRUD
     # lifecycle already runs ~4m13s on a good day - 84% of the 5m default - so
     # any per-op or operator-startup jitter tips it over.
+    #
+    # The two TLS proxies and the certificate itself belong here for the same
+    # reason and were the only members of the family left on the default: each
+    # adds a managed SSL certificate to the chain.
+    TIMEOUT_ARG="TIMEOUT=15"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
+  network-firewall-policy-association|region-network-firewall-policy-association|network-firewall-policy-rule)
+    # Attaching a network firewall policy is a slow global operation - it has to
+    # propagate before it reports DONE - and the case builds a network and the
+    # policy itself first, three serial operations before any of them is read
+    # back. network-firewall-policy-association timed out on Create at the 5m
+    # default in the 2026-09-03 nightly with nothing wrong at the API.
     TIMEOUT_ARG="TIMEOUT=15"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;

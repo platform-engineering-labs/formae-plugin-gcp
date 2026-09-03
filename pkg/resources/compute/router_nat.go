@@ -259,12 +259,13 @@ func (p *RouterNatProvisioner) Read(
 	for k, v := range nat {
 		out[k] = v
 	}
-	// Return router as its full selfLink URL so it round-trips against a
-	// resolvable reference (router = someRouter.res.selfLink); a bare name would
-	// drift against the resolved full URL (see PLA-265).
-	out["router"] = fmt.Sprintf(
-		"https://www.googleapis.com/compute/v1/projects/%s/regions/%s/routers/%s",
-		project, region, router)
+	// The router and region are path components, so put them back for
+	// comparison against the declared forma - the router as the bare name the
+	// forma names it by, the way the other router sub-resources do. Reporting
+	// the full selfLink instead made a re-apply of the extracted forma plan a
+	// delete-and-create: "router" is createOnly, and a resolved bare name never
+	// equals a URL.
+	out["router"] = router
 	out["region"] = region
 
 	// Strip provider-populated fields that no forma declares, or they read back

@@ -172,6 +172,14 @@ func listingRequest(props map[string]interface{}, ctx base.TransformContext) (ma
 	if err != nil {
 		return nil, err
 	}
+	// The published dataset is fixed at creation ("The field 'bigquery_dataset'
+	// cannot be updated on this listing"), and the update mask is built from
+	// the body, so leaving it in asks the API to change it and fails every
+	// update - even one that only touches the description.
+	if ctx.Operation == resource.OperationUpdate {
+		delete(body, "bigqueryDataset")
+		return body, nil
+	}
 	source, ok := body["bigqueryDataset"].(map[string]interface{})
 	if !ok {
 		return body, nil
@@ -204,6 +212,14 @@ func listingResponse(props map[string]interface{}, ctx base.TransformContext) ma
 		if i := strings.LastIndex(dataset, "/datasets/"); i >= 0 {
 			copied["dataset"] = dataset[i+len("/datasets/"):]
 		}
+	}
+	// Provider-assigned noise inside a declared object: the API reports the
+	// replication state of the shared dataset and an all-false export policy on
+	// every listing, neither of which a forma declares. Unexpected keys under a
+	// declared property read back as drift, so they are dropped the way
+	// separately-owned mirrors are elsewhere.
+	for _, k := range []string{"effectiveReplicas", "restrictedExportPolicy"} {
+		delete(copied, k)
 	}
 	out["bigqueryDataset"] = copied
 	return out

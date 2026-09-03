@@ -175,6 +175,14 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Clean test resources
+        # SSL certificates are capped at 10 per project globally and the cap is
+        # not per-run: a case that leaves one behind eats the budget for every
+        # later run, and once it is full every certificate insert is refused.
+        # Nine leaked certificates is how target-https-proxy, target-ssl-proxy
+        # and ssl-certificate all failed in the 2026-09-03 nightly. The sweep
+        # only takes names matching SWEEP_RE and never the ones in KEEP_RE.
+        env:
+          FORMAE_SWEEP_SSL_CERTIFICATES: "1"
         run: ./scripts/ci/clean-environment.sh
 
   # Conformance tests run the full CRUD lifecycle against real GCP resources.
@@ -275,6 +283,14 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Clean test resources
+        # SSL certificates are capped at 10 per project globally and the cap is
+        # not per-run: a case that leaves one behind eats the budget for every
+        # later run, and once it is full every certificate insert is refused.
+        # Nine leaked certificates is how target-https-proxy, target-ssl-proxy
+        # and ssl-certificate all failed in the 2026-09-03 nightly. The sweep
+        # only takes names matching SWEEP_RE and never the ones in KEEP_RE.
+        env:
+          FORMAE_SWEEP_SSL_CERTIFICATES: "1"
         run: ./scripts/ci/clean-environment.sh
 
   # Notify when build is fixed (was red, now green)
