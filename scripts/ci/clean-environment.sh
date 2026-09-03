@@ -1652,3 +1652,199 @@ if [ -n "$EV_PROJECT" ] && [ -n "$EV_TOKEN" ]; then
 else
     echo "  Skipping Eventarc Advanced (no project or token)"
 fi
+
+# --- 26. Network Security. Nothing in this API was swept before this section
+#         existed, and eight of its types now ship: the four in the first batch
+#         (address groups, URL lists, security profiles and profile groups) plus
+#         the six added with the client/server TLS policies. None of them costs
+#         money to hold - a security profile is billable only once an
+#         organization-level firewall endpoint attaches to it - but an
+#         unswept collection is exactly how the SSL-certificate cap was reached,
+#         so they are collected all the same.
+#
+#         Ordering matters in one place: a gateway security policy DELETE is
+#         refused with HTTP 400 while it still has rules, so the rules go first.
+#         gcloud's network-security surface does not cover most of these
+#         collections, so this is REST throughout.
+echo "Cleaning GCP Network Security..."
+NS_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+NS_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+NS_REGION="${GCP_REGION:-europe-central2}"
+if [ -n "$NS_PROJECT" ] && [ -n "$NS_TOKEN" ]; then
+    ns_list() {
+        curl -s -H "Authorization: Bearer ${NS_TOKEN}" "$1" \
+            | grep -oE '"name": *"[^"]+"' \
+            | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+            | grep -v '/operations/' || true
+    }
+    # A gateway security policy's rules are addressed under their parent, and the
+    # API takes "-" as a wildcard parent, so one call names every rule in the
+    # region without walking the policies.
+    NS_RULES=$(ns_list "https://networksecurity.googleapis.com/v1/projects/${NS_PROJECT}/locations/${NS_REGION}/gatewaySecurityPolicies/-/rules")
+    if [ -n "$NS_RULES" ]; then
+        echo "$NS_RULES" | while read -r r; do
+            # The rule's own short name is the last segment; the parent policy
+            # name is what precedes "/rules/", and either may carry the prefix.
+            rn="${r##*/}"
+            if echo "$rn" | grep -Eq "$SWEEP_RE" && ! echo "$rn" | grep -Eq "$KEEP_RE"; then
+                echo "  Deleting Network Security gatewaySecurityPolicy rule: $rn"
+                curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${NS_TOKEN}" \
+                  "https://networksecurity.googleapis.com/v1/${r}" || true
+            fi
+        done
+    else
+        echo "  No Network Security gateway security policy rules found"
+    fi
+    # "<collection> <location>" - tlsInspectionPolicies and gatewaySecurityPolicies
+    # and urlLists are regional; the rest live under locations/global. Asking for
+    # the wrong scope is not an empty answer here, it is HTTP 400, so the split
+    # is explicit rather than inferred.
+    for ns in "addressGroups global" "securityProfiles global" "securityProfileGroups global" \
+              "clientTlsPolicies global" "serverTlsPolicies global" \
+              "backendAuthenticationConfigs global" "authorizationPolicies global" \
+              "dnsThreatDetectors global" \
+              "urlLists ${NS_REGION}" "gatewaySecurityPolicies ${NS_REGION}" \
+              "tlsInspectionPolicies ${NS_REGION}"; do
+        ns_coll="${ns%% *}"; ns_loc="${ns##* }"
+        NS_API="https://networksecurity.googleapis.com/v1/projects/${NS_PROJECT}/locations/${ns_loc}/${ns_coll}"
+        NS_ITEMS=$(ns_list "$NS_API" | sed 's#.*/##' | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+        if [ -n "$NS_ITEMS" ]; then
+            echo "$NS_ITEMS" | while read -r item; do
+                echo "  Deleting Network Security $ns_coll: $item"
+                curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${NS_TOKEN}" "${NS_API}/${item}" || true
+            done
+        else
+            echo "  No Network Security $ns_coll found"
+        fi
+    done
+else
+    echo "  Skipping Network Security (no project or token)"
+fi
+
+# --- 27. Network Connectivity service connection tokens. Regional, and they
+#         carry a server-set 30-minute expireTime - but an expired token is not
+#         necessarily a deleted one, so they are collected like anything else. ---
+echo "Cleaning GCP Network Connectivity service connection tokens..."
+NCT_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+NCT_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+if [ -n "$NCT_PROJECT" ] && [ -n "$NCT_TOKEN" ]; then
+    NCT_API="https://networkconnectivity.googleapis.com/v1/projects/${NCT_PROJECT}/locations/${GCP_REGION:-europe-central2}/serviceConnectionTokens"
+    NCT_ITEMS=$(curl -s -H "Authorization: Bearer ${NCT_TOKEN}" "$NCT_API" \
+        | grep -oE '"name": *"[^"]+"' \
+        | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+        | sed 's#.*/##' \
+        | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$NCT_ITEMS" ]; then
+        echo "$NCT_ITEMS" | while read -r item; do
+            echo "  Deleting service connection token: $item"
+            curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${NCT_TOKEN}" "${NCT_API}/${item}" || true
+        done
+    else
+        echo "  No service connection tokens found"
+    fi
+else
+    echo "  Skipping service connection tokens (no project or token)"
+fi
+
+# --- 28. Backend buckets, global and regional. Free, but they pin the Cloud
+#         Storage bucket they serve, so they have to go before section 8 can
+#         delete it - and until now nothing swept them at all.
+#
+#         REST rather than gcloud: "gcloud compute backend-buckets list" takes
+#         neither --global nor --regions and only ever lists the global
+#         collection, so the regional one has no gcloud surface to sweep with. ---
+echo "Cleaning GCP backend buckets..."
+BB_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+BB_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+if [ -n "$BB_PROJECT" ] && [ -n "$BB_TOKEN" ]; then
+    for bb in "global/backendBuckets" "regions/${GCP_REGION:-europe-central2}/backendBuckets"; do
+        BB_API="https://compute.googleapis.com/compute/v1/projects/${BB_PROJECT}/${bb}"
+        BB_ITEMS=$(curl -s -H "Authorization: Bearer ${BB_TOKEN}" "$BB_API" \
+            | grep -oE '"name": *"[^"]+"' \
+            | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+            | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+        if [ -n "$BB_ITEMS" ]; then
+            echo "$BB_ITEMS" | while read -r b; do
+                echo "  Deleting backend bucket (${bb%%/*}): $b"
+                curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${BB_TOKEN}" "${BB_API}/${b}" || true
+            done
+        else
+            echo "  No backend buckets in ${bb%%/*} found"
+        fi
+    done
+else
+    echo "  Skipping backend buckets (no project or token)"
+fi
+
+# --- 29. Compute rollout plans (global) and zonal VM extension policies. Both
+#         are configuration and cost nothing, but a VM extension policy with no
+#         instanceSelectors targets every VM in its zone, so a leaked one is a
+#         behaviour change rather than a bill. gcloud has no surface for either. ---
+echo "Cleaning GCP Compute rollout plans and VM extension policies..."
+CX_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+CX_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+if [ -n "$CX_PROJECT" ] && [ -n "$CX_TOKEN" ]; then
+    for cx in "global/rolloutPlans" "zones/${GCP_ZONE:-europe-central2-b}/vmExtensionPolicies"; do
+        CX_API="https://compute.googleapis.com/compute/v1/projects/${CX_PROJECT}/${cx}"
+        CX_ITEMS=$(curl -s -H "Authorization: Bearer ${CX_TOKEN}" "$CX_API" \
+            | grep -oE '"name": *"[^"]+"' \
+            | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+            | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+        if [ -n "$CX_ITEMS" ]; then
+            echo "$CX_ITEMS" | while read -r item; do
+                echo "  Deleting compute ${cx##*/}: $item"
+                curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${CX_TOKEN}" "${CX_API}/${item}" || true
+            done
+        else
+            echo "  No compute ${cx##*/} found"
+        fi
+    done
+else
+    echo "  Skipping compute rollout plans and VM extension policies (no project or token)"
+fi
+
+# --- 30. Memorystore for Redis ACL policies. Regional configuration objects,
+#         free to hold: a policy is only billed through the clusters that attach
+#         it, and no cluster is ever created by a conformance run. ---
+echo "Cleaning GCP Redis ACL policies..."
+RA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+RA_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+if [ -n "$RA_PROJECT" ] && [ -n "$RA_TOKEN" ]; then
+    RA_API="https://redis.googleapis.com/v1/projects/${RA_PROJECT}/locations/${GCP_REGION:-europe-central2}/aclPolicies"
+    RA_ITEMS=$(curl -s -H "Authorization: Bearer ${RA_TOKEN}" "$RA_API" \
+        | grep -oE '"name": *"[^"]+"' \
+        | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+        | sed 's#.*/##' \
+        | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$RA_ITEMS" ]; then
+        echo "$RA_ITEMS" | while read -r item; do
+            echo "  Deleting Redis ACL policy: $item"
+            curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${RA_TOKEN}" "${RA_API}/${item}" || true
+        done
+    else
+        echo "  No Redis ACL policies found"
+    fi
+else
+    echo "  Skipping Redis ACL policies (no project or token)"
+fi
+
+# --- 31. Spanner user-managed instance configurations. Free - nothing is
+#         provisioned until an instance is created against one - but they need
+#         their own pattern: Spanner requires a user-managed configuration's id
+#         to begin "custom-", so the fixture is named
+#         "custom-formae-test-sic-<runID>" and SWEEP_RE, which is anchored at the
+#         start of the name, does not match it. This is the one place a sweep
+#         deliberately matches a prefixed form; narrowing SWEEP_RE instead would
+#         loosen it for every other collection. Google-managed configurations
+#         have no "custom-" prefix, so they can never be caught by this. ---
+echo "Cleaning GCP Spanner instance configurations..."
+SIC_RE="${SIC_RE:-^custom-formae[-_](test|probe|plugin)[-_]}"
+SIC=$(gcloud spanner instance-configs list --format="value(name)" 2>/dev/null | sed 's#.*/##' | grep -E "$SIC_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$SIC" ]; then
+    echo "$SIC" | while read -r c; do
+        echo "  Deleting Spanner instance configuration: $c"
+        gcloud spanner instance-configs delete "$c" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Spanner instance configurations found"
+fi

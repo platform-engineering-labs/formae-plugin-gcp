@@ -28,6 +28,218 @@ formae agent.
 
 ### Added
 
+- `GCP::NetworkSecurity::ClientTlsPolicy` — the client half of a TLS connection a
+  Google-managed proxy makes on your behalf: `clientCertificate` is what it
+  presents upstream, `serverValidationCa` is who it believes about the upstream's
+  own certificate, and `sni` is the name it asks for. A policy on its own connects
+  to nothing — a backend service or a mesh route names it — and it is free to
+  hold. Global; create, update and delete are long-running operations. `name` is
+  the resource's path rather than a body field and the update mask is built from
+  the body, so it leaves before every patch.
+
+- `GCP::NetworkSecurity::ServerTlsPolicy` — the server half: which certificate a
+  Google-managed proxy serves, and whether it demands a client certificate in
+  return. `allowOpen` is the "plaintext is acceptable too" switch, and it is what
+  makes a policy declarable with no certificate to point at — which is how the
+  conformance case runs with no key material, CA pool or trust config.
+
+- `GCP::NetworkSecurity::BackendAuthenticationConfig` — what a load balancer
+  trusts when it opens a TLS connection *to* a backend: `wellKnownRoots` for the
+  public root set or a Certificate Manager `trustConfig` for a private one, plus
+  an optional client certificate to present.
+
+  Unusually for this API the response really does carry an `etag`, and every patch
+  rolls it, so the field is tolerated as a provider default but never sent back:
+  replaying a stored etag stakes a claim on a version the server has already moved
+  past, and with the mask built from the body it would land in the mask as well.
+
+- `GCP::NetworkSecurity::AuthorizationPolicy` — who may talk to a service mesh
+  workload: a list of match rules and one verdict, ALLOW or DENY, for whatever
+  matches them. Enforcement belongs to the sidecars of a mesh that names the
+  policy, so a policy on its own enforces nothing and costs nothing. The rules are
+  a three-deep nest — rules, then sources and destinations, then a header match —
+  and every one of those classes extends `formae.SubResource`, because schema
+  extraction only walks nested classes that formally do and their `@gcp.FieldHint`
+  annotations would otherwise never reach the schema.
+
+- `GCP::NetworkSecurity::GatewaySecurityPolicy` — the container for Secure Web
+  Proxy rules, and the thing a gateway points at. Regional, which makes it the
+  second collection in this API that is not global: asked for `locations/global`
+  it answers 400 "Malformed name", so like `urlLists` it is deliberately absent
+  from the plugin's global-collection map and inherits the target's region.
+
+  One API behaviour the type compensates for: a policy created without a TLS
+  inspection policy is reported back with `tlsInspectionPolicy` set to the empty
+  string. Left alone, state carries a value against a declaration that omits the
+  field and every sync reads it as drift, so the empty string is stripped on read.
+  Attaching a real one is out of scope for the conformance suite — a TLS
+  inspection policy needs a CA pool with an enabled, and therefore billable,
+  certificate authority behind it, which is also why `tlsInspectionPolicies` is
+  not part of this batch.
+
+- `GCP::NetworkSecurity::GatewaySecurityPolicyRule` — one rule of a Secure Web
+  Proxy policy: a CEL `sessionMatcher`, a `priority`, and ALLOW or DENY. Nested
+  under its policy and regional with it.
+
+  `gatewaySecurityPolicy` addresses the rule rather than describing it: the API
+  rejects it as an unknown body field on create as well as on update, so it is
+  dropped from every request and lifted back out of the path the API reports.
+  Recovering it from the response rather than from the request context is what
+  makes discovery work: a List goes through the API's `-` wildcard parent, which
+  enumerates the rules of every policy in the region in one call, so there is no
+  parent in context but every listed item still carries its own full path. The
+  native ID gained a parser for the same reason — the generic path parser
+  overwrites the resource type as it walks, so a rule's id arrived with its parent
+  silently dropped and the read addressed a collection that does not exist.
+
+  `applicationMatcher` comes back as an empty string for a rule that never sent
+  one and is stripped, the same artifact as the policy's `tlsInspectionPolicy`;
+  `tlsInspectionEnabled` comes back as `false` and is a top-level bool, so a
+  schema hint reaches it and it is tolerated in place. Deleting a policy that
+  still has rules is refused with HTTP 400, and declaring the policy through its
+  resolvable is what fixes the order.
+
+- `GCP::NetworkSecurity::DnsThreatDetector` — a subscription that has Cloud DNS
+  queries checked against a threat intelligence feed, so a lookup of a
+  known-malicious domain is flagged; `provider` names who holds the intelligence.
+  Global — asked for a region the API answers 400 "Malformed name".
+
+  Alone in this API it is synchronous: create and update answer with the resource
+  itself rather than an Operation, so it carries its own `OperationConfig` instead
+  of the registry's asynchronous one. That override is required, not tidiness. A
+  create whose response has no `/operations/` segment leaves the operation-id
+  extractor returning nothing, and unlike delete — which reads an empty operation
+  id as "already finished" — create would report the resource as in progress with
+  an empty request id, poll a URL that is not an operation, and fail on a resource
+  it had in fact created.
+
+  The patch response is also stale: a label added by a patch is absent from what
+  the patch returns and present in the very next read. `provider` is fixed at
+  creation, so it leaves the body on update rather than entering the field mask.
+
+- `GCP::NetworkConnectivity::Spoke` — what actually attaches to a Network
+  Connectivity Center hub. A hub on its own connects nothing; a spoke links one
+  VPC network into its mesh, and the hub then propagates that network's routes to
+  every other spoke it has accepted. Only the VPC-network shape is exposed:
+  `linkedVpnTunnels`, `linkedInterconnectAttachments`,
+  `linkedRouterApplianceInstances` and `gateway` each require an underlay that
+  bills by the hour, while a hub, an empty VPC and a VPC spoke are all free.
+
+  Three API behaviours the type compensates for. The discovery document files
+  spokes under `projects.locations`, which reads as regional, but a VPC spoke was
+  verified to create, read, patch and delete only under `locations/global` — so
+  the collection is pinned global and a target's region can never reach the URL.
+  `hub` is reported as a full resource path while a `Hub` resolvable yields a short
+  id, and the field is immutable, so the plugin expands short to
+  `projects/{p}/locations/global/hubs/{name}` on the way out and shortens it back
+  on the way in; one half without the other would leave the forma and stored state
+  disagreeing forever, with every re-apply planning a replacement the API then
+  refuses. And a spoke reports output-only members inside `linkedVpcNetwork`
+  (`vpcNetwork`, the `proposed*ExportRanges` pair, `producerVpcSpokes`) where a
+  `hasProviderDefault` hint cannot reach them, so they are stripped from the
+  response rather than declared.
+
+- `GCP::Compute::RolloutPlan` — a named, reusable schedule for rolling a change
+  out in stages instead of everywhere at once. Each wave names a slice of the
+  estate, by location or by position in the resource hierarchy, plus the
+  validation that has to pass before the next wave starts.
+
+  Two API behaviours the type compensates for. `rolloutPlans` has insert, get,
+  list and delete and no update method at all, so every field is immutable and the
+  type is registered without an update operation rather than with a patch that
+  would 404 — its conformance case is a `-replace` case. And the server stamps an
+  output-only `number` onto each wave it stores; it sits inside `waves[]`, where a
+  schema hint cannot reach it, so it is stripped on read. Without that strip every
+  read disagrees with the declaration, and because there is no update method the
+  disagreement plans a *replacement* on every reconcile rather than a no-op patch.
+
+  A wave's `includedLocations` takes bare zone or region names. A scoped path is
+  refused outright — `zones/europe-central2-b` answers 400 "RolloutPlan wave has a
+  LocationSelector with invalid location zones/europe-central2-b".
+
+- `GCP::Compute::ZoneVmExtensionPolicy` — a standing instruction that named VM
+  extensions, the Ops Agent for instance, are installed and held at a version on
+  the VMs a selector picks out, in one zone. Nothing has to be baked into an image
+  and no VM has to be touched: the policy is the desired state and Compute
+  converges the fleet onto it, including VMs created after the policy exists.
+
+  `instanceSelectors` is optional, and a policy with none selects **every VM in
+  the zone** and installs the named extension on all of them. The schema says so
+  at the field, and the conformance fixtures always carry a `labelSelector` whose
+  label matches nothing, so the case exercises create, patch and delete while
+  selecting no machine.
+
+  One API behaviour the type compensates for: once a policy has been patched, GCP
+  echoes each `extensionPolicies` entry with a `stringConfig: ""` it was never
+  sent. It is a member of a mapping value, where a hint cannot reach it, so an
+  empty `stringConfig` is stripped on read. An empty `pinnedVersion` is
+  deliberately not stripped: `""` is what a forma says to mean "track the current
+  release", so it is a declared value.
+
+  The global sibling, `globalVmExtensionPolicies`, is deliberately not
+  implemented. Its delete is a `POST .../{name}/delete` carrying a `rolloutInput`
+  body, and — verified live — that call's operation reports DONE while the policy
+  is still there, disappearing only minutes later when an out-of-band purge
+  rollout catches up. A delete the plugin cannot observe completing is a delete it
+  cannot promise. The zonal type has an ordinary DELETE and no such race.
+
+- `GCP::Compute::RegionBackendBucket` — the regional counterpart of
+  `BackendBucket`: the same `backendBuckets` body under `regions/{region}` instead
+  of `global`, so a regional URL map can route static paths to Cloud Storage and
+  dynamic paths to a `RegionBackendService`.
+
+  One API behaviour the type compensates for: `loadBalancingScheme` is required at
+  regional scope, where the global type is happy without it. An insert that omits
+  it is refused with 400 "Load balancing scheme is required for backend bucket of
+  scope REGION", so the field is declared required rather than left to fail at
+  apply time, and narrowed to the two schemes regional scope accepts,
+  `EXTERNAL_MANAGED` and `INTERNAL_MANAGED`.
+
+  That rejection is the one regional-specific behaviour verified live. The full
+  create/read/patch/delete cycle was *not* observed: the probe's insert finished
+  with `GCS_BUCKET_ACCESS_DENIED` because the service account this project is
+  tested with cannot read a Cloud Storage bucket, and the same failure reproduces
+  against the already-shipping global `BackendBucket` with the same bucket — an
+  environment gap, not a property of the type, but not a verified type either.
+
+- `GCP::Redis::AclPolicy` — a named set of Redis OSS ACL rules that a Memorystore
+  for Redis Cluster attaches: each rule binds one IAM user or service account to
+  one rule string. The policy is a standalone configuration object — it provisions
+  nothing and is billed only through the clusters that reference it — which is why
+  this batch covers it and not `GCP::Redis::Cluster`.
+
+  Two API behaviours the type compensates for. It is the one collection in the
+  Redis v1 API that is not a long-running operation: create answers 200 with the
+  finished policy and no Operation to poll, so the registry-wide operation config
+  is overridden per resource. And `clusterAclPolicyAttachments`, the output-only
+  per-cluster attachment status, is a nested array no schema hint can reach: it is
+  stripped on the way in, so a policy some cluster later attaches does not start
+  reading as drift against a forma that never mentioned it.
+
+- `GCP::Spanner::InstanceConfig` — a user-managed configuration naming where a
+  Spanner instance's replicas may live. Configuration only, and free to hold:
+  nothing is provisioned and nothing is billed until an instance is created
+  against it. `replicas` must be the base configuration's own replicas plus one or
+  more of its `optionalReplicas`.
+
+  Three API behaviours the type compensates for. The create body is wrapped and
+  carries the id *twice*: `instanceConfigId` beside the wrapped object and the full
+  resource path inside it — a create that omitted `instanceConfig.name` was refused
+  400 "Invalid CreateInstanceConfig request." with a field violation on
+  `instance_config.name`, so neither `RequestWrapper` nor `CreateIDParam` can build
+  it and the transformer emits the whole envelope itself. The patch field mask goes
+  in the *body* rather than the query string, and it is fixed at
+  `displayName,labels` — the only two fields the API will update — rather than
+  derived from the fields present, so a forma that drops its labels actually clears
+  them. And a read reports `optionalReplicas`, every replica location GCP offers
+  for the base configuration with a display name and a labels map each, which is
+  never declarable and is stripped rather than stored on every configuration.
+
+  Spanner requires a user-managed configuration's id to begin `custom-`, so the
+  conformance fixture is named `custom-formae-test-sic-<runID>` and
+  `scripts/ci/clean-environment.sh` carries its own pattern for that one prefixed
+  form — `SWEEP_RE` is anchored at the start of the name and would not match it.
+
 - `GCP::Compute::PacketMirroring` — a copy of selected VMs' traffic, delivered to
   an internal passthrough load balancer for inspection. `mirroredResources` says
   whose packets to copy — named instances, whole subnets, or network tags — and

@@ -722,6 +722,14 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/regionBackendBucket.pkl#RegionBackendBucket.compressionMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionBackendBucket.pkl#RegionBackendBucket.enableCdn",
+      "disposition": "pending"
+    },
+    {
       "key": "compute/regionBackendService.pkl#RegionBackendService.fingerprint",
       "disposition": "pending"
     },
@@ -1102,6 +1110,18 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/zoneVmExtensionPolicy.pkl#ZoneVmExtensionPolicy.globalResourceLink",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/zoneVmExtensionPolicy.pkl#ZoneVmExtensionPolicy.managedByGlobal",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/zoneVmExtensionPolicy.pkl#ZoneVmExtensionPolicy.state",
+      "disposition": "pending"
+    },
+    {
       "key": "container/cluster.pkl#Cluster.createTime",
       "disposition": "pending"
     },
@@ -1454,11 +1474,39 @@
       "disposition": "pending"
     },
     {
+      "key": "networkconnectivity/spoke.pkl#Spoke.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.group",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.spokeType",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.uniqueId",
+      "disposition": "pending"
+    },
+    {
       "key": "networksecurity/addressGroup.pkl#AddressGroup.purpose",
       "disposition": "pending"
     },
     {
       "key": "networksecurity/addressGroup.pkl#AddressGroup.selfLink",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/backendAuthenticationConfig.pkl#BackendAuthenticationConfig.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/gatewaySecurityPolicyRule.pkl#GatewaySecurityPolicyRule.tlsInspectionEnabled",
       "disposition": "pending"
     },
     {
@@ -1514,6 +1562,26 @@
       "disposition": "pending"
     },
     {
+      "key": "redis/aclPolicy.pkl#AclPolicy.createTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.updateTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.version",
+      "disposition": "pending"
+    },
+    {
       "key": "redis/redisInstance.pkl#Instance.authorizedNetwork",
       "disposition": "pending"
     },
@@ -1559,6 +1627,18 @@
     },
     {
       "key": "spanner/database_spanner.pkl#Database.versionRetentionPeriod",
+      "disposition": "pending"
+    },
+    {
+      "key": "spanner/instanceConfig.pkl#InstanceConfig.configType",
+      "disposition": "pending"
+    },
+    {
+      "key": "spanner/instanceConfig.pkl#InstanceConfig.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "spanner/instanceConfig.pkl#InstanceConfig.state",
       "disposition": "pending"
     },
     {

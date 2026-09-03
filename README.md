@@ -11,7 +11,7 @@ Monitoring and more.
 
 ## Supported Resources
 
-This plugin supports **205 GCP resource types** across 39 services. See
+This plugin supports **219 GCP resource types** across 39 services. See
 [`schema/pkl/`](schema/pkl/) for field definitions.
 
 | Resource Type | Description |
@@ -91,6 +91,7 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::Compute::PacketMirroring` | Copies selected VMs' traffic to an internal load balancer for inspection |
 | `GCP::Compute::ProjectMetadataItem` | One key of the project's common instance metadata |
 | `GCP::Compute::RegionAutoscaler` | Autoscaler for a regional managed instance group |
+| `GCP::Compute::RegionBackendBucket` | Regional load balancer backend that serves objects straight out of a Cloud Storage bucket |
 | `GCP::Compute::RegionBackendService` | Regional backend service |
 | `GCP::Compute::RegionCompositeHealthCheck` | Aggregates one or more `regionHealthSource`s and reports the verdict at a forwarding rule |
 | `GCP::Compute::RegionDisk` | Persistent disk synchronously replicated across two zones in a region |
@@ -112,6 +113,7 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::Compute::RegionTargetTcpProxy` | Regional target TCP proxy |
 | `GCP::Compute::RegionUrlMap` | Regional URL map |
 | `GCP::Compute::ResourcePolicy` | Schedule attached to disks or instances |
+| `GCP::Compute::RolloutPlan` | Named staged rollout schedule - waves of locations, each gated on a validation step |
 | `GCP::Compute::Route` | Static custom route in a VPC |
 | `GCP::Compute::Router` | Cloud Router |
 | `GCP::Compute::RouterInterface` | One interface of a Cloud Router |
@@ -135,6 +137,7 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::Compute::TargetVpnGateway` | Classic, route-based VPN gateway |
 | `GCP::Compute::UrlMap` | Global URL map |
 | `GCP::Compute::VpnTunnel` | Replaces the tunnel |
+| `GCP::Compute::ZoneVmExtensionPolicy` | Keeps named VM extensions installed at a version on the VMs a selector picks out, in one zone |
 | `GCP::Container::Cluster` | GKE cluster |
 | `GCP::Container::NodePool` | GKE node pool |
 | `GCP::DNS::ManagedZone` | Cloud DNS managed zone |
@@ -185,9 +188,17 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::NetworkConnectivity::InternalRange` | A reservation of internal IP space inside a VPC. It marks a CIDR range as spoken for so nothing else is allocated… |
 | `GCP::NetworkConnectivity::PolicyBasedRoute` | A route chosen by what the traffic *is*, not only where it is going |
 | `GCP::NetworkConnectivity::ServiceConnectionPolicy` | Permission, in advance, for a managed service to place Private Service Connect endpoints in a consumer's subnets |
+| `GCP::NetworkConnectivity::Spoke` | Links one VPC network into a Network Connectivity Center hub's mesh |
 | `GCP::NetworkSecurity::AddressGroup` | A named, reusable set of IP addresses and CIDR blocks |
+| `GCP::NetworkSecurity::AuthorizationPolicy` | Who may talk to a service mesh workload: match rules and one verdict, ALLOW or DENY |
+| `GCP::NetworkSecurity::BackendAuthenticationConfig` | What a load balancer trusts when it opens a TLS connection to a backend |
+| `GCP::NetworkSecurity::ClientTlsPolicy` | The client half of a TLS connection a Google-managed proxy makes on your behalf |
+| `GCP::NetworkSecurity::DnsThreatDetector` | Has Cloud DNS queries checked against a threat intelligence feed |
+| `GCP::NetworkSecurity::GatewaySecurityPolicy` | The container for Secure Web Proxy rules, and the thing a gateway points at |
+| `GCP::NetworkSecurity::GatewaySecurityPolicyRule` | One rule of a Secure Web Proxy policy: a session matcher, a priority, and ALLOW or DENY |
 | `GCP::NetworkSecurity::SecurityProfile` | The policy half of Cloud NGFW's layer-7 inspection: what to do about a threat, not where to apply it |
 | `GCP::NetworkSecurity::SecurityProfileGroup` | The binding a firewall policy rule actually names |
+| `GCP::NetworkSecurity::ServerTlsPolicy` | Which certificate a Google-managed proxy serves, and whether it demands one in return |
 | `GCP::NetworkSecurity::UrlList` | A named list of URL patterns for a Secure Web Proxy policy to match on, so a rule names one list rather than… |
 | `GCP::OrgPolicy::Policy` | Policy configures a constraint on a Google Cloud resource |
 | `GCP::PubSub::Schema` | Pub/Sub schema |
@@ -196,6 +207,7 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::PubSub::SubscriptionIamMember` | A single (role, member) binding on a `Subscription`'s IAM policy, managed as read-modify-write so sibling bindings… |
 | `GCP::PubSub::Topic` | Pub/Sub topic |
 | `GCP::PubSub::TopicIamMember` | A single (role, member) binding on a `Topic`'s IAM policy, managed as read-modify-write so sibling bindings survive |
+| `GCP::Redis::AclPolicy` | Redis OSS ACL rules a Memorystore for Redis Cluster attaches |
 | `GCP::Redis::Instance` | Managed Redis instance |
 | `GCP::SQL::BackupRun` | One on-demand backup of a Cloud SQL instance |
 | `GCP::SQL::Database` | Cloud SQL database |
@@ -211,6 +223,7 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::Spanner::BackupSchedule` | A recurring backup of one database |
 | `GCP::Spanner::Database` | A database inside a Spanner instance |
 | `GCP::Spanner::Instance` | The compute and storage a Spanner deployment runs on |
+| `GCP::Spanner::InstanceConfig` | A user-managed configuration naming where a Spanner instance's replicas may live |
 | `GCP::Storage::AnywhereCache` | Cloud Storage Anywhere Cache |
 | `GCP::Storage::Bucket` | Cloud Storage bucket |
 | `GCP::Storage::BucketAccessControl` | Cloud Storage bucket ACL entry |
