@@ -6,7 +6,7 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/dataform/repository_dataform.pkl"
+import "@gcp/dataform/repository_dataform.pkl" as repository
 import "./config/vars.pkl" as v
 
 // Changes the display name and a label. Both are mutable, and the PATCH's field

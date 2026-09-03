@@ -6,7 +6,7 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/firestore/database_firestore.pkl"
+import "@gcp/firestore/database_firestore.pkl" as database
 import "./config/vars.pkl" as v
 
 // The update half of firestore-database: concurrencyMode moves from

@@ -6,7 +6,7 @@
 
 amends "@formae/forma.pkl"
 
-import "@gcp/dataform/repository_dataform.pkl"
+import "@gcp/dataform/repository_dataform.pkl" as repository
 import "@gcp/dataform/releaseConfig.pkl"
 import "./config/vars.pkl" as v
 
