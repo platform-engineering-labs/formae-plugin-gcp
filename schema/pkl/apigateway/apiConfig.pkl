@@ -18,6 +18,7 @@ import "@formae/formae.pkl"
 const type = "GCP::ApiGateway::ApiConfig"
 
 /// One document of an OpenAPI definition.
+@gcp.SubResourceHint
 class ApiDocument extends formae.SubResource {
     /// File name, e.g. "openapi.yaml".
     @gcp.FieldHint
@@ -29,6 +30,7 @@ class ApiDocument extends formae.SubResource {
 }
 
 /// An OpenAPI definition attached to the config.
+@gcp.SubResourceHint
 class OpenApiDocument extends formae.SubResource {
     @gcp.FieldHint
     document: ApiDocument?

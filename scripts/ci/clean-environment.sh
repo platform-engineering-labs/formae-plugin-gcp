@@ -616,6 +616,12 @@ done
 # api, a certificate can be one someone installed deliberately, and the cap being
 # global means a wrong deletion is felt project-wide. Set
 # FORMAE_SWEEP_SSL_CERTIFICATES=1 to include them.
+#
+# CI, nightly and debug-conformance all set it. Leaving it off is what let nine
+# certificates accumulate and refuse every insert in the 2026-09-03 nightly, and
+# the guard that actually keeps a hand-installed certificate safe is SWEEP_RE
+# plus KEEP_RE, not the flag. Off remains the default for a local run against
+# someone's own project.
 if [ "${FORMAE_SWEEP_SSL_CERTIFICATES:-0}" != "1" ]; then
     echo "Skipping GCP SSL certificates (set FORMAE_SWEEP_SSL_CERTIFICATES=1 to sweep them)"
 else
@@ -633,7 +639,10 @@ else
 fi
 
 echo "Cleaning GCP SSL certificates..."
-SSL_CERTS=$(gcloud compute ssl-certificates list --global --filter="name~^formae-" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+# SWEEP_RE, not a wider "name~^formae-": the sweep must take the same names here
+# as everywhere else, and KEEP_RE alone should not be the only thing standing
+# between a hand-installed certificate and deletion.
+SSL_CERTS=$(gcloud compute ssl-certificates list --global --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SSL_CERTS" ]; then
     echo "$SSL_CERTS" | while read -r cert; do
         echo "  Deleting SSL certificate: $cert"

@@ -176,3 +176,54 @@ func TestProviderDefaultDispositionsManifest(t *testing.T) {
 		}
 	}
 }
+
+// Every class extending formae.SubResource must carry a SubResourceHint.
+//
+// Without it formae's renderer has no outputKeyTransformation to apply and
+// evaluating any forma declaring the class dies with "Cannot find property
+// `outputKeyTransformation` in object of type `Null`" - which reads as a bug in
+// formae rather than a missing annotation here, and fails the case at eval
+// before a single API call. Three cases failed the 2026-09-03 nightly on two
+// such classes.
+func TestEverySubResourceCarriesAHint(t *testing.T) {
+	subResourceRe := regexp.MustCompile(`^(?:open\s+|abstract\s+)*class\s+(\w+)\s+extends\s+formae\.SubResource\b`)
+	err := filepath.WalkDir(filepath.Join("schema", "pkl"), func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".pkl") {
+			return err
+		}
+		content, rErr := os.ReadFile(path)
+		if rErr != nil {
+			return rErr
+		}
+		lines := strings.Split(string(content), "\n")
+		for i, line := range lines {
+			m := subResourceRe.FindStringSubmatch(strings.TrimSpace(line))
+			if m == nil {
+				continue
+			}
+			// The annotation sits on the lines above the declaration, after any
+			// doc comment.
+			annotated := false
+			for j := i - 1; j >= 0; j-- {
+				trimmed := strings.TrimSpace(lines[j])
+				if strings.HasPrefix(trimmed, "@") {
+					if strings.Contains(trimmed, "SubResourceHint") {
+						annotated = true
+					}
+					continue
+				}
+				if trimmed == "" || strings.HasPrefix(trimmed, "///") || strings.HasPrefix(trimmed, "//") {
+					continue
+				}
+				break
+			}
+			if !annotated {
+				t.Errorf("%s:%d: class %s extends formae.SubResource without @gcp.SubResourceHint", path, i+1, m[1])
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking schema/pkl: %v", err)
+	}
+}

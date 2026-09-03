@@ -43,11 +43,18 @@ fi
 
 api="https://eventarc.googleapis.com/v1/projects/${PROJECT}/locations"
 
+# Both namings: the fixtures were renamed to "formae-test-" and this script kept
+# matching only the old "formae-plugin-sdk-test-", so it swept nothing while
+# reporting success - three eventarc cases failed the 2026-09-03 nightly on a
+# quota held by buses this was supposed to have deleted. Same shape as SWEEP_RE
+# in sweep-patterns.sh.
+LEAK_RE='formae[-_](test|probe|plugin)[-_]'
+
 names_in() { # collection location -> full resource names of test leftovers
     curl -s -H "Authorization: Bearer ${TOKEN}" "${api}/$2/$1" \
         | grep -o '"name": *"[^"]*"' \
         | sed -E 's/.*"(projects\/[^"]*)".*/\1/' \
-        | grep "formae-plugin-sdk-test" || true
+        | grep -E "$LEAK_RE" || true
 }
 
 for loc in $LOCATIONS; do
