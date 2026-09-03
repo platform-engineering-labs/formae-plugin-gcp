@@ -28,6 +28,61 @@ FORMAE_TEST_FUTURE_TIMESTAMP="$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/
     || date -u -v+7d +%Y-%m-%dT%H:%M:%SZ)"
 export FORMAE_TEST_FUTURE_TIMESTAMP
 
+# An Analytics Hub query template is refused unless its primaryContact is the
+# authenticated caller's own email ("Primary contact must be the same as the
+# authenticated user's email."), and who that is differs between CI
+# (github-deploy@) and a local run. A fixture cannot know it, so read it off the
+# credentials the plugin itself will use.
+#
+# Finding the caller's own email is not one lookup, because the credential can
+# be any of three shapes. A service-account key says it outright in
+# "client_email". An external account that impersonates a service account names
+# it in service_account_impersonation_url. And neither key is present when the
+# federation is direct, where the identity is a principal:// subject with no
+# email at all - so the last resort asks Google who the token belongs to.
+#
+# "gcloud auth list" is NOT a substitute: under workload identity it reports the
+# federated principal, which is not an email. Sending that produced "The
+# QueryTemplate primary contact should be either a valid email or URL", and
+# because the string carries the project number it came back masked in the log,
+# which is why the source and shape are reported below rather than trusted.
+caller_email_from_creds() {
+    for f in "${GCP_CREDENTIALS_FILE:-}" "${GOOGLE_APPLICATION_CREDENTIALS:-}" \
+             "${CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE:-}"; do
+        [ -n "$f" ] && [ -f "$f" ] || continue
+        sed -n 's/.*"client_email"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f"
+        sed -n 's|.*/serviceAccounts/\([^:"]*\):generateAccessToken.*|\1|p' "$f"
+    done | head -1
+}
+
+# tokeninfo answers for whoever the token actually belongs to, impersonated
+# service accounts included. The token is short-lived and goes only to Google's
+# own endpoint, and nothing here prints it.
+caller_email_from_token() {
+    local token
+    token="$(gcloud auth print-access-token 2>/dev/null)" || return 0
+    [ -n "$token" ] || return 0
+    curl -s --max-time 20 "https://oauth2.googleapis.com/tokeninfo?access_token=${token}" \
+        | sed -n 's/.*"email"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
+caller_email_source=credentials-file
+FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_creds)"
+if [ -z "$FORMAE_TEST_CALLER_EMAIL" ]; then
+    caller_email_source=tokeninfo
+    FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_token)"
+fi
+export FORMAE_TEST_CALLER_EMAIL
+
+# The value itself is usually a masked secret in CI, so report what it is rather
+# than what it says: a wrong one fails a case with a message that names nothing.
+case "${FORMAE_TEST_CALLER_EMAIL:-}" in
+    "")    caller_email_shape="empty" ;;
+    *@*.*) caller_email_shape="looks like an email" ;;
+    *)     caller_email_shape="NOT an email" ;;
+esac
+echo "Conformance caller identity: source=${caller_email_source}, ${caller_email_shape}"
+
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
 # "no available packages for: formae" when the package channel is unreachable,
@@ -150,11 +205,24 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
-  url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule)
+  url-map|target-http-proxy|target-tcp-proxy|target-grpc-proxy|region-http-lb|global-forwarding-rule|target-https-proxy|target-ssl-proxy|ssl-certificate)
     # Load-balancer chains create 3-5 dependent resources serially
     # (health-check -> backend-service -> url-map -> proxy -> rule). The CRUD
     # lifecycle already runs ~4m13s on a good day - 84% of the 5m default - so
     # any per-op or operator-startup jitter tips it over.
+    #
+    # The two TLS proxies and the certificate itself belong here for the same
+    # reason and were the only members of the family left on the default: each
+    # adds a managed SSL certificate to the chain.
+    TIMEOUT_ARG="TIMEOUT=15"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
+  network-firewall-policy-association|region-network-firewall-policy-association|network-firewall-policy-rule)
+    # Attaching a network firewall policy is a slow global operation - it has to
+    # propagate before it reports DONE - and the case builds a network and the
+    # policy itself first, three serial operations before any of them is read
+    # back. network-firewall-policy-association timed out on Create at the 5m
+    # default in the 2026-09-03 nightly with nothing wrong at the API.
     TIMEOUT_ARG="TIMEOUT=15"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
     ;;

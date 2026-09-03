@@ -22,13 +22,18 @@ case "${1:-}" in
     eventarc-*) exec "$here/clean-eventarc-case.sh" "$1" ;;
     datastream-*) exec "$here/clean-datastream-case.sh" "$1" ;;
     filestore-*)  exec "$here/clean-filestore-case.sh" "$1" ;;
-    security-policy-rule)        PREFIX="formae-plugin-sdk-test-spr-"  KIND=armor ;;
-    region-security-policy-rule) PREFIX="formae-plugin-sdk-test-rspr-" KIND=armor ;;
-    network-firewall-policy-association)        PREFIX="formae-plugin-sdk-test-nfpa-pol-"  KIND=firewall ;;
-    region-network-firewall-policy-association) PREFIX="formae-plugin-sdk-test-rnfpa-pol-" KIND=firewall ;;
-    network-firewall-policy-rule)               PREFIX="formae-plugin-sdk-test-nfpr-pol-"  KIND=firewall ;;
-    machine-image)                              PREFIX="formae-plugin-sdk-test-mi-"        KIND=vmchain ;;
-    spanner-database)                           PREFIX="formae-plugin-sdk-test-spdbi-"     KIND=spanner ;;
+    # These prefixes must match what the fixture actually names. They were
+    # written against the old "formae-plugin-sdk-test-" convention and never
+    # updated when the fixtures were renamed, so every one of them swept nothing
+    # while reporting success - which is how network-firewall-policy-association
+    # met its own leftover policy in the 2026-09-03 nightly.
+    security-policy-rule)        PREFIX="formae-test-spr-"  KIND=armor ;;
+    region-security-policy-rule) PREFIX="formae-test-rspr-" KIND=armor ;;
+    network-firewall-policy-association)        PREFIX="formae-test-nfpa-pol-"  KIND=firewall ;;
+    region-network-firewall-policy-association) PREFIX="formae-test-rnfpa-pol-" KIND=firewall ;;
+    network-firewall-policy-rule)               PREFIX="formae-test-nfpr-pol-"  KIND=firewall ;;
+    machine-image)                              PREFIX="formae-test-mi-"        KIND=vmchain ;;
+    spanner-database)                           PREFIX="formae-test-spdb-inst-" KIND=spanner ;;
     *)
         KIND=network
         ;;
@@ -55,7 +60,12 @@ if [ "${KIND:-}" = "network" ]; then
     # the project, including the ones sibling jobs are using right now. The
     # network case is its own resource under test, so its Destroy already
     # removes it and there is nothing left to reclaim.
-    if [ "$NET_PREFIX" = "formae-plugin-sdk-test-" ]; then
+    # Matched as a shape, not as one literal: the previous check named the old
+    # "formae-plugin-sdk-test-" convention, so after the fixtures were renamed
+    # the bare "formae-test-" the network case yields sailed past it and the
+    # sweep would have taken every test network in the project, including the
+    # ones sibling jobs were using.
+    if printf '%s' "$NET_PREFIX" | grep -qE '^formae[-_](test|probe|plugin)[-_]$'; then
         echo "clean-case-prereqs: '${1}' owns no distinct network prefix, skipping"
         exit 0
     fi

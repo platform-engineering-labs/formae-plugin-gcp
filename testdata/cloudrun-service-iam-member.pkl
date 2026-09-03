@@ -40,14 +40,19 @@ forma {
   // The real public use case is member = "allUsers", but many orgs enforce
   // Domain Restricted Sharing (iam.allowedPolicyMemberDomains), which rejects
   // allUsers with a 400 failedPrecondition. Conformance therefore binds a
-  // permitted principal (the test project's own service account) - the exact
-  // same create/get/set/delete code path, without depending on the org allowing
-  // public members.
+  // permitted principal - the exact same create/get/set/delete code path,
+  // without depending on the org allowing public members.
+  //
+  // The principal is the project's default compute service account rather than
+  // a test identity: setIamPolicy rejects a member that does not exist, and
+  // this case failed on exactly that when the sweep deleted the account the
+  // fixture used to name. A Google-created project identity cannot be swept,
+  // and creating one here instead would race IAM propagation.
   new serviceIamMember.ServiceIamMember {
     label = "plugin-sdk-test-run-invoker"
     service = svc.res.name
     location = v.gcpRegion
     role = "roles/run.invoker"
-    member = "serviceAccount:formae-tester@\(v.gcpProject).iam.gserviceaccount.com"
+    member = "serviceAccount:\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
   }
 }

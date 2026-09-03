@@ -61,23 +61,32 @@ open class QueryTemplate extends formae.Resource {
     @gcp.FieldHint { createOnly = true }
     dataExchange: (String|formae.Resolvable)
 
-    /// Human-readable name. Required by the API.
-    @gcp.FieldHint
+    /// Human-readable name. Required by the API, and fixed once set: a patch
+    /// naming it answers "The field 'display_name' cannot be updated on this
+    /// query_template".
+    @gcp.FieldHint { createOnly = true }
     displayName: String
 
     @gcp.FieldHint
     description: String?
 
-    @gcp.FieldHint
+    /// Fixed at creation, like displayName.
+    @gcp.FieldHint { createOnly = true }
     documentation: String?
 
-    @gcp.FieldHint
+    /// Must be the authenticated caller's own email - the API rejects anything
+    /// else outright - and cannot be changed afterwards.
+    @gcp.FieldHint { createOnly = true }
     primaryContact: String?
 
-    /// Who proposed the template.
-    @gcp.FieldHint
+    /// Who proposed the template. Deprecated by the API in favour of
+    /// primaryContact.
+    @gcp.FieldHint { createOnly = true }
     proposer: String?
 
+    /// The routine the template proposes. The definition body names the routine
+    /// itself and that name must equal the template's: "formae_test_qt_x() AS
+    /// (SELECT ...)", with no CREATE TABLE FUNCTION prefix.
     @gcp.FieldHint
     routine: Routine?
 

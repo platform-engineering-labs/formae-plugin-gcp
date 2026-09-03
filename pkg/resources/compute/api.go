@@ -177,8 +177,28 @@ func parseComputeNativeID(nativeID string) (base.PathContext, error) {
 	return ctx, nil
 }
 
-// checkComputeOperationStatus checks if a Compute operation is complete
+// checkComputeOperationStatus checks if a Compute operation is complete.
+//
+// An operation carrying an "error" is finished whatever its status says. Compute
+// leaves some rejections - a quota refusal, notably - parked at status=RUNNING
+// with progress=0 and the error already attached, forever. Gating the error
+// check on status=="DONE" turned "Quota 'SSL_CERTIFICATES' exceeded. Limit: 10.0
+// globally." into a five-minute poll and a bare "timeout waiting for command to
+// complete", which is how three cases failed in the 2026-09-03 nightly with
+// nothing in the log naming the cause. The error is the answer; read it first.
 func checkComputeOperationStatus(operationResponse map[string]interface{}) (done bool, err error) {
+	errorObj, hasError := operationResponse["error"].(map[string]interface{})
+	if hasError {
+		if errs, ok := errorObj["errors"].([]interface{}); ok && len(errs) > 0 {
+			if firstErr, ok := errs[0].(map[string]interface{}); ok {
+				if msg, ok := firstErr["message"].(string); ok {
+					return true, fmt.Errorf("operation failed: %s", msg)
+				}
+			}
+			return true, fmt.Errorf("operation failed with unknown error")
+		}
+	}
+
 	// Check status field
 	status, ok := operationResponse["status"].(string)
 	if !ok {
@@ -190,15 +210,9 @@ func checkComputeOperationStatus(operationResponse map[string]interface{}) (done
 		return false, nil
 	}
 
-	// Check for errors
-	if errorObj, ok := operationResponse["error"].(map[string]interface{}); ok {
-		if errors, ok := errorObj["errors"].([]interface{}); ok && len(errors) > 0 {
-			if firstErr, ok := errors[0].(map[string]interface{}); ok {
-				if msg, ok := firstErr["message"].(string); ok {
-					return true, fmt.Errorf("operation failed: %s", msg)
-				}
-			}
-		}
+	// An empty error object on a finished operation says something went wrong
+	// without saying what; it is still a failure.
+	if hasError {
 		return true, fmt.Errorf("operation failed with unknown error")
 	}
 

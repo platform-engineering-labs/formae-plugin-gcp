@@ -78,6 +78,10 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Clean test resources
+        # See the note in nightly.yml: the 10-per-project SSL certificate cap is
+        # shared by every run, so a leaked certificate is everyone's problem.
+        env:
+          FORMAE_SWEEP_SSL_CERTIFICATES: "1"
         run: ./scripts/ci/clean-environment.sh
 
   conformance-tests:
@@ -218,4 +222,8 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Clean test resources
+        # See the note in nightly.yml: the 10-per-project SSL certificate cap is
+        # shared by every run, so a leaked certificate is everyone's problem.
+        env:
+          FORMAE_SWEEP_SSL_CERTIFICATES: "1"
         run: ./scripts/ci/clean-environment.sh

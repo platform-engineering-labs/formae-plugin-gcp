@@ -35,9 +35,17 @@ local peerRange = new globalAddress.GlobalAddress {
   network = net.res.selfLink
 }
 
+// The connection names the network by its short name rather than its self link.
+// A Connection echoes the network reference it was given back as its own
+// "network" property, and the instance below points authorizedNetwork at that
+// property - so this is what the instance's declared value resolves to. Memcache
+// reports authorizedNetwork as a bare name, authorizedNetwork is createOnly, and
+// a self link never equals a bare name: with the link here, re-applying the
+// extracted forma planned a delete and a create. The Connection accepts any of
+// the three forms.
 local psa = new connection.Connection {
   label = "plugin-sdk-test-mc-psa"
-  network = net.res.selfLink
+  network = net.res.name
   reservedPeeringRanges = new Listing {
     peerRange.res.name
   }

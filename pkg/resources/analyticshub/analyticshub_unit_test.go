@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
 func TestPathBuilder(t *testing.T) {
@@ -135,5 +136,94 @@ func TestListingDatasetLeavesFullPathAlone(t *testing.T) {
 	src := body["bigqueryDataset"].(map[string]interface{})
 	if got, want := src["dataset"], "projects/other/datasets/d"; got != want {
 		t.Errorf("dataset = %v, want %v", got, want)
+	}
+}
+
+// The published dataset is fixed at creation and the update mask is built from
+// the body, so an update that leaves bigqueryDataset in it is refused outright.
+func TestListingUpdateDropsPublishedDataset(t *testing.T) {
+	body, err := listingRequest(map[string]interface{}{
+		"name":            "li1",
+		"project":         "p",
+		"displayName":     "L",
+		"description":     "changed",
+		"bigqueryDataset": map[string]interface{}{"dataset": "my_ds"},
+	}, base.TransformContext{Project: "p", Operation: resource.OperationUpdate})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, k := range []string{"bigqueryDataset", "name", "project"} {
+		if _, ok := body[k]; ok {
+			t.Errorf("%q must not reach the update mask", k)
+		}
+	}
+	if body["description"] != "changed" {
+		t.Errorf("the field actually being changed must survive: %+v", body)
+	}
+}
+
+// The API populates the replication state and an all-false export policy on
+// every listing. Neither is declarable, and an unexpected key under a declared
+// property reads back as drift.
+func TestListingResponseDropsProviderNoise(t *testing.T) {
+	out := listingResponse(map[string]interface{}{
+		"name": "projects/p/locations/eu/dataExchanges/de1/listings/li1",
+		"bigqueryDataset": map[string]interface{}{
+			"dataset":                "projects/p/datasets/my_ds",
+			"effectiveReplicas":      []interface{}{map[string]interface{}{"location": "eu"}},
+			"restrictedExportPolicy": map[string]interface{}{"enabled": false},
+		},
+	}, base.TransformContext{})
+	src := out["bigqueryDataset"].(map[string]interface{})
+	for _, k := range []string{"effectiveReplicas", "restrictedExportPolicy"} {
+		if _, ok := src[k]; ok {
+			t.Errorf("%q is provider noise and must be dropped", k)
+		}
+	}
+	if src["dataset"] != "my_ds" {
+		t.Errorf("dataset = %v, want my_ds", src["dataset"])
+	}
+}
+
+// A query template is almost entirely fixed once created: the API refuses
+// display_name, primary_contact and documentation in an update mask, and the
+// mask is the body, so anything else left in it fails the whole update.
+func TestQueryTemplateUpdateKeepsOnlyWhatTheAPITakes(t *testing.T) {
+	props := map[string]interface{}{
+		"name":           "qt1",
+		"project":        "p",
+		"location":       "us",
+		"dataExchange":   "de1",
+		"displayName":    "T",
+		"documentation":  "docs",
+		"primaryContact": "someone@example.com",
+		"description":    "changed",
+		"routine": map[string]interface{}{
+			"routineType":    "TABLE_VALUED_FUNCTION",
+			"definitionBody": "qt1() AS (SELECT 1)",
+		},
+	}
+	body, err := queryTemplateRequest(props, base.TransformContext{Project: "p", Operation: resource.OperationUpdate})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(body) != 2 || body["description"] != "changed" || body["routine"] == nil {
+		t.Errorf("update body = %+v, want only description and routine", body)
+	}
+
+	// Create still carries everything but the path components.
+	body, err = queryTemplateRequest(props, base.TransformContext{Project: "p", Operation: resource.OperationCreate})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, k := range []string{"name", "displayName", "primaryContact", "documentation", "routine"} {
+		if _, ok := body[k]; !ok {
+			t.Errorf("create body is missing %q", k)
+		}
+	}
+	for _, k := range []string{"location", "dataExchange"} {
+		if _, ok := body[k]; ok {
+			t.Errorf("%q addresses the resource in the URL and must not be a body field", k)
+		}
 	}
 }

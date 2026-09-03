@@ -12,8 +12,11 @@
 # first one for a type found a real defect almost every time.
 #
 # List a case here only for a reason that survives being written down: it costs
-# real money to hold, or it mutates something shared. Slowness alone is not a
-# reason; that is what the per-case timeouts are for.
+# real money to hold, it mutates something shared, or the API cannot be made to
+# accept it at all. Slowness alone is not a reason; that is what the per-case
+# timeouts are for. Neither is "it is failing" - a failing case is a bug to fix,
+# and the only admissible version of that reason is a demonstrated, written-down
+# refusal on the provider's side.
 #
 # One case name per line. Blank lines and # comments are ignored.
 
@@ -21,3 +24,28 @@
 # a DEVELOPMENT instance - which the other Bigtable cases use - cannot have a
 # second cluster at all, so there is no cheap way to exercise this type.
 bigtable-cluster
+
+# analyticshub queryTemplates.create cannot be satisfied by a service account,
+# and a service account is the only identity CI has (github-deploy@, via
+# workload identity).
+#
+# The API checks primaryContact twice, format first and identity second, and
+# demands it equal the authenticated caller's own email. Probed 2026-09-03
+# against development-477117: a malformed value answers "The QueryTemplate
+# primary contact should be either a valid email or URL"; a well-formed address
+# belonging to somebody else answers "Primary contact must be the same as the
+# authenticated user's email". Sent by a human caller, the CI service account's
+# own address clears the format check and fails only the identity one - so the
+# string is well-formed. Sent by that service account as its own contact, it
+# fails the FORMAE check instead, which is only consistent if the complaint is
+# about the caller's resolved email. A service account does not have one, so no
+# value satisfies both checks.
+#
+# The type itself works: created, patched and deleted by hand under a human
+# identity on the same date, which is what the fixture, the createOnly flags on
+# displayName/primaryContact/documentation and the update transformer were
+# written against. To run this case, use a user identity - locally, with
+# "gcloud auth application-default login" and FORMAE_TEST_CALLER_EMAIL set to
+# that account. Naming it in debug-conformance will not help; that runs as the
+# same service account.
+analyticshub-query-template

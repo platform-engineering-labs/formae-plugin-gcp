@@ -89,7 +89,7 @@ func init() {
 				UpdateMaskFromBody: true,
 			},
 			Operations:          standardOps(),
-			RequestTransformer:  base.RequestTransformerFunc(dropPathFields),
+			RequestTransformer:  base.RequestTransformerFunc(queryTemplateRequest),
 			ResponseTransformer: shortNameWithLocation("queryTemplates"),
 		},
 	})
