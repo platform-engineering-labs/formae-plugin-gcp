@@ -1,0 +1,57 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl"
+import "@gcp/dataform/releaseConfig.pkl"
+import "./config/vars.pkl" as v
+
+// A release config names what to compile, so it needs the repository above it.
+// Both are free, and the release config is free for a specific reason: it
+// carries no cronSchedule, so the service never creates a compilation result on
+// its own. Compilation is where Dataform starts costing money - a compilation
+// result is what a workflow invocation later executes as BigQuery jobs - and
+// with no schedule nothing compiles.
+//
+// gitCommitish is required but is not validated against a remote, which is why
+// "main" is accepted on a repository that has no Git remote at all.
+//
+// The repository is referenced through its resolvable, which orders the creates
+// and, more importantly, the destroys: a repository that still has nested
+// resources refuses to delete with HTTP 400.
+local repo = new repository.Repository {
+  label = "plugin-sdk-test-df-rc-repository"
+  name = "formae-test-df-rcr-\(v.testRunID)"
+  displayName = "Repository owning the release config under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  repo
+
+  new releaseConfig.ReleaseConfig {
+    label = "plugin-sdk-test-df-release-config"
+    name = "formae-test-df-rc-\(v.testRunID)"
+    repository = repo.res.name
+    gitCommitish = "main"
+    timeZone = "Europe/Berlin"
+    // Belt and braces on top of the absent cronSchedule: nothing is scheduled,
+    // and automatic creation is switched off as well.
+    disabled = true
+    codeCompilationConfig = new {
+      defaultDatabase = v.gcpProject
+      defaultSchema = "formae_test_df"
+      assertionSchema = "formae_test_df_assertions"
+      defaultLocation = v.gcpRegion
+      vars = new Mapping {
+        ["environment"] = "test"
+      }
+    }
+  }
+}

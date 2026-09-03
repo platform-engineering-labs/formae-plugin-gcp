@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl"
+import "@gcp/dataform/releaseConfig.pkl"
+import "@gcp/dataform/workflowConfig.pkl"
+import "./config/vars.pkl" as v
+
+// A workflow config executes a release config, which compiles a repository, so
+// all three are here.
+//
+// All three are free, and the workflow config is free for one reason only: it
+// carries no cronSchedule. A schedule is what has the service create workflow
+// invocations, and a workflow invocation runs the compiled workflow as BigQuery
+// jobs - real money. Verified live: creating a workflow config with no schedule
+// left the repository's workflowInvocations and compilationResults both empty.
+// `disabled = true` switches automatic creation off on top of that.
+//
+// invocationConfig.serviceAccount is required in practice: a create without it
+// is refused with "Service account must be set when strict act as checks are
+// enabled". The project's default compute service account is used, the same one
+// testdata/eventarc-trigger.pkl relies on, because it exists in every project
+// without this fixture having to create an identity.
+//
+// Both parents are referenced through their resolvables, which is what orders
+// the whole chain in each direction. On destroy the workflow config goes first,
+// then the release config, then the repository - and the repository's own
+// delete is refused with HTTP 400 while anything is still nested under it.
+local repo = new repository.Repository {
+  label = "plugin-sdk-test-df-wc-repository"
+  name = "formae-test-df-wcr-\(v.testRunID)"
+  displayName = "Repository owning the workflow config under test"
+}
+
+local release = new releaseConfig.ReleaseConfig {
+  label = "plugin-sdk-test-df-wc-release-config"
+  name = "formae-test-df-wcrc-\(v.testRunID)"
+  repository = repo.res.name
+  gitCommitish = "main"
+  disabled = true
+}
+
+forma {
+  v.stack
+  v.target
+
+  repo
+  release
+
+  new workflowConfig.WorkflowConfig {
+    label = "plugin-sdk-test-df-workflow-config"
+    name = "formae-test-df-wc-\(v.testRunID)"
+    repository = repo.res.name
+    // Declared as the short name; the plugin expands it to the full
+    // projects/*/locations/*/repositories/*/releaseConfigs/* path the API wants
+    // and shortens it again on read.
+    releaseConfig = release.res.name
+    timeZone = "Europe/Berlin"
+    disabled = true
+    invocationConfig = new {
+      serviceAccount = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+      includedTags = new Listing { "nightly" }
+      transitiveDependenciesIncluded = true
+      queryPriority = "BATCH"
+    }
+  }
+}

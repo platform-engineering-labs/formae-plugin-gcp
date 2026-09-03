@@ -1,0 +1,177 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Dataform WorkflowConfig
+///
+/// The schedule half of Dataform: which release config to execute, and when.
+///
+/// Free only because "when" can be left out. A workflow config with no
+/// `cronSchedule` creates no workflow invocations — verified live, both the
+/// repository's `workflowInvocations` and its `compilationResults` stayed empty
+/// after a create — and a workflow invocation is what runs BigQuery jobs and
+/// bills. Set a schedule and this resource starts spending money on its own.
+///
+/// `invocationConfig.serviceAccount` is required in practice even though the
+/// API documents the whole block as optional: a create without it is refused
+/// with "Service account must be set when strict act as checks are enabled".
+///
+/// Nested under its repository, which is a path component rather than a body
+/// field — the plugin drops it from every request and lifts it back out of the
+/// path the API reports. Declare it through the repository's resolvable so the
+/// destroy order holds; a repository with workflow configs under it refuses to
+/// delete.
+///
+/// Create, patch and delete are all synchronous.
+module gcp.dataform.workflowConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Dataform::WorkflowConfig"
+
+/// One action to include in an invocation, addressed as it is in compiled
+/// output: a name inside a schema inside a database.
+@gcp.SubResourceHint
+open class Target extends formae.SubResource {
+    /// The action's name within `database` and `schema`.
+    @gcp.FieldHint
+    name: String?
+
+    /// The action's Google Cloud project.
+    @gcp.FieldHint
+    database: String?
+
+    /// The action's BigQuery dataset, within `database`.
+    @gcp.FieldHint
+    schema: String?
+}
+
+/// How the scheduled invocations run: which actions, under which identity, at
+/// which BigQuery priority.
+///
+/// Immutable as a whole, and immutable by field mask rather than by value: a
+/// PATCH whose updateMask names `invocationConfig` is refused with "immutable
+/// fields: [invocation_config]" even when nothing inside it changed. Nothing in
+/// the API's discovery document says so — the field is documented as plain
+/// "Optional" — so this was established against the live API. The plugin drops
+/// it from every update body, which makes a change here a replacement.
+@gcp.SubResourceHint
+open class InvocationConfig extends formae.SubResource {
+    /// The service account the invocations run under. Documented as optional,
+    /// required in practice: a create without it is refused with "Service
+    /// account must be set when strict act as checks are enabled".
+    @gcp.FieldHint
+    serviceAccount: String?
+
+    /// Only run these actions. Omit to run everything.
+    @gcp.FieldHint
+    includedTargets: Listing<Target>?
+
+    /// Only run actions carrying one of these tags.
+    @gcp.FieldHint
+    includedTags: Listing<String>?
+
+    /// Also run whatever the included actions depend on.
+    @gcp.FieldHint
+    transitiveDependenciesIncluded: Boolean?
+
+    /// Also run whatever depends on the included actions.
+    @gcp.FieldHint
+    transitiveDependentsIncluded: Boolean?
+
+    /// Rebuild incremental tables from scratch rather than appending.
+    @gcp.FieldHint
+    fullyRefreshIncrementalTablesEnabled: Boolean?
+
+    /// BigQuery query priority: "INTERACTIVE" or "BATCH".
+    ///
+    /// The API reports "QUERY_PRIORITY_UNSPECIFIED" for an invocation config
+    /// that never named one. It is nested, where a `hasProviderDefault` hint
+    /// cannot reach it, so the plugin drops that placeholder from every read
+    /// instead — leave the field out and it stays out of state.
+    @gcp.FieldHint
+    queryPriority: String?
+}
+
+open class WorkflowConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: WorkflowConfigResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::Dataform::Repository"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty {
+            parentProperty = "repository"
+            listParameter = "repository"
+        }
+    }.toList()
+}
+open class WorkflowConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "nightly"). Immutable — it is sent as
+    /// ?workflowConfigId= at creation and is the path afterwards.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The repository this workflow config belongs to. A path component rather
+    /// than a body field: it is dropped from the request and recovered from the
+    /// returned path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    repository: (String|formae.Resolvable)
+
+    /// The release config whose released compilation result gets executed.
+    ///
+    /// Declared as the release config's short name; the API wants the full path
+    /// `projects/*/locations/*/repositories/*/releaseConfigs/*`, and the plugin
+    /// expands it on the way out and shortens it on the way back so the
+    /// declared value and stored state agree. The release config must live in
+    /// the same repository as this workflow config.
+    ///
+    /// Mutable, and not validated on write: the API accepts the path of a
+    /// release config that does not exist.
+    @gcp.FieldHint
+    releaseConfig: (String|formae.Resolvable)
+
+    /// A cron schedule for executing automatically, e.g. "0 6 * * *".
+    ///
+    /// This is the field that costs money. Every firing creates a workflow
+    /// invocation, and an invocation runs the compiled workflow as BigQuery
+    /// jobs. Omit it and this resource schedules nothing.
+    @gcp.FieldHint
+    cronSchedule: String?
+
+    /// The time zone `cronSchedule` is interpreted in, as a tz database name
+    /// e.g. "Europe/Berlin". Accepted without a `cronSchedule`. Mutable.
+    @gcp.FieldHint
+    timeZone: String?
+
+    /// Stops automatic creation of workflow invocations without removing the
+    /// schedule. Mutable, and absent from a read when it was never set.
+    @gcp.FieldHint
+    disabled: Boolean?
+
+    /// How the scheduled invocations run. Immutable — see `InvocationConfig`.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    invocationConfig: InvocationConfig?
+
+    hidden res: WorkflowConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

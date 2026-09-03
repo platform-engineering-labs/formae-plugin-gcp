@@ -1,0 +1,36 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl"
+import "./config/vars.pkl" as v
+
+// A Dataform repository is free to hold, and free precisely because it is
+// declared without a Git remote: gitRemoteSettings is optional, and an
+// unconnected repository needs no personal access token in Secret Manager. It
+// provisions nothing - the money in Dataform starts at a compilation result or
+// a workflow invocation, and neither is created here.
+forma {
+  v.stack
+  v.target
+
+  new repository.Repository {
+    label = "plugin-sdk-test-df-repository"
+    name = "formae-test-df-repo-\(v.testRunID)"
+    displayName = "Formae SDK test Dataform repository"
+    // Compilation settings only; nothing compiles until a release config or a
+    // workspace asks for it.
+    workspaceCompilationOverrides = new {
+      defaultDatabase = v.gcpProject
+      schemaSuffix = "formae_test"
+      tablePrefix = "formae_"
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl"
+import "@gcp/dataform/releaseConfig.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the commitish and the time zone, both mutable. codeCompilationConfig
+// is unchanged and is dropped from the update body by the plugin: the API
+// refuses a field mask naming it with "immutable fields:
+// [code_compilation_config]" even when the object has not changed.
+//
+// Still no cronSchedule and still disabled, so still nothing compiles.
+local repo = new repository.Repository {
+  label = "plugin-sdk-test-df-rc-repository"
+  name = "formae-test-df-rcr-\(v.testRunID)"
+  displayName = "Repository owning the release config under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  repo
+
+  new releaseConfig.ReleaseConfig {
+    label = "plugin-sdk-test-df-release-config"
+    name = "formae-test-df-rc-\(v.testRunID)"
+    repository = repo.res.name
+    gitCommitish = "release"
+    timeZone = "UTC"
+    disabled = true
+    codeCompilationConfig = new {
+      defaultDatabase = v.gcpProject
+      defaultSchema = "formae_test_df"
+      assertionSchema = "formae_test_df_assertions"
+      defaultLocation = v.gcpRegion
+      vars = new Mapping {
+        ["environment"] = "test"
+      }
+    }
+  }
+}
