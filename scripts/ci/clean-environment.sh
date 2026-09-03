@@ -53,7 +53,12 @@ set -euo pipefail
 #
 # One shape, one pattern, no per-sweep guessing. "probe" is included so the
 # ad-hoc resources a live API probe leaves behind are collected too.
-SWEEP_RE="${SWEEP_RE:-^formae[-_](test|probe)[-_]}"
+# "plugin" is here for the resources named before the convention landed. A live
+# survey found 85 Pub/Sub topics, 21 secrets and 2 networks still carrying
+# "formae-plugin-sdk-test-", and a pattern matching only the new shape would have
+# left every one of them in the project permanently. It can come out once a sweep
+# reports none of them left.
+SWEEP_RE="${SWEEP_RE:-^formae[-_](test|probe|plugin)[-_]}"
 
 # Names that match SWEEP_RE but must never be deleted. A "formae-" resource is
 # not always a leak: formae-byo-cert is a certificate someone installed in July
@@ -1362,7 +1367,7 @@ SA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || t
 # "sa-<8hex>@" form is kept so accounts leaked before the rename are still
 # collected - narrowing this to a prefix no fixture used is exactly how they
 # started leaking. KEEP_RE still guards the identities on top.
-SA_SWEEP_RE="${SA_SWEEP_RE:-^(formae[-_]test[-_]|sa-[0-9a-f]{8}@)}"
+SA_SWEEP_RE="${SA_SWEEP_RE:-^(formae[-_](test|plugin)[-_]|sa-[0-9a-f]{8}@)}"
 SERVICE_ACCOUNTS=$(gcloud iam service-accounts list --format="value(email)" 2>/dev/null \
     | grep -E "$SA_SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SERVICE_ACCOUNTS" ]; then
