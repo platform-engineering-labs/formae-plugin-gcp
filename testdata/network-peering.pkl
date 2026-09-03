@@ -16,12 +16,12 @@ import "./config/vars.pkl" as v
 // resource under test is: the peering object itself.
 local netA = new network.Network {
   label = "plugin-sdk-test-peer-net-a"
-  name = "formae-plugin-sdk-test-peer-a-\(v.testRunID)"
+  name = "formae-test-peer-a-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local netB = new network.Network {
   label = "plugin-sdk-test-peer-net-b"
-  name = "formae-plugin-sdk-test-peer-b-\(v.testRunID)"
+  name = "formae-test-peer-b-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
@@ -34,7 +34,7 @@ forma {
 
   new networkPeering.NetworkPeering {
     label = "plugin-sdk-test-network-peering"
-    name = "formae-peering-\(v.testRunID)"
+    name = "formae-test-peering-\(v.testRunID)"
     // Owning network: a path component, so the short name.
     network = netA.res.name
     // Far side: stored as a full URL by the API, so pass the self-link.

@@ -16,12 +16,12 @@ import "./config/vars.pkl" as v
 forma {
   local t = new topic.Topic {
     label = "plugin-sdk-test-snap-topic"
-    name = "formae-plugin-sdk-test-snap-topic-\(v.testRunID)"
+    name = "formae-test-snap-topic-\(v.testRunID)"
   }
 
   local s = new subscription.Subscription {
     label = "plugin-sdk-test-snap-sub"
-    name = "formae-plugin-sdk-test-snap-sub-\(v.testRunID)"
+    name = "formae-test-snap-sub-\(v.testRunID)"
     topic = t.res.name
   }
 
@@ -33,7 +33,7 @@ forma {
 
   new snapshot.Snapshot {
     label = "plugin-sdk-test-pubsub-snapshot"
-    name = "formae-plugin-sdk-test-snapshot-\(v.testRunID)"
+    name = "formae-test-snapshot-\(v.testRunID)"
     subscription = s.res.name
     labels = new Mapping {
       ["environment"] = "staging"

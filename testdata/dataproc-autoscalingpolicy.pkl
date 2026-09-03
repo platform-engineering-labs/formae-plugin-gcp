@@ -15,7 +15,7 @@ forma {
 
   new autoscalingPolicy.AutoscalingPolicy {
     label = "plugin-sdk-test-autoscaling-policy"
-    name = "formae-asp-\(v.testRunID)"
+    name = "formae-test-asp-\(v.testRunID)"
     basicAlgorithm = new {
       yarnConfig = new {
         scaleUpFactor = 0.5

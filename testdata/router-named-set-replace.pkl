@@ -15,13 +15,13 @@ import "./config/vars.pkl" as v
 // No BGP peer is needed for the set to exist.
 local net = new network.Network {
   label = "plugin-sdk-test-rns-network"
-  name = "formae-plugin-sdk-test-rns-net-\(v.testRunID)"
+  name = "formae-test-rns-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
 local rt = new router.Router {
   label = "plugin-sdk-test-rns-router"
-  name = "formae-plugin-sdk-test-rns-rt-\(v.testRunID)"
+  name = "formae-test-rns-rt-\(v.testRunID)"
   region = v.gcpRegion
   network = net.res.selfLink
 }
@@ -38,7 +38,7 @@ forma {
     // The name is immutable, so changing it forces a replace rather than
     // an update. The prerequisites above are untouched: only the resource
     // under test is replaced.
-    name = "formae-plugin-sdk-test-rns-r2-\(v.testRunID)"
+    name = "formae-test-rns-r2-\(v.testRunID)"
     // Resolvable -> the router exists before the update verb runs.
     router = rt.res.name
     region = v.gcpRegion

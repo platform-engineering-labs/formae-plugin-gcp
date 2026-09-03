@@ -23,7 +23,7 @@ import "./config/vars.pkl" as v
 // needs to deliver. Declaring one is required for a Google-source trigger.
 local wf = new workflow.Workflow {
   label = "plugin-sdk-test-trigger-workflow"
-  name = "formae-plugin-sdk-test-trig-wf-\(v.testRunID)"
+  name = "formae-test-trig-wf-\(v.testRunID)"
   description = "Destination workflow for the Eventarc trigger test"
   sourceContents = """
     main:
@@ -42,7 +42,7 @@ forma {
 
   new trigger.Trigger {
     label = "plugin-sdk-test-eventarc-trigger"
-    name = "formae-plugin-sdk-test-trig-\(v.testRunID)"
+    name = "formae-test-trig-\(v.testRunID)"
     eventFilters = new Listing {
       new trigger.EventFilter {
         attribute = "type"

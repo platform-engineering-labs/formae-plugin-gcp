@@ -1,0 +1,37 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/addressGroup.pkl"
+import "./config/vars.pkl" as v
+
+// Updates items, description and labels. type and capacity are unchanged: both
+// are immutable, and the plugin drops them from the patch body so neither can
+// enter the update mask.
+//
+// labels is restated rather than dropped for a reason. A patch whose mask omits
+// labels clears them on this type, so the mask has to keep carrying them.
+forma {
+  v.stack
+  v.target
+
+  new addressGroup.AddressGroup {
+    label = "plugin-sdk-test-ns-address-group"
+    name = "formae-test-ns-ag-\(v.testRunID)"
+    type = "IPV4"
+    capacity = 100
+    items = new Listing {
+      "192.0.2.0/24"
+      "203.0.113.0/24"
+    }
+    description = "Updated test address group description"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

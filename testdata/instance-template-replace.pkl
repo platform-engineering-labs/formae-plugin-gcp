@@ -16,12 +16,12 @@ import "./config/vars.pkl" as v
 // formae creates them before the template.
 local net = new network.Network {
   label = "plugin-sdk-test-instance-template-net"
-  name = "formae-plugin-sdk-test-tmpl-net-\(v.testRunID)"
+  name = "formae-test-tmpl-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-instance-template-subnet"
-  name = "formae-plugin-sdk-test-tmpl-subnet-\(v.testRunID)"
+  name = "formae-test-tmpl-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.91.0.0/24"
@@ -38,7 +38,7 @@ forma {
     label = "plugin-sdk-test-instance-template"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-tmpl-r2-\(v.testRunID)"
+    name = "formae-test-tmpl-r2-\(v.testRunID)"
     description = "Test instance template for plugin SDK conformance tests"
     properties = new instanceTemplate.InstanceProperties {
       machineType = "e2-micro"

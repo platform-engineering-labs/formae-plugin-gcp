@@ -16,7 +16,7 @@ forma {
 
   new httpHealthCheck.HttpHealthCheck {
     label = "plugin-sdk-test-http-health-check"
-    name = "formae-plugin-sdk-test-hhc-\(v.testRunID)"
+    name = "formae-test-hhc-\(v.testRunID)"
     description = "Test legacy HTTP health check for plugin SDK conformance tests"
     port = 80
     requestPath = "/healthz"

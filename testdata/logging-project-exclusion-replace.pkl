@@ -19,7 +19,7 @@ forma {
     label = "plugin-sdk-test-logging-project-exclusion"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-excl-r2-\(v.testRunID)"
+    name = "formae-test-excl-r2-\(v.testRunID)"
     description = "Test log exclusion for plugin SDK conformance tests"
     filter = "resource.type=\"gce_instance\" AND severity<\"WARNING\""
   }

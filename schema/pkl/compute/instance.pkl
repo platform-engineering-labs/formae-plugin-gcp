@@ -72,7 +72,7 @@ class NetworkAccessConfig {
 
 /// Attached disk configuration
 @gcp.SubResourceHint
-class AttachedDisk {
+class AttachedDisk extends formae.SubResource {
   /// Whether the disk will be auto-deleted when the instance is deleted
   autoDelete: Boolean?
 
@@ -147,7 +147,7 @@ class Scheduling {
 
 /// A single instance metadata entry (matches the GCE API's items[] shape)
 @gcp.SubResourceHint
-class MetadataItem {
+class MetadataItem extends formae.SubResource {
   /// Metadata key (e.g. "startup-script", "ssh-keys")
   @gcp.FieldHint
   key: String
@@ -160,7 +160,7 @@ class MetadataItem {
 /// Instance metadata. Mirrors the GCE API: `items` is an array of {key,value}
 /// entries plus a server-managed `fingerprint`.
 @gcp.SubResourceHint
-class Metadata {
+class Metadata extends formae.SubResource {
   /// Metadata entries
   @gcp.FieldHint
   items: Listing<MetadataItem>?

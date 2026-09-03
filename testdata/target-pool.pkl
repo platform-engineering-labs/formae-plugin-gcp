@@ -18,7 +18,7 @@ forma {
 
   new targetPool.TargetPool {
     label = "plugin-sdk-test-target-pool"
-    name = "formae-plugin-sdk-test-tp-\(v.testRunID)"
+    name = "formae-test-tp-\(v.testRunID)"
     description = "Test target pool for plugin SDK conformance tests"
     region = v.gcpRegion
     sessionAffinity = "NONE"

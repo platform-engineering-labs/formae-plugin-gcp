@@ -20,12 +20,12 @@ import "./config/vars.pkl" as v
 // source).
 local net = new network.Network {
   label = "plugin-sdk-test-ti-net"
-  name = "formae-plugin-sdk-test-ti-net-\(v.testRunID)"
+  name = "formae-test-ti-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-ti-subnet"
-  name = "formae-plugin-sdk-test-ti-subnet-\(v.testRunID)"
+  name = "formae-test-ti-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.97.0.0/24"
@@ -42,7 +42,7 @@ forma {
     label = "plugin-sdk-test-ti-bootdisk"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-ti-disk-\(v.testRunID)"
+    name = "formae-test-ti-disk-\(v.testRunID)"
     description = "Boot disk for the target-instance test VM"
     sizeGb = 10
     type = "pd-standard"
@@ -53,7 +53,7 @@ forma {
     label = "plugin-sdk-test-ti-vm"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-ti-vm-\(v.testRunID)"
+    name = "formae-test-ti-vm-\(v.testRunID)"
     machineType = "e2-micro"
     description = "VM behind the target instance"
     disks = new Listing {
@@ -77,7 +77,7 @@ forma {
 
   new targetInstance.TargetInstance {
     label = "plugin-sdk-test-target-instance"
-    name = "formae-plugin-sdk-test-ti-\(v.testRunID)"
+    name = "formae-test-ti-\(v.testRunID)"
     description = "Test protocol-forwarding target for plugin SDK conformance tests"
     zone = v.gcpZone
     // Resolvable -> establishes VM-before-target create ordering.

@@ -1,0 +1,26 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/urlList.pkl"
+import "./config/vars.pkl" as v
+
+// Updates values and description - the only two mutable fields this type has.
+forma {
+  v.stack
+  v.target
+
+  new urlList.UrlList {
+    label = "plugin-sdk-test-ns-url-list"
+    name = "formae-test-ns-ul-\(v.testRunID)"
+    values = new Listing {
+      "example.com"
+      "updated.example.net"
+    }
+    description = "Updated test URL list description"
+  }
+}

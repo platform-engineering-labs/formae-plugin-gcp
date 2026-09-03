@@ -15,7 +15,7 @@ forma {
 
   new healthCheck.HealthCheck {
     label = "plugin-sdk-test-healthcheck"
-    name = "formae-plugin-sdk-test-hc-\(v.testRunID)"
+    name = "formae-test-hc-\(v.testRunID)"
     description = "Test health check for plugin SDK conformance tests"
     type = "TCP"
     checkIntervalSec = 10

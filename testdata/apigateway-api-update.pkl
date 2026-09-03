@@ -18,7 +18,7 @@ forma {
   new api.Api {
     label = "plugin-sdk-test-apigateway-api"
     project = v.gcpProject
-    name = "formae-plugin-sdk-test-agw-\(v.testRunID)"
+    name = "formae-test-agw-\(v.testRunID)"
     displayName = "Plugin SDK conformance api"
     labels = new Mapping {
       ["purpose"] = "conformance"

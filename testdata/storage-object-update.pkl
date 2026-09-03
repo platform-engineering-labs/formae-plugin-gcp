@@ -17,7 +17,7 @@ import "./config/vars.pkl" as v
 // names that look like paths, and the native ID has to survive that.
 local b = new bucket.Bucket {
   label = "plugin-sdk-test-object-bucket"
-  name = "formae-plugin-sdk-test-obj-\(v.testRunID)"
+  name = "formae-test-obj-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
 }

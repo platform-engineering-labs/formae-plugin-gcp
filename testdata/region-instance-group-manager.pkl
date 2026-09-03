@@ -22,19 +22,19 @@ import "./config/vars.pkl" as v
 // would read back as drift.
 local net = new network.Network {
   label = "plugin-sdk-test-rmig-net"
-  name = "formae-plugin-sdk-test-rmig-net-\(v.testRunID)"
+  name = "formae-test-rmig-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-rmig-subnet"
-  name = "formae-plugin-sdk-test-rmig-subnet-\(v.testRunID)"
+  name = "formae-test-rmig-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.95.0.0/24"
 }
 local tmpl = new instanceTemplate.InstanceTemplate {
   label = "plugin-sdk-test-rmig-template"
-  name = "formae-plugin-sdk-test-rmig-tmpl-\(v.testRunID)"
+  name = "formae-test-rmig-tmpl-\(v.testRunID)"
   description = "Blueprint for the regional MIG conformance test"
   properties = new instanceTemplate.InstanceProperties {
     machineType = "e2-micro"
@@ -66,10 +66,10 @@ forma {
 
   new regionInstanceGroupManager.RegionInstanceGroupManager {
     label = "plugin-sdk-test-region-instance-group-manager"
-    name = "formae-plugin-sdk-test-rmig-\(v.testRunID)"
+    name = "formae-test-rmig-\(v.testRunID)"
     description = "Test regional managed instance group for plugin SDK conformance tests"
     region = v.gcpRegion
-    baseInstanceName = "formae-rmig-vm"
+    baseInstanceName = "formae-test-rmig-vm"
     // Resolvable -> establishes template-before-MIG create ordering.
     instanceTemplate = tmpl.res.selfLink
     targetSize = 0

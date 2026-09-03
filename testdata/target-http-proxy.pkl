@@ -18,7 +18,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-thp-healthcheck"
-    name = "formae-plugin-sdk-test-thp-hc-\(v.testRunID)"
+    name = "formae-test-thp-hc-\(v.testRunID)"
     type = "HTTP"
     checkIntervalSec = 10
     timeoutSec = 5
@@ -33,7 +33,7 @@ forma {
 
   local bs = new backendService.BackendService {
     label = "plugin-sdk-test-thp-backend-service"
-    name = "formae-plugin-sdk-test-thp-bs-\(v.testRunID)"
+    name = "formae-test-thp-bs-\(v.testRunID)"
     loadBalancingScheme = "EXTERNAL_MANAGED"
     protocol = "HTTP"
     timeoutSec = 30
@@ -44,7 +44,7 @@ forma {
 
   local um = new urlMap.UrlMap {
     label = "plugin-sdk-test-thp-url-map"
-    name = "formae-plugin-sdk-test-thp-um-\(v.testRunID)"
+    name = "formae-test-thp-um-\(v.testRunID)"
     defaultService = bs.res.selfLink
   }
 
@@ -57,7 +57,7 @@ forma {
 
   new targetHttpProxy.TargetHttpProxy {
     label = "plugin-sdk-test-target-http-proxy"
-    name = "formae-plugin-sdk-test-thp-\(v.testRunID)"
+    name = "formae-test-thp-\(v.testRunID)"
     description = "Test target HTTP proxy for plugin SDK conformance tests"
     urlMap = um.res.selfLink
   }

@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // and costs nothing.
 local bkt = new bucket.Bucket {
   label = "plugin-sdk-test-mf-bucket"
-  name = "formae-plugin-sdk-test-mf-\(v.testRunID)"
+  name = "formae-test-mf-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
   iamConfiguration = new bucket.IamConfiguration {
@@ -34,7 +34,7 @@ forma {
   // The trailing slash is part of the name, not decoration.
   new managedFolder.ManagedFolder {
     label = "plugin-sdk-test-storage-managed-folder"
-    name = "formae-reports/"
+    name = "formae-test-reports/"
     bucket = bkt.res.name
   }
 }

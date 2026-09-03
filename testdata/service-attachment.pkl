@@ -28,12 +28,12 @@ import "./config/vars.pkl" as v
 // the internet in this project.
 local net = new network.Network {
   label = "plugin-sdk-test-sa-net"
-  name = "formae-plugin-sdk-test-sa-net-\(v.testRunID)"
+  name = "formae-test-sa-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-sa-subnet"
-  name = "formae-plugin-sdk-test-sa-subnet-\(v.testRunID)"
+  name = "formae-test-sa-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.98.0.0/24"
@@ -42,7 +42,7 @@ local subnet = new subnetwork.Subnetwork {
 // purpose, and such a subnet carries no instances.
 local pscSubnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-sa-psc-subnet"
-  name = "formae-plugin-sdk-test-sa-psc-\(v.testRunID)"
+  name = "formae-test-sa-psc-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.98.1.0/24"
@@ -50,7 +50,7 @@ local pscSubnet = new subnetwork.Subnetwork {
 }
 local hc = new regionHealthCheck.RegionHealthCheck {
   label = "plugin-sdk-test-sa-hc"
-  name = "formae-plugin-sdk-test-sa-hc-\(v.testRunID)"
+  name = "formae-test-sa-hc-\(v.testRunID)"
   region = v.gcpRegion
   type = "TCP"
   tcpHealthCheck = new regionHealthCheck.TcpHealthCheck {
@@ -59,7 +59,7 @@ local hc = new regionHealthCheck.RegionHealthCheck {
 }
 local bes = new regionBackendService.RegionBackendService {
   label = "plugin-sdk-test-sa-bes"
-  name = "formae-plugin-sdk-test-sa-bes-\(v.testRunID)"
+  name = "formae-test-sa-bes-\(v.testRunID)"
   region = v.gcpRegion
   loadBalancingScheme = "INTERNAL"
   protocol = "TCP"
@@ -69,7 +69,7 @@ local bes = new regionBackendService.RegionBackendService {
 }
 local rule = new forwardingRule.ForwardingRule {
   label = "plugin-sdk-test-sa-rule"
-  name = "formae-plugin-sdk-test-sa-rule-\(v.testRunID)"
+  name = "formae-test-sa-rule-\(v.testRunID)"
   region = v.gcpRegion
   loadBalancingScheme = "INTERNAL"
   backendService = bes.res.selfLink
@@ -93,7 +93,7 @@ forma {
 
   new serviceAttachment.ServiceAttachment {
     label = "plugin-sdk-test-service-attachment"
-    name = "formae-plugin-sdk-test-sa-\(v.testRunID)"
+    name = "formae-test-sa-\(v.testRunID)"
     description = "Test PSC service attachment for plugin SDK conformance tests"
     region = v.gcpRegion
     connectionPreference = "ACCEPT_AUTOMATIC"

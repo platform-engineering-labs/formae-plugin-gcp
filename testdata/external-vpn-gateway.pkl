@@ -19,7 +19,7 @@ forma {
 
   new externalVpnGateway.ExternalVpnGateway {
     label = "plugin-sdk-test-external-vpn-gateway"
-    name = "formae-plugin-sdk-test-egw-\(v.testRunID)"
+    name = "formae-test-egw-\(v.testRunID)"
     description = "Test peer VPN gateway for plugin SDK conformance tests"
     redundancyType = "SINGLE_IP_INTERNALLY_REDUNDANT"
     interfaces = new Listing {

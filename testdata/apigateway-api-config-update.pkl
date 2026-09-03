@@ -16,7 +16,7 @@ import "./config/vars.pkl" as v
 local parentApi = new api.Api {
   label = "plugin-sdk-test-agw-cfg-api"
   project = v.gcpProject
-  name = "formae-plugin-sdk-test-agwc-\(v.testRunID)"
+  name = "formae-test-agwc-\(v.testRunID)"
   displayName = "Plugin SDK config api"
 }
 
@@ -26,7 +26,7 @@ local parentApi = new api.Api {
 local openapi = """
   swagger: '2.0'
   info:
-    title: formae-conformance
+    title: formae-test-anchor
     description: Plugin SDK conformance config
     version: 1.0.0
   schemes:
@@ -57,7 +57,7 @@ forma {
     project = v.gcpProject
     // Resolvable -> the api exists before a config is added to it.
     api = parentApi.res.name
-    name = "formae-plugin-sdk-test-agwcfg-\(v.testRunID)"
+    name = "formae-test-agwcfg-\(v.testRunID)"
     displayName = "Plugin SDK conformance config (updated)"
     labels = new Mapping {
       ["updated"] = "true"

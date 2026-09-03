@@ -17,7 +17,7 @@ forma {
 
   new regionHealthAggregationPolicy.RegionHealthAggregationPolicy {
     label = "plugin-sdk-test-region-health-aggregation-policy"
-    name = "formae-plugin-sdk-test-hap-\(v.testRunID)"
+    name = "formae-test-hap-\(v.testRunID)"
     description = "Test health aggregation policy for plugin SDK conformance tests"
     region = v.gcpRegion
     policyType = "BACKEND_SERVICE_POLICY"

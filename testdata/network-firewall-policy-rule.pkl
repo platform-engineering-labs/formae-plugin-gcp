@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 // is what makes it enforce anything.
 local policy = new networkFirewallPolicy.NetworkFirewallPolicy {
   label = "plugin-sdk-test-nfpr-policy"
-  name = "formae-plugin-sdk-test-nfpr-pol-\(v.testRunID)"
+  name = "formae-test-nfpr-pol-\(v.testRunID)"
   description = "Policy owning the rule under test"
 }
 

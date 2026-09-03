@@ -21,7 +21,7 @@ import "./config/vars.pkl" as v
 local auth = new dnsAuthorization.DnsAuthorization {
   label = "plugin-sdk-test-cert-dns-auth"
   name = "formae-test-cert-da-\(v.testRunID)"
-  domain = "formae-cert-\(v.testRunID).example.com"
+  domain = "formae-test-cert-\(v.testRunID).example.com"
   description = "Authorization for the certificate under test"
 }
 
@@ -36,7 +36,7 @@ forma {
     name = "formae-test-cert-\(v.testRunID)"
     managedCertificate = new certificate.ManagedCertificate {
       domains = new Listing {
-        "formae-cert-\(v.testRunID).example.com"
+        "formae-test-cert-\(v.testRunID).example.com"
       }
       // Certificate Manager reports this back with the project number in place
       // of the project id; the plugin rewrites it so the two forms agree.

@@ -10,7 +10,7 @@ import "@gcp/compute/network.pkl"
 import "@gcp/compute/firewall.pkl"
 import "./config/vars.pkl" as v
 
-local testNetworkName = "formae-plugin-sdk-test-fw-net-\(v.testRunID)"
+local testNetworkName = "formae-test-fw-net-\(v.testRunID)"
 
 forma {
   v.stack
@@ -32,7 +32,7 @@ forma {
     label = "plugin-sdk-test-firewall"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-fw-r2-\(v.testRunID)"
+    name = "formae-test-fw-r2-\(v.testRunID)"
     description = "Test firewall for plugin SDK conformance tests"
     network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
     direction = "INGRESS"

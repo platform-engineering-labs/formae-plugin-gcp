@@ -17,7 +17,7 @@ forma {
   // rules to exist, not anything serving behind them.
   local bs = new backendService.BackendService {
     label = "plugin-sdk-test-tgp-backend-service"
-    name = "formae-plugin-sdk-test-tgp-bs-\(v.testRunID)"
+    name = "formae-test-tgp-bs-\(v.testRunID)"
     loadBalancingScheme = "INTERNAL_SELF_MANAGED"
     protocol = "GRPC"
     portName = "grpc"
@@ -26,7 +26,7 @@ forma {
 
   local um = new urlMap.UrlMap {
     label = "plugin-sdk-test-tgp-url-map"
-    name = "formae-plugin-sdk-test-tgp-um-\(v.testRunID)"
+    name = "formae-test-tgp-um-\(v.testRunID)"
     defaultService = bs.res.selfLink
   }
 
@@ -38,7 +38,7 @@ forma {
 
   new targetGrpcProxy.TargetGrpcProxy {
     label = "plugin-sdk-test-target-grpc-proxy"
-    name = "formae-plugin-sdk-test-tgp-\(v.testRunID)"
+    name = "formae-test-tgp-\(v.testRunID)"
     description = "Test target gRPC proxy for plugin SDK conformance tests"
     urlMap = um.res.selfLink
     validateForProxyless = true

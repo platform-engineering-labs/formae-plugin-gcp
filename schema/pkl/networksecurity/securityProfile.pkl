@@ -1,0 +1,189 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security SecurityProfile
+///
+/// The policy half of Cloud NGFW's layer-7 inspection: what to do about a
+/// threat, not where to apply it. A profile on its own inspects nothing — it is
+/// named by a SecurityProfileGroup, which a firewall policy rule then points
+/// at.
+///
+/// Creating one provisions no capacity. Inspection becomes billable only when a
+/// firewall endpoint, an organization-level resource, is attached; a profile
+/// with nothing attached costs nothing.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.securityProfile
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::SecurityProfile"
+
+/// Override the action taken for one threat severity.
+@gcp.SubResourceHint
+open class SeverityOverride extends formae.SubResource {
+    /// INFORMATIONAL, LOW, MEDIUM, HIGH or CRITICAL.
+    @gcp.FieldHint
+    severity: String?
+
+    /// DEFAULT_ACTION, ALLOW, ALERT or DENY.
+    @gcp.FieldHint
+    action: String?
+}
+
+/// Override the action taken for one specific threat signature.
+@gcp.SubResourceHint
+open class ThreatOverride extends formae.SubResource {
+    /// The signature id to override.
+    @gcp.FieldHint
+    threatId: String?
+
+    /// DEFAULT_ACTION, ALLOW, ALERT or DENY.
+    @gcp.FieldHint
+    action: String?
+}
+
+/// Override the action taken for antivirus detections on one protocol.
+@gcp.SubResourceHint
+open class AntivirusOverride extends formae.SubResource {
+    /// SMTP, SMB, POP3, IMAP, HTTP2, HTTP or FTP.
+    @gcp.FieldHint
+    protocol: String?
+
+    /// DEFAULT_ACTION, ALLOW, ALERT or DENY.
+    @gcp.FieldHint
+    action: String?
+}
+
+/// Threat-prevention settings. Every field is an override: whatever is not
+/// named here keeps the built-in action for that threat.
+@gcp.SubResourceHint
+open class ThreatPreventionProfile extends formae.SubResource {
+    @gcp.FieldHint
+    severityOverrides: Listing<SeverityOverride>?
+
+    @gcp.FieldHint
+    threatOverrides: Listing<ThreatOverride>?
+
+    @gcp.FieldHint
+    antivirusOverrides: Listing<AntivirusOverride>?
+}
+
+/// One URL-matching rule inside a URL filtering profile.
+@gcp.SubResourceHint
+open class UrlFilter extends formae.SubResource {
+    @gcp.FieldHint
+    urls: Listing<String>?
+
+    /// ALLOW or DENY.
+    @gcp.FieldHint
+    filteringAction: String?
+
+    /// Lower numbers are evaluated first.
+    @gcp.FieldHint
+    priority: Int?
+}
+
+/// URL filtering settings, used when `type` is URL_FILTERING.
+@gcp.SubResourceHint
+open class UrlFilteringProfile extends formae.SubResource {
+    @gcp.FieldHint
+    urlFilters: Listing<UrlFilter>?
+}
+
+/// Packet-mirroring settings, used when `type` is CUSTOM_MIRRORING.
+@gcp.SubResourceHint
+open class CustomMirroringProfile extends formae.SubResource {
+    /// Full path of the mirroring endpoint group traffic is copied to.
+    @gcp.FieldHint
+    mirroringEndpointGroup: (String|formae.Resolvable)?
+}
+
+/// Traffic-interception settings, used when `type` is CUSTOM_INTERCEPT.
+@gcp.SubResourceHint
+open class CustomInterceptProfile extends formae.SubResource {
+    /// Full path of the intercept endpoint group traffic is diverted to.
+    @gcp.FieldHint
+    interceptEndpointGroup: (String|formae.Resolvable)?
+}
+
+open class SecurityProfileResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SecurityProfileResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class SecurityProfile extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-profile"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// What the profile governs: THREAT_PREVENTION, URL_FILTERING,
+    /// CUSTOM_MIRRORING or CUSTOM_INTERCEPT. Immutable, and it decides which of
+    /// the settings blocks below applies.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: String
+
+    /// Threat-prevention settings. GCP reports an empty block for a
+    /// THREAT_PREVENTION profile that overrides nothing.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    threatPreventionProfile: ThreatPreventionProfile?
+
+    /// URL filtering settings.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    urlFilteringProfile: UrlFilteringProfile?
+
+    /// Packet-mirroring settings.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    customMirroringProfile: CustomMirroringProfile?
+
+    /// Traffic-interception settings.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    customInterceptProfile: CustomInterceptProfile?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Server-assigned concurrency token. Never sent back on a write: replaying
+    /// a stored etag fails the call as soon as anything else has touched the
+    /// profile.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    etag: String?
+
+    hidden res: SecurityProfileResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

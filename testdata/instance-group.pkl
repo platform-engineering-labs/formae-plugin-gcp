@@ -23,12 +23,12 @@ import "./config/vars.pkl" as v
 // setNamedPorts (NativeID must stay stable — update, not replace).
 local net = new network.Network {
   label = "plugin-sdk-test-ig-net"
-  name = "formae-plugin-sdk-test-ig-net-\(v.testRunID)"
+  name = "formae-test-ig-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-ig-subnet"
-  name = "formae-plugin-sdk-test-ig-subnet-\(v.testRunID)"
+  name = "formae-test-ig-subnet-\(v.testRunID)"
   network = net.res.selfLink
   region = v.gcpRegion
   ipCidrRange = "10.91.0.0/24"
@@ -39,7 +39,7 @@ forma {
     label = "plugin-sdk-test-ig-bootdisk"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-ig-disk-\(v.testRunID)"
+    name = "formae-test-ig-disk-\(v.testRunID)"
     description = "Boot disk for instance-group member VM"
     sizeGb = 10
     type = "pd-standard"
@@ -50,7 +50,7 @@ forma {
     label = "plugin-sdk-test-ig-vm"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-ig-vm-\(v.testRunID)"
+    name = "formae-test-ig-vm-\(v.testRunID)"
     machineType = "e2-micro"
     description = "Member VM for instance-group conformance test"
     disks = new Listing {
@@ -79,7 +79,7 @@ forma {
 
   new instanceGroup.InstanceGroup {
     label = "plugin-sdk-test-instance-group"
-    name = "formae-plugin-sdk-test-ig-\(v.testRunID)"
+    name = "formae-test-ig-\(v.testRunID)"
     description = "Test unmanaged instance group with a VM member"
     zone = v.gcpZone
     namedPorts = new Listing {

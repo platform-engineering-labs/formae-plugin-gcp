@@ -16,7 +16,7 @@ local src = new regionDisk.RegionDisk {
   label = "plugin-sdk-test-ris-disk"
   project = v.gcpProject
   region = v.gcpRegion
-  name = "formae-plugin-sdk-test-ris-disk-\(v.testRunID)"
+  name = "formae-test-ris-disk-\(v.testRunID)"
   description = "Source regional disk for the regional instant snapshot test"
   sizeGb = 10
   type = "pd-ssd"
@@ -34,7 +34,7 @@ forma {
 
   new regionInstantSnapshot.RegionInstantSnapshot {
     label = "plugin-sdk-test-region-instant-snapshot"
-    name = "formae-plugin-sdk-test-ris-\(v.testRunID)"
+    name = "formae-test-ris-\(v.testRunID)"
     description = "Test regional instant snapshot for plugin SDK conformance tests"
     region = v.gcpRegion
     // Resolvable -> establishes disk-before-snapshot create ordering.

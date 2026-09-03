@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // content. Without the key, enableCDN can only serve public objects.
 local hc = new healthCheck.HealthCheck {
   label = "plugin-sdk-test-suk-hc"
-  name = "formae-plugin-sdk-test-suk-hc-\(v.testRunID)"
+  name = "formae-test-suk-hc-\(v.testRunID)"
   type = "HTTP"
   httpHealthCheck = new healthCheck.HttpHealthCheck {
     port = 80
@@ -24,7 +24,7 @@ local hc = new healthCheck.HealthCheck {
 
 local bs = new backendService.BackendService {
   label = "plugin-sdk-test-suk-backend-service"
-  name = "formae-plugin-sdk-test-suk-bs-\(v.testRunID)"
+  name = "formae-test-suk-bs-\(v.testRunID)"
   loadBalancingScheme = "EXTERNAL_MANAGED"
   protocol = "HTTP"
   timeoutSec = 30
@@ -43,7 +43,7 @@ forma {
 
   new backendServiceSignedUrlKey.BackendServiceSignedUrlKey {
     label = "plugin-sdk-test-backend-service-signed-url-key"
-    keyName = "formae-plugin-sdk-test-suk-key-\(v.testRunID)"
+    keyName = "formae-test-suk-key-\(v.testRunID)"
     // Resolvable -> the backend service exists before the add verb runs.
     backendService = bs.res.name
     // A throwaway 16-byte test key: base64url of "0123456789abcdef". It signs

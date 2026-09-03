@@ -1,0 +1,89 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security SecurityProfileGroup
+///
+/// The binding a firewall policy rule actually names. A group gathers up to one
+/// SecurityProfile of each kind, so a rule points at one group rather than at
+/// each profile separately.
+///
+/// Each profile field takes the profile's short name — a resolvable reference
+/// yields exactly that — and the plugin expands it to the full resource path
+/// the API expects, then shortens what the API reports back.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.securityProfileGroup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::SecurityProfileGroup"
+
+open class SecurityProfileGroupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: SecurityProfileGroupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class SecurityProfileGroup extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-profile-group"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The THREAT_PREVENTION profile this group binds.
+    @gcp.FieldHint
+    threatPreventionProfile: (String|formae.Resolvable)?
+
+    /// The URL_FILTERING profile this group binds.
+    @gcp.FieldHint
+    urlFilteringProfile: (String|formae.Resolvable)?
+
+    /// The CUSTOM_MIRRORING profile this group binds.
+    @gcp.FieldHint
+    customMirroringProfile: (String|formae.Resolvable)?
+
+    /// The CUSTOM_INTERCEPT profile this group binds.
+    @gcp.FieldHint
+    customInterceptProfile: (String|formae.Resolvable)?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Server-assigned concurrency token. Never sent back on a write: replaying
+    /// a stored etag fails the call as soon as anything else has touched the
+    /// group.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    etag: String?
+
+    /// Server-assigned identifier used in the dataplane.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    dataPathId: String?
+
+    hidden res: SecurityProfileGroupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

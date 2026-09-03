@@ -19,7 +19,7 @@ forma {
 
   new logView.LogView {
     label = "plugin-sdk-test-logging-log-view"
-    name = "formae-plugin-sdk-test-view-\(v.testRunID)"
+    name = "formae-test-view-\(v.testRunID)"
     bucket = "_Default"
     location = "global"
     description = "Updated log view description"

@@ -15,7 +15,7 @@ forma {
 
   new globalAddress.GlobalAddress {
     label = "plugin-sdk-test-global-address"
-    name = "formae-plugin-sdk-test-gaddr-\(v.testRunID)"
+    name = "formae-test-gaddr-\(v.testRunID)"
     addressType = "EXTERNAL"
     description = "Test global address for plugin SDK conformance tests"
   }

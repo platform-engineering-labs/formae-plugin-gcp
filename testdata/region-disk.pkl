@@ -19,7 +19,7 @@ forma {
     label = "plugin-sdk-test-region-disk"
     project = v.gcpProject
     region = v.gcpRegion
-    name = "formae-plugin-sdk-test-regdisk-\(v.testRunID)"
+    name = "formae-test-regdisk-\(v.testRunID)"
     description = "Test regional disk for plugin SDK conformance tests"
     sizeGb = 10
     type = "pd-balanced"

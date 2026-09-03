@@ -18,7 +18,7 @@ forma {
 
   new projectMetadataItem.ProjectMetadataItem {
     label = "plugin-sdk-test-project-metadata-item"
-    key = "formae-plugin-sdk-test-pmi-\(v.testRunID)"
+    key = "formae-test-pmi-\(v.testRunID)"
     value = "conformance-test-value"
   }
 }

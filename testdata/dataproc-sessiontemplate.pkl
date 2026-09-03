@@ -18,7 +18,7 @@ forma {
 
   new sessionTemplate.SessionTemplate {
     label = "plugin-sdk-test-dataproc-session-template"
-    name = "formae-plugin-sdk-test-st-\(v.testRunID)"
+    name = "formae-test-st-\(v.testRunID)"
     description = "Test session template for plugin SDK conformance tests"
     jupyterSession = new sessionTemplate.JupyterSession {
       kernel = "PYTHON"

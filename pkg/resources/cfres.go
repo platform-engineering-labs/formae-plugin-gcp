@@ -34,6 +34,7 @@ import (
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/memcache"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/monitoring"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/networkconnectivity"
+	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/networksecurity"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/orgpolicy"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/pubsub"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/redis"

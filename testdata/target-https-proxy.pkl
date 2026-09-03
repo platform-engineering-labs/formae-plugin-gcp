@@ -23,7 +23,7 @@ import "./config/vars.pkl" as v
 forma {
   local hc = new healthCheck.HealthCheck {
     label = "plugin-sdk-test-thsp-healthcheck"
-    name = "formae-plugin-sdk-test-thsp-hc-\(v.testRunID)"
+    name = "formae-test-thsp-hc-\(v.testRunID)"
     type = "TCP"
     tcpHealthCheck = new healthCheck.TcpHealthCheck {
       port = 80
@@ -32,7 +32,7 @@ forma {
 
   local bs = new backendService.BackendService {
     label = "plugin-sdk-test-thsp-backend-service"
-    name = "formae-plugin-sdk-test-thsp-bs-\(v.testRunID)"
+    name = "formae-test-thsp-bs-\(v.testRunID)"
     loadBalancingScheme = "EXTERNAL_MANAGED"
     protocol = "HTTP"
     timeoutSec = 30
@@ -43,16 +43,16 @@ forma {
 
   local um = new urlMap.UrlMap {
     label = "plugin-sdk-test-thsp-url-map"
-    name = "formae-plugin-sdk-test-thsp-um-\(v.testRunID)"
+    name = "formae-test-thsp-um-\(v.testRunID)"
     defaultService = bs.res.selfLink
   }
 
   local cert = new sslCertificate.SslCertificate {
     label = "plugin-sdk-test-thsp-cert"
-    name = "formae-plugin-sdk-test-thsp-cert-\(v.testRunID)"
+    name = "formae-test-thsp-cert-\(v.testRunID)"
     type = "MANAGED"
     managedDomains = new Listing {
-      "formae-thsp-\(v.testRunID).example.com"
+      "formae-test-thsp-\(v.testRunID).example.com"
     }
   }
 
@@ -66,7 +66,7 @@ forma {
 
   new targetHttpsProxy.TargetHttpsProxy {
     label = "plugin-sdk-test-target-https-proxy"
-    name = "formae-plugin-sdk-test-thsp-\(v.testRunID)"
+    name = "formae-test-thsp-\(v.testRunID)"
     description = "Test target HTTPS proxy for plugin SDK conformance tests"
     urlMap = um.res.selfLink
     sslCertificates = new Listing {

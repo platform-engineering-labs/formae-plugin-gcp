@@ -22,7 +22,7 @@ import "./config/vars.pkl" as v
 local auth = new dnsAuthorization.DnsAuthorization {
   label = "plugin-sdk-test-cme-dns-auth"
   name = "formae-test-cme-da-\(v.testRunID)"
-  domain = "formae-cme-\(v.testRunID).example.com"
+  domain = "formae-test-cme-\(v.testRunID).example.com"
 }
 
 local cert = new certificate.Certificate {
@@ -30,7 +30,7 @@ local cert = new certificate.Certificate {
   name = "formae-test-cme-cert-\(v.testRunID)"
   managedCertificate = new certificate.ManagedCertificate {
     domains = new Listing {
-      "formae-cme-\(v.testRunID).example.com"
+      "formae-test-cme-\(v.testRunID).example.com"
     }
     dnsAuthorizations = new Listing {
       auth.res.name
@@ -56,7 +56,7 @@ forma {
     label = "plugin-sdk-test-certmanager-certificate-map-entry"
     name = "formae-test-cme-\(v.testRunID)"
     certificateMap = map.res.name
-    hostname = "formae-cme-\(v.testRunID).example.com"
+    hostname = "formae-test-cme-\(v.testRunID).example.com"
     certificates = new Listing {
       cert.res.name
     }

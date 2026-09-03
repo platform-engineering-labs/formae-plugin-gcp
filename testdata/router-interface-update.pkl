@@ -17,13 +17,13 @@ import "./config/vars.pkl" as v
 // gateway quota, and nothing here boots a VM.
 local net = new network.Network {
   label = "plugin-sdk-test-ri-network"
-  name = "formae-plugin-sdk-test-ri-net-\(v.testRunID)"
+  name = "formae-test-ri-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
 local sub = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-ri-subnet"
-  name = "formae-plugin-sdk-test-ri-sub-\(v.testRunID)"
+  name = "formae-test-ri-sub-\(v.testRunID)"
   region = v.gcpRegion
   ipCidrRange = "10.44.0.0/24"
   network = net.res.selfLink
@@ -31,7 +31,7 @@ local sub = new subnetwork.Subnetwork {
 
 local rt = new router.Router {
   label = "plugin-sdk-test-ri-router"
-  name = "formae-plugin-sdk-test-ri-rt-\(v.testRunID)"
+  name = "formae-test-ri-rt-\(v.testRunID)"
   region = v.gcpRegion
   network = net.res.selfLink
 }
@@ -46,7 +46,7 @@ forma {
 
   new routerInterface.RouterInterface {
     label = "plugin-sdk-test-router-interface"
-    name = "formae-plugin-sdk-test-ri-if"
+    name = "formae-test-ri-if"
     // Resolvables -> the router and subnet exist before the patch runs.
     router = rt.res.name
     region = v.gcpRegion

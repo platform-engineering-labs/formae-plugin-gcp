@@ -20,7 +20,7 @@ forma {
     label = "plugin-sdk-test-disk"
     project = v.gcpProject
     zone = v.gcpZone
-    name = "formae-plugin-sdk-test-\(v.testRunID)"
+    name = "formae-test-\(v.testRunID)"
     description = "Test disk for plugin SDK tests"
     sizeGb = 10
     type = "pd-standard"

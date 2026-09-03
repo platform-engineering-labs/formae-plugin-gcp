@@ -18,12 +18,12 @@ forma {
   // exist for the NEG's own create/read/delete lifecycle.
   new networkEndpointGroup.NetworkEndpointGroup {
     label = "plugin-sdk-test-neg"
-    name = "formae-plugin-sdk-test-neg-\(v.testRunID)"
+    name = "formae-test-neg-\(v.testRunID)"
     description = "Test serverless NEG for plugin SDK conformance tests"
     networkEndpointType = "SERVERLESS"
     region = v.gcpRegion
     cloudRun = new networkEndpointGroup.CloudRun {
-      service = "formae-plugin-sdk-test-svc-\(v.testRunID)"
+      service = "formae-test-svc-\(v.testRunID)"
     }
   }
 }

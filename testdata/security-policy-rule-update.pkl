@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 // 2147483647 — so nothing here fights the separately managed rule below.
 local policy = new securityPolicy.SecurityPolicy {
   label = "plugin-sdk-test-spr-policy"
-  name = "formae-plugin-sdk-test-spr-\(v.testRunID)"
+  name = "formae-test-spr-\(v.testRunID)"
   description = "Cloud Armor policy owning the rule under test"
   type = "CLOUD_ARMOR"
 }

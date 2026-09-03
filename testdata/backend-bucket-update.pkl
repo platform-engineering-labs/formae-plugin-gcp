@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // nothing, and a backend bucket is configuration.
 local b = new bucket.Bucket {
   label = "plugin-sdk-test-backend-bucket-source"
-  name = "formae-plugin-sdk-test-bb-\(v.testRunID)"
+  name = "formae-test-bb-\(v.testRunID)"
   location = v.gcpRegion
   storageClass = "STANDARD"
 }
@@ -28,7 +28,7 @@ forma {
 
   new backendBucket.BackendBucket {
     label = "plugin-sdk-test-backend-bucket"
-    name = "formae-plugin-sdk-test-bbk-\(v.testRunID)"
+    name = "formae-test-bbk-\(v.testRunID)"
     description = "Updated backend bucket for plugin SDK conformance tests"
     // Resolvable -> the bucket exists before the backend references it.
     bucketName = b.res.name

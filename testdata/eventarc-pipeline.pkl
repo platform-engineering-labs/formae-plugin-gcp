@@ -21,7 +21,7 @@ import "./config/vars.pkl" as v
 // slot and fail this one's bus.
 local bus = new messageBus.MessageBus {
   label = "plugin-sdk-test-pl-bus"
-  name = "formae-plugin-sdk-test-pl-bus-\(v.testRunID)"
+  name = "formae-test-pl-bus-\(v.testRunID)"
   location = "us-central1"
 }
 
@@ -33,7 +33,7 @@ forma {
 
   new pipeline.Pipeline {
     label = "plugin-sdk-test-eventarc-pipeline"
-    name = "formae-plugin-sdk-test-pl-\(v.testRunID)"
+    name = "formae-test-pl-\(v.testRunID)"
     location = "us-central1"
     destinations = new Listing {
       new pipeline.PipelineDestination {

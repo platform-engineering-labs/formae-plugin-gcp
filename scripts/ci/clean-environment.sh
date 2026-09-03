@@ -36,23 +36,8 @@
 set -euo pipefail
 
 # Prefix used for test resources - should match what conformance tests create
-# Every fixture names what it creates "formae-<something>-<testRunID>", but only
-# some use the "formae-plugin-sdk-test-" form. 101 name literals in testdata/ use
-# a bare "formae-test-" instead, and a handful use neither ("formae-sp-",
-# "formae-thsp-", "formae-rrset-"). The sweeps matched "^formae-plugin-sdk" only,
-# so those never got collected - which is how eight SSL certificates reached the
-# global cap of ten and how thirteen Service Directory namespaces accumulated in
-# europe-central2. Leaked resources exhaust quotas, and a quota failure surfaces
-# as an unrelated case failing, so this is a correctness problem, not tidiness.
-#
-# Matching "^formae-" covers every family, including ones added later - the
-# enumeration is what drifted, so there is no enumeration any more.
-SWEEP_RE="${SWEEP_RE:-^formae-}"
-
-# Names that match SWEEP_RE but must never be deleted. A "formae-" resource is
-# not always a leak: formae-byo-cert is a certificate someone installed in July
-# and is still in use. Add a name here rather than narrowing SWEEP_RE.
-KEEP_RE="${KEEP_RE:-^(formae-byo-cert|formae-tester|formae-tester-nico)([@[:space:]].*)?$}"
+# Names the cleanup tooling treats as ours - shared with find-leaks.sh.
+. "$(dirname "$0")/sweep-patterns.sh"
 
 echo "clean-environment.sh: sweeping names matching '${SWEEP_RE}' (keeping '${KEEP_RE}')"
 
@@ -1128,10 +1113,10 @@ fi
 
 # --- 5. BigQuery tables (must delete before datasets) ---
 echo "Cleaning GCP BigQuery tables..."
-DATASETS=$(bq ls --format=json --project_id="${GCP_PROJECT_ID:-}" 2>/dev/null | grep -o '"formae_plugin_sdk_test_[^"]*"' | tr -d '"' || true)
+DATASETS=$(bq ls --format=json --project_id="${GCP_PROJECT_ID:-}" 2>/dev/null | grep -oE '"formae[-_](test|probe)[-_][^"]*"' | tr -d '"' || true)
 if [ -n "$DATASETS" ]; then
     for ds in $DATASETS; do
-        TABLES=$(bq ls --format=json "${GCP_PROJECT_ID}:${ds}" 2>/dev/null | grep -o '"formae_plugin_sdk_test_[^"]*"' | tr -d '"' || true)
+        TABLES=$(bq ls --format=json "${GCP_PROJECT_ID}:${ds}" 2>/dev/null | grep -oE '"formae[-_](test|probe)[-_][^"]*"' | tr -d '"' || true)
         if [ -n "$TABLES" ]; then
             for tbl in $TABLES; do
                 echo "  Deleting table: ${ds}.${tbl}"
@@ -1145,7 +1130,7 @@ fi
 
 # --- 6. BigQuery datasets ---
 echo "Cleaning GCP BigQuery datasets..."
-DATASETS=$(bq ls --format=json --project_id="${GCP_PROJECT_ID:-}" 2>/dev/null | grep -o '"formae_plugin_sdk_test_[^"]*"' | tr -d '"' || true)
+DATASETS=$(bq ls --format=json --project_id="${GCP_PROJECT_ID:-}" 2>/dev/null | grep -oE '"formae[-_](test|probe)[-_][^"]*"' | tr -d '"' || true)
 if [ -n "$DATASETS" ]; then
     for ds in $DATASETS; do
         echo "  Deleting dataset: $ds"
@@ -1193,7 +1178,7 @@ fi
 #         testdata name is "formae-test-conn-<runID>", not the long
 #         formae-plugin-sdk prefix the other filters use. ---
 echo "Cleaning GCP VPC Access connectors..."
-VPC_CONNECTORS=$(gcloud compute networks vpc-access connectors list --region="${GCP_REGION:-europe-central2}" --filter="name~formae-test-conn" --format="value(name.basename())" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+VPC_CONNECTORS=$(gcloud compute networks vpc-access connectors list --region="${GCP_REGION:-europe-central2}" --format="value(name.basename())" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$VPC_CONNECTORS" ]; then
     echo "$VPC_CONNECTORS" | while read -r conn; do
         echo "  Deleting VPC Access connector: $conn"
@@ -1201,6 +1186,22 @@ if [ -n "$VPC_CONNECTORS" ]; then
     done
 else
     echo "  No VPC Access connectors found"
+fi
+
+# --- 6d. Packet mirroring policies. A policy pins the network it mirrors, and
+#         the network delete fails with "already being used by ... packetMirrorings"
+#         until it goes. Two leaked policies held two networks in the project
+#         indefinitely because nothing swept this collection at all. ---
+echo "Cleaning GCP packet mirroring policies..."
+PACKET_MIRRORINGS=$(gcloud compute packet-mirrorings list --format="value(name,region.basename())" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$PACKET_MIRRORINGS" ]; then
+    echo "$PACKET_MIRRORINGS" | while read -r pm pm_region; do
+        [ -z "$pm" ] && continue
+        echo "  Deleting packet mirroring: $pm (region: ${pm_region:-${GCP_REGION:-europe-central2}})"
+        gcloud compute packet-mirrorings delete "$pm" --region="${pm_region:-${GCP_REGION:-europe-central2}}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No packet mirroring policies found"
 fi
 
 # --- 7. Networks (after firewalls and subnetworks are deleted) ---
@@ -1221,7 +1222,7 @@ fi
 # nothing swept them and they outlived every run - and the credentials used to
 # create one often cannot delete it.
 echo "Cleaning GCP storage buckets..."
-BUCKETS=$(gcloud storage buckets list --filter="name~^formae--test OR name~^formae-probe-" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+BUCKETS=$(gcloud storage buckets list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$BUCKETS" ]; then
     echo "$BUCKETS" | while read -r bucket; do
         echo "  Deleting bucket: $bucket"
@@ -1231,9 +1232,18 @@ else
     echo "  No buckets found"
 fi
 
-# --- 9. Bigtable instances ---
+# --- 9. Bigtable instances. THE EXPENSIVE ONE: an instance holds nodes and is
+#         billed per node-hour for as long as it exists, so a leak here costs
+#         real money rather than clutter.
+#
+#         This filtered on "^formae-test-instance", which only matched the
+#         fixtures that happen to name their instance that way. bigtable-app-profile
+#         names its instance "formae-test-btap-<runID>", so every run of that case
+#         left a billed instance behind and no sweep ever collected it. Match the
+#         same "^formae-" every other sweep uses; deleting an instance takes its
+#         tables, backups and views with it. ---
 echo "Cleaning GCP Bigtable instances..."
-INSTANCES=$(gcloud bigtable instances list --filter="name~^formae-test-instance" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+INSTANCES=$(gcloud bigtable instances list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$INSTANCES" ]; then
     echo "$INSTANCES" | while read -r instance; do
         echo "  Deleting Bigtable instance: $instance"
@@ -1301,8 +1311,9 @@ SQL_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
 if [ -n "$SQL_PROJECT" ] && [ -n "$SQL_TOKEN" ]; then
     SQL_API="https://sqladmin.googleapis.com/v1/projects/${SQL_PROJECT}/instances"
     SQL_INSTANCES=$(curl -s -H "Authorization: Bearer ${SQL_TOKEN}" "$SQL_API" \
-        | grep -oE '"name": *"formae-test-sql[^"]*"' \
-        | sed -E 's/.*"(formae-test-sql[^"]*)".*/\1/' || true)
+        | grep -oE '"name": *"[^"]+"' \
+        | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+        | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
     if [ -n "$SQL_INSTANCES" ]; then
         echo "$SQL_INSTANCES" | while read -r instance; do
             echo "  Deleting Cloud SQL instance: $instance"
@@ -1319,7 +1330,7 @@ fi
 # Not cleaned before => leaked secrets cause AlreadyExists on re-run. Deleting a
 # secret removes its versions, so this covers both test resource types.
 echo "Cleaning GCP Secret Manager secrets..."
-SECRETS=$(gcloud secrets list --filter="name~^formae--test" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+SECRETS=$(gcloud secrets list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SECRETS" ]; then
     echo "$SECRETS" | while read -r secret; do
         echo "  Deleting secret: $secret"
@@ -1341,7 +1352,6 @@ fi
 # depends on.
 echo "Cleaning GCP IAM service accounts..."
 SA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
-SA_SWEEP_RE="${SA_SWEEP_RE:-^formae-plugin-sdk-test-}"
 SERVICE_ACCOUNTS=$(gcloud iam service-accounts list --format="value(email)" 2>/dev/null \
     | grep -E "$SA_SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SERVICE_ACCOUNTS" ]; then
@@ -1428,3 +1438,217 @@ for cm_kind in "maps:certificate map" "certificates:certificate" "dns-authorizat
         echo "  No ${cm_label}s found"
     fi
 done
+# --- 16. Filestore instances and backups. BILLABLE and among the most expensive
+#         things a run can leave behind - a BASIC_HDD instance is provisioned
+#         capacity billed per GB-hour, and one leaked at 1024GB before. Backups
+#         first: a backup pins the instance it came from. ---
+echo "Cleaning GCP Filestore..."
+FS_BACKUPS=$(gcloud filestore backups list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$FS_BACKUPS" ]; then
+    echo "$FS_BACKUPS" | while read -r b; do
+        echo "  Deleting Filestore backup: $(basename "$b")"
+        gcloud filestore backups delete "$(basename "$b")" --region="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Filestore backups found"
+fi
+FS_INSTANCES=$(gcloud filestore instances list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$FS_INSTANCES" ]; then
+    echo "$FS_INSTANCES" | while read -r i; do
+        echo "  Deleting Filestore instance: $(basename "$i")"
+        gcloud filestore instances delete "$(basename "$i")" --zone="${GCP_ZONE:-europe-central2-a}" --quiet 2>/dev/null \
+          || gcloud filestore instances delete "$(basename "$i")" --region="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Filestore instances found"
+fi
+
+# --- 17. Redis instances and clusters. BILLABLE: both hold provisioned memory
+#         and are charged per hour for as long as they exist. ---
+echo "Cleaning GCP Redis..."
+for redis_kind in instances clusters; do
+    REDIS=$(gcloud redis "$redis_kind" list --region="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$REDIS" ]; then
+        echo "$REDIS" | while read -r r; do
+            echo "  Deleting Redis $redis_kind: $(basename "$r")"
+            gcloud redis "$redis_kind" delete "$(basename "$r")" --region="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Redis $redis_kind found"
+    fi
+done
+
+# --- 18. Certificate Authority Service. BILLABLE: a CA pool is charged per month
+#         and an ENTERPRISE pool is the expensive tier - two were left behind
+#         before. A CA has to be disabled before it can be deleted, and the pool
+#         only goes once every CA in it has. ---
+echo "Cleaning GCP Certificate Authority Service..."
+CA_POOLS=$(gcloud privateca pools list --location="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$CA_POOLS" ]; then
+    echo "$CA_POOLS" | while read -r pool; do
+        pn=$(basename "$pool")
+        CAS=$(gcloud privateca roots list --pool="$pn" --location="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null || true)
+        for ca in $CAS; do
+            can=$(basename "$ca")
+            echo "  Disabling and deleting CA: $can (pool: $pn)"
+            gcloud privateca roots disable "$can" --pool="$pn" --location="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+            gcloud privateca roots delete "$can" --pool="$pn" --location="${GCP_REGION:-europe-central2}" --ignore-active-certificates --skip-grace-period --quiet 2>/dev/null || true
+        done
+        echo "  Deleting CA pool: $pn"
+        gcloud privateca pools delete "$pn" --location="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No CA pools found"
+fi
+
+# --- 19. Datastream. A private connection reserves a VPC peering range and is
+#         billable; streams and connection profiles pin it, so they go first. ---
+echo "Cleaning GCP Datastream..."
+for ds_kind in streams connection-profiles private-connections; do
+    DS=$(gcloud datastream "$ds_kind" list --location="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$DS" ]; then
+        echo "$DS" | while read -r d; do
+            echo "  Deleting Datastream $ds_kind: $(basename "$d")"
+            gcloud datastream "$ds_kind" delete "$(basename "$d")" --location="${GCP_REGION:-europe-central2}" --quiet --force 2>/dev/null \
+              || gcloud datastream "$ds_kind" delete "$(basename "$d")" --location="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Datastream $ds_kind found"
+    fi
+done
+
+# --- 20. Pub/Sub. Free, but the highest-volume leak we have had: 162 topics and
+#         their subscriptions accumulated before anything collected them.
+#         Subscriptions and snapshots pin a topic, so they go first. ---
+echo "Cleaning GCP Pub/Sub..."
+for ps_kind in subscriptions snapshots topics schemas; do
+    PS=$(gcloud pubsub "$ps_kind" list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$PS" ]; then
+        echo "$PS" | while read -r x; do
+            echo "  Deleting Pub/Sub $ps_kind: $(basename "$x")"
+            gcloud pubsub "$ps_kind" delete "$(basename "$x")" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Pub/Sub $ps_kind found"
+    fi
+done
+
+# --- 21. Cloud DNS. A policy holds a reference to every network it is attached
+#         to and refuses to delete while attached, so detach first - that is why
+#         the policy update carries an empty networks list before the delete. ---
+echo "Cleaning GCP Cloud DNS..."
+DNS_POLICIES=$(gcloud dns policies list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$DNS_POLICIES" ]; then
+    echo "$DNS_POLICIES" | while read -r pol; do
+        echo "  Detaching and deleting DNS policy: $pol"
+        gcloud dns policies update "$pol" --networks="" --quiet 2>/dev/null || true
+        gcloud dns policies delete "$pol" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No DNS policies found"
+fi
+for dns_kind in response-policies managed-zones; do
+    DNSX=$(gcloud dns "$dns_kind" list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$DNSX" ]; then
+        echo "$DNSX" | while read -r z; do
+            echo "  Deleting DNS $dns_kind: $z"
+            if [ "$dns_kind" = "response-policies" ]; then
+                for r in $(gcloud dns response-policies rules list --response-policy="$z" --format="value(ruleName)" 2>/dev/null || true); do
+                    gcloud dns response-policies rules delete "$r" --response-policy="$z" --quiet 2>/dev/null || true
+                done
+            fi
+            gcloud dns "$dns_kind" delete "$z" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No DNS $dns_kind found"
+    fi
+done
+
+# --- 22. Cloud Scheduler and Cloud Tasks. Free, and both leaked before - three
+#         scheduler jobs were found in an earlier sweep of the project. ---
+echo "Cleaning GCP Cloud Scheduler jobs and Cloud Tasks queues..."
+SCHED=$(gcloud scheduler jobs list --location="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$SCHED" ]; then
+    echo "$SCHED" | while read -r j; do
+        echo "  Deleting Scheduler job: $(basename "$j")"
+        gcloud scheduler jobs delete "$(basename "$j")" --location="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Scheduler jobs found"
+fi
+TASKQ=$(gcloud tasks queues list --location="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$TASKQ" ]; then
+    echo "$TASKQ" | while read -r q; do
+        echo "  Deleting Tasks queue: $(basename "$q")"
+        gcloud tasks queues delete "$(basename "$q")" --location="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No Tasks queues found"
+fi
+
+# --- 23. Network Connectivity. A spoke pins its hub, so spokes go first. Internal
+#         ranges and policy-based routes are global; service connection policies
+#         are regional, alone in this API. ---
+echo "Cleaning GCP Network Connectivity..."
+for nc in "spokes global" "hubs global" "internal-ranges global" "policy-based-routes global" "service-connection-policies ${GCP_REGION:-europe-central2}"; do
+    nc_kind="${nc%% *}"; nc_loc="${nc##* }"
+    NCX=$(gcloud network-connectivity "$nc_kind" list --location="$nc_loc" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$NCX" ]; then
+        echo "$NCX" | while read -r x; do
+            echo "  Deleting Network Connectivity $nc_kind: $(basename "$x")"
+            gcloud network-connectivity "$nc_kind" delete "$(basename "$x")" --location="$nc_loc" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Network Connectivity $nc_kind found"
+    fi
+done
+
+# --- 24. Eventarc. A trigger pins the bus or channel it reads from. A message bus
+#         is capped at one per region, so a leaked one blocks the next run rather
+#         than costing money. ---
+echo "Cleaning GCP Eventarc..."
+# gcloud only knows triggers, channels and channel-connections here. The Eventarc
+# Advanced types - message buses, pipelines, enrollments, google API sources -
+# have no gcloud surface at all, so they are swept over REST below. A sweep naming
+# a subcommand that does not exist fails into "|| true" and collects nothing,
+# which is the silent-no-op this whole change is about.
+for ev_kind in triggers channels channel-connections; do
+    EV=$(gcloud eventarc "$ev_kind" list --location="${GCP_REGION:-europe-central2}" --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+    if [ -n "$EV" ]; then
+        echo "$EV" | while read -r x; do
+            echo "  Deleting Eventarc $ev_kind: $(basename "$x")"
+            gcloud eventarc "$ev_kind" delete "$(basename "$x")" --location="${GCP_REGION:-europe-central2}" --quiet 2>/dev/null || true
+        done
+    else
+        echo "  No Eventarc $ev_kind found"
+    fi
+done
+
+# --- 25. Eventarc Advanced (message buses, pipelines, enrollments, Google API
+#         sources). No gcloud surface, so REST. A message bus is capped at one per
+#         region: a leaked one does not cost money, it blocks the next run that
+#         needs one. Enrollments and pipelines pin the bus, so they go first. ---
+echo "Cleaning GCP Eventarc Advanced..."
+EV_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+EV_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+EV_LOC="${GCP_REGION:-europe-central2}"
+if [ -n "$EV_PROJECT" ] && [ -n "$EV_TOKEN" ]; then
+    for ev_coll in enrollments pipelines googleApiSources messageBuses; do
+        EV_API="https://eventarc.googleapis.com/v1/projects/${EV_PROJECT}/locations/${EV_LOC}/${ev_coll}"
+        EV_ITEMS=$(curl -s -H "Authorization: Bearer ${EV_TOKEN}" "$EV_API" \
+            | grep -oE '"name": *"[^"]+"' \
+            | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+            | sed 's#.*/##' \
+            | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+        if [ -n "$EV_ITEMS" ]; then
+            echo "$EV_ITEMS" | while read -r item; do
+                echo "  Deleting Eventarc $ev_coll: $item"
+                curl -s -o /dev/null -X DELETE -H "Authorization: Bearer ${EV_TOKEN}" "${EV_API}/${item}" || true
+            done
+        else
+            echo "  No Eventarc $ev_coll found"
+        fi
+    done
+else
+    echo "  Skipping Eventarc Advanced (no project or token)"
+fi

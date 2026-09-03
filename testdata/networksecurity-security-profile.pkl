@@ -1,0 +1,42 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/securityProfile.pkl" as sp
+import "./config/vars.pkl" as v
+
+// A security profile says what to do about a threat, not where to look for one.
+// Creating it provisions nothing: layer-7 inspection becomes billable only once
+// a firewall endpoint - an organization-level resource - is attached, and this
+// fixture attaches none.
+//
+// threatPreventionProfile is declared with a single severity override. Left
+// empty, GCP reports back an empty block of its own, which the schema covers
+// with a provider default.
+forma {
+  v.stack
+  v.target
+
+  new sp.SecurityProfile {
+    label = "plugin-sdk-test-ns-security-profile"
+    name = "formae-test-ns-sp-\(v.testRunID)"
+    // Immutable, and it decides which settings block applies.
+    type = "THREAT_PREVENTION"
+    threatPreventionProfile = new sp.ThreatPreventionProfile {
+      severityOverrides = new Listing {
+        new sp.SeverityOverride {
+          severity = "CRITICAL"
+          action = "DENY"
+        }
+      }
+    }
+    description = "Test security profile for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

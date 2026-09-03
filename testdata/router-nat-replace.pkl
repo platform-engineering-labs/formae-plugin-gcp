@@ -22,13 +22,13 @@ import "./config/vars.pkl" as v
 // translation.
 local net = new network.Network {
   label = "plugin-sdk-test-nat-network"
-  name = "formae-plugin-sdk-test-nat-net-\(v.testRunID)"
+  name = "formae-test-nat-net-\(v.testRunID)"
   autoCreateSubnetworks = false
 }
 
 local sub = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-nat-subnet"
-  name = "formae-plugin-sdk-test-nat-sub-\(v.testRunID)"
+  name = "formae-test-nat-sub-\(v.testRunID)"
   region = v.gcpRegion
   ipCidrRange = "10.46.0.0/24"
   network = net.res.selfLink
@@ -36,7 +36,7 @@ local sub = new subnetwork.Subnetwork {
 
 local rt = new router.Router {
   label = "plugin-sdk-test-nat-router"
-  name = "formae-plugin-sdk-test-nat-rt-\(v.testRunID)"
+  name = "formae-test-nat-rt-\(v.testRunID)"
   region = v.gcpRegion
   network = net.res.selfLink
 }
@@ -54,7 +54,7 @@ forma {
     // The name is immutable, so changing it forces a replace rather than
     // an update. The prerequisites above are untouched: only the resource
     // under test is replaced.
-    name = "formae-plugin-sdk-test-nat-r2-\(v.testRunID)"
+    name = "formae-test-nat-r2-\(v.testRunID)"
     // Resolvable -> the router exists before the NAT is configured on it.
     router = rt.res.name
     region = v.gcpRegion

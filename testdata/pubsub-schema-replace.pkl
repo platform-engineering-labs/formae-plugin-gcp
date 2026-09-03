@@ -17,7 +17,7 @@ forma {
     label = "plugin-sdk-test-pubsub-schema"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-schema-r2-\(v.testRunID)"
+    name = "formae-test-schema-r2-\(v.testRunID)"
     type = "AVRO"
     definition = #"{"type":"record","name":"Msg","fields":[{"name":"id","type":"string"}]}"#
   }

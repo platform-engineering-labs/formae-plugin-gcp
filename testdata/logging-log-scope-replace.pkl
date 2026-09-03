@@ -19,7 +19,7 @@ forma {
     label = "plugin-sdk-test-logging-log-scope"
     // The name is immutable, so changing it forces a replace rather than
     // an update: the old resource is destroyed and a new one takes its place.
-    name = "formae-plugin-sdk-test-scope-r2-\(v.testRunID)"
+    name = "formae-test-scope-r2-\(v.testRunID)"
     location = "global"
     description = "Test log scope for plugin SDK conformance tests"
     resourceNames = new Listing {
