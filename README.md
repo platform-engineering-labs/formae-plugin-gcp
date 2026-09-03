@@ -11,7 +11,7 @@ Monitoring and more.
 
 ## Supported Resources
 
-This plugin supports **154 GCP resource types** across 32 services. See
+This plugin supports **205 GCP resource types** across 39 services. See
 [`schema/pkl/`](schema/pkl/) for field definitions.
 
 | Resource Type | Description |
@@ -20,17 +20,32 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::AlloyDB::Cluster` | Cluster of AlloyDB for PostgreSQL databases |
 | `GCP::AlloyDB::Instance` | Compute that actually serves an AlloyDB cluster |
 | `GCP::AlloyDB::User` | Database user in an AlloyDB cluster |
+| `GCP::AnalyticsHub::DataExchange` | The container a publisher shares data through: listings are published into an exchange, and subscribers browse it |
+| `GCP::AnalyticsHub::Listing` | One published item inside a `DataExchange`: a BigQuery dataset a subscriber can link into their own project |
+| `GCP::AnalyticsHub::QueryTemplate` | A data-clean-room construct: a routine a subscriber may run against shared data without seeing the rows |
+| `GCP::ApiGateway::Api` | The top of the API Gateway hierarchy: an api holds api configs, and a gateway serves one config |
+| `GCP::ApiGateway::ApiConfig` | A versioned snapshot of an api: the OpenAPI document describing it, plus the identity a gateway serving it runs as |
+| `GCP::ApiGateway::Gateway` | The regional endpoint that serves one api config |
 | `GCP::ArtifactRegistry::Repository` | Repository for container images or language packages |
 | `GCP::ArtifactRegistry::Rule` | Rule gates an operation on its repository |
+| `GCP::BigQuery::Connection` | A named handle BigQuery uses to reach something outside itself — Cloud SQL, Spark, or Google Cloud resources generally |
 | `GCP::BigQuery::Dataset` | BigQuery dataset (container for tables and views) |
 | `GCP::BigQuery::Routine` | User-defined function, table function, or stored procedure inside a dataset |
 | `GCP::BigQuery::Table` | BigQuery table |
+| `GCP::Bigtable::AppProfile` | Decides how an application's requests are routed across an instance's clusters |
 | `GCP::Bigtable::Backup` | Cloud Bigtable table backup |
 | `GCP::Bigtable::Cluster` | Cloud Bigtable cluster within an instance |
 | `GCP::Bigtable::Instance` | Cloud Bigtable instance |
 | `GCP::Bigtable::MaterializedView` | Cloud Bigtable materialized view |
 | `GCP::Bigtable::Table` | Cloud Bigtable table |
 | `GCP::CertificateAuthority::CaPool` | Group of certificate authorities forming a trust anchor for issuing certificates |
+| `GCP::CertificateAuthority::CertificateAuthority` | The CA that actually signs certificates |
+| `GCP::CertificateAuthority::CertificateTemplate` | A reusable issuance policy: what a certificate requested against it may ask for, and what values are forced |
+| `GCP::CertificateManager::Certificate` | A TLS certificate a load balancer can serve |
+| `GCP::CertificateManager::CertificateMap` | Groups the certificates a load balancer serves, picking one per hostname through its entries |
+| `GCP::CertificateManager::CertificateMapEntry` | One row of a certificate map: which certificates to serve for a given hostname |
+| `GCP::CertificateManager::DnsAuthorization` | Proves control of a domain |
+| `GCP::CertificateManager::TrustConfig` | The set of certificate authorities a load balancer will accept client certificates from — the anchor set for… |
 | `GCP::CloudRun::Execution` | Cloud Run job execution (discovered/read-only) |
 | `GCP::CloudRun::Job` | Cloud Run job (run-to-completion) |
 | `GCP::CloudRun::Revision` | Cloud Run service revision (discovered/read-only) |
@@ -73,6 +88,7 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::Compute::NetworkFirewallPolicyRule` | One rule inside a `networkFirewallPolicy` |
 | `GCP::Compute::NetworkPeering` | VPC peering between two networks, for private-IP reachability without a VPN |
 | `GCP::Compute::NodeTemplate` | Specification a sole-tenant `nodeGroup` stamps its physical nodes from: which node type |
+| `GCP::Compute::PacketMirroring` | Copies selected VMs' traffic to an internal load balancer for inspection |
 | `GCP::Compute::ProjectMetadataItem` | One key of the project's common instance metadata |
 | `GCP::Compute::RegionAutoscaler` | Autoscaler for a regional managed instance group |
 | `GCP::Compute::RegionBackendService` | Regional backend service |
@@ -89,6 +105,7 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::Compute::RegionNetworkFirewallPolicyAssociation` | Attaches a regional network firewall policy to a VPC network |
 | `GCP::Compute::RegionSecurityPolicy` | Set of rules matching incoming requests to a backend service |
 | `GCP::Compute::RegionSecurityPolicyRule` | One rule inside a regional `regionSecurityPolicy` |
+| `GCP::Compute::RegionSnapshot` | A point-in-time incremental backup of a regional persistent disk, stored in the same region as its source |
 | `GCP::Compute::RegionSslPolicy` | TLS floor enforced by a regional target HTTPS proxy |
 | `GCP::Compute::RegionTargetHttpProxy` | Regional target HTTP proxy |
 | `GCP::Compute::RegionTargetHttpsProxy` | Regional target HTTPS proxy |
@@ -120,16 +137,27 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::Compute::VpnTunnel` | Replaces the tunnel |
 | `GCP::Container::Cluster` | GKE cluster |
 | `GCP::Container::NodePool` | GKE node pool |
+| `GCP::DNS::ManagedZone` | Cloud DNS managed zone |
+| `GCP::DNS::Policy` | Governs how DNS resolves for the VPC networks attached to it: whether an on-premises resolver may query into the… |
+| `GCP::DNS::ResourceRecordSet` | What a managed zone actually serves: one name, one record type, and the data behind it |
+| `GCP::DNS::ResponsePolicy` | A container for rules that override DNS resolution for the networks attached to it — the private-DNS equivalent of… |
+| `GCP::DNS::ResponsePolicyRule` | Overrides what one DNS name resolves to for the networks attached to the rule's response policy |
 | `GCP::Dataproc::AutoscalingPolicy` | Autoscaling policy for Dataproc clusters |
 | `GCP::Dataproc::SessionTemplate` | Reusable configuration for a serverless Spark session |
 | `GCP::Dataproc::WorkflowTemplate` | Spark job graph plus the cluster to run it on |
 | `GCP::Datastream::ConnectionProfile` | Connection profile defines the connectivity to a source or destination used by Datastream streams |
-| `GCP::DNS::ManagedZone` | Cloud DNS managed zone |
+| `GCP::Datastream::PrivateConnection` | Private connectivity to a source that is not reachable over the public internet: a VPC peering between a network… |
+| `GCP::Datastream::Route` | Tells a `PrivateConnection` which address to reach the source on |
+| `GCP::Datastream::Stream` | What actually moves data: a source `ConnectionProfile`, a destination `ConnectionProfile`, and the config joining them |
 | `GCP::EssentialContacts::Contact` | Contact that receives notifications from Google Cloud for a project |
+| `GCP::Eventarc::Enrollment` | The routing rule of an Eventarc Advanced setup: a CEL expression matched against the events on a `MessageBus`, and… |
+| `GCP::Eventarc::GoogleApiSource` | Routes this project's own Google API events onto a `MessageBus`, so an Eventarc Advanced setup can react to… |
 | `GCP::Eventarc::MessageBus` | Hub of an Eventarc Advanced setup: publishers send events to a bus |
 | `GCP::Eventarc::Pipeline` | Where an Eventarc Advanced `messageBus` sends the events it accepts |
 | `GCP::Eventarc::Trigger` | Routes events matching CloudEvents attribute filters to a destination |
+| `GCP::Filestore::Backup` | A copy of one file share of an `Instance`, kept independently of it: a backup outlives the instance it was taken… |
 | `GCP::Filestore::Instance` | Managed NFS file server |
+| `GCP::Filestore::Snapshot` | A point-in-time copy of an `Instance`'s file shares, stored inside the instance itself |
 | `GCP::GKEBackup::BackupPlan` | Schedule and configuration for backing up a GKE cluster's Kubernetes resources |
 | `GCP::GKEHub::Feature` | GKE Hub (fleet) feature |
 | `GCP::GKEHub::Membership` | GKE Hub (fleet) membership |
@@ -137,12 +165,14 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::IAM::Role` | Custom IAM role |
 | `GCP::IAM::ServiceAccount` | IAM service account |
 | `GCP::KMS::KeyRing` | Logical grouping of CryptoKeys, scoped to a project + location |
+| `GCP::Logging::LogBucket` | Where log entries are actually retained |
 | `GCP::Logging::LogMetric` | Logs-based metric |
 | `GCP::Logging::LogScope` | Names a set of log views (or buckets) so a Logs Explorer session can query them together |
 | `GCP::Logging::LogView` | Filtered window onto a log bucket |
 | `GCP::Logging::ProjectExclusion` | Drops matching entries before they are stored or billed |
 | `GCP::Logging::ProjectSink` | Routes matching log entries out of a project to a bucket, dataset, topic or Cloud Storage |
 | `GCP::Logging::SavedQuery` | Stored Logs Explorer query |
+| `GCP::Memcache::Instance` | A managed memcached cluster on a VPC network |
 | `GCP::Monitoring::AlertPolicy` | Policy that fires notifications when its conditions are met |
 | `GCP::Monitoring::CustomService` | Hand-declared monitored service, as opposed to one Cloud Monitoring discovers |
 | `GCP::Monitoring::Dashboard` | Custom Cloud Monitoring dashboard |
@@ -152,20 +182,43 @@ This plugin supports **154 GCP resource types** across 32 services. See
 | `GCP::Monitoring::Slo` | Reliability target on a service: "`goal` of the time, over `rollingPeriod`, the indicator is good" |
 | `GCP::Monitoring::UptimeCheckConfig` | Recurring check that an HTTP/TCP endpoint is reachable |
 | `GCP::NetworkConnectivity::Hub` | Network Connectivity Center hub |
+| `GCP::NetworkConnectivity::InternalRange` | A reservation of internal IP space inside a VPC. It marks a CIDR range as spoken for so nothing else is allocated… |
+| `GCP::NetworkConnectivity::PolicyBasedRoute` | A route chosen by what the traffic *is*, not only where it is going |
+| `GCP::NetworkConnectivity::ServiceConnectionPolicy` | Permission, in advance, for a managed service to place Private Service Connect endpoints in a consumer's subnets |
+| `GCP::NetworkSecurity::AddressGroup` | A named, reusable set of IP addresses and CIDR blocks |
+| `GCP::NetworkSecurity::SecurityProfile` | The policy half of Cloud NGFW's layer-7 inspection: what to do about a threat, not where to apply it |
+| `GCP::NetworkSecurity::SecurityProfileGroup` | The binding a firewall policy rule actually names |
+| `GCP::NetworkSecurity::UrlList` | A named list of URL patterns for a Secure Web Proxy policy to match on, so a rule names one list rather than… |
 | `GCP::OrgPolicy::Policy` | Policy configures a constraint on a Google Cloud resource |
 | `GCP::PubSub::Schema` | Pub/Sub schema |
+| `GCP::PubSub::Snapshot` | A snapshot captures the acknowledgement state of a subscription at a point in time, so a subscription can later be… |
 | `GCP::PubSub::Subscription` | Pub/Sub subscription |
+| `GCP::PubSub::SubscriptionIamMember` | A single (role, member) binding on a `Subscription`'s IAM policy, managed as read-modify-write so sibling bindings… |
 | `GCP::PubSub::Topic` | Pub/Sub topic |
+| `GCP::PubSub::TopicIamMember` | A single (role, member) binding on a `Topic`'s IAM policy, managed as read-modify-write so sibling bindings survive |
 | `GCP::Redis::Instance` | Managed Redis instance |
-| `GCP::SecretManager::Secret` | Secret Manager secret |
-| `GCP::SecretManager::SecretVersion` | Secret Manager secret version |
-| `GCP::ServiceNetworking::Connection` | Private Service Access connection (VPC peering to Google services) |
+| `GCP::SQL::BackupRun` | One on-demand backup of a Cloud SQL instance |
 | `GCP::SQL::Database` | Cloud SQL database |
 | `GCP::SQL::DatabaseInstance` | Cloud SQL instance |
+| `GCP::SQL::SslCert` | A client certificate for connecting to a Cloud SQL instance over mutual TLS. An instance with `requireSsl` set… |
+| `GCP::SQL::User` | A database user on a Cloud SQL instance |
+| `GCP::SecretManager::Secret` | Secret Manager secret |
+| `GCP::SecretManager::SecretVersion` | Secret Manager secret version |
+| `GCP::ServiceDirectory::Endpoint` | One address and port a service answers on |
+| `GCP::ServiceDirectory::Namespace` | The top-level container of a Service Directory registry: services are registered inside a namespace, and endpoints… |
+| `GCP::ServiceDirectory::Service` | A named service inside a namespace |
+| `GCP::ServiceNetworking::Connection` | Private Service Access connection (VPC peering to Google services) |
+| `GCP::Spanner::BackupSchedule` | A recurring backup of one database |
+| `GCP::Spanner::Database` | A database inside a Spanner instance |
+| `GCP::Spanner::Instance` | The compute and storage a Spanner deployment runs on |
 | `GCP::Storage::AnywhereCache` | Cloud Storage Anywhere Cache |
 | `GCP::Storage::Bucket` | Cloud Storage bucket |
 | `GCP::Storage::BucketAccessControl` | Cloud Storage bucket ACL entry |
 | `GCP::Storage::DefaultObjectAccessControl` | Cloud Storage default object ACL for a bucket |
+| `GCP::Storage::Folder` | An IAM boundary inside a bucket: it lets a policy be attached to a prefix without granting it over the whole bucket |
+| `GCP::Storage::ManagedFolder` | An IAM boundary inside a bucket: it lets a policy be attached to a prefix without granting it over the whole bucket |
+| `GCP::Storage::Notification` | Publishes object change events from a `Bucket` to a Pub/Sub topic |
+| `GCP::Storage::Object` | A single object in a `Bucket`, with its content declared inline |
 | `GCP::Storage::ObjectAccessControl` | Cloud Storage object ACL entry |
 | `GCP::Vpcaccess::Connector` | Connector that lets serverless environments reach resources in a VPC network via internal IP |
 | `GCP::Workflows::Workflow` | Workflow definition: the YAML or JSON program Workflows runs |

@@ -28,6 +28,31 @@ formae agent.
 
 ### Added
 
+- `GCP::Compute::PacketMirroring` — a copy of selected VMs' traffic, delivered to
+  an internal passthrough load balancer for inspection. `mirroredResources` says
+  whose packets to copy — named instances, whole subnets, or network tags — and
+  `collectorIlb` says where the copies go. The collector has to be a forwarding
+  rule created with `isMirroringCollector`; an ordinary internal rule is refused.
+
+  Two API behaviours the type compensates for. `network` is fixed once set, and
+  a patch carrying it in any spelling other than the exact stored URL is refused
+  with "Network cannot be changed" — so the field never goes out on an update and
+  a change to it replaces the resource. And `packetMirrorings.patch` is a JSON
+  merge patch, so a selector left out of `mirroredResources` keeps its old value:
+  dropping every tag from a forma would otherwise leave the tags mirroring while
+  the plugin reported success. The absent selectors are sent as explicit empty
+  lists instead, which does clear them. The conformance case's update exercises
+  exactly that, dropping a tag the create declared.
+
+  Every reference in this resource is an object rather than a bare string, and
+  GCP answers each with a second `canonicalUrl` naming the same target by numeric
+  id. It is output-only and sits inside a sub-resource, where a schema hint
+  cannot reach it, so it is stripped on read — without that, every read disagrees
+  with the declaration and plans an update that changes nothing.
+
+  The case costs nothing to run: mirroring a subnet rather than named instances
+  means no VM has to exist to have something to mirror, and the collector's
+  backend service carries no backends.
 - `GCP::CertificateManager::Certificate` — a TLS certificate a load balancer can
   serve. A *managed* one is obtained and renewed by Google against a
   `DnsAuthorization` and carries no private key, which is the kind a repository
