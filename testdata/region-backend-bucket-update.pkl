@@ -1,0 +1,41 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/storage/bucket.pkl"
+import "@gcp/compute/regionBackendBucket.pkl"
+import "./config/vars.pkl" as v
+
+// A regional backend bucket points a regional load balancer at a Cloud Storage
+// bucket, so the bucket comes first. Both are free to hold: an empty STANDARD
+// bucket costs nothing, and a backend bucket is configuration.
+local b = new bucket.Bucket {
+  label = "plugin-sdk-test-region-backend-bucket-source"
+  name = "formae-test-rbb-\(v.testRunID)"
+  location = v.gcpRegion
+  storageClass = "STANDARD"
+}
+
+forma {
+  v.stack
+  v.target
+
+  b
+
+  new regionBackendBucket.RegionBackendBucket {
+    label = "plugin-sdk-test-region-backend-bucket"
+    name = "formae-test-rbbk-\(v.testRunID)"
+    description = "Updated regional backend bucket for plugin SDK conformance tests"
+    // Resolvable -> the bucket exists before the backend references it.
+    bucketName = b.res.name
+    // Required for a REGIONAL backend bucket, unlike the global one: omitting it
+    // is refused with "Load balancing scheme is required for backend bucket of
+    // scope REGION".
+    loadBalancingScheme = "EXTERNAL_MANAGED"
+    enableCdn = true
+  }
+}

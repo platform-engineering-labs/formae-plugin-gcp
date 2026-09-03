@@ -1,0 +1,50 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/rolloutPlan.pkl"
+import "./config/vars.pkl" as v
+
+// A rollout plan is pure configuration - it describes how a rollout would
+// proceed and touches nothing until something runs against it - so it is free
+// to hold.
+//
+// rolloutPlans has no update method, so every field is immutable and the paired
+// case is rollout-plan-replace.pkl rather than an -update.
+forma {
+  v.stack
+  v.target
+
+  new rolloutPlan.RolloutPlan {
+    label = "plugin-sdk-test-rollout-plan"
+    name = "formae-test-rp-\(v.testRunID)"
+    description = "Test rollout plan for plugin SDK conformance tests"
+    waves {
+      new {
+        displayName = "w1"
+        selectors {
+          new {
+            locationSelector {
+              // A BARE zone name. A scoped path is rejected: "zones/<zone>"
+              // answers 400 "RolloutPlan wave has a LocationSelector with
+              // invalid location zones/<zone>".
+              includedLocations {
+                v.gcpZone
+              }
+            }
+          }
+        }
+        validation {
+          type = "time"
+          timeBasedValidationMetadata {
+            waitDuration = "60s"
+          }
+        }
+      }
+    }
+  }
+}
