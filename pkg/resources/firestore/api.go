@@ -20,7 +20,15 @@ var FirestoreAPI = base.APIConfig{
 	BaseURL:     "https://firestore.googleapis.com/v1",
 	APIVersion:  "v1",
 	PathBuilder: firestorePathBuilder,
-	Pagination:  &base.PaginationConfig{PageSizeParam: "pageSize"},
+	// databases.list takes NO pagination parameters. It returns every database
+	// in the project in one response and refuses the ones it does not know:
+	// "?pageSize=100" answers 400 "page_size is not supported." and
+	// "?maxResults=100" answers 400 Unknown name "maxResults". Either way the
+	// whole request is refused rather than the parameter ignored, so a List
+	// returned an error instead of a list and the type was undiscoverable while
+	// create, read, update and delete all worked - which is exactly the kind of
+	// gap only a discovery conformance run finds.
+	Pagination: &base.PaginationConfig{Disabled: true},
 }
 
 // FirestoreSyncOperations - synchronous, and not as a shortcut.
@@ -59,6 +67,26 @@ var FirestoreSyncOperations = base.OperationConfig{
 	OperationURLBuilder:    func(_ base.PathContext, opID string) string { return opID },
 	NativeIDExtractor:      extractFirestoreNativeID,
 	OperationStatusChecker: checkOperationStatus,
+	RetryableError:         isConcurrentDatabaseChange,
+}
+
+// isConcurrentDatabaseChange reports whether an error is Firestore asking for a
+// retry rather than refusing the request.
+//
+// A patch issued while a create is still settling is answered 409 ABORTED,
+// "There are concurrent database changes, please try again." - measured against
+// the live API, and deterministic rather than occasional: a create followed
+// immediately by a patch reproduces it every time, which is exactly the shape a
+// reconcile has. Classified retryable, the update comes back as NotStabilized
+// and formae core re-runs it; classified terminal, as it was, the whole apply
+// fails on a database that is fine.
+func isConcurrentDatabaseChange(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "concurrent database changes") ||
+		(strings.Contains(msg, "ABORTED") && strings.Contains(msg, "please try again"))
 }
 
 // FirestoreNativeID - "projects/{project}/databases/{database}".

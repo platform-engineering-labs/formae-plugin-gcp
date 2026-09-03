@@ -7,6 +7,7 @@
 package firestore
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -222,5 +223,31 @@ func TestFirestorePathBuilder(t *testing.T) {
 	})
 	if single != "/projects/p/databases/formae-probe-db1" {
 		t.Errorf("resource path = %q", single)
+	}
+}
+
+// Firestore answers a patch issued while a create is still settling with
+// 409 ABORTED and a request to try again. It has to be classified retryable, or
+// a reconcile - which patches seconds after creating - fails on a database that
+// is perfectly healthy.
+func TestIsConcurrentDatabaseChange(t *testing.T) {
+	cases := map[string]bool{
+		`googleapi: Error 409: There are concurrent database changes, please try again., aborted`: true,
+		`rpc error: ABORTED: something happened, please try again`:                                true,
+		`googleapi: Error 404: Operation does not exist`:                                          false,
+		`googleapi: Error 400: Invalid argument`:                                                  false,
+		``:                                                                                        false,
+	}
+	for msg, want := range cases {
+		var err error
+		if msg != "" {
+			err = errors.New(msg)
+		}
+		if got := isConcurrentDatabaseChange(err); got != want {
+			t.Errorf("isConcurrentDatabaseChange(%q) = %v, want %v", msg, got, want)
+		}
+	}
+	if isConcurrentDatabaseChange(nil) {
+		t.Error("nil error must not be retryable")
 	}
 }
