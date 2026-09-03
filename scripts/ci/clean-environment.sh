@@ -1251,15 +1251,35 @@ fi
 #         left a billed instance behind and no sweep ever collected it. Match the
 #         same "^formae-" every other sweep uses; deleting an instance takes its
 #         tables, backups and views with it. ---
+#         Deleted over REST, and loudly, for the same reason Cloud SQL is just
+#         below: "gcloud bigtable instances delete ... --quiet 2>/dev/null || true"
+#         hides every failure it has. stderr went to /dev/null and the exit code
+#         was swallowed, so a delete refused for lack of a permission printed
+#         "Deleting Bigtable instance: x" and did nothing - output identical to a
+#         delete that worked. Four instances survived a sweep that way and billed
+#         per node-hour until someone looked at the bill. The REST DELETE returns
+#         200 with an empty body and its status is checked.
 echo "Cleaning GCP Bigtable instances..."
+BT_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+BT_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
 INSTANCES=$(gcloud bigtable instances list --format="value(name)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
-if [ -n "$INSTANCES" ]; then
+if [ -n "$INSTANCES" ] && [ -n "$BT_PROJECT" ] && [ -n "$BT_TOKEN" ]; then
     echo "$INSTANCES" | while read -r instance; do
-        echo "  Deleting Bigtable instance: $instance"
-        gcloud bigtable instances delete "$instance" --quiet 2>/dev/null || true
+        bt_name="$(basename "$instance")"
+        bt_code=$(curl -s -o /dev/null -m 60 -X DELETE \
+            -H "Authorization: Bearer ${BT_TOKEN}" \
+            "https://bigtableadmin.googleapis.com/v2/projects/${BT_PROJECT}/instances/${bt_name}" \
+            -w "%{http_code}" || echo "000")
+        if [ "$bt_code" = "200" ] || [ "$bt_code" = "404" ]; then
+            echo "  Deleted Bigtable instance: $bt_name"
+        else
+            echo "  FAILED to delete Bigtable instance $bt_name (HTTP $bt_code) - IT IS STILL BILLING"
+        fi
     done
-else
+elif [ -z "$INSTANCES" ]; then
     echo "  No Bigtable instances found"
+else
+    echo "  Skipping Bigtable (no project or token) - any instance found is still billing"
 fi
 
 # --- 10. Cloud SQL instances ---
