@@ -170,6 +170,22 @@
       "disposition": "pending"
     },
     {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.createTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.id",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.resourceName",
+      "disposition": "pending"
+    },
+    {
       "key": "cloudrun/job.pkl#TaskTemplate.executionEnvironment",
       "disposition": "pending"
     },
@@ -922,6 +938,10 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/regionTargetHttpsProxy.pkl#RegionTargetHttpsProxy.tlsEarlyData",
+      "disposition": "pending"
+    },
+    {
       "key": "compute/regionTargetTcpProxy.pkl#RegionTargetTcpProxy.proxyHeader",
       "disposition": "pending"
     },
@@ -1146,6 +1166,10 @@
       "disposition": "pending"
     },
     {
+      "key": "dataform/workspace.pkl#Workspace.disableMoves",
+      "disposition": "pending"
+    },
+    {
       "key": "dataproc/autoscalingPolicy.pkl#AutoscalingPolicy.secondaryWorkerConfig",
       "disposition": "pending"
     },
@@ -1303,6 +1327,26 @@
     },
     {
       "key": "filestore/filestoreSnapshot.pkl#Snapshot.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.appEngineIntegrationMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.concurrencyMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.databaseEdition",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.deleteProtectionState",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.pointInTimeRecoveryEnablement",
       "disposition": "pending"
     },
     {
@@ -1539,6 +1583,14 @@
     },
     {
       "key": "networksecurity/urlList.pkl#UrlList.description",
+      "disposition": "pending"
+    },
+    {
+      "key": "parametermanager/parameter.pkl#Parameter.format",
+      "disposition": "pending"
+    },
+    {
+      "key": "parametermanager/parameterVersion.pkl#ParameterVersion.disabled",
       "disposition": "pending"
     },
     {

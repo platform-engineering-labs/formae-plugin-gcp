@@ -1848,3 +1848,140 @@ if [ -n "$SIC" ]; then
 else
     echo "  No Spanner instance configurations found"
 fi
+
+# --- 32. The services added with the Network Services / Cloud Deploy batch.
+#         None of them has a usable gcloud surface for these collections, so all
+#         of it is REST, and the eight services share one helper rather than
+#         eight near-identical copies - the copies are exactly how the earlier
+#         sweeps drifted apart.
+#
+#         Ordering matters in four places and is encoded in the order of the
+#         lists below, not left to chance:
+#           - a Cloud Deploy delivery pipeline refuses to delete while it still
+#             has an automation under it, so automations go first;
+#           - a Dataform repository refuses while it has workspaces, release
+#             configs or workflow configs;
+#           - a Parameter Manager parameter refuses with FAILED_PRECONDITION
+#             while it still has versions, and its delete takes no force flag;
+#           - a Network Services mesh is deleted after the routes that attach to
+#             it.
+#         Nested collections are reached through each API's own "-" wildcard
+#         parent, which is the same trick their discovery uses. ---
+echo "Cleaning GCP Network Services / Cloud Deploy / Dataform / Firestore / Parameter Manager / Binary Authorization / Cloud Build / API Keys..."
+BATCH_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
+BATCH_TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+BATCH_REGION="${GCP_REGION:-europe-central2}"
+if [ -n "$BATCH_PROJECT" ] && [ -n "$BATCH_TOKEN" ]; then
+    # sweep_rest <label> <collection-url> [items-key]
+    # Lists, filters the last path segment of every "name" through SWEEP_RE and
+    # KEEP_RE, and DELETEs each survivor by its full reported name so a nested
+    # resource is addressed under its real parent rather than a wildcard.
+    sweep_rest() {
+        local label="$1" url="$2" api_root="$3"
+        local names
+        names=$(curl -s -m 60 -H "Authorization: Bearer ${BATCH_TOKEN}" "$url" \
+            | grep -oE '"name": *"[^"]+"' \
+            | sed -E 's/.*"name": *"([^"]+)".*/\1/' \
+            | grep -v '/operations/' || true)
+        local found=0
+        if [ -n "$names" ]; then
+            while read -r n; do
+                [ -z "$n" ] && continue
+                local short="${n##*/}"
+                echo "$short" | grep -Eq "$SWEEP_RE" || continue
+                echo "$short" | grep -Eq "$KEEP_RE" && continue
+                found=1
+                echo "  Deleting $label: $short"
+                curl -s -o /dev/null -m 60 -X DELETE \
+                    -H "Authorization: Bearer ${BATCH_TOKEN}" "${api_root}/${n}" || true
+            done <<< "$names"
+        fi
+        [ "$found" = "0" ] && echo "  No $label found"
+        return 0
+    }
+
+    CD=https://clouddeploy.googleapis.com/v1
+    CD_PARENT="projects/${BATCH_PROJECT}/locations/${BATCH_REGION}"
+    sweep_rest "Cloud Deploy automation"        "${CD}/${CD_PARENT}/deliveryPipelines/-/automations" "$CD"
+    sweep_rest "Cloud Deploy deliveryPipeline"  "${CD}/${CD_PARENT}/deliveryPipelines"               "$CD"
+    sweep_rest "Cloud Deploy target"            "${CD}/${CD_PARENT}/targets"                         "$CD"
+    sweep_rest "Cloud Deploy customTargetType"  "${CD}/${CD_PARENT}/customTargetTypes"               "$CD"
+    sweep_rest "Cloud Deploy deployPolicy"      "${CD}/${CD_PARENT}/deployPolicies"                  "$CD"
+
+    DF=https://dataform.googleapis.com/v1
+    DF_PARENT="projects/${BATCH_PROJECT}/locations/${BATCH_REGION}"
+    sweep_rest "Dataform workflowConfig" "${DF}/${DF_PARENT}/repositories/-/workflowConfigs" "$DF"
+    sweep_rest "Dataform releaseConfig"  "${DF}/${DF_PARENT}/repositories/-/releaseConfigs"  "$DF"
+    sweep_rest "Dataform workspace"      "${DF}/${DF_PARENT}/repositories/-/workspaces"      "$DF"
+    sweep_rest "Dataform repository"     "${DF}/${DF_PARENT}/repositories"                   "$DF"
+
+    # Firestore databases are project-scoped, not location-scoped. An empty
+    # database costs nothing, but a leaked one holds its id for reuse.
+    FS=https://firestore.googleapis.com/v1
+    sweep_rest "Firestore database" "${FS}/projects/${BATCH_PROJECT}/databases" "$FS"
+
+    # Parameter Manager is registered global-only in the plugin, because it
+    # serves each region from its own host and answers a cross-host request with
+    # a 403 that reads like a missing IAM grant. The sweep follows the plugin:
+    # locations/global on the plain host.
+    PM=https://parametermanager.googleapis.com/v1
+    PM_PARENT="projects/${BATCH_PROJECT}/locations/global"
+    sweep_rest "Parameter Manager parameterVersion" "${PM}/${PM_PARENT}/parameters/-/versions" "$PM"
+    sweep_rest "Parameter Manager parameter"        "${PM}/${PM_PARENT}/parameters"            "$PM"
+
+    BA=https://binaryauthorization.googleapis.com/v1
+    sweep_rest "Binary Authorization attestor"       "${BA}/projects/${BATCH_PROJECT}/attestors"                "$BA"
+    sweep_rest "Binary Authorization platformPolicy" "${BA}/projects/${BATCH_PROJECT}/platforms/gke/policies"   "$BA"
+
+    # Cloud Build triggers are project-scoped and global; the plugin pins that
+    # path because the location-scoped spelling creates regional triggers a
+    # project-scoped list never returns.
+    CB=https://cloudbuild.googleapis.com/v1
+    sweep_rest "Cloud Build trigger" "${CB}/projects/${BATCH_PROJECT}/triggers" "$CB"
+
+    NSVC=https://networkservices.googleapis.com/v1
+    NSVC_PARENT="projects/${BATCH_PROJECT}/locations/global"
+    for nsvc_coll in httpRoutes grpcRoutes tcpRoutes tlsRoutes endpointPolicies serviceLbPolicies meshes; do
+        sweep_rest "Network Services ${nsvc_coll}" "${NSVC}/${NSVC_PARENT}/${nsvc_coll}" "$NSVC"
+    done
+
+    # API keys are a special case and this sweep is only half a sweep.
+    #
+    # A key delete is a SOFT delete: the key stops working and drops out of a
+    # default list, but a read keeps answering 200 for thirty days with
+    # deleteTime set, and the v2 API has no purge - only undelete. So a
+    # tombstoned key cannot be collected by anything, and every conformance run
+    # of apikeys-key leaves one behind until it self-purges. They are free and
+    # non-functional; this is recorded so the next person does not go looking for
+    # the sweep that is missing. What IS collected is a live key a run created
+    # and failed to delete, which is the case that would otherwise leave a
+    # working credential lying around.
+    AK=https://apikeys.googleapis.com/v2
+    AK_KEYS=$(curl -s -m 60 -H "Authorization: Bearer ${BATCH_TOKEN}" \
+        "${AK}/projects/${BATCH_PROJECT}/locations/global/keys" \
+        | grep -oE '"displayName": *"[^"]+"|"name": *"[^"]+"' \
+        | sed -E 's/.*: *"([^"]+)".*/\1/' || true)
+    AK_FOUND=0
+    if [ -n "$AK_KEYS" ]; then
+        # A key's own id is a server-assigned uuid, so it can only be matched by
+        # displayName - which is why the list above reads both fields and pairs
+        # each name with the displayName that follows it.
+        AK_CURRENT=""
+        while read -r line; do
+            case "$line" in
+                projects/*) AK_CURRENT="$line" ;;
+                *) if echo "$line" | grep -Eq "$SWEEP_RE" && ! echo "$line" | grep -Eq "$KEEP_RE"; then
+                       if [ -n "$AK_CURRENT" ]; then
+                           AK_FOUND=1
+                           echo "  Deleting API key: $line (${AK_CURRENT##*/})"
+                           curl -s -o /dev/null -m 60 -X DELETE \
+                               -H "Authorization: Bearer ${BATCH_TOKEN}" "${AK}/${AK_CURRENT}" || true
+                       fi
+                   fi ;;
+            esac
+        done <<< "$AK_KEYS"
+    fi
+    [ "$AK_FOUND" = "0" ] && echo "  No live API keys found"
+else
+    echo "  Skipping this batch's services (no project or token)"
+fi
