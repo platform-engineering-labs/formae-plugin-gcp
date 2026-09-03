@@ -1,0 +1,120 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security ServerTlsPolicy
+///
+/// The server half: which certificate a Google-managed proxy serves, and
+/// whether it demands a client certificate in return. A policy enforces nothing
+/// until a target HTTPS proxy or a mesh gateway names it, and it costs nothing.
+///
+/// `allowOpen = true` is the "plaintext is also acceptable" switch, and it is
+/// what makes a policy declarable with no certificate to point at.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.serverTlsPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::ServerTlsPolicy"
+
+/// A certificate served by a plugin running beside the workload, named by the
+/// plugin instance rather than by a path to key material.
+@gcp.SubResourceHint
+open class CertificateProviderInstance extends formae.SubResource {
+    /// The plugin instance this policy asks for its certificates.
+    @gcp.FieldHint
+    pluginInstance: String?
+}
+
+/// A local gRPC endpoint that serves certificates (the xDS / SDS pattern).
+@gcp.SubResourceHint
+open class GrpcEndpoint extends formae.SubResource {
+    /// Target URI of the endpoint, e.g. "unix:/var/run/sds.sock".
+    @gcp.FieldHint
+    targetUri: String?
+}
+
+/// Where a certificate comes from. Give one of the two.
+@gcp.SubResourceHint
+open class CertificateProvider extends formae.SubResource {
+    @gcp.FieldHint
+    certificateProviderInstance: CertificateProviderInstance?
+
+    @gcp.FieldHint
+    grpcEndpoint: GrpcEndpoint?
+}
+
+/// Mutual TLS settings: what to require of the client, and who vouches for it.
+@gcp.SubResourceHint
+open class MTLSPolicy extends formae.SubResource {
+    /// How strict the proxy is about a client certificate:
+    /// CLIENT_VALIDATION_MODE_UNSPECIFIED, ALLOW_INVALID_OR_MISSING_CLIENT_CERT
+    /// or REJECT_INVALID.
+    @gcp.FieldHint
+    clientValidationMode: String?
+
+    /// Full path of a Certificate Manager trust config holding the CAs client
+    /// certificates are validated against.
+    @gcp.FieldHint
+    clientValidationTrustConfig: (String|formae.Resolvable)?
+
+    /// Certificate providers that serve the client-validation CAs, as an
+    /// alternative to a trust config.
+    @gcp.FieldHint
+    clientValidationCa: Listing<CertificateProvider>?
+}
+
+open class ServerTlsPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ServerTlsPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ServerTlsPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-server-tls-policy"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Accept plaintext connections as well as TLS. Set this to declare a
+    /// policy that needs no certificate; it is mutually exclusive with
+    /// `serverCertificate` and `mtlsPolicy`.
+    @gcp.FieldHint
+    allowOpen: Boolean?
+
+    /// The certificate the proxy serves.
+    @gcp.FieldHint
+    serverCertificate: CertificateProvider?
+
+    /// Require and validate a client certificate — the other half of mutual
+    /// TLS.
+    @gcp.FieldHint
+    mtlsPolicy: MTLSPolicy?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ServerTlsPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

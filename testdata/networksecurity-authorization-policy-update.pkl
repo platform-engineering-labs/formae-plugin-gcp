@@ -1,0 +1,38 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/authorizationPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the description and the rule's source block, so the update covers a
+// nested list as well as a scalar.
+forma {
+  v.stack
+  v.target
+
+  new authorizationPolicy.AuthorizationPolicy {
+    label = "plugin-sdk-test-ns-authorization-policy"
+    name = "formae-test-ns-ap-\(v.testRunID)"
+    action = "ALLOW"
+    rules = new Listing {
+      new authorizationPolicy.Rule {
+        sources = new Listing {
+          new authorizationPolicy.Source {
+            ipBlocks = new Listing {
+              "192.168.0.0/16"
+            }
+          }
+        }
+      }
+    }
+    description = "Updated test authorization policy description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

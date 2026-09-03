@@ -1,0 +1,129 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security AuthorizationPolicy
+///
+/// Who may talk to a service mesh workload: a list of match rules and one
+/// verdict, ALLOW or DENY, for whatever matches them. Enforcement is done by
+/// the Envoy sidecars of the mesh a route attaches the policy to — the policy
+/// on its own enforces nothing and costs nothing.
+///
+/// A rule with no `sources` and no `destinations` matches everything, so an
+/// empty rule under `action = "DENY"` denies all traffic.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.authorizationPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::AuthorizationPolicy"
+
+/// Match one HTTP header. Give exactly one matcher.
+@gcp.SubResourceHint
+open class HttpHeaderMatch extends formae.SubResource {
+    /// The header to look at, e.g. "user-agent". ":method" matches the HTTP
+    /// method.
+    @gcp.FieldHint
+    headerName: String?
+
+    /// RE2 expression the header value must match.
+    @gcp.FieldHint
+    regexMatch: String?
+}
+
+/// Where a request comes from. Within one source the conditions are ANDed;
+/// across sources they are ORed.
+@gcp.SubResourceHint
+open class Source extends formae.SubResource {
+    /// CIDR blocks or single addresses the request may originate from.
+    @gcp.FieldHint
+    ipBlocks: Listing<String>?
+
+    /// Peer identities, as a mesh SPIFFE ID or an exact/prefix/suffix match on
+    /// one. Requires mTLS between the workloads to mean anything.
+    @gcp.FieldHint
+    principals: Listing<String>?
+}
+
+/// What a request is trying to reach. All three of `hosts`, `ports` and
+/// `methods` are required once a destination is given.
+@gcp.SubResourceHint
+open class Destination extends formae.SubResource {
+    /// Host names the request is addressed to.
+    @gcp.FieldHint
+    hosts: Listing<String>?
+
+    /// Destination ports.
+    @gcp.FieldHint
+    ports: Listing<Int>?
+
+    /// HTTP methods, e.g. "GET". Use "*" for any.
+    @gcp.FieldHint
+    methods: Listing<String>?
+
+    /// A further condition on one header.
+    @gcp.FieldHint
+    httpHeaderMatch: HttpHeaderMatch?
+}
+
+/// One rule. Sources and destinations are ANDed with each other; a request
+/// matching any rule takes the policy's action.
+@gcp.SubResourceHint
+open class Rule extends formae.SubResource {
+    @gcp.FieldHint
+    sources: Listing<Source>?
+
+    @gcp.FieldHint
+    destinations: Listing<Destination>?
+}
+
+open class AuthorizationPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AuthorizationPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class AuthorizationPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-authz-policy"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// What happens to a request that matches: ALLOW or DENY. Required.
+    @gcp.FieldHint {
+        required = true
+    }
+    action: String
+
+    /// The rules to match. Omitting them means nothing matches, which under
+    /// ALLOW allows nothing.
+    @gcp.FieldHint
+    rules: Listing<Rule>?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: AuthorizationPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

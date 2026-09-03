@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/clientTlsPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the two fields a patch of this type is known to accept: the SNI it
+// sends and the description.
+forma {
+  v.stack
+  v.target
+
+  new clientTlsPolicy.ClientTlsPolicy {
+    label = "plugin-sdk-test-ns-client-tls-policy"
+    name = "formae-test-ns-ctp-\(v.testRunID)"
+    sni = "updated.example.net"
+    description = "Updated test client TLS policy description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

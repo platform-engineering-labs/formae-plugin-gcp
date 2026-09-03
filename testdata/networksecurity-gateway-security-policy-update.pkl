@@ -1,0 +1,23 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/gatewaySecurityPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the description - the only mutable field a policy without TLS
+// inspection has.
+forma {
+  v.stack
+  v.target
+
+  new gatewaySecurityPolicy.GatewaySecurityPolicy {
+    label = "plugin-sdk-test-ns-gateway-security-policy"
+    name = "formae-test-ns-gsp-\(v.testRunID)"
+    description = "Updated test gateway security policy description"
+  }
+}

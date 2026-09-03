@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/gatewaySecurityPolicy.pkl"
+import "@gcp/networksecurity/gatewaySecurityPolicyRule.pkl"
+import "./config/vars.pkl" as v
+
+// A rule is one row of a Secure Web Proxy policy, so it needs the policy above
+// it. Both are free and inspect nothing: no gateway names the policy, so no
+// traffic is ever matched.
+//
+// The policy is referenced through its resolvable, which is what orders both
+// halves of the lifecycle. On create the policy comes first; on destroy the
+// rule goes first - which matters here, because a policy that still has rules
+// refuses to delete with HTTP 400. Interpolating the policy's name into a
+// string would carry no edge and the teardown would fail.
+local policy = new gatewaySecurityPolicy.GatewaySecurityPolicy {
+  label = "plugin-sdk-test-ns-gspr-policy"
+  name = "formae-test-ns-gsprp-\(v.testRunID)"
+  description = "Policy owning the rule under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  policy
+
+  new gatewaySecurityPolicyRule.GatewaySecurityPolicyRule {
+    label = "plugin-sdk-test-ns-gateway-security-policy-rule"
+    name = "formae-test-ns-gspr-\(v.testRunID)"
+    gatewaySecurityPolicy = policy.res.name
+    enabled = true
+    priority = 100
+    // Layer 3/4 only. An applicationMatcher would need TLS inspection, which
+    // needs a CA pool with an enabled - billable - certificate authority.
+    sessionMatcher = "host() == \"example.com\""
+    basicProfile = "ALLOW"
+    description = "Test gateway security policy rule for plugin SDK conformance tests"
+  }
+}

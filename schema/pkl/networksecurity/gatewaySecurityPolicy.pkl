@@ -1,0 +1,70 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security GatewaySecurityPolicy
+///
+/// The container for Secure Web Proxy rules, and the thing a gateway points at.
+/// A policy on its own inspects nothing: its GatewaySecurityPolicyRule children
+/// carry the matching, and a Secure Web Proxy gateway has to name the policy
+/// before any of it takes effect. Both are free.
+///
+/// Regional — the second collection in this API that is not global. Asked for
+/// locations/global it answers 400 "Malformed name", so it lives under the
+/// target's region.
+///
+/// A policy that still has rules refuses to delete with HTTP 400. Declaring the
+/// rules through the policy's resolvable is what orders the teardown: the rule
+/// is the consumer of that reference and formae destroys the consumer first.
+///
+/// Create, update and delete are long-running operations.
+module gcp.networksecurity.gatewaySecurityPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::GatewaySecurityPolicy"
+
+open class GatewaySecurityPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: GatewaySecurityPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class GatewaySecurityPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-gateway-policy"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Full path of the TLS inspection policy that lets the proxy decrypt and
+    /// inspect TLS traffic. Optional, and not exercised by this plugin's
+    /// conformance suite: a TLS inspection policy needs a CA pool with an
+    /// enabled — that is, billable — certificate authority behind it.
+    ///
+    /// GCP reports this field back as an empty string when it was never set.
+    /// The plugin strips that, so an omitted field stays omitted in state
+    /// instead of reading as drift on every sync.
+    @gcp.FieldHint
+    tlsInspectionPolicy: (String|formae.Resolvable)?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    hidden res: GatewaySecurityPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

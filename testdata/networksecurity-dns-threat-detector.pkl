@@ -1,0 +1,33 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/dnsThreatDetector.pkl"
+import "./config/vars.pkl" as v
+
+// A detector subscribes Cloud DNS queries to a threat intelligence feed.
+// Creating one provisions no capacity - it is the binding to a provider, and
+// nothing is inspected while no network is enrolled - and excludedNetworks is
+// left unset so the case needs no VPC of its own.
+//
+// Global: asked for a region the API answers 400 "Malformed name".
+//
+// This is also the one synchronous type in the API - create and update return
+// the resource rather than an Operation - so the case is what covers that path.
+forma {
+  v.stack
+  v.target
+
+  new dnsThreatDetector.DnsThreatDetector {
+    label = "plugin-sdk-test-ns-dns-threat-detector"
+    name = "formae-test-ns-dtd-\(v.testRunID)"
+    provider = "INFOBLOX"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

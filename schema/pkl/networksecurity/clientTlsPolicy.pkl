@@ -1,0 +1,98 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security ClientTlsPolicy
+///
+/// The client half of a TLS connection a Google-managed proxy makes on your
+/// behalf: which certificate to present to the upstream, which CAs to trust in
+/// its answer, and the SNI to send. A policy on its own connects to nothing —
+/// a backend service or a service mesh route names it — and it costs nothing.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.clientTlsPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::ClientTlsPolicy"
+
+/// A certificate served by a plugin running beside the workload, named by the
+/// plugin instance rather than by a path to key material.
+@gcp.SubResourceHint
+open class CertificateProviderInstance extends formae.SubResource {
+    /// The plugin instance this policy asks for its certificates.
+    @gcp.FieldHint
+    pluginInstance: String?
+}
+
+/// A local gRPC endpoint that serves certificates (the xDS / SDS pattern).
+@gcp.SubResourceHint
+open class GrpcEndpoint extends formae.SubResource {
+    /// Target URI of the endpoint, e.g. "unix:/var/run/sds.sock".
+    @gcp.FieldHint
+    targetUri: String?
+}
+
+/// Where a certificate comes from. Give one of the two.
+@gcp.SubResourceHint
+open class CertificateProvider extends formae.SubResource {
+    @gcp.FieldHint
+    certificateProviderInstance: CertificateProviderInstance?
+
+    @gcp.FieldHint
+    grpcEndpoint: GrpcEndpoint?
+}
+
+open class ClientTlsPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ClientTlsPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ClientTlsPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-client-tls-policy"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Server Name Indication to send when opening the connection. Mutable.
+    @gcp.FieldHint
+    sni: String?
+
+    /// The certificate this policy presents to the upstream — the client half
+    /// of mutual TLS. Omit it for one-way TLS, where only the server proves
+    /// who it is.
+    @gcp.FieldHint
+    clientCertificate: CertificateProvider?
+
+    /// The CAs the upstream's certificate is validated against. Empty means
+    /// "whatever the platform trusts".
+    @gcp.FieldHint
+    serverValidationCa: Listing<CertificateProvider>?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ClientTlsPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
