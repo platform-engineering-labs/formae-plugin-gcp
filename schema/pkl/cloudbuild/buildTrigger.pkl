@@ -1,0 +1,335 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Build BuildTrigger
+///
+/// The configuration that says when a build runs and what it runs. A trigger is
+/// not a build: creating one provisions nothing, queues nothing and costs
+/// nothing — verified against the live API, where the project's builds
+/// collection was empty before the first trigger was created and still empty
+/// after seven. A build starts only when something fires the trigger.
+///
+/// Project-scoped and global. Cloud Build spells the same collection two ways,
+/// `projects/{p}/triggers` and `projects/{p}/locations/{loc}/triggers`; this
+/// plugin uses the first, because the second would create *regional* triggers
+/// that the global list does not return.
+///
+/// Create, update and delete are all synchronous — the API answers with the
+/// trigger itself, not an Operation, which is the opposite of its own
+/// `builds.create`.
+///
+/// A trigger is addressed by its user-assigned `name`. The API also assigns a
+/// uuid and accepts either in the path, but the name is what a forma can
+/// reconstruct and what a name-prefix sweep can find.
+module gcp.cloudbuild.buildTrigger
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudBuild::BuildTrigger"
+
+/// A git repository to build from, named by URL rather than through a
+/// connection.
+///
+/// This is the one source form that needs nothing outside the project. The
+/// event-driven forms all do: `github`, `repositoryEventConfig` and
+/// `developerConnectEventConfig` need a host connection authorized against a
+/// real external account, `webhookConfig` needs a Secret Manager secret whose
+/// value is the shared webhook token, and `triggerTemplate` needs a Cloud
+/// Source Repositories repo. None is declared here for that reason.
+///
+/// A trigger built this way has no event to respond to, so nothing fires it but
+/// an explicit `triggers.run` — which is exactly why it is safe to declare.
+@gcp.SubResourceHint
+open class GitRepoSource extends formae.SubResource {
+    /// The clone URL, e.g. "https://github.com/org/repo".
+    @gcp.FieldHint
+    uri: String?
+
+    /// The ref to build, e.g. "refs/heads/main".
+    @gcp.FieldHint
+    ref: String?
+
+    /// Which kind of host the uri points at: GITHUB, GITLAB, BITBUCKET_CLOUD,
+    /// BITBUCKET_SERVER, CLOUD_SOURCE_REPOSITORIES or UNKNOWN.
+    @gcp.FieldHint
+    repoType: String?
+}
+
+/// One step of an inline build: a container image and what to run in it.
+@gcp.SubResourceHint
+open class BuildStep extends formae.SubResource {
+    /// The builder image, e.g. "gcr.io/cloud-builders/gcloud" or "ubuntu".
+    @gcp.FieldHint
+    name: String?
+
+    /// A step id other steps can name in `waitFor`.
+    @gcp.FieldHint
+    id: String?
+
+    /// Arguments passed to the entrypoint.
+    @gcp.FieldHint
+    args: Listing<String>?
+
+    /// A shell script to run instead of `args`.
+    @gcp.FieldHint
+    script: String?
+
+    /// Overrides the image's entrypoint.
+    @gcp.FieldHint
+    entrypoint: String?
+
+    /// "KEY=value" pairs for this step only.
+    @gcp.FieldHint
+    env: Listing<String>?
+
+    /// Working directory, relative to the source root.
+    @gcp.FieldHint
+    dir: String?
+
+    /// Step ids that must finish first. "-" means "start immediately".
+    @gcp.FieldHint
+    waitFor: Listing<String>?
+
+    /// Per-step timeout, e.g. "120s".
+    @gcp.FieldHint
+    timeout: String?
+
+    // `allowFailure` is deliberately absent. The API accepts it and then drops
+    // it when false, so a forma declaring the default would read as drift
+    // forever, and a nested field cannot carry hasProviderDefault.
+}
+
+/// Build-wide options.
+@gcp.SubResourceHint
+open class BuildOptions extends formae.SubResource {
+    /// Where build logs go: CLOUD_LOGGING_ONLY, GCS_ONLY, LEGACY, NONE or
+    /// STACKDRIVER_ONLY. Set CLOUD_LOGGING_ONLY when the build runs as a
+    /// user-specified service account and no logs bucket is given, which is
+    /// otherwise the commonest reason a build fails the moment it starts.
+    @gcp.FieldHint
+    logging: String?
+
+    /// The machine to build on, e.g. "E2_HIGHCPU_8". Leave it unset for the
+    /// default rather than sending "UNSPECIFIED": the API drops that value from
+    /// the response, so declaring it reads as drift.
+    @gcp.FieldHint
+    machineType: String?
+
+    /// How unmatched substitutions are handled: MUST_MATCH or ALLOW_LOOSE.
+    @gcp.FieldHint
+    substitutionOption: String?
+
+    /// Which hashes of the source to compute, e.g. ["SHA256"].
+    @gcp.FieldHint
+    sourceProvenanceHash: Listing<String>?
+
+    /// "KEY=value" pairs applied to every step.
+    @gcp.FieldHint
+    env: Listing<String>?
+
+    /// Where the default logs bucket lives, e.g.
+    /// "REGIONAL_USER_OWNED_BUCKET".
+    @gcp.FieldHint
+    defaultLogsBucketBehavior: String?
+
+    // `dynamicSubstitutions` and `requestedVerifyOption` /
+    // `logStreamingOption` are deliberately absent: the API drops the false and
+    // the zero-valued enums from the response, and unlike approvalConfig this
+    // class has many fields, so there is no presence signal a response
+    // transformer could hang a repair on.
+}
+
+/// Artifacts to publish when the build succeeds.
+@gcp.SubResourceHint
+open class BuildArtifacts extends formae.SubResource {
+    /// Images to push, e.g. ["gcr.io/my-project/my-image"].
+    @gcp.FieldHint
+    images: Listing<String>?
+}
+
+/// The build the trigger runs, declared inline.
+///
+/// Give this or `filename`, not both: `filename` points at a build config file
+/// inside the source instead.
+@gcp.SubResourceHint
+open class Build extends formae.SubResource {
+    /// The steps, in order.
+    @gcp.FieldHint
+    steps: Listing<BuildStep>?
+
+    /// Overall build timeout, e.g. "1200s".
+    @gcp.FieldHint
+    timeout: String?
+
+    /// How long a queued build waits before being expired, e.g. "3600s".
+    @gcp.FieldHint
+    queueTtl: String?
+
+    /// Tags on the resulting build, for filtering build history.
+    @gcp.FieldHint
+    tags: Listing<String>?
+
+    /// Build-level substitutions. Keys must start with an underscore.
+    @gcp.FieldHint
+    substitutions: Mapping<String, String>?
+
+    @gcp.FieldHint
+    options: BuildOptions?
+
+    @gcp.FieldHint
+    artifacts: BuildArtifacts?
+}
+
+/// Whether a build from this trigger waits for a human before it runs.
+@gcp.SubResourceHint
+open class ApprovalConfig extends formae.SubResource {
+    /// True means a triggered build enters PENDING and runs only once someone
+    /// approves it.
+    ///
+    /// The API reduces a false here to the empty object. The response
+    /// transformer puts the false back, which is safe precisely because this
+    /// class has one field: the block's presence implies it.
+    @gcp.FieldHint
+    approvalRequired: Boolean?
+}
+
+open class BuildTriggerResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BuildTriggerResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class BuildTrigger extends formae.Resource {
+    hidden parent = this
+
+    /// The trigger's name: 1-64 alphanumerics and dashes, beginning and ending
+    /// alphanumeric, unique within the project. This is what addresses the
+    /// trigger for get, patch and delete.
+    ///
+    /// createOnly, though the API would in fact rename a trigger in place: a
+    /// rename would strand the stored native id, which is built from the name,
+    /// so a name change plans a replacement instead. Omitting it entirely does
+    /// not fail — the API creates a trigger literally named "trigger" — which
+    /// is why it is required here.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The service account the triggered build runs as, as a bare email, or an
+    /// `IAM::ServiceAccount` resolvable's `email`.
+    ///
+    /// Required in practice, not merely by convention. A project without the
+    /// legacy `[PROJECT_NUM]@cloudbuild.gserviceaccount.com` account — which is
+    /// every project created since Cloud Build stopped provisioning it — rejects
+    /// a trigger with no service account, and the rejection is a bare
+    /// HTTP 400 INVALID_ARGUMENT with no field named. Supplying one is the
+    /// difference between "the API hates this body" and a working create.
+    ///
+    /// The account must already exist (the API answers 403 "Gaia id not found
+    /// for email ..." otherwise) but needs no roles of its own to be named.
+    ///
+    /// Declared as the email. The API requires and reports the qualified
+    /// `projects/{p}/serviceAccounts/{email}` form — the bare email is rejected
+    /// as invalid — so the plugin expands it on the way out and shortens it on
+    /// the way back.
+    @gcp.FieldHint
+    serviceAccount: (String|formae.Resolvable)?
+
+    /// What the trigger responds to: MANUAL, REPO, WEBHOOK or PUBSUB. The API
+    /// validates it against the rest of the configuration and echoes back only
+    /// what was explicitly set, so leaving it unset is safe.
+    @gcp.FieldHint
+    eventType: String?
+
+    /// A repository to build from, named by URL. See `GitRepoSource` for why
+    /// this is the only source form declared.
+    @gcp.FieldHint
+    sourceToBuild: GitRepoSource?
+
+    /// Path from the source root to a build config file, e.g.
+    /// "cloudbuild.yaml". Give this or `build`.
+    @gcp.FieldHint
+    filename: String?
+
+    /// The build to run, declared inline. Give this or `filename`.
+    @gcp.FieldHint
+    build: Build?
+
+    /// Human-readable description.
+    @gcp.FieldHint
+    description: String?
+
+    /// True stops the trigger firing at all. The API drops a false from its
+    /// response, so the plugin restores it and this carries a provider default
+    /// for the forma that never mentions it.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    disabled: Boolean?
+
+    /// Tags on the trigger itself, for organizing the trigger list.
+    @gcp.FieldHint
+    tags: Listing<String>?
+
+    /// Substitutions available to the build. Keys must start with an
+    /// underscore.
+    @gcp.FieldHint
+    substitutions: Mapping<String, String>?
+
+    /// A CEL expression that must be true for the trigger to fire. Meaningful
+    /// for webhook and Pub/Sub triggers, where it filters the incoming payload.
+    @gcp.FieldHint
+    filter: String?
+
+    /// Whether a triggered build waits for approval.
+    @gcp.FieldHint
+    approvalConfig: ApprovalConfig?
+
+    /// The uuid Cloud Build assigns. Output only; it also addresses the trigger
+    /// in the path, but this plugin uses `name` for that.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    id: String?
+
+    /// When the trigger was created. Output only.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    createTime: String?
+
+    /// The API's own name for the trigger,
+    /// "projects/{p}/locations/global/triggers/{uuid}". Output only, and
+    /// stripped from every request body: Cloud Build authorizes a PATCH against
+    /// the body's resourceName rather than the URL's, so replaying a stored one
+    /// is an authorization check against a path that is not the target.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    resourceName: String?
+
+    // `includedFiles` and `ignoredFiles` are deliberately absent. The API
+    // accepts both on a non-repo trigger and never returns them — verified
+    // live, sent on a PATCH and missing from the response and the next GET — so
+    // declaring them would read as drift on every sync. They are only honoured
+    // by the repo-connected trigger forms this type does not support.
+    //
+    // `includeBuildLogs` is absent too, for a different reason: it is rejected
+    // outright ("include_logs_with_status can only be set on GitHub trigger").
+
+    hidden res: BuildTriggerResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
