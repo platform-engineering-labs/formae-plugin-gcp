@@ -28,6 +28,63 @@ formae agent.
 
 ### Added
 
+- `GCP::NetworkSecurity::AddressGroup` — a named, reusable set of IP addresses and
+  CIDR blocks that firewall policy and Cloud Armor rules match against, so a rule
+  names one group instead of restating every address. Global, and free: a group
+  provisions nothing and matches no traffic until a rule points at it.
+
+  `type` and `capacity` are both fixed at creation — the API answers a capacity
+  change with "capacity can't be changed" — so neither goes out on an update and a
+  change to either replaces the resource. `purpose` carries a provider default of
+  `["DEFAULT"]`; its only other value, `CLOUD_ARMOR`, needs a Cloud Armor
+  Enterprise subscription and is refused outright without one, so the conformance
+  case leaves the field unset.
+
+  One API behaviour worth knowing: a patch whose update mask omits `labels` clears
+  them, which is not how the other types in this API behave. The mask is built
+  from the request body, so a forma that declares labels keeps sending them and
+  the wipe cannot bite — but a patch hand-built with a narrower mask would lose
+  them silently.
+
+- `GCP::NetworkSecurity::UrlList` — a named list of URL patterns for a Secure Web
+  Proxy policy to match on. Free, and inert until a policy names it.
+
+  Regional, alone among the types in this API. Asked for `locations/global` it
+  does not return an empty list, it fails the call with "Invalid location in
+  resource URL path", so the scope is pinned per collection rather than inferred.
+  `description` comes back as an empty string when it was never set, so it carries
+  a provider default rather than staying absent.
+
+- `GCP::NetworkSecurity::SecurityProfile` — the policy half of Cloud NGFW's
+  layer-7 inspection: what to do about a threat, not where to apply it. Global.
+
+  Creating one provisions no capacity. Inspection becomes billable only when a
+  firewall endpoint — an organization-level resource — is attached, so a profile
+  with nothing attached costs nothing, and the conformance case attaches nothing.
+
+  `type` is fixed at creation and decides which of the four settings blocks
+  applies; it is dropped from the patch body so it cannot enter the update mask.
+  `etag` is never sent back on a write: replaying a stored one fails the call with
+  409 "Provided etag is out of date" as soon as anything else has touched the
+  profile. And `threatPreventionProfile.threatOverrides[].type` is output-only but
+  nested, where a schema hint cannot reach it, so it is stripped on read —
+  otherwise every read carries a property the schema never declared.
+
+- `GCP::NetworkSecurity::SecurityProfileGroup` — the binding a firewall policy
+  rule actually names, gathering up to one security profile of each kind. Global,
+  and free for the same reason a profile is.
+
+  Each of the four profile fields is a full resource path on the wire but a short
+  name in a forma, which is what a resolvable yields. The plugin expands on the
+  request and shortens on the response; both halves have to exist, because
+  expanding without shortening would leave the declared value and the stored state
+  permanently disagreeing and every re-apply planning a replacement of a group
+  that has not changed. `etag` and `dataPathId` are server-owned and never sent.
+
+  Note: only `threatPreventionProfile` is exercised by the conformance fixture.
+  The other three references use the identical code path but are declared from the
+  API's discovery document rather than from a live create.
+
 - `GCP::NetworkConnectivity::InternalRange` — a reservation of internal IP space
   in a VPC. It marks a CIDR range as spoken for so nothing else is allocated over
   it; a subnet created later in the same space is rejected. Give it a range, or a

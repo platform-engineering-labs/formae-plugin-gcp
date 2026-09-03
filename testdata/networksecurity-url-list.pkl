@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/urlList.pkl"
+import "./config/vars.pkl" as v
+
+// A URL list is a named set of patterns a Secure Web Proxy policy matches on.
+// It is free, and it filters nothing until a policy names it.
+//
+// Regional - alone in this API it lives under the target's region rather than
+// locations/global, which the API rejects as an invalid location.
+forma {
+  v.stack
+  v.target
+
+  new urlList.UrlList {
+    label = "plugin-sdk-test-ns-url-list"
+    name = "formae-test-ns-ul-\(v.testRunID)"
+    values = new Listing {
+      "example.com"
+      "*.example.org/path"
+    }
+    description = "Test URL list for plugin SDK conformance tests"
+  }
+}

@@ -1,0 +1,90 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security AddressGroup
+///
+/// A named, reusable set of IP addresses and CIDR blocks. Firewall policies and
+/// Cloud Armor rules match against the group rather than restating every
+/// address, so one edit here changes every rule that names it.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.addressGroup
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::AddressGroup"
+
+open class AddressGroupResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AddressGroupResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class AddressGroup extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-address-group"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Which address family the group holds: IPV4 or IPV6. Immutable — every
+    /// item has to match it, so changing it would invalidate the contents.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    type: String
+
+    /// How many items the group may hold. Immutable: the API answers a change
+    /// with "capacity can't be changed", so a different capacity is a
+    /// replacement rather than an update.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    capacity: Int
+
+    /// The addresses themselves, as IPs or CIDR blocks.
+    @gcp.FieldHint
+    items: Listing<String>?
+
+    /// What the group may be used for: DEFAULT for firewall policies,
+    /// CLOUD_ARMOR for Cloud Armor rules. GCP reports ["DEFAULT"] when unset.
+    ///
+    /// CLOUD_ARMOR needs a Cloud Armor Enterprise subscription on the project;
+    /// without one the API refuses the value outright.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    purpose: Listing<String>?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Server-assigned URL for the group.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    selfLink: String?
+
+    hidden res: AddressGroupResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/addressGroup.pkl"
+import "./config/vars.pkl" as v
+
+// An address group is a named set of addresses that firewall policy rules match
+// against. It is free: nothing is provisioned, and the group inspects no traffic
+// until a rule names it.
+//
+// purpose is left unset on purpose. GCP reports ["DEFAULT"] for it, and the only
+// other value, CLOUD_ARMOR, needs a Cloud Armor Enterprise subscription the test
+// project does not have - the API refuses it outright.
+forma {
+  v.stack
+  v.target
+
+  new addressGroup.AddressGroup {
+    label = "plugin-sdk-test-ns-address-group"
+    name = "formae-test-ns-ag-\(v.testRunID)"
+    // type and capacity are both fixed at creation; a change to either is a
+    // replacement, not an update.
+    type = "IPV4"
+    capacity = 100
+    items = new Listing {
+      "192.0.2.0/24"
+      "198.51.100.7"
+    }
+    description = "Test address group for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

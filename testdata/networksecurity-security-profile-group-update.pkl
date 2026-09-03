@@ -1,0 +1,40 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/securityProfile.pkl" as sp
+import "@gcp/networksecurity/securityProfileGroup.pkl" as spg
+import "./config/vars.pkl" as v
+
+// Updates description and labels. The profile binding is restated unchanged:
+// re-declaring the same reference is what proves the expand-on-request,
+// shorten-on-response pair round-trips - if either half were missing, this
+// re-apply would plan a replacement of a group that has not changed.
+local profile = new sp.SecurityProfile {
+  label = "plugin-sdk-test-ns-spg-profile"
+  name = "formae-test-ns-spg-sp-\(v.testRunID)"
+  type = "THREAT_PREVENTION"
+  description = "Test security profile backing the profile group conformance test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  profile
+
+  new spg.SecurityProfileGroup {
+    label = "plugin-sdk-test-ns-security-profile-group"
+    name = "formae-test-ns-spg-\(v.testRunID)"
+    threatPreventionProfile = profile.res.name
+    description = "Updated test security profile group description"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

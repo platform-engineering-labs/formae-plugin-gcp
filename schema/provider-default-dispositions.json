@@ -1438,6 +1438,46 @@
       "disposition": "pending"
     },
     {
+      "key": "networksecurity/addressGroup.pkl#AddressGroup.purpose",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/addressGroup.pkl#AddressGroup.selfLink",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfile.pkl#SecurityProfile.customInterceptProfile",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfile.pkl#SecurityProfile.customMirroringProfile",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfile.pkl#SecurityProfile.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfile.pkl#SecurityProfile.threatPreventionProfile",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfile.pkl#SecurityProfile.urlFilteringProfile",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfileGroup.pkl#SecurityProfileGroup.dataPathId",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/securityProfileGroup.pkl#SecurityProfileGroup.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/urlList.pkl#UrlList.description",
+      "disposition": "pending"
+    },
+    {
       "key": "pubsub/pubsubSnapshot.pkl#Snapshot.expireTime",
       "disposition": "pending"
     },
