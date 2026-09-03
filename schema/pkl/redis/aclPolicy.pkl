@@ -1,0 +1,121 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Memorystore for Redis AclPolicy
+///
+/// A standalone ACL configuration object for Memorystore for Redis Cluster: a
+/// named set of Redis ACL rules, each binding one IAM user or service account
+/// to one rule string. It provisions nothing on its own - it is a policy
+/// document that clusters attach - and it is billed only through the clusters
+/// that attach it. Nothing here creates a cluster: `GCP::Redis::Cluster` is
+/// deliberately out of scope, because a cluster bills per hour, whereas an
+/// unattached ACL policy is free to hold.
+///
+/// Location-scoped, and - unlike `GCP::Redis::Instance` in the same API -
+/// synchronous: create returns the finished resource rather than an Operation.
+/// The API's own `state` enum documents this ("Since ACL policy creation is
+/// synchronous and not an LRO, there is no CREATING state").
+module gcp.redis.aclPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Redis::AclPolicy"
+
+/// A single ACL rule: the policy one user gets.
+@gcp.SubResourceHint
+open class AclRule extends formae.SubResource {
+    /// The IAM user or service account the rule applies to, e.g.
+    /// "svc@my-project.iam.gserviceaccount.com". Set verbatim as the username
+    /// on Redis OSS, so it is an identity string rather than a reference - the
+    /// API validates nothing about it at create time.
+    @gcp.FieldHint
+    username: String
+
+    /// The Redis OSS ACL rule applied to that username, e.g. "on ~* +@all" for
+    /// full access or "on ~cache:* +@read" for read-only access to one key
+    /// prefix. The grammar is Redis OSS's, not GCP's:
+    /// https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/
+    @gcp.FieldHint
+    rule: String
+}
+
+open class AclPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AclPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class AclPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short policy id (e.g. "my-acl"). Sent as ?aclPolicyId= at create, and a
+    /// path component thereafter, so it is immutable. The API reports it back
+    /// as the full path; the plugin shortens it again to what was declared.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The ACL rules within the policy. Required by the API - a policy with no
+    /// rules grants nothing and is rejected. This is also the only mutable
+    /// field: a PATCH masks exactly `rules`.
+    @gcp.FieldHint
+    rules: Listing<AclRule>
+
+    /// The state of the policy ("ACTIVE", "UPDATING", "DELETING"). Set by the
+    /// API and reported on every read, so it carries a provider default rather
+    /// than being something a forma declares.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    state: String?
+
+    /// Revision counter, reported as a JSON string. Output only, and
+    /// documented by the API as "Deprecated: Used in drift resolution" - it is
+    /// declared only so a read-back that carries it is not an unexpected field.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    version: String?
+
+    /// Server-assigned etag. Output only. The plugin never echoes it back in a
+    /// request body: this API takes the etag as a delete query parameter, not
+    /// as payload.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    etag: String?
+
+    /// When the policy was created. Output only.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    createTime: String?
+
+    /// When the policy was last updated. Output only.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    updateTime: String?
+
+    // `clusterAclPolicyAttachments` is deliberately absent. It is an
+    // output-only array of per-cluster attachment status, and a
+    // `hasProviderDefault` hint reaches only top-level fields - Verify compares
+    // a nested object whole, so an extra member inside it reads as a mismatch.
+    // The plugin strips the array in its ResponseTransformer instead.
+
+    hidden res: AclPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/redis/aclPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Narrows the rule from full access to read-only on one key prefix. `rules` is
+// the only mutable field an ACL policy has - name is the path, everything else
+// is output only - so this is the whole of what a PATCH may carry, and the
+// computed updateMask is exactly "rules".
+forma {
+  v.stack
+  v.target
+
+  new aclPolicy.AclPolicy {
+    label = "plugin-sdk-test-redis-acl-policy"
+    name = "formae-test-redis-acl-\(v.testRunID)"
+    rules {
+      new {
+        username = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+        rule = "on ~cache:* +@read"
+      }
+    }
+  }
+}

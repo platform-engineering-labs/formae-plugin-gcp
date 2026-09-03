@@ -179,6 +179,14 @@ func (b *BaseResource) Read(
 		}, nil
 	}
 
+	// An API that keeps serving a tombstone reports a resource that is on its
+	// way out as present; see ResourceConfig.ReadTreatAsMissing.
+	if f := b.ResourceConfig.ReadTreatAsMissing; f != nil && f(response.Body) {
+		return &resource.ReadResult{
+			ErrorCode: resource.OperationErrorCodeNotFound,
+		}, nil
+	}
+
 	// Transform response if configured
 	apiResponse := response.Body
 	if b.ResponseTransformer != nil {
