@@ -78,8 +78,14 @@ sweep "filestore instances" "gcloud filestore instances list --project=$PROJECT 
                             "gcloud filestore instances delete {} --project=$PROJECT --region=$REGION --quiet"
 sweep "redis instances"     "gcloud redis instances list --project=$PROJECT --region=$REGION --format='value(name.basename())'" \
                             "gcloud redis instances delete {} --project=$PROJECT --region=$REGION --quiet"
+# gcloud cannot delete a Cloud SQL instance in this project - it answers
+#   Invalid request: Final Backup Retention Days can not be set if
+#   enable_final_backup is disabled
+# and exits non-zero, so a sweep built on it removes nothing while appearing to
+# try. Twenty-one instances accumulated behind that. The REST call has no such
+# problem.
 sweep "cloud sql instances" "gcloud sql instances list --project=$PROJECT --format='value(name)'" \
-                            "gcloud sql instances delete {} --project=$PROJECT --quiet"
+                            "curl -sS -o /dev/null -X DELETE -H \"Authorization: Bearer \$(gcloud auth print-access-token)\" https://sqladmin.googleapis.com/v1/projects/$PROJECT/instances/{}"
 sweep "spanner instances"   "gcloud spanner instances list --project=$PROJECT --format='value(name)'" \
                             "gcloud spanner instances delete {} --project=$PROJECT --quiet"
 sweep "memcache instances"  "gcloud memcache instances list --project=$PROJECT --region=$REGION --format='value(name.basename())'" \
@@ -103,6 +109,8 @@ sweep "sd namespaces"       "gcloud service-directory namespaces list --project=
                             "gcloud service-directory namespaces delete {} --project=$PROJECT --location=$REGION --quiet"
 sweep "scheduler jobs"      "gcloud scheduler jobs list --project=$PROJECT --location=$REGION --format='value(name.basename())'" \
                             "gcloud scheduler jobs delete {} --project=$PROJECT --location=$REGION --quiet"
+sweep "packet mirrorings"   "gcloud compute packet-mirrorings list --project=$PROJECT --format='value(name)'" \
+                            "gcloud compute packet-mirrorings delete {} --project=$PROJECT --region=$REGION --quiet"
 sweep "compute networks"    "gcloud compute networks list --project=$PROJECT --format='value(name)'" \
                             "gcloud compute networks delete {} --project=$PROJECT --quiet"
 

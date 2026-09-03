@@ -1188,6 +1188,22 @@ else
     echo "  No VPC Access connectors found"
 fi
 
+# --- 6d. Packet mirroring policies. A policy pins the network it mirrors, and
+#         the network delete fails with "already being used by ... packetMirrorings"
+#         until it goes. Two leaked policies held two networks in the project
+#         indefinitely because nothing swept this collection at all. ---
+echo "Cleaning GCP packet mirroring policies..."
+PACKET_MIRRORINGS=$(gcloud compute packet-mirrorings list --format="value(name,region.basename())" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$PACKET_MIRRORINGS" ]; then
+    echo "$PACKET_MIRRORINGS" | while read -r pm pm_region; do
+        [ -z "$pm" ] && continue
+        echo "  Deleting packet mirroring: $pm (region: ${pm_region:-${GCP_REGION:-europe-central2}})"
+        gcloud compute packet-mirrorings delete "$pm" --region="${pm_region:-${GCP_REGION:-europe-central2}}" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No packet mirroring policies found"
+fi
+
 # --- 7. Networks (after firewalls and subnetworks are deleted) ---
 echo "Cleaning GCP networks..."
 NETWORKS=$(gcloud compute networks list --filter="name~^formae-" --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
