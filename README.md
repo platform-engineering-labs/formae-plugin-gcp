@@ -88,6 +88,7 @@ This plugin supports **205 GCP resource types** across 39 services. See
 | `GCP::Compute::NetworkFirewallPolicyRule` | One rule inside a `networkFirewallPolicy` |
 | `GCP::Compute::NetworkPeering` | VPC peering between two networks, for private-IP reachability without a VPN |
 | `GCP::Compute::NodeTemplate` | Specification a sole-tenant `nodeGroup` stamps its physical nodes from: which node type |
+| `GCP::Compute::PacketMirroring` | Copies selected VMs' traffic to an internal load balancer for inspection |
 | `GCP::Compute::ProjectMetadataItem` | One key of the project's common instance metadata |
 | `GCP::Compute::RegionAutoscaler` | Autoscaler for a regional managed instance group |
 | `GCP::Compute::RegionBackendService` | Regional backend service |
