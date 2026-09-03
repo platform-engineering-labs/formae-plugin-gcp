@@ -11,7 +11,7 @@ Monitoring and more.
 
 ## Supported Resources
 
-This plugin supports **205 GCP resource types** across 39 services. See
+This plugin supports **206 GCP resource types** across 39 services. See
 [`schema/pkl/`](schema/pkl/) for field definitions.
 
 | Resource Type | Description |
