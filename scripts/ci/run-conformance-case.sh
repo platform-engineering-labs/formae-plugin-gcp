@@ -34,22 +34,30 @@ export FORMAE_TEST_FUTURE_TIMESTAMP
 # (github-deploy@) and a local run. A fixture cannot know it, so read it off the
 # credentials the plugin itself will use.
 #
-# A service-account key names the identity in "client_email". The workload
-# identity file CI writes does not - it is an external account that impersonates
-# one - so fall back to whoever gcloud is active as, which under workload
-# identity is that same impersonated service account.
-caller_email_from_key() {
-    for f in "${GCP_CREDENTIALS_FILE:-}" "${GOOGLE_APPLICATION_CREDENTIALS:-}"; do
+# Two credential shapes name the identity two different ways. A service-account
+# key says it outright in "client_email". The workload identity file CI writes
+# does not: it is an external account, and the service account it impersonates
+# appears only in service_account_impersonation_url. gcloud is not a substitute -
+# "gcloud auth list" does not report the impersonated account, which is how this
+# first went out reading the wrong identity and failing the case with "Primary
+# contact must be the same as the authenticated user's email."
+caller_email_from_creds() {
+    for f in "${GCP_CREDENTIALS_FILE:-}" "${GOOGLE_APPLICATION_CREDENTIALS:-}" \
+             "${CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE:-}"; do
         [ -n "$f" ] && [ -f "$f" ] || continue
-        sed -n 's/.*"client_email"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1
+        sed -n 's/.*"client_email"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f"
+        sed -n 's|.*/serviceAccounts/\([^:"]*\):generateAccessToken.*|\1|p' "$f"
     done | head -1
 }
-FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_key)"
+FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_creds)"
 if [ -z "$FORMAE_TEST_CALLER_EMAIL" ]; then
     FORMAE_TEST_CALLER_EMAIL="$(gcloud auth list --filter=status:ACTIVE \
         --format='value(account)' 2>/dev/null | head -1)"
 fi
 export FORMAE_TEST_CALLER_EMAIL
+# Printed because a wrong value fails one case with a message that says nothing
+# about where the value came from.
+echo "Conformance caller identity: ${FORMAE_TEST_CALLER_EMAIL:-<unknown>}"
 
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
