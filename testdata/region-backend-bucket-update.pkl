@@ -36,6 +36,10 @@ forma {
     // is refused with "Load balancing scheme is required for backend bucket of
     // scope REGION".
     loadBalancingScheme = "EXTERNAL_MANAGED"
-    enableCdn = true
+    // Stays false: unlike the global type, whose update case flips this to
+    // true, regional scope refuses Cloud CDN outright ("CDN is not supported
+    // for backend bucket with scope REGION"). The update therefore changes the
+    // description, which is what a regional backend bucket will actually patch.
+    enableCdn = false
   }
 }

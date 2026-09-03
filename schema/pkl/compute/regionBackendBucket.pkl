@@ -77,6 +77,14 @@ open class RegionBackendBucket extends formae.Resource {
     loadBalancingScheme: RegionalLoadBalancingScheme
 
     /// Serve through Cloud CDN.
+    ///
+    /// Only `false` is accepted at regional scope. Cloud CDN is a global,
+    /// external feature, and setting this true is refused outright: "Invalid
+    /// value for field 'resource.enableCdn': 'true'. CDN is not supported for
+    /// backend bucket with scope REGION and load balancing scheme:
+    /// EXTERNAL_MANAGED". The field stays declarable because the API reports it
+    /// back as `false` on every read, so it carries a provider default rather
+    /// than being absent - but a forma that sets it true fails at apply.
     @gcp.FieldHint { hasProviderDefault = true }
     enableCdn: Boolean?
 
