@@ -1,0 +1,190 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Deploy Automation
+///
+/// Promotion and advancement without a human: rules that fire on the events a
+/// rollout produces, run as a named service account. An automation with no
+/// release to act on does nothing at all, which is what makes it free to
+/// declare — and this plugin does not create releases.
+///
+/// Nested under the `DeliveryPipeline` whose releases it acts on. That is a
+/// path component, not a body field: the plugin drops it from the request and
+/// lifts it back out of the returned name. Declaring it also orders the two
+/// resources — the pipeline is created first and destroyed last, which matters
+/// because a pipeline refuses to delete while an automation still hangs off it.
+///
+/// `serviceAccount` is the one thing here that must exist outside Cloud Deploy.
+/// It is checked against IAM at create time: a non-existent address is refused
+/// with "authorization check: generic::invalid_argument: invalid service
+/// account", and the caller must be able to act as the account it names.
+///
+/// Two rule kinds the API offers are not declared. `repairRolloutRule` was not
+/// exercised against the live API, and `timedPromoteReleaseRule` runs off a
+/// cron schedule rather than off a rollout event — the one rule that acts
+/// without something having been deployed first.
+///
+/// Discovery finds these without a parent to walk from: Cloud Deploy accepts
+/// `-` as a wildcard pipeline, so one list call enumerates the automations of
+/// every pipeline in the region.
+///
+/// Regional. Create, update and delete are long-running operations.
+module gcp.clouddeploy.automation
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudDeploy::Automation"
+
+/// Which targets the automation acts on.
+@gcp.SubResourceHint
+open class TargetAttribute extends formae.SubResource {
+    /// A target's **short** id, or `"*"` for every target in the location. A
+    /// Target resolvable yields that short id.
+    @gcp.FieldHint
+    id: (String|formae.Resolvable)?
+
+    /// Match by target labels instead.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+}
+
+/// The resources the automation applies to.
+@gcp.SubResourceHint
+open class AutomationResourceSelector extends formae.SubResource {
+    @gcp.FieldHint
+    targets: Listing<TargetAttribute>?
+}
+
+/// Promote a release to the next target once it has been there long enough.
+@gcp.SubResourceHint
+open class PromoteReleaseRule extends formae.SubResource {
+    /// Rule id, unique within the automation.
+    /// `[a-z]([a-z0-9-]{0,61}[a-z0-9])?`.
+    @gcp.FieldHint
+    id: String
+
+    /// How long to hold the release before promoting it, e.g. "3600s".
+    @gcp.FieldHint
+    wait: String?
+
+    /// The stage to promote into, by short target id. The next stage in the
+    /// flow when absent.
+    @gcp.FieldHint
+    destinationTargetId: (String|formae.Resolvable)?
+
+    /// The phase the created rollout starts in. The first phase when absent.
+    @gcp.FieldHint
+    destinationPhase: String?
+}
+
+/// Advance a rollout that has finished a phase successfully.
+@gcp.SubResourceHint
+open class AdvanceRolloutRule extends formae.SubResource {
+    /// Rule id, unique within the automation.
+    @gcp.FieldHint
+    id: String
+
+    /// Only advance out of these phases. Any phase when absent.
+    @gcp.FieldHint
+    sourcePhases: Listing<String>?
+
+    /// How long to wait after the phase finishes, e.g. "600s".
+    @gcp.FieldHint
+    wait: String?
+}
+
+/// One rule. Give exactly one kind.
+///
+/// Cloud Deploy adds an output-only `condition` inside whichever kind is set,
+/// reporting whether the targets the rule would act on exist. It is two levels
+/// below a declared field, where no `hasProviderDefault` can reach, so the
+/// plugin strips it on read.
+@gcp.SubResourceHint
+open class AutomationRule extends formae.SubResource {
+    @gcp.FieldHint
+    promoteReleaseRule: PromoteReleaseRule?
+
+    @gcp.FieldHint
+    advanceRolloutRule: AdvanceRolloutRule?
+}
+
+open class AutomationResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: AutomationResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::CloudDeploy::DeliveryPipeline"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty {
+            parentProperty = "deliveryPipeline"
+            listParameter = "deliveryPipeline"
+        }
+    }.toList()
+}
+open class Automation extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "promote-to-prod"). Immutable — it is the path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The pipeline this automation belongs to, by short id — or a
+    /// DeliveryPipeline resolvable, which yields that. A path component rather
+    /// than a body field: it is dropped from the request and lifted back out of
+    /// the returned path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    deliveryPipeline: (String|formae.Resolvable)
+
+    /// The service account Cloud Deploy creates releases and rollouts as.
+    /// Required, and validated against IAM when the automation is created.
+    @gcp.FieldHint
+    serviceAccount: String
+
+    /// What the automation acts on. Required.
+    @gcp.FieldHint
+    selector: AutomationResourceSelector
+
+    /// What it does. At least one rule is required.
+    @gcp.FieldHint
+    rules: Listing<AutomationRule>
+
+    /// Deactivate the automation without deleting it.
+    ///
+    /// Set it to `true` or leave it out — `false` is the protobuf default and
+    /// the API drops it from the response, so a forma declaring `false` would
+    /// read as a field that never arrives.
+    @gcp.FieldHint
+    suspended: Boolean?
+
+    /// An optional description. Max 255 characters.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Optional user annotations. Unlike labels these are never read by Cloud
+    /// Deploy itself.
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    hidden res: AutomationResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -1,0 +1,126 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Deploy CustomTargetType
+///
+/// A deploy action Cloud Deploy does not know how to perform itself. Render and
+/// deploy are supplied either as Skaffold custom actions (`customActions`) or as
+/// container images to run (`tasks`) — give one or the other — and a `Target`
+/// then names this type instead of a Cloud Run location or a cluster.
+///
+/// Pure configuration: nothing here runs until a rollout invokes it, and a
+/// rollout is not a resource this plugin creates. The image named under `tasks`
+/// is never pulled by creating this type.
+///
+/// Regional, like everything in Cloud Deploy. Create, update and delete are
+/// long-running operations.
+module gcp.clouddeploy.customTargetType
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudDeploy::CustomTargetType"
+
+/// A container image Cloud Deploy runs for one step of a custom deploy.
+@gcp.SubResourceHint
+open class ContainerTask extends formae.SubResource {
+    /// The image to run, e.g. "gcr.io/my-project/my-deployer:latest".
+    @gcp.FieldHint
+    image: String
+
+    /// Entrypoint override.
+    @gcp.FieldHint
+    command: Listing<String>?
+
+    /// Argument override.
+    @gcp.FieldHint
+    args: Listing<String>?
+
+    /// Environment variables set in the container.
+    @gcp.FieldHint
+    env: Mapping<String, String>?
+}
+
+/// One unit of work of a custom deploy. Only the container form exists.
+@gcp.SubResourceHint
+open class Task extends formae.SubResource {
+    @gcp.FieldHint
+    container: ContainerTask?
+}
+
+/// Render and deploy expressed as container tasks.
+@gcp.SubResourceHint
+open class CustomTargetTasks extends formae.SubResource {
+    /// Required by the API when `tasks` is used at all.
+    @gcp.FieldHint
+    deploy: Task
+
+    /// Optional — Cloud Deploy renders with Skaffold when this is absent.
+    @gcp.FieldHint
+    render: Task?
+}
+
+/// Render and deploy expressed as named Skaffold custom actions.
+@gcp.SubResourceHint
+open class CustomTargetSkaffoldActions extends formae.SubResource {
+    /// The Skaffold custom action that performs the deploy. Required by the API
+    /// when `customActions` is used at all.
+    @gcp.FieldHint
+    deployAction: String
+
+    /// The Skaffold custom action that performs the render. Optional — Cloud
+    /// Deploy renders with `skaffold render` when this is absent.
+    @gcp.FieldHint
+    renderAction: String?
+}
+
+open class CustomTargetTypeResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: CustomTargetTypeResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class CustomTargetType extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-custom-target-type"). Immutable — it is the path.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Skaffold custom actions. Give this or `tasks`.
+    @gcp.FieldHint
+    customActions: CustomTargetSkaffoldActions?
+
+    /// Container tasks. Give this or `customActions`.
+    @gcp.FieldHint
+    tasks: CustomTargetTasks?
+
+    /// An optional description. Max 255 characters.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Optional user annotations. Unlike labels these are never read by Cloud
+    /// Deploy itself.
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    hidden res: CustomTargetTypeResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}
