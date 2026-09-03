@@ -36,34 +36,8 @@
 set -euo pipefail
 
 # Prefix used for test resources - should match what conformance tests create
-# Every fixture names what it creates "formae-test-<abbrev>-<testRunID>", or
-# "formae_test_..." where the API demands underscores. That is now a rule rather
-# than a habit: the names were standardised across all 293 fixtures, and every
-# sweep below matches exactly that shape.
-#
-# It was not always so, and the drift cost real money. Sweeps matched whatever
-# prefix the fixtures happened to use when they were written - "^formae-plugin-sdk",
-# "^formae-test-instance", and two that read "^formae--test" with a doubled hyphen
-# and therefore matched nothing at all. Anything named differently was created by
-# a run and never collected by one: eight SSL certificates reaching a global cap
-# of ten, a hundred and fifty leaked secrets, and Bigtable instances - which hold
-# nodes and are billed per node-hour - left behind by every single run of
-# bigtable-app-profile, because that fixture calls its instance
-# "formae-test-btap-<runID>" and the sweep only looked for "^formae-test-instance".
-#
-# One shape, one pattern, no per-sweep guessing. "probe" is included so the
-# ad-hoc resources a live API probe leaves behind are collected too.
-# "plugin" is here for the resources named before the convention landed. A live
-# survey found 85 Pub/Sub topics, 21 secrets and 2 networks still carrying
-# "formae-plugin-sdk-test-", and a pattern matching only the new shape would have
-# left every one of them in the project permanently. It can come out once a sweep
-# reports none of them left.
-SWEEP_RE="${SWEEP_RE:-^formae[-_](test|probe|plugin)[-_]}"
-
-# Names that match SWEEP_RE but must never be deleted. A "formae-" resource is
-# not always a leak: formae-byo-cert is a certificate someone installed in July
-# and is still in use. Add a name here rather than narrowing SWEEP_RE.
-KEEP_RE="${KEEP_RE:-^(formae-byo-cert|formae-tester|formae-tester-nico)([@[:space:]].*)?$}"
+# Names the cleanup tooling treats as ours - shared with find-leaks.sh.
+. "$(dirname "$0")/sweep-patterns.sh"
 
 echo "clean-environment.sh: sweeping names matching '${SWEEP_RE}' (keeping '${KEEP_RE}')"
 
@@ -1362,12 +1336,6 @@ fi
 # depends on.
 echo "Cleaning GCP IAM service accounts..."
 SA_PROJECT="${GCP_PROJECT_ID:-$(gcloud config get-value project 2>/dev/null || true)}"
-# The fixture now names itself "formae-test-sa-<runID>" like everything else, so
-# this is the standard shape anchored at the start of the email. The legacy
-# "sa-<8hex>@" form is kept so accounts leaked before the rename are still
-# collected - narrowing this to a prefix no fixture used is exactly how they
-# started leaking. KEEP_RE still guards the identities on top.
-SA_SWEEP_RE="${SA_SWEEP_RE:-^(formae[-_](test|plugin)[-_]|sa-[0-9a-f]{8}@)}"
 SERVICE_ACCOUNTS=$(gcloud iam service-accounts list --format="value(email)" 2>/dev/null \
     | grep -E "$SA_SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SERVICE_ACCOUNTS" ]; then
