@@ -163,6 +163,30 @@ func dropPathFields(props map[string]interface{}, ctx base.TransformContext) (ma
 	return body, nil
 }
 
+// queryTemplateRequest keeps only what the API will accept in an update mask.
+// A query template is almost entirely fixed once created: the API refuses
+// display_name, primary_contact and documentation ("The field 'display_name'
+// cannot be updated on this query_template"), and the mask is built from the
+// body, so anything left in it fails the whole update. Description and routine
+// are the two it does take.
+func queryTemplateRequest(props map[string]interface{}, ctx base.TransformContext) (map[string]interface{}, error) {
+	body, err := dropPathFields(props, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if ctx.Operation != resource.OperationUpdate {
+		return body, nil
+	}
+	for k := range body {
+		switch k {
+		case "description", "routine":
+		default:
+			delete(body, k)
+		}
+	}
+	return body, nil
+}
+
 // listingRequest expands the published dataset into the full path the API
 // wants. A forma passes `dataset.res.datasetId` - a resolvable, so formae
 // creates the dataset first and the listing gets the ordering edge - which

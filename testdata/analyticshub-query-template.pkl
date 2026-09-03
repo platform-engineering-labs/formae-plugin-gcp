@@ -35,13 +35,20 @@ forma {
     location = v.gcpLocation
     dataExchange = cleanRoom.res.name
     displayName = "formae plugin sdk test query template"
+    // The API refuses a template whose primaryContact is not the caller's own
+    // email: "Primary contact must be the same as the authenticated user's
+    // email." Who that is differs between CI and a local run, so it comes from
+    // the environment - run-conformance-case.sh reads it off the credentials
+    // the plugin will use. A fixture reading this must run through that script.
+    primaryContact = read("env:FORMAE_TEST_CALLER_EMAIL")
     description = "Created by the formae GCP plugin conformance suite."
-    // Required: without it the API answers "Query template routine must be
-    // provided." A routine is still not enough on its own - see the entry for
-    // this case in testdata/on-demand-cases.txt.
+    // The definition body is the routine itself, named after the template and
+    // WITHOUT a CREATE TABLE FUNCTION prefix - the API parses the leading
+    // identifier as the routine name and rejects any other shape with "Query
+    // template routine name should be same as the template name."
     routine = new queryTemplate.Routine {
       routineType = "TABLE_VALUED_FUNCTION"
-      definitionBody = "SELECT 1 AS n"
+      definitionBody = "formae_test_qt_\(v.testRunID)() AS (SELECT 1 AS n)"
     }
   }
 }

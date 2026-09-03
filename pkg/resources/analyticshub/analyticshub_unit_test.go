@@ -184,3 +184,46 @@ func TestListingResponseDropsProviderNoise(t *testing.T) {
 		t.Errorf("dataset = %v, want my_ds", src["dataset"])
 	}
 }
+
+// A query template is almost entirely fixed once created: the API refuses
+// display_name, primary_contact and documentation in an update mask, and the
+// mask is the body, so anything else left in it fails the whole update.
+func TestQueryTemplateUpdateKeepsOnlyWhatTheAPITakes(t *testing.T) {
+	props := map[string]interface{}{
+		"name":           "qt1",
+		"project":        "p",
+		"location":       "us",
+		"dataExchange":   "de1",
+		"displayName":    "T",
+		"documentation":  "docs",
+		"primaryContact": "someone@example.com",
+		"description":    "changed",
+		"routine": map[string]interface{}{
+			"routineType":    "TABLE_VALUED_FUNCTION",
+			"definitionBody": "qt1() AS (SELECT 1)",
+		},
+	}
+	body, err := queryTemplateRequest(props, base.TransformContext{Project: "p", Operation: resource.OperationUpdate})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(body) != 2 || body["description"] != "changed" || body["routine"] == nil {
+		t.Errorf("update body = %+v, want only description and routine", body)
+	}
+
+	// Create still carries everything but the path components.
+	body, err = queryTemplateRequest(props, base.TransformContext{Project: "p", Operation: resource.OperationCreate})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, k := range []string{"name", "displayName", "primaryContact", "documentation", "routine"} {
+		if _, ok := body[k]; !ok {
+			t.Errorf("create body is missing %q", k)
+		}
+	}
+	for _, k := range []string{"location", "dataExchange"} {
+		if _, ok := body[k]; ok {
+			t.Errorf("%q addresses the resource in the URL and must not be a body field", k)
+		}
+	}
+}

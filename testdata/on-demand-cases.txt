@@ -24,17 +24,3 @@
 # a DEVELOPMENT instance - which the other Bigtable cases use - cannot have a
 # second cluster at all, so there is no cheap way to exercise this type.
 bigtable-cluster
-
-# analyticshub queryTemplates.create cannot be satisfied through the v1 REST API.
-# Validation runs routine present -> definitionBody non-empty -> "Query template
-# routine name should be same as the template name.", and nothing in the request
-# carries a routine name: the v1 discovery document gives Routine exactly two
-# fields, routineType and definitionBody, and the API rejects name, routineId,
-# routineName, routineReference and routine_name as unknown. Probed 2026-09-03
-# against development-477117 with the queryTemplateId matching the routine name,
-# with a CREATE TABLE FUNCTION body naming it (bare, backticked and fully
-# qualified), and with a real TABLE_VALUED_FUNCTION shared into the clean room by
-# a listing with restricted egress. Every one returns the same refusal, so this
-# is an upstream gap and not something the fixture can express. The plugin code
-# is complete; run the case on demand once the API accepts a create.
-analyticshub-query-template

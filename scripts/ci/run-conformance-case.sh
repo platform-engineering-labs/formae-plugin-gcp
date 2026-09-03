@@ -28,6 +28,29 @@ FORMAE_TEST_FUTURE_TIMESTAMP="$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ 2>/dev/
     || date -u -v+7d +%Y-%m-%dT%H:%M:%SZ)"
 export FORMAE_TEST_FUTURE_TIMESTAMP
 
+# An Analytics Hub query template is refused unless its primaryContact is the
+# authenticated caller's own email ("Primary contact must be the same as the
+# authenticated user's email."), and who that is differs between CI
+# (github-deploy@) and a local run. A fixture cannot know it, so read it off the
+# credentials the plugin itself will use.
+#
+# A service-account key names the identity in "client_email". The workload
+# identity file CI writes does not - it is an external account that impersonates
+# one - so fall back to whoever gcloud is active as, which under workload
+# identity is that same impersonated service account.
+caller_email_from_key() {
+    for f in "${GCP_CREDENTIALS_FILE:-}" "${GOOGLE_APPLICATION_CREDENTIALS:-}"; do
+        [ -n "$f" ] && [ -f "$f" ] || continue
+        sed -n 's/.*"client_email"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1
+    done | head -1
+}
+FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_key)"
+if [ -z "$FORMAE_TEST_CALLER_EMAIL" ]; then
+    FORMAE_TEST_CALLER_EMAIL="$(gcloud auth list --filter=status:ACTIVE \
+        --format='value(account)' 2>/dev/null | head -1)"
+fi
+export FORMAE_TEST_CALLER_EMAIL
+
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
 # "no available packages for: formae" when the package channel is unreachable,
