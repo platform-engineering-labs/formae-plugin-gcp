@@ -34,13 +34,18 @@ export FORMAE_TEST_FUTURE_TIMESTAMP
 # (github-deploy@) and a local run. A fixture cannot know it, so read it off the
 # credentials the plugin itself will use.
 #
-# Two credential shapes name the identity two different ways. A service-account
-# key says it outright in "client_email". The workload identity file CI writes
-# does not: it is an external account, and the service account it impersonates
-# appears only in service_account_impersonation_url. gcloud is not a substitute -
-# "gcloud auth list" does not report the impersonated account, which is how this
-# first went out reading the wrong identity and failing the case with "Primary
-# contact must be the same as the authenticated user's email."
+# Finding the caller's own email is not one lookup, because the credential can
+# be any of three shapes. A service-account key says it outright in
+# "client_email". An external account that impersonates a service account names
+# it in service_account_impersonation_url. And neither key is present when the
+# federation is direct, where the identity is a principal:// subject with no
+# email at all - so the last resort asks Google who the token belongs to.
+#
+# "gcloud auth list" is NOT a substitute: under workload identity it reports the
+# federated principal, which is not an email. Sending that produced "The
+# QueryTemplate primary contact should be either a valid email or URL", and
+# because the string carries the project number it came back masked in the log,
+# which is why the source and shape are reported below rather than trusted.
 caller_email_from_creds() {
     for f in "${GCP_CREDENTIALS_FILE:-}" "${GOOGLE_APPLICATION_CREDENTIALS:-}" \
              "${CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE:-}"; do
@@ -49,15 +54,34 @@ caller_email_from_creds() {
         sed -n 's|.*/serviceAccounts/\([^:"]*\):generateAccessToken.*|\1|p' "$f"
     done | head -1
 }
+
+# tokeninfo answers for whoever the token actually belongs to, impersonated
+# service accounts included. The token is short-lived and goes only to Google's
+# own endpoint, and nothing here prints it.
+caller_email_from_token() {
+    local token
+    token="$(gcloud auth print-access-token 2>/dev/null)" || return 0
+    [ -n "$token" ] || return 0
+    curl -s --max-time 20 "https://oauth2.googleapis.com/tokeninfo?access_token=${token}" \
+        | sed -n 's/.*"email"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
+}
+
+caller_email_source=credentials-file
 FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_creds)"
 if [ -z "$FORMAE_TEST_CALLER_EMAIL" ]; then
-    FORMAE_TEST_CALLER_EMAIL="$(gcloud auth list --filter=status:ACTIVE \
-        --format='value(account)' 2>/dev/null | head -1)"
+    caller_email_source=tokeninfo
+    FORMAE_TEST_CALLER_EMAIL="$(caller_email_from_token)"
 fi
 export FORMAE_TEST_CALLER_EMAIL
-# Printed because a wrong value fails one case with a message that says nothing
-# about where the value came from.
-echo "Conformance caller identity: ${FORMAE_TEST_CALLER_EMAIL:-<unknown>}"
+
+# The value itself is usually a masked secret in CI, so report what it is rather
+# than what it says: a wrong one fails a case with a message that names nothing.
+case "${FORMAE_TEST_CALLER_EMAIL:-}" in
+    "")    caller_email_shape="empty" ;;
+    *@*.*) caller_email_shape="looks like an email" ;;
+    *)     caller_email_shape="NOT an email" ;;
+esac
+echo "Conformance caller identity: source=${caller_email_source}, ${caller_email_shape}"
 
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
