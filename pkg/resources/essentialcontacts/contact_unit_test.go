@@ -75,9 +75,13 @@ func TestContactRegistered(t *testing.T) {
 			t.Errorf("%s not registered for %v", ContactResourceType, op)
 		}
 	}
-	// Update stays unsupported: contacts.patch exists, but an Allowed Contact
-	// Domains org policy stops a conformance case creating a contact at all, so
-	// nothing can verify it.
+	// Update stays unsupported: contacts.patch works - probed live, an
+	// updateMask of "languageTag,notificationCategorySubscriptions" is accepted
+	// and one naming "email" is refused - but the project's Allowed Contact
+	// Domains org policy admits only the organisation's own live mail domain, so
+	// no conformance case can create a contact without inventing a mailbox real
+	// people would receive notifications at. Nothing verifies update, so it
+	// stays off. See resources.go for what would unblock it.
 	if registry.HasProvisioner(ContactResourceType, resource.OperationUpdate) {
 		t.Errorf("%s should not be registered for Update", ContactResourceType)
 	}

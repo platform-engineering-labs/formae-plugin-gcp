@@ -1265,6 +1265,12 @@ func init() {
 		},
 
 		// Region Target HTTP Proxy - Regional HTTP proxy for internal load balancers
+		//
+		// Update is off. regionTargetHttpProxies has only delete, get, insert,
+		// list and setUrlMap - no patch - so a PATCH lands on a URL the API does
+		// not serve and comes back as Google's HTML 404 page rather than an API
+		// error. Its global sibling does have patch, which is how the regional
+		// one came to claim update it never had. A change replaces.
 		{
 			ResourceType: RegionTargetHttpProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1272,7 +1278,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1280,6 +1286,15 @@ func init() {
 		},
 
 		// Region Target HTTPS Proxy - Regional HTTPS proxy for internal load balancers
+		//
+		// regionTargetHttpsProxies.patch enforces the fingerprint, unlike most
+		// Compute patches where it is advisory: a PATCH without one is refused
+		// outright with
+		//
+		//	Required field 'resource.fingerprint' not specified
+		//
+		// so optimistic locking is not an optimisation here, it is the only way
+		// an update reaches the API at all.
 		{
 			ResourceType: RegionTargetHttpsProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1287,8 +1302,12 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
-				OptimisticLocking: nil,
+				SupportsUpdate: true,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "fingerprint",
+					LocationInURL: false,
+				},
 			},
 			RequestTransformer:  nil,
 			ResponseTransformer: base.RegionResponseTransformer,

@@ -29,11 +29,22 @@ func init() {
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "contacts",
 				Scope:        &base.ScopeConfig{Type: base.ScopeProjectLevel},
-				// contacts.patch exists and takes an updateMask, but nothing
-				// exercises it: the shared test project carries an Allowed
-				// Contact Domains org policy, so a conformance case cannot
-				// create a contact at all - "doesn't have a domain that matches
-				// the Allowed Contact Domains org policy". Still deferred.
+				// contacts.patch exists and works - an updateMask of
+				// "languageTag,notificationCategorySubscriptions" is accepted,
+				// and one naming "email" is refused, so email is immutable and
+				// the other two are the patchable pair. It stays deferred only
+				// because nothing exercises it.
+				//
+				// What stops a case: the shared test project's Allowed Contact
+				// Domains org policy admits exactly one domain - the
+				// organisation's own live mail domain, with real Google
+				// Workspace MX records. No subdomain of it is admitted, and
+				// example.com is not. So every address a case could use is an
+				// invented mailbox on a domain real people read, and choosing to
+				// point Google's technical notifications there is not a decision
+				// this plugin should make on its own. An Allowed Contact Domains
+				// entry for a throwaway domain would unblock the case, and with
+				// it this field.
 				SupportsUpdate: false,
 			},
 			ResponseTransformer: base.ShortNameResponseTransformer,

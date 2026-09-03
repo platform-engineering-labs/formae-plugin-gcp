@@ -1,0 +1,29 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/kms/keyRing.pkl"
+import "./config/vars.pkl" as v
+
+// A key ring on its own is free to hold: Cloud KMS bills per active
+// CryptoKeyVersion, and a key ring holds no keys. It carries no key material
+// and nothing can encrypt with it.
+//
+// This case was dropped once because Cloud KMS had no keyRings.delete: every
+// run leaked a key ring that could never be reclaimed. The method now exists
+// and deletes immediately (the operation it answers with is already done), and
+// the deleted name can be reused, so the out-of-band-delete phase can re-create
+// this exact key ring.
+forma {
+  v.stack
+  v.target
+
+  new keyRing.KeyRing {
+    label = "plugin-sdk-test-kms-keyring"
+    name = "formae-test-keyring-\(v.testRunID)"
+  }
+}

@@ -57,10 +57,13 @@ func TestNativeIDParseRoundTrip(t *testing.T) {
 }
 
 func TestKeyRingRegistered(t *testing.T) {
-	// KeyRings support only Create/Read/List (+ CheckStatus): no delete/update.
+	// Create/Read/Delete/List (+ CheckStatus). Delete matters most: keyRings.delete
+	// was absent from the API for years, and without it every ring a forma created
+	// was permanent - the reason this type's conformance case was once dropped.
 	for _, op := range []resource.Operation{
 		resource.OperationCreate,
 		resource.OperationRead,
+		resource.OperationDelete,
 		resource.OperationList,
 		resource.OperationCheckStatus,
 	} {
@@ -68,13 +71,9 @@ func TestKeyRingRegistered(t *testing.T) {
 			t.Errorf("%s not registered for %v", KeyRingResourceType, op)
 		}
 	}
-	// Delete and Update are intentionally NOT registered (unsupported by API).
-	for _, op := range []resource.Operation{
-		resource.OperationDelete,
-		resource.OperationUpdate,
-	} {
-		if registry.HasProvisioner(KeyRingResourceType, op) {
-			t.Errorf("%s should NOT be registered for %v (KMS KeyRings cannot be %v)", KeyRingResourceType, op, op)
-		}
+	// Update stays unregistered: Cloud KMS has no keyRings.patch, and the id is
+	// the only declarable field, so a change replaces.
+	if registry.HasProvisioner(KeyRingResourceType, resource.OperationUpdate) {
+		t.Errorf("%s should NOT be registered for Update (KMS has no keyRings.patch)", KeyRingResourceType)
 	}
 }
