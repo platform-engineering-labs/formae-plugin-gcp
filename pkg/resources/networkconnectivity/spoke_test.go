@@ -106,9 +106,7 @@ func TestSpokeRequestTransformer(t *testing.T) {
 				"name":        "my-spoke",
 				"hub":         "my-hub",
 				"description": "d",
-				"linkedVpcNetwork": map[string]interface{}{
-					"uri": "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
-				},
+				"network":     "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
 			},
 			op: resource.OperationCreate,
 			want: map[string]interface{}{
@@ -127,14 +125,12 @@ func TestSpokeRequestTransformer(t *testing.T) {
 				"hub":         "my-hub",
 				"description": "d",
 				"labels":      map[string]interface{}{"k": "v"},
-				"linkedVpcNetwork": map[string]interface{}{
-					"uri": "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
-				},
-				"group":     "projects/p/locations/global/hubs/my-hub/groups/default",
-				"spokeType": "VPC_NETWORK",
-				"state":     "ACTIVE",
-				"uniqueId":  "349fcee1",
-				"etag":      "2",
+				"network":     "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
+				"group":       "projects/p/locations/global/hubs/my-hub/groups/default",
+				"spokeType":   "VPC_NETWORK",
+				"state":       "ACTIVE",
+				"uniqueId":    "349fcee1",
+				"etag":        "2",
 			},
 			op: resource.OperationUpdate,
 			want: map[string]interface{}{
@@ -209,17 +205,16 @@ func TestSpokeResponseTransformer(t *testing.T) {
 		"uniqueId":  "349fcee1",
 		"group":     "projects/p/locations/global/hubs/my-hub/groups/default",
 		"etag":      "2",
-		"linkedVpcNetwork": map[string]interface{}{
-			"uri": "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
-		},
+		"network":   "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %#v\nwant %#v", got, want)
 	}
 }
 
-// The declared members of linkedVpcNetwork must survive the strip, or a forma
-// that restricts propagation would see its ranges vanish and drift forever.
+// The declared members of linkedVpcNetwork must survive the strip and land on
+// the flat properties the schema declares, or a forma that restricts
+// propagation would see its ranges vanish and drift forever.
 func TestSpokeResponseTransformerKeepsDeclaredLinkedMembers(t *testing.T) {
 	got := spokeResponseTransformer(map[string]interface{}{
 		"name": "projects/p/locations/global/spokes/my-spoke",
@@ -232,12 +227,17 @@ func TestSpokeResponseTransformerKeepsDeclaredLinkedMembers(t *testing.T) {
 	}, base.TransformContext{Project: "p"})
 
 	want := map[string]interface{}{
-		"uri":                 "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
+		"network":             "https://www.googleapis.com/compute/v1/projects/p/global/networks/n",
 		"includeExportRanges": []interface{}{"10.0.0.0/8"},
 		"excludeExportRanges": []interface{}{"10.1.0.0/16"},
 	}
-	if !reflect.DeepEqual(got["linkedVpcNetwork"], want) {
-		t.Errorf("got  %#v\nwant %#v", got["linkedVpcNetwork"], want)
+	for k, v := range want {
+		if !reflect.DeepEqual(got[k], v) {
+			t.Errorf("%s: got %#v, want %#v", k, got[k], v)
+		}
+	}
+	if _, nested := got["linkedVpcNetwork"]; nested {
+		t.Error("linkedVpcNetwork must be unpacked onto the flat properties")
 	}
 }
 
@@ -272,5 +272,54 @@ func TestSpokePathIsAlwaysGlobal(t *testing.T) {
 	want := "/projects/p/locations/global/spokes/my-spoke"
 	if path != want {
 		t.Errorf("path = %q, want %q", path, want)
+	}
+}
+
+// The schema is flat and the wire is nested, so the two transformers have to be
+// exact inverses: whatever a forma declares must come back identical after a
+// create assembles it and a read unpacks it. If they drift, the declared value
+// and stored state disagree on a createOnly field and every re-apply plans a
+// replacement that the API then refuses.
+func TestSpokeLinkedVpcNetworkFlattensAndAssembles(t *testing.T) {
+	const uri = "https://www.googleapis.com/compute/v1/projects/p/global/networks/n"
+	declared := map[string]interface{}{
+		"name":                "spk",
+		"hub":                 "my-hub",
+		"network":             uri,
+		"includeExportRanges": []interface{}{"10.0.0.0/8"},
+	}
+
+	sent, err := spokeRequestTransformer(declared, base.TransformContext{Project: "p"})
+	if err != nil {
+		t.Fatalf("request transform: %v", err)
+	}
+	linked, ok := sent["linkedVpcNetwork"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("linkedVpcNetwork not assembled, got %#v", sent)
+	}
+	if linked["uri"] != uri {
+		t.Errorf("uri = %v, want %v", linked["uri"], uri)
+	}
+	if _, stillFlat := sent["network"]; stillFlat {
+		t.Error("flat network must not also be sent to the API")
+	}
+
+	// The API echoes the object back, with its output-only members attached.
+	linked["vpcNetwork"] = "projects/p/global/networks/n"
+	linked["proposedIncludeExportRanges"] = []interface{}{"x"}
+	got := spokeResponseTransformer(
+		map[string]interface{}{"name": "projects/p/locations/global/spokes/spk", "linkedVpcNetwork": linked},
+		base.TransformContext{Project: "p"})
+
+	if got["network"] != uri {
+		t.Errorf("network = %v, want %v", got["network"], uri)
+	}
+	if _, nested := got["linkedVpcNetwork"]; nested {
+		t.Error("linkedVpcNetwork must be unpacked, not left in state")
+	}
+	for _, leaked := range []string{"vpcNetwork", "proposedIncludeExportRanges"} {
+		if _, present := got[leaked]; present {
+			t.Errorf("output-only %q leaked into state", leaked)
+		}
 	}
 }

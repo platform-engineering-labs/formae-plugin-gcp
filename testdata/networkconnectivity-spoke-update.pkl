@@ -50,11 +50,12 @@ forma {
     // The hub resolvable yields the hub's short id; the plugin expands it to
     // the full path the API wants and shortens it again on read.
     hub = h.res.name
-    linkedVpcNetwork = new spoke.LinkedVpcNetwork {
-      // The API echoes the selfLink form back on read, so declaring it this
-      // way round-trips; the relative form would not match what it reports.
-      uri = net.res.selfLink
-    }
+    // The API echoes the selfLink form back on read, so declaring it this way
+    // round-trips; the relative form would not match what it reports. The
+    // schema is flat here while the wire is nested - the plugin assembles
+    // linkedVpcNetwork{uri} - because a reference inside a createOnly
+    // sub-resource makes every patch-mode update fail; see the field's doc.
+    network = net.res.selfLink
     description = "Updated spoke description"
     labels = new Mapping {
       ["environment"] = "test"
