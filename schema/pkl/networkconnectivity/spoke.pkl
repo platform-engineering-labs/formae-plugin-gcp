@@ -34,22 +34,7 @@ open class LinkedVpcNetwork extends formae.SubResource {
     /// form ("https://www.googleapis.com/compute/v1/projects/{p}/global/networks/{n}"),
     /// so pass a network's `selfLink` resolvable and the value round-trips
     /// without any rewriting.
-    ///
-    /// Immutable, and the hint belongs HERE rather than on the enclosing
-    /// `linkedVpcNetwork` object. A resolvable inside a sub-resource is still
-    /// unresolved when a patch-mode apply plans the change - the network it
-    /// points at is not in that changeset - and only resolves at execution
-    /// time. With `createOnly` on the wrapper, formae compares the whole object
-    /// before and after that resolution, sees a createOnly field go from
-    /// unresolved to resolved, and refuses: "resolving references at execution
-    /// time changed createOnly fields [linkedVpcNetwork] ... a replacement was
-    /// not planned". With the hint on the scalar that actually carries the
-    /// reference, the comparison is between the resolved value and the stored
-    /// one, which are the same string - the shape
-    /// `GCP::NetworkConnectivity::InternalRange.network` already uses.
-    @gcp.FieldHint {
-        createOnly = true
-    }
+    @gcp.FieldHint
     uri: String|formae.Resolvable
 
     /// Restrict propagation to these IP ranges instead of the whole network.
@@ -92,10 +77,11 @@ open class Spoke extends formae.Resource {
     }
     hub: String|formae.Resolvable
 
-    /// The VPC network to link. Which network a spoke carries is fixed when it
-    /// is created, and that immutability is declared on `LinkedVpcNetwork.uri`
-    /// rather than here - see the comment there for why the level matters.
-    @gcp.FieldHint
+    /// The VPC network to link. Immutable: which network a spoke carries is
+    /// fixed when it is created.
+    @gcp.FieldHint {
+        createOnly = true
+    }
     linkedVpcNetwork: LinkedVpcNetwork
 
     /// An optional description. One of only two mutable fields on a spoke.
