@@ -1,0 +1,237 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Deploy DeployPolicy
+///
+/// When deploys may *not* happen: a set of time windows, and the pipelines and
+/// targets the restriction applies to. A policy only inhibits actions — it
+/// never performs one — so it holds nothing and costs nothing.
+///
+/// A selector matches by short id, by `"*"` for everything in the location, or
+/// by labels; one matching selector is enough for the policy to apply. Both
+/// `selectors` and `rules` are required, and a rule needs at least one time
+/// window.
+///
+/// **Give whole, non-zero clock times.** The time-of-day and date messages are
+/// protobuf, so a zero component is dropped on the wire: `startTime` sent as
+/// `{ hours = 0 }` comes back as `{}` (observed live), and a forma declaring it
+/// that way would never match what is read. Use `hours = 24` for the end of a
+/// day, and prefer explicit non-zero start hours.
+///
+/// Regional. Create, update and delete are long-running operations.
+module gcp.clouddeploy.deployPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::CloudDeploy::DeployPolicy"
+
+/// A wall-clock time. Every component is optional, but a component whose value
+/// is zero is indistinguishable from an absent one on the wire — see the module
+/// comment.
+@gcp.SubResourceHint
+open class TimeOfDay extends formae.SubResource {
+    /// 0-24. Use 24 for the end of a day.
+    @gcp.FieldHint
+    hours: Int?
+
+    /// 0-59.
+    @gcp.FieldHint
+    minutes: Int?
+
+    /// 0-59.
+    @gcp.FieldHint
+    seconds: Int?
+
+    /// 0-999,999,999.
+    @gcp.FieldHint
+    nanos: Int?
+}
+
+/// A calendar date.
+@gcp.SubResourceHint
+open class PolicyDate extends formae.SubResource {
+    @gcp.FieldHint
+    year: Int?
+
+    @gcp.FieldHint
+    month: Int?
+
+    @gcp.FieldHint
+    day: Int?
+}
+
+/// A one-off restricted window, e.g. a year-end freeze.
+@gcp.SubResourceHint
+open class OneTimeWindow extends formae.SubResource {
+    @gcp.FieldHint
+    startDate: PolicyDate
+
+    @gcp.FieldHint
+    startTime: TimeOfDay
+
+    @gcp.FieldHint
+    endDate: PolicyDate
+
+    /// Exclusive.
+    @gcp.FieldHint
+    endTime: TimeOfDay
+}
+
+/// A window that recurs every week.
+@gcp.SubResourceHint
+open class WeeklyWindow extends formae.SubResource {
+    /// MONDAY … SUNDAY. Every day when absent.
+    @gcp.FieldHint
+    daysOfWeek: Listing<String>?
+
+    /// Inclusive.
+    @gcp.FieldHint
+    startTime: TimeOfDay?
+
+    /// Exclusive.
+    @gcp.FieldHint
+    endTime: TimeOfDay?
+}
+
+/// The windows a restriction applies in.
+@gcp.SubResourceHint
+open class TimeWindows extends formae.SubResource {
+    /// IANA zone, e.g. "Europe/Berlin". Required — the windows mean nothing
+    /// without it.
+    @gcp.FieldHint
+    timeZone: String
+
+    /// Recurring weekly windows.
+    @gcp.FieldHint
+    weeklyWindows: Listing<WeeklyWindow>?
+
+    /// One-off windows.
+    @gcp.FieldHint
+    oneTimeWindows: Listing<OneTimeWindow>?
+}
+
+/// What is forbidden, and when.
+@gcp.SubResourceHint
+open class RolloutRestriction extends formae.SubResource {
+    /// Rule id, unique within the policy. `[a-z]([a-z0-9-]{0,61}[a-z0-9])?`.
+    @gcp.FieldHint
+    id: String
+
+    /// The windows in which the actions are restricted.
+    @gcp.FieldHint
+    timeWindows: TimeWindows
+
+    /// ADVANCE, APPROVE, CANCEL, CREATE, IGNORE_JOB, RETRY_JOB, ROLLBACK,
+    /// TERMINATE_JOBRUN. All of them when absent.
+    @gcp.FieldHint
+    actions: Listing<String>?
+
+    /// USER or DEPLOY_AUTOMATION. Both when absent.
+    @gcp.FieldHint
+    invokers: Listing<String>?
+}
+
+/// One rule of a policy. Only the rollout restriction exists today.
+@gcp.SubResourceHint
+open class PolicyRule extends formae.SubResource {
+    @gcp.FieldHint
+    rolloutRestriction: RolloutRestriction?
+}
+
+/// Which pipelines the policy applies to.
+@gcp.SubResourceHint
+open class DeliveryPipelineAttribute extends formae.SubResource {
+    /// A pipeline's **short** id, or `"*"` for every pipeline in the location.
+    /// A DeliveryPipeline resolvable yields that short id.
+    @gcp.FieldHint
+    id: (String|formae.Resolvable)?
+
+    /// Match by pipeline labels instead.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+}
+
+/// Which targets the policy applies to.
+@gcp.SubResourceHint
+open class TargetAttribute extends formae.SubResource {
+    /// A target's **short** id, or `"*"` for every target in the location. A
+    /// Target resolvable yields that short id.
+    @gcp.FieldHint
+    id: (String|formae.Resolvable)?
+
+    /// Match by target labels instead.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+}
+
+/// One selector. Every attribute given must match.
+@gcp.SubResourceHint
+open class DeployPolicyResourceSelector extends formae.SubResource {
+    @gcp.FieldHint
+    deliveryPipeline: DeliveryPipelineAttribute?
+
+    @gcp.FieldHint
+    target: TargetAttribute?
+}
+
+open class DeployPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DeployPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class DeployPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "no-friday-deploys"). Immutable — it is the path. The API
+    /// documents `name` as output-only because the id travels as a query
+    /// parameter on create; the plugin sends it there.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// What the policy applies to. At least one selector is required.
+    @gcp.FieldHint
+    selectors: Listing<DeployPolicyResourceSelector>
+
+    /// What the policy forbids. At least one rule is required.
+    @gcp.FieldHint
+    rules: Listing<PolicyRule>
+
+    /// Stop enforcing the policy without deleting it.
+    ///
+    /// Set it to `true` or leave it out — `false` is the protobuf default and
+    /// the API drops it from the response, so a forma declaring `false` would
+    /// read as a field that never arrives.
+    @gcp.FieldHint
+    suspended: Boolean?
+
+    /// An optional description. Max 255 characters.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Optional user annotations. Unlike labels these are never read by Cloud
+    /// Deploy itself.
+    @gcp.FieldHint
+    annotations: Mapping<String, String>?
+
+    hidden res: DeployPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

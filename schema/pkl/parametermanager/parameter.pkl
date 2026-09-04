@@ -1,0 +1,104 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Parameter Manager Parameter
+///
+/// A named container for configuration values. The parameter itself holds no
+/// data — the `ParameterVersion`s under it do — it holds the format they are
+/// written in and, optionally, the CMEK they are encrypted with. It is free to
+/// keep.
+///
+/// Global only, and that is a hard limit rather than a simplification.
+/// Parameter Manager serves each region from its own host
+/// (`parametermanager.<region>.rep.googleapis.com`) and serves
+/// `locations/global` only from the plain host. Asking the plain host for a
+/// region answers HTTP 403 "Read access to project '<project>' was denied",
+/// which reads exactly like a missing IAM grant and is not one. This plugin
+/// therefore always addresses `locations/global`, whatever region the target is
+/// configured for, and a regional parameter cannot be managed here.
+///
+/// Every call is synchronous: create, update and delete answer with the result,
+/// not an Operation.
+module gcp.parametermanager.parameter
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::ParameterManager::Parameter"
+
+/// How Parameter Manager reads a version's payload. UNFORMATTED stores bytes
+/// verbatim; YAML and JSON make the API parse the payload and reject a version
+/// that does not conform, and are what let a `render` resolve Secret Manager
+/// references inside it.
+typealias ParameterFormat = "UNFORMATTED"|"YAML"|"JSON"
+
+open class ParameterResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: ParameterResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Parameter extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-parameter"). Immutable — a PATCH that names it is
+    /// refused with 400 IMMUTABLE_FIELD.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The format of every version under this parameter. Immutable: the API
+    /// answers a PATCH with `updateMask=format` with 400 IMMUTABLE_FIELD, so
+    /// changing it plans a replace, which destroys the parameter and its
+    /// versions.
+    ///
+    /// Omitting it is not the same as leaving it unset — the API assigns
+    /// UNFORMATTED and reports that back, so the field carries a provider
+    /// default.
+    @gcp.FieldHint {
+        createOnly = true
+        hasProviderDefault = true
+    }
+    format: ParameterFormat?
+
+    /// Customer-managed encryption key for the versions under this parameter,
+    /// as the full CryptoKey path
+    /// "projects/{p}/locations/{loc}/keyRings/{ring}/cryptoKeys/{key}". Left
+    /// unset, versions use Google-managed encryption.
+    ///
+    /// A plain String rather than a reference: this plugin does not ship
+    /// `GCP::KMS::CryptoKey` (only `GCP::KMS::KeyRing`), so there is no
+    /// resolvable to point at, and the round trip a reference would need was
+    /// not verified — exercising CMEK means creating a KMS key version, which
+    /// bills every month. Modelled as mutable because the API documents it as a
+    /// plain optional field rather than an immutable one; that too is
+    /// unverified.
+    @gcp.FieldHint
+    kmsKey: String?
+
+    /// Optional labels in key-value pair format.
+    ///
+    /// Worth knowing: labels sent on a create are absent from the create
+    /// response and present in the very next GET — the server applies them in a
+    /// follow-up write. This API is synchronous, so the create response is what
+    /// lands in state and there is no operation to poll behind it. An update
+    /// does read the resource back, so a labels change applied by an update is
+    /// reflected immediately.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: ParameterResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

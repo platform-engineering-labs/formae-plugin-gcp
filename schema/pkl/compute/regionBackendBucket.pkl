@@ -1,0 +1,103 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RegionBackendBucket (regional)
+///
+/// A regional load balancer backend that serves objects straight out of a Cloud
+/// Storage bucket, so a regional URL map can route static paths to GCS and
+/// dynamic paths to a RegionBackendService. The regional counterpart of
+/// `GCP::Compute::BackendBucket`, and the same `backendBuckets` resource body —
+/// with one difference the API enforces, see `loadBalancingScheme`.
+///
+/// The region comes from the target, not from a field here, matching the global
+/// type's schema: `region` is a path segment rather than a payload field.
+///
+/// ponytail: `cdnPolicy` is not exposed — `enableCdn` covers the common case
+/// and GCP fills the policy with defaults. Add the sub-resource when someone
+/// needs to tune TTLs or cache keys.
+module gcp.compute.regionBackendBucket
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RegionBackendBucket"
+
+typealias CompressionMode = "AUTOMATIC"|"DISABLED"
+
+/// The two schemes a regional backend bucket may serve. The global type also
+/// accepts being told nothing at all; this one does not.
+typealias RegionalLoadBalancingScheme = "EXTERNAL_MANAGED"|"INTERNAL_MANAGED"
+
+open class RegionBackendBucketResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RegionBackendBucketResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RegionBackendBucketResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RegionBackendBucketResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RegionBackendBucket extends formae.Resource {
+    hidden parent = this
+
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Name of the Cloud Storage bucket to serve. Pass `bucket.res.name` so
+    /// formae creates the bucket first.
+    @gcp.FieldHint
+    bucketName: (String|formae.Resolvable)
+
+    /// Required, unlike on the global type, and this is the whole difference
+    /// between the two. A regional insert without it is refused with 400
+    /// "Invalid value for field 'resource.loadBalancingScheme':
+    /// 'LOAD_BALANCING_SCHEME_UNSPECIFIED'. Load balancing scheme is required
+    /// for backend bucket of scope REGION." — so it is declared required here
+    /// rather than left to fail at apply time.
+    @gcp.FieldHint
+    loadBalancingScheme: RegionalLoadBalancingScheme
+
+    /// Serve through Cloud CDN.
+    ///
+    /// Only `false` is accepted at regional scope. Cloud CDN is a global,
+    /// external feature, and setting this true is refused outright: "Invalid
+    /// value for field 'resource.enableCdn': 'true'. CDN is not supported for
+    /// backend bucket with scope REGION and load balancing scheme:
+    /// EXTERNAL_MANAGED". The field stays declarable because the API reports it
+    /// back as `false` on every read, so it carries a provider default rather
+    /// than being absent - but a forma that sets it true fails at apply.
+    @gcp.FieldHint { hasProviderDefault = true }
+    enableCdn: Boolean?
+
+    /// Whether the LB compresses responses. GCP fills DISABLED.
+    @gcp.FieldHint { hasProviderDefault = true }
+    compressionMode: CompressionMode?
+
+    /// Headers the LB adds to every response, as "Name: value" strings.
+    @gcp.FieldHint
+    customResponseHeaders: Listing<String>?
+
+    hidden res: RegionBackendBucketResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

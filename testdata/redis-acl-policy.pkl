@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/redis/aclPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// An ACL policy is a standalone configuration object for Memorystore for Redis
+// Cluster: a named set of Redis OSS ACL rules that a cluster can attach. It
+// provisions nothing, and it is free to hold - the cost sits with the clusters
+// that attach it, and this case deliberately creates none (a Redis cluster
+// bills per hour).
+//
+// Unlike everything else in this API, create and delete are synchronous: the
+// POST returns the finished policy rather than an Operation.
+//
+// The username is the project's default compute service agent. It always
+// exists, and the API validates nothing about the identity at create time - it
+// is set verbatim as the Redis OSS username - so no service account has to be
+// created as a prerequisite.
+forma {
+  v.stack
+  v.target
+
+  new aclPolicy.AclPolicy {
+    label = "plugin-sdk-test-redis-acl-policy"
+    name = "formae-test-redis-acl-\(v.testRunID)"
+    rules {
+      new {
+        username = "\(v.gcpProjectNumber)-compute@developer.gserviceaccount.com"
+        rule = "on ~* +@all"
+      }
+    }
+  }
+}

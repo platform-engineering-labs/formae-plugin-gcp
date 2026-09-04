@@ -12,9 +12,11 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 )
 
-// SpannerAPI - Cloud Spanner Admin API v1. Instances are project-scoped, not
-// location-scoped: an instance's region is its `config`, not a path segment.
-// Databases nest under instances, backup schedules under databases.
+// SpannerAPI - Cloud Spanner Admin API v1. Instances and instance
+// configurations are project-scoped, not location-scoped: an instance's region
+// is its `config`, and a user-managed configuration's geography is its
+// `replicas` - neither is a path segment. Databases nest under instances,
+// backup schedules under databases.
 var SpannerAPI = base.APIConfig{
 	BaseURL:     "https://spanner.googleapis.com/v1",
 	APIVersion:  "v1",
@@ -22,9 +24,10 @@ var SpannerAPI = base.APIConfig{
 	Pagination:  &base.PaginationConfig{PageSizeParam: "pageSize"},
 }
 
-// SpannerOperations - asynchronous. Instance and database creates return an
-// Operation to poll. Their deletes answer with an empty body and no operation,
-// which base.Delete already treats as done.
+// SpannerOperations - asynchronous. Instance, instance-configuration and
+// database creates return an Operation to poll, and an instance
+// configuration's patch does too. Their deletes answer with an empty body and
+// no operation, which base.Delete already treats as done.
 var SpannerOperations = base.OperationConfig{
 	Synchronous:            false,
 	OperationIDExtractor:   extractOperationName,
@@ -43,8 +46,9 @@ var SpannerSyncOperations = base.OperationConfig{
 	OperationStatusChecker: func(map[string]interface{}) (bool, error) { return true, nil },
 }
 
-// SpannerNativeID - the full resource path, in one of three shapes:
+// SpannerNativeID - the full resource path, in one of four shapes:
 //
+//	projects/{p}/instanceConfigs/{c}
 //	projects/{p}/instances/{i}
 //	projects/{p}/instances/{i}/databases/{d}
 //	projects/{p}/instances/{i}/databases/{d}/backupSchedules/{b}
@@ -55,6 +59,9 @@ var SpannerNativeID = base.NativeIDConfig{
 
 // spannerPathBuilder builds
 // /projects/{p}[/instances/{i}][/databases/{d}]/{resourceType}[/{name}].
+//
+// A project-scoped collection - "instances" or "instanceConfigs" - names no
+// parent and so comes out as /projects/{p}/{resourceType}[/{name}].
 //
 // The immediate parent comes from ParentResource and, for a backup schedule,
 // the instance above it from CustomSegments[0].
@@ -78,7 +85,22 @@ func spannerPathBuilder(ctx base.PathContext) string {
 // the project-level collection and 404.
 func parseSpannerNativeID(nativeID string) (base.PathContext, error) {
 	parts := strings.Split(nativeID, "/")
-	if len(parts) < 4 || parts[0] != "projects" || parts[2] != "instances" {
+	if len(parts) < 4 || parts[0] != "projects" {
+		return base.PathContext{}, fmt.Errorf("invalid spanner native ID: %s", nativeID)
+	}
+	// An instance configuration is a sibling collection of instances, not a
+	// child of one: projects/{p}/instanceConfigs/{c} and nothing deeper.
+	if parts[2] == "instanceConfigs" {
+		if len(parts) != 4 {
+			return base.PathContext{}, fmt.Errorf("invalid spanner native ID: %s", nativeID)
+		}
+		return base.PathContext{
+			Project:      parts[1],
+			ResourceType: parts[2],
+			ResourceName: parts[3],
+		}, nil
+	}
+	if parts[2] != "instances" {
 		return base.PathContext{}, fmt.Errorf("invalid spanner native ID: %s", nativeID)
 	}
 	ctx := base.PathContext{

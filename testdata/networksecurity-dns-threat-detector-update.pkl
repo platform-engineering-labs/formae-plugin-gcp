@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/dnsThreatDetector.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the labels, which is the mutable surface this type has - the provider
+// is fixed at creation.
+//
+// Worth knowing: the PATCH response omits the new labels, and only the next GET
+// shows them. The plugin reads the resource back after an update rather than
+// trusting the patch response, so this case would fail if that were removed.
+forma {
+  v.stack
+  v.target
+
+  new dnsThreatDetector.DnsThreatDetector {
+    label = "plugin-sdk-test-ns-dns-threat-detector"
+    name = "formae-test-ns-dtd-\(v.testRunID)"
+    provider = "INFOBLOX"
+    labels = new Mapping {
+      ["environment"] = "test"
+      ["updated"] = "true"
+    }
+  }
+}

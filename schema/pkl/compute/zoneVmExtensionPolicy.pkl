@@ -1,0 +1,161 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute ZoneVmExtensionPolicy (zonal)
+///
+/// A standing instruction that the named VM extensions — the Ops Agent, for
+/// instance — are installed and kept at a version on the VMs a selector picks
+/// out, in one zone. Nothing has to be baked into an image and no VM has to be
+/// touched: the policy is the desired state and Compute converges the fleet
+/// onto it, including VMs created after the policy exists.
+///
+/// **`instanceSelectors` is optional, and a policy with none selects every VM
+/// in the zone** and installs the named extension on all of them. Write a
+/// selector, always. Every fixture in this repo carries a `labelSelector` whose
+/// label matches nothing for exactly that reason.
+///
+/// The policy is configuration and costs nothing to hold; what it can cost is
+/// an agent rolled onto machines nobody meant to include.
+///
+/// The zone comes from the target, not from a field here. The API neither takes
+/// nor echoes a zone in the body — it lives only in the URL — so declaring one
+/// would be a property that never reads back.
+///
+/// ponytail: the global sibling, `globalVmExtensionPolicies`, is deliberately
+/// not implemented. Its delete is not a DELETE but a `POST .../{name}/delete`
+/// carrying a `rolloutInput` body, and — verified live — that call's LRO reports
+/// DONE while the policy is still there, disappearing only minutes later when
+/// an out-of-band purge rollout catches up. A delete the plugin cannot observe
+/// completing is a delete it cannot promise, so the type is left out rather than
+/// shipped with a race in it. The zonal type below has an ordinary synchronous
+/// DELETE and no such problem.
+///
+/// One API behaviour this type compensates for: on update the API echoes an
+/// added `stringConfig: ""` inside each `extensionPolicies` entry that was sent
+/// without one (observed on the global sibling). It sits inside a mapping value,
+/// where a `hasProviderDefault` hint cannot reach it, so the plugin strips
+/// empty-string members of those entries on read — without that, the first
+/// update makes every later read disagree with the declaration.
+module gcp.compute.zoneVmExtensionPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::ZoneVmExtensionPolicy"
+
+/// What to do with one named extension.
+@gcp.SubResourceHint
+open class VmExtensionPolicyExtensionPolicy extends formae.SubResource {
+    /// Version to hold the extension at. An empty string means "whatever the
+    /// current release is", which is how the API spells "unpinned" — and, being
+    /// what a forma actually means to say, an empty `pinnedVersion` is kept on
+    /// read rather than stripped like `stringConfig`.
+    @gcp.FieldHint
+    pinnedVersion: String?
+
+    /// Opaque configuration handed to the extension, as a string. GCP echoes
+    /// this back as "" once the policy has been updated even when it was never
+    /// sent, so the plugin strips an empty one on read — which means declaring
+    /// `stringConfig = ""` here says nothing. Either give it real content or
+    /// leave it out.
+    @gcp.FieldHint
+    stringConfig: String?
+}
+
+/// Matches VMs by label. A VM is selected when it carries every label in
+/// `inclusionLabels`.
+@gcp.SubResourceHint
+open class VmExtensionPolicyLabelSelector extends formae.SubResource {
+    @gcp.FieldHint
+    inclusionLabels: Mapping<String, String>?
+}
+
+/// One way of naming the VMs a policy applies to. A policy carries a list of
+/// these, and they are additive.
+@gcp.SubResourceHint
+open class VmExtensionPolicyInstanceSelector extends formae.SubResource {
+    @gcp.FieldHint
+    labelSelector: VmExtensionPolicyLabelSelector?
+}
+
+open class ZoneVmExtensionPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: ZoneVmExtensionPolicyResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: ZoneVmExtensionPolicyResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: ZoneVmExtensionPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class ZoneVmExtensionPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id, e.g. "ops-agent-canary". Sent in the request body, like every
+    /// ordinary Compute insert.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    @gcp.FieldHint
+    description: String?
+
+    /// Order among the policies covering the same VM — lower wins. Required
+    /// rather than optional: which policy wins decides which agent version a
+    /// machine ends up running, and that is not a thing to leave to a server
+    /// default nobody wrote down.
+    @gcp.FieldHint
+    priority: Int
+
+    /// The extensions to install, keyed by extension name ("ops-agent").
+    /// Required — a policy that names no extension does nothing.
+    @gcp.FieldHint
+    extensionPolicies: Mapping<String, VmExtensionPolicyExtensionPolicy>
+
+    /// Which VMs the policy applies to.
+    ///
+    /// **Omitting this selects every VM in the zone** and installs the named
+    /// extensions on all of them. Declare a selector unless that is genuinely
+    /// what is wanted.
+    @gcp.FieldHint
+    instanceSelectors: Listing<VmExtensionPolicyInstanceSelector>?
+
+    /// Output only — GCP reports "ACTIVE" for a policy it has accepted.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    state: String?
+
+    /// Output only — true when this zonal policy is a projection of a global
+    /// one rather than something declared here.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    managedByGlobal: Boolean?
+
+    /// Output only — the global policy this one was projected from, when
+    /// `managedByGlobal` is true.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    globalResourceLink: String?
+
+    hidden res: ZoneVmExtensionPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

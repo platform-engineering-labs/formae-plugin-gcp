@@ -1,0 +1,63 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/clouddeploy/target.pkl" as target
+import "@gcp/clouddeploy/deliveryPipeline.pkl" as deliveryPipeline
+import "./config/vars.pkl" as v
+
+// A pipeline is the promotion flow; a stage of it names a target. Both are
+// configuration and free to hold - the pipeline holds no compute, and a
+// pipeline with no release has nothing to promote. The target names a Cloud Run
+// location but provisions no service.
+//
+// The target is referenced through its resolvable, which orders the creates.
+// The resolvable yields its short name, and a stage's targetId must be exactly
+// that: the API rejects a full resource path here outright, so this reference
+// needs no translation and this case is what proves it stays that way.
+local tgt = new target.Target {
+  label = "plugin-sdk-test-cd-dp-target"
+  name = "formae-test-cd-dp-tgt-\(v.testRunID)"
+  description = "Target the pipeline under test promotes to"
+  run = new target.CloudRunLocation {
+    location = "projects/\(v.gcpProject)/locations/\(v.gcpRegion)"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  tgt
+
+  new deliveryPipeline.DeliveryPipeline {
+    label = "plugin-sdk-test-clouddeploy-delivery-pipeline"
+    name = "formae-test-cd-dp-\(v.testRunID)"
+    description = "Test delivery pipeline for plugin SDK conformance tests"
+    serialPipeline = new deliveryPipeline.SerialPipeline {
+      stages = new Listing {
+        new deliveryPipeline.Stage {
+          targetId = tgt.res.name
+          profiles = new Listing {
+            "formae-test"
+          }
+          strategy = new deliveryPipeline.Strategy {
+            standard = new deliveryPipeline.StandardStrategy {
+              verify = true
+            }
+          }
+        }
+      }
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+    annotations = new Mapping {
+      ["formae-test"] = "delivery-pipeline"
+    }
+  }
+}

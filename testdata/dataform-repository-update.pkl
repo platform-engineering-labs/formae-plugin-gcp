@@ -1,0 +1,34 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl" as repository
+import "./config/vars.pkl" as v
+
+// Changes the display name and a label. Both are mutable, and the PATCH's field
+// mask is built from the body, so the immutable kmsKeyName the schema also
+// declares has to stay absent - which it does, because it was never set.
+//
+// Still no Git remote, so still free to hold.
+forma {
+  v.stack
+  v.target
+
+  new repository.Repository {
+    label = "plugin-sdk-test-df-repository"
+    name = "formae-test-df-repo-\(v.testRunID)"
+    displayName = "Formae SDK test Dataform repository (updated)"
+    workspaceCompilationOverrides = new {
+      defaultDatabase = v.gcpProject
+      schemaSuffix = "formae_test"
+      tablePrefix = "formae_"
+    }
+    labels = new Mapping {
+      ["environment"] = "test-updated"
+    }
+  }
+}

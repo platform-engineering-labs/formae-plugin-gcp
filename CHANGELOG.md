@@ -28,6 +28,448 @@ formae agent.
 
 ### Added
 
+- `GCP::NetworkServices::Mesh`, `ServiceLbPolicy`, `EndpointPolicy`, `HttpRoute`,
+  `GrpcRoute`, `TcpRoute` and `TlsRoute` — Cloud Service Mesh, and the direct
+  consumer of the Network Security policies added earlier in this release. A mesh
+  is the routing scope sidecars configure from; the four route kinds attach to it;
+  an endpoint policy hands matched endpoints their TLS posture; a service load
+  balancing policy says how a global load balancer spreads traffic across regions.
+
+  Every collection in this API answers 200 at both `locations/global` and
+  `locations/{region}`, and they are separate namespaces: a mesh created globally
+  is absent from the regional list and 404s on a regional GET. A wrong guess
+  therefore creates unfindable resources rather than failing, so the scope is
+  pinned in a map with that reasoning rather than inferred from the target.
+
+  Four API behaviours these types compensate for. `EndpointPolicy`'s three policy
+  references and every route's `meshes` listing are full resource paths on the
+  wire and short names in a forma — the short form is refused outright — so both
+  halves of that translation exist, pinned as identity round trips. A PATCH here
+  validates the resource from the request body alone rather than merging it over
+  stored state, so an update omitting `type`, `hostnames` or `rules` is refused
+  as though the stored value did not exist; those fields are non-optional and
+  always ride along. This API also clears `labels` on any patch whose mask does
+  not name them, while leaving every other unmasked field alone. And it renders
+  JSON the proto3 way, omitting false booleans, so a declared `false` reads back
+  absent — documented at each such field rather than papered over.
+
+  Each route kind stays free of a billable prerequisite by a different route:
+  an HTTP route redirects, a gRPC route injects a fault, a TCP route hands the
+  connection to its original destination, and a TLS route — the one kind with no
+  destination-free action — points at a backend service with no backends.
+  `gateways` is deliberately absent from all four: a gateway allocates Envoy
+  proxies and bills, so the field could not be verified, and an unverified
+  reference reads as drift on every sync. `ServiceBinding` is absent too: its only
+  functional field is deprecated in the API's own discovery document, which leaves
+  a name and some labels binding nothing.
+
+- `GCP::CloudDeploy::Target`, `DeliveryPipeline`, `CustomTargetType`,
+  `DeployPolicy` and `Automation` — the declarative half of Cloud Deploy: where a
+  deploy may land, the promotion flow it walks, custom deploy actions, when
+  deploys are forbidden, and promotion without a human. Releases, rollouts and job
+  runs are deliberately absent — a release renders through Cloud Build and a
+  rollout actually deploys, so both cost money, and neither is a desired state
+  rather than a record of an action taken.
+
+  Cloud Deploy is where "a 200 is not proof" earns its keep twice over. A create
+  accepted with HTTP 200 came back as a *done operation carrying an error* — a
+  pipeline stage naming its target by full path is refused with `"projects/…" is
+  not a valid resource ID for resource type "stage.targetId"` — and the pipeline
+  never existed. The API also serialises operations per resource and refuses a
+  second mutating call while one is in flight with HTTP 409 `ABORTED`.
+
+  The reference forms are mixed, which is the trap: `stage.targetId` must be a
+  short id and rejects a full path, while `customTarget.customTargetType` is a
+  full path. So the pipeline stage passes a resolvable straight through while
+  Target expands and shortens. `executionConfigs` is not declarable — Cloud Deploy
+  fills it in whether or not it was sent and rewrites what was sent, adding
+  `artifactStorage`, `executionTimeout` and a `defaultPool` mirror, additions
+  nested too deep for a schema hint to tolerate and too meaningful to strip. An
+  automation's rules come back carrying an output-only `condition` two levels
+  down, which is stripped. Discovery needs no walking provisioner: Cloud Deploy
+  accepts `-` as a wildcard pipeline.
+
+- `GCP::Dataform::Repository`, `Workspace`, `ReleaseConfig` and `WorkflowConfig` —
+  a Dataform repository, an editable checkout of it, which commitish to compile,
+  and when to execute the result. Workflow invocations and compilation results are
+  absent: both execute against BigQuery.
+
+  The whole API is synchronous — no operations collection exists in it at all — so
+  it is registered that way; left on the async path a create would report
+  in-progress with an empty request id and then poll the bare base URL forever.
+
+  Three fields are immutable in a way nothing in the discovery document says, and
+  immutable *by field mask rather than by value*: a PATCH whose mask names
+  `invocationConfig`, `codeCompilationConfig` or `kmsKeyName` is refused with
+  "Request update_mask contains immutable fields" even when the object sent is
+  byte-identical to the stored one. Since the mask is built from the body, all
+  three leave update bodies — the difference between a working `timeZone` change
+  and a rejected one. `invocationConfig.serviceAccount` is likewise documented
+  optional and required in practice. `internalMetadata`, a bookkeeping blob that
+  changes on every write, is stripped from all four types, along with
+  `containingFolder`, which can only be changed through a custom verb and so could
+  never be reconciled. A workspace has no patch method at all, so it replaces.
+
+- `GCP::ParameterManager::Parameter` and `ParameterVersion` — a named container
+  for configuration values and the immutable revisions that hold the payload.
+
+  Global only, and that is a limit of the API rather than a simplification.
+  Parameter Manager serves each region from its own host,
+  `parametermanager.<region>.rep.googleapis.com`, and serves `locations/global`
+  only from the plain host. Cross the two and it answers 403 PERMISSION_DENIED,
+  "Read access to project '<project>' was denied" — a wrong-host error wearing a
+  missing-IAM-grant's clothes, which is worth knowing before anyone responds to it
+  by granting a role. `base.APIConfig.BaseURL` is one constant string, so the
+  location segment is pinned to `global` and a target configured for a region
+  cannot walk into that 403.
+
+  A version's payload is stripped from every response, and that is a security
+  control rather than a drift fix: this payload is user data and may be a secret,
+  and unlike Secret Manager — whose API withholds secret material — Parameter
+  Manager hands it straight back, on a GET defaulting to `view=FULL` and on the
+  create response too. So `data` is declared write-only, the payload is removed on
+  read, and `versions:render`, which would additionally resolve Secret Manager
+  references inside it, is never called from a read path. `disabled` is ignored on
+  create — a create sending `true` answers 200 and the version is enabled anyway —
+  and takes effect only through a patch. A parameter with versions refuses to
+  delete and its delete takes no force flag, so the declared reference is also
+  what orders the teardown.
+
+- `GCP::BinaryAuthorization::Attestor` and `PlatformPolicy` — a named set of
+  public keys that must have signed an image, and the check-based policy a GKE
+  cluster opts into.
+
+  The attestor's Grafeas note lives in the Container Analysis API, which this
+  plugin does not ship, and that turns out not to matter: Binary Authorization
+  does not resolve `noteReference` at create time, so an attestor pointing at a
+  note that does not exist — in a project where Container Analysis is not even
+  enabled — is accepted. That is what makes the type declarable with no
+  prerequisite in someone else's API. A public key sent without an `id` comes back
+  with one the API computed from the key's DER digest, and
+  `asciiArmoredPgpPublicKey` is absent from the schema for the harder version of
+  the same problem: with a PGP key the API overwrites `id` with the key's
+  fingerprint, so declared and stored could never agree. Update is a PUT — this
+  API has no patch, no update mask and no long-running operation anywhere — so
+  omitting an optional field really does clear it.
+
+  `PlatformPolicy` is the reason the project-wide `projects/{project}/policy`
+  singleton is not modelled: it offers the same expressive power as a real,
+  deletable collection, where the singleton has only a get and a PUT and a
+  "create" would mean mutating live admission policy. The platform is a URL
+  segment rather than a field — v1 exposes only `gke`, and a field with exactly
+  one legal value the API never echoes back is an input-only field that reads as
+  drift. `ListItemsKey` is set because the response keys its array
+  `platformPolicies` while the collection segment is `policies`; without it the
+  policies are never listed and never appear in inventory.
+
+- `GCP::ApiKeys::Key` — an API key, with the restrictions that narrow which
+  callers may use it and which services it may reach.
+
+  It is the first type here whose creation mints a secret, and the create call is
+  the only call that returns it: `keyString` arrives inline in the completed
+  operation and nowhere else. It is dropped in the response transformer on every
+  path rather than merely expected to be absent, the same treatment
+  `compute.vpnTunnels.sharedSecret` gets, and the separate `getKeyString` method
+  is never called from a read path. There is no field to declare opaque — the
+  value has no authored counterpart, only something to refuse to store.
+
+  Two API behaviours the type compensates for. Every response reports `name` in
+  project-*number* form while the target declares a project *id*; both address the
+  key, so the native ID is rebuilt from context, or the same key would be managed
+  under one identity and discovered under another. And delete is a *soft* delete:
+  the key stops working and drops out of listings, but a read keeps answering 200
+  for thirty days with `deleteTime` set, so `ReadTreatAsMissing` turns such a read
+  into NotFound — without it every sync inside that month would put a deleted key
+  back into inventory. That window also reserves the id, so a recreate under the
+  same name is refused and the case exercises update rather than replace. The
+  tombstone cannot be collected by anything: the v2 API has no purge, only
+  undelete, so a conformance run leaves a free, non-functional key behind until it
+  self-purges. The sweep collects live keys and says so.
+
+- `GCP::CloudBuild::BuildTrigger` — the configuration that says when a build runs
+  and what it runs. Creating one starts nothing, which was checked rather than
+  assumed: the project's builds collection was empty before the first probe
+  trigger and still empty after nine.
+
+  Three behaviours compensated for. Its trigger methods are synchronous — create
+  and patch answer with the trigger, unlike this API's own `builds.create` which
+  answers with an Operation — so the collection carries a synchronous operation
+  config. It authorizes a PATCH against the request body's `resourceName` rather
+  than the URL's, so a replayed one turns an in-project update into a 403 on
+  another project's path, and that field is stripped from requests. And it
+  silently drops false booleans, so `disabled: false` comes back absent and an
+  `approvalConfig` of `{approvalRequired: false}` comes back as `{}`; both are
+  restored on read.
+
+  A project with no legacy Cloud Build service account — every project created in
+  recent years — rejects a trigger that names none with a bare HTTP 400 naming no
+  field. That opaque 400 is the single biggest trap in this API: five different
+  source forms and gcloud's own `builds triggers create manual` all fail
+  identically, and the cause is the missing `serviceAccount`. It is documented in
+  the schema.
+
+- `GCP::Firestore::Database` — a Firestore database, the container documents and
+  indexes live in.
+
+  Every mutating call in the Firestore Admin API answers with a long-running
+  operation and two of the three cannot be polled: the operation a PATCH names
+  answers 404 "Operation does not exist" on a patch that plainly applied, and the
+  one a DELETE names carries the deleted database under `response` but never sets
+  `done`. Create needs no polling either — it returns the finished database inline
+  in about a second — so the type is registered synchronous and reads back after
+  an update.
+
+  Three fields the API volunteers are dropped rather than defaulted: `etag`, which
+  is recomputed on every read of an untouched database; `earliestVersionTime`,
+  which moves continuously; and `realtimeUpdatesMode`, which is reported for every
+  database and refused on create for Standard-edition ones, so declaring it would
+  put a value in state that fails the create it came from.
+  `enhancedTextSearchQueryMode` is dropped for a different reason: the API returns
+  it on every database and the v1 discovery document does not mention it.
+  `deleteProtectionState` is declared explicitly in the fixture because a database
+  created with protection enabled cannot be deleted at all, and every run would
+  leak one. A deleted database's id is held for about five minutes, so the case
+  exercises update rather than replace. `Index` is absent: its name is
+  server-assigned and the API ignores a caller-supplied one, so a declared name
+  could never round-trip, and an index build on an empty collection did not
+  complete in five minutes of polling.
+
+- `GCP::BigQuery::RowAccessPolicy` — row-level access control on a single table: a
+  SQL boolean predicate deciding which rows a principal may see, so one shared
+  table can serve each tenant only its own rows instead of a view per tenant.
+
+  Its identity is not a name but the composite
+  `rowAccessPolicyReference{projectId,datasetId,tableId,policyId}`, which every
+  request body must carry and which the API checks against the URL segment by
+  segment, so the four flat properties a forma declares are assembled on the way
+  out and flattened back on the way in. Its update is a PUT with no field mask,
+  and sending one is not ignored — the API answers `Unknown name "updateMask":
+  Cannot bind query parameter`. And a delete that would leave the table with no
+  policy is refused unless `force=true` is sent, so the type always sends it;
+  without that flag every teardown of a single-policy table fails.
+
+  `grantees` is accepted on insert and returned by neither `get` nor `list`, so it
+  is not declared: an input-only field reads as drift on every sync. It is
+  readable only through a separate `getIamPolicy` call, and a PUT that omits it
+  clears the `roles/bigquery.filteredDataViewer` binding it created — both facts
+  are recorded at the field, because they mean a formae-managed policy grants row
+  access to nobody until someone binds that role out of band. Policies hang off a
+  table and BigQuery accepts no wildcard for the dataset or table segment, so
+  discovery walks datasets, then tables, then policies rather than reporting an
+  empty inventory.
+
+- `GCP::NetworkSecurity::ClientTlsPolicy` — the client half of a TLS connection a
+  Google-managed proxy makes on your behalf: `clientCertificate` is what it
+  presents upstream, `serverValidationCa` is who it believes about the upstream's
+  own certificate, and `sni` is the name it asks for. A policy on its own connects
+  to nothing — a backend service or a mesh route names it — and it is free to
+  hold. Global; create, update and delete are long-running operations. `name` is
+  the resource's path rather than a body field and the update mask is built from
+  the body, so it leaves before every patch.
+
+- `GCP::NetworkSecurity::ServerTlsPolicy` — the server half: which certificate a
+  Google-managed proxy serves, and whether it demands a client certificate in
+  return. `allowOpen` is the "plaintext is acceptable too" switch, and it is what
+  makes a policy declarable with no certificate to point at — which is how the
+  conformance case runs with no key material, CA pool or trust config.
+
+- `GCP::NetworkSecurity::BackendAuthenticationConfig` — what a load balancer
+  trusts when it opens a TLS connection *to* a backend: `wellKnownRoots` for the
+  public root set or a Certificate Manager `trustConfig` for a private one, plus
+  an optional client certificate to present.
+
+  Unusually for this API the response really does carry an `etag`, and every patch
+  rolls it, so the field is tolerated as a provider default but never sent back:
+  replaying a stored etag stakes a claim on a version the server has already moved
+  past, and with the mask built from the body it would land in the mask as well.
+
+- `GCP::NetworkSecurity::AuthorizationPolicy` — who may talk to a service mesh
+  workload: a list of match rules and one verdict, ALLOW or DENY, for whatever
+  matches them. Enforcement belongs to the sidecars of a mesh that names the
+  policy, so a policy on its own enforces nothing and costs nothing. The rules are
+  a three-deep nest — rules, then sources and destinations, then a header match —
+  and every one of those classes extends `formae.SubResource`, because schema
+  extraction only walks nested classes that formally do and their `@gcp.FieldHint`
+  annotations would otherwise never reach the schema.
+
+- `GCP::NetworkSecurity::GatewaySecurityPolicy` — the container for Secure Web
+  Proxy rules, and the thing a gateway points at. Regional, which makes it the
+  second collection in this API that is not global: asked for `locations/global`
+  it answers 400 "Malformed name", so like `urlLists` it is deliberately absent
+  from the plugin's global-collection map and inherits the target's region.
+
+  One API behaviour the type compensates for: a policy created without a TLS
+  inspection policy is reported back with `tlsInspectionPolicy` set to the empty
+  string. Left alone, state carries a value against a declaration that omits the
+  field and every sync reads it as drift, so the empty string is stripped on read.
+  Attaching a real one is out of scope for the conformance suite — a TLS
+  inspection policy needs a CA pool with an enabled, and therefore billable,
+  certificate authority behind it, which is also why `tlsInspectionPolicies` is
+  not part of this batch.
+
+- `GCP::NetworkSecurity::GatewaySecurityPolicyRule` — one rule of a Secure Web
+  Proxy policy: a CEL `sessionMatcher`, a `priority`, and ALLOW or DENY. Nested
+  under its policy and regional with it.
+
+  `gatewaySecurityPolicy` addresses the rule rather than describing it: the API
+  rejects it as an unknown body field on create as well as on update, so it is
+  dropped from every request and lifted back out of the path the API reports.
+  Recovering it from the response rather than from the request context is what
+  makes discovery work: a List goes through the API's `-` wildcard parent, which
+  enumerates the rules of every policy in the region in one call, so there is no
+  parent in context but every listed item still carries its own full path. The
+  native ID gained a parser for the same reason — the generic path parser
+  overwrites the resource type as it walks, so a rule's id arrived with its parent
+  silently dropped and the read addressed a collection that does not exist.
+
+  `applicationMatcher` comes back as an empty string for a rule that never sent
+  one and is stripped, the same artifact as the policy's `tlsInspectionPolicy`;
+  `tlsInspectionEnabled` comes back as `false` and is a top-level bool, so a
+  schema hint reaches it and it is tolerated in place. Deleting a policy that
+  still has rules is refused with HTTP 400, and declaring the policy through its
+  resolvable is what fixes the order.
+
+- `GCP::NetworkSecurity::DnsThreatDetector` — a subscription that has Cloud DNS
+  queries checked against a threat intelligence feed, so a lookup of a
+  known-malicious domain is flagged; `provider` names who holds the intelligence.
+  Global — asked for a region the API answers 400 "Malformed name".
+
+  Alone in this API it is synchronous: create and update answer with the resource
+  itself rather than an Operation, so it carries its own `OperationConfig` instead
+  of the registry's asynchronous one. That override is required, not tidiness. A
+  create whose response has no `/operations/` segment leaves the operation-id
+  extractor returning nothing, and unlike delete — which reads an empty operation
+  id as "already finished" — create would report the resource as in progress with
+  an empty request id, poll a URL that is not an operation, and fail on a resource
+  it had in fact created.
+
+  The patch response is also stale: a label added by a patch is absent from what
+  the patch returns and present in the very next read. `provider` is fixed at
+  creation, so it leaves the body on update rather than entering the field mask.
+
+- `GCP::NetworkConnectivity::Spoke` — what actually attaches to a Network
+  Connectivity Center hub. A hub on its own connects nothing; a spoke links one
+  VPC network into its mesh, and the hub then propagates that network's routes to
+  every other spoke it has accepted. Only the VPC-network shape is exposed:
+  `linkedVpnTunnels`, `linkedInterconnectAttachments`,
+  `linkedRouterApplianceInstances` and `gateway` each require an underlay that
+  bills by the hour, while a hub, an empty VPC and a VPC spoke are all free.
+
+  Three API behaviours the type compensates for. The discovery document files
+  spokes under `projects.locations`, which reads as regional, but a VPC spoke was
+  verified to create, read, patch and delete only under `locations/global` — so
+  the collection is pinned global and a target's region can never reach the URL.
+  `hub` is reported as a full resource path while a `Hub` resolvable yields a short
+  id, and the field is immutable, so the plugin expands short to
+  `projects/{p}/locations/global/hubs/{name}` on the way out and shortens it back
+  on the way in; one half without the other would leave the forma and stored state
+  disagreeing forever, with every re-apply planning a replacement the API then
+  refuses. And a spoke reports output-only members inside `linkedVpcNetwork`
+  (`vpcNetwork`, the `proposed*ExportRanges` pair, `producerVpcSpokes`) where a
+  `hasProviderDefault` hint cannot reach them, so they are stripped from the
+  response rather than declared.
+
+- `GCP::Compute::RolloutPlan` — a named, reusable schedule for rolling a change
+  out in stages instead of everywhere at once. Each wave names a slice of the
+  estate, by location or by position in the resource hierarchy, plus the
+  validation that has to pass before the next wave starts.
+
+  Two API behaviours the type compensates for. `rolloutPlans` has insert, get,
+  list and delete and no update method at all, so every field is immutable and the
+  type is registered without an update operation rather than with a patch that
+  would 404 — its conformance case is a `-replace` case. And the server stamps an
+  output-only `number` onto each wave it stores; it sits inside `waves[]`, where a
+  schema hint cannot reach it, so it is stripped on read. Without that strip every
+  read disagrees with the declaration, and because there is no update method the
+  disagreement plans a *replacement* on every reconcile rather than a no-op patch.
+
+  A wave's `includedLocations` takes bare zone or region names. A scoped path is
+  refused outright — `zones/europe-central2-b` answers 400 "RolloutPlan wave has a
+  LocationSelector with invalid location zones/europe-central2-b".
+
+- `GCP::Compute::ZoneVmExtensionPolicy` — a standing instruction that named VM
+  extensions, the Ops Agent for instance, are installed and held at a version on
+  the VMs a selector picks out, in one zone. Nothing has to be baked into an image
+  and no VM has to be touched: the policy is the desired state and Compute
+  converges the fleet onto it, including VMs created after the policy exists.
+
+  `instanceSelectors` is optional, and a policy with none selects **every VM in
+  the zone** and installs the named extension on all of them. The schema says so
+  at the field, and the conformance fixtures always carry a `labelSelector` whose
+  label matches nothing, so the case exercises create, patch and delete while
+  selecting no machine.
+
+  One API behaviour the type compensates for: once a policy has been patched, GCP
+  echoes each `extensionPolicies` entry with a `stringConfig: ""` it was never
+  sent. It is a member of a mapping value, where a hint cannot reach it, so an
+  empty `stringConfig` is stripped on read. An empty `pinnedVersion` is
+  deliberately not stripped: `""` is what a forma says to mean "track the current
+  release", so it is a declared value.
+
+  The global sibling, `globalVmExtensionPolicies`, is deliberately not
+  implemented. Its delete is a `POST .../{name}/delete` carrying a `rolloutInput`
+  body, and — verified live — that call's operation reports DONE while the policy
+  is still there, disappearing only minutes later when an out-of-band purge
+  rollout catches up. A delete the plugin cannot observe completing is a delete it
+  cannot promise. The zonal type has an ordinary DELETE and no such race.
+
+- `GCP::Compute::RegionBackendBucket` — the regional counterpart of
+  `BackendBucket`: the same `backendBuckets` body under `regions/{region}` instead
+  of `global`, so a regional URL map can route static paths to Cloud Storage and
+  dynamic paths to a `RegionBackendService`.
+
+  One API behaviour the type compensates for: `loadBalancingScheme` is required at
+  regional scope, where the global type is happy without it. An insert that omits
+  it is refused with 400 "Load balancing scheme is required for backend bucket of
+  scope REGION", so the field is declared required rather than left to fail at
+  apply time, and narrowed to the two schemes regional scope accepts,
+  `EXTERNAL_MANAGED` and `INTERNAL_MANAGED`.
+
+  That rejection is the one regional-specific behaviour verified live. The full
+  create/read/patch/delete cycle was *not* observed: the probe's insert finished
+  with `GCS_BUCKET_ACCESS_DENIED` because the service account this project is
+  tested with cannot read a Cloud Storage bucket, and the same failure reproduces
+  against the already-shipping global `BackendBucket` with the same bucket — an
+  environment gap, not a property of the type, but not a verified type either.
+
+- `GCP::Redis::AclPolicy` — a named set of Redis OSS ACL rules that a Memorystore
+  for Redis Cluster attaches: each rule binds one IAM user or service account to
+  one rule string. The policy is a standalone configuration object — it provisions
+  nothing and is billed only through the clusters that reference it — which is why
+  this batch covers it and not `GCP::Redis::Cluster`.
+
+  Two API behaviours the type compensates for. It is the one collection in the
+  Redis v1 API that is not a long-running operation: create answers 200 with the
+  finished policy and no Operation to poll, so the registry-wide operation config
+  is overridden per resource. And `clusterAclPolicyAttachments`, the output-only
+  per-cluster attachment status, is a nested array no schema hint can reach: it is
+  stripped on the way in, so a policy some cluster later attaches does not start
+  reading as drift against a forma that never mentioned it.
+
+- `GCP::Spanner::InstanceConfig` — a user-managed configuration naming where a
+  Spanner instance's replicas may live. Configuration only, and free to hold:
+  nothing is provisioned and nothing is billed until an instance is created
+  against it. `replicas` must be the base configuration's own replicas plus one or
+  more of its `optionalReplicas`.
+
+  Three API behaviours the type compensates for. The create body is wrapped and
+  carries the id *twice*: `instanceConfigId` beside the wrapped object and the full
+  resource path inside it — a create that omitted `instanceConfig.name` was refused
+  400 "Invalid CreateInstanceConfig request." with a field violation on
+  `instance_config.name`, so neither `RequestWrapper` nor `CreateIDParam` can build
+  it and the transformer emits the whole envelope itself. The patch field mask goes
+  in the *body* rather than the query string, and it is fixed at
+  `displayName,labels` — the only two fields the API will update — rather than
+  derived from the fields present, so a forma that drops its labels actually clears
+  them. And a read reports `optionalReplicas`, every replica location GCP offers
+  for the base configuration with a display name and a labels map each, which is
+  never declarable and is stripped rather than stored on every configuration.
+
+  Spanner requires a user-managed configuration's id to begin `custom-`, so the
+  conformance fixture is named `custom-formae-test-sic-<runID>` and
+  `scripts/ci/clean-environment.sh` carries its own pattern for that one prefixed
+  form — `SWEEP_RE` is anchored at the start of the name and would not match it.
+
 - `GCP::Compute::PacketMirroring` — a copy of selected VMs' traffic, delivered to
   an internal passthrough load balancer for inspection. `mirroredResources` says
   whose packets to copy — named instances, whole subnets, or network tags — and
@@ -1778,6 +2220,44 @@ Together these close the managed-instance-group gap: the plugin previously had
   yet:** `backendBuckets.insert` validates the bucket asynchronously and fails
   the operation with `GCS_BUCKET_NOT_FOUND`, so the test needs a real bucket,
   and the dev service account currently has no Storage permissions.
+
+### Fixed
+
+- `GCP::KMS::KeyRing` can be destroyed. `cloudkms…keyRings.delete` did not exist
+  when the type was written, and the plugin said so in a comment, a doc comment
+  and a unit test — so a forma could create a key ring and then never reclaim it,
+  and the conformance case was dropped for exactly that reason. The method exists
+  now: it answers with an already-finished Operation, the ring 404s on the very
+  next GET, and the deleted id can be re-used. The case is back with a `-replace`
+  companion, since there is still no `keyRings.patch` and the id is the only
+  declarable field. Nine key rings leaked by the nightly before the case was
+  dropped have been reclaimed.
+
+- `GCP::Compute::RegionTargetHttpsProxy` updates reach the API.
+  `regionTargetHttpsProxies.patch` *enforces* the fingerprint rather than treating
+  it as advisory — a PATCH without one is refused outright with `Required field
+  'resource.fingerprint' not specified` — so optimistic locking here is not an
+  optimisation, it is the only way an update lands at all, and it was off. Every
+  update of this type failed with a 400. `tlsEarlyData` also gained
+  `hasProviderDefault`: the API reports `DISABLED` back on every read whether or
+  not it was sent, exactly as the global sibling already documents, so a proxy
+  declared without it drifted on the first sync.
+
+- `GCP::Compute::RegionTargetHttpProxy` no longer claims an update it never had.
+  That collection offers `delete`, `get`, `insert`, `list` and `setUrlMap` and no
+  `patch`, so a PATCH landed on a URL the API does not serve and came back as
+  Google's HTML 404 page rather than an API error. Its global sibling does have
+  `patch`, which is how the regional one came to claim it. A change now replaces.
+
+- `GCP::BigQuery::Table.datasetId` accepts a resolvable. It was typed plain
+  `String`, so `dataset.res.datasetId` failed evaluation and a table could only
+  name a dataset some other forma had already created — the sibling `Routine`
+  already had this right.
+
+- `GCP::EssentialContacts::Contact.email` is marked `createOnly`. The API refuses
+  a masked change to it, and the field was annotated as though it were mutable.
+  Inert today, because the type does not support update at all and any change
+  replaces, but it stops the trap for whoever enables update.
 
 ## [0.1.13]
 

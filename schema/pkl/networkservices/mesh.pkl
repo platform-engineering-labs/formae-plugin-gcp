@@ -1,0 +1,81 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Services Mesh
+///
+/// The control-plane anchor of a Cloud Service Mesh. A mesh is a routing scope
+/// and a name: routes attach to it, and the Envoy sidecars of the workloads
+/// that join it ask it for their configuration. It allocates no proxy and no
+/// address of its own, so a mesh with nothing joined to it costs nothing.
+///
+/// Global — it lives under locations/global. The regional path answers HTTP 200
+/// for this collection too, but it is a different and always-empty namespace: a
+/// mesh created globally is not listed there and a GET for it there answers
+/// 404. Create, update and delete are long-running operations.
+module gcp.networkservices.mesh
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkServices::Mesh"
+
+/// Whether Envoy adds its debug headers to proxied requests.
+typealias EnvoyHeaders = "ENVOY_HEADERS_UNSPECIFIED"|"NONE"|"DEBUG_HEADERS"
+
+open class MeshResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: MeshResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Mesh extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-mesh"). Immutable — it is the resource path, and it
+    /// travels as the ?meshId= query parameter on create rather than in the
+    /// body.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The port the sidecars listen on to intercept traffic. Mutable: a patch
+    /// to it was applied and read back changed.
+    @gcp.FieldHint
+    interceptionPort: Int?
+
+    /// Whether Envoy adds its debug headers. Mutable.
+    @gcp.FieldHint
+    envoyHeaders: EnvoyHeaders?
+
+    /// An optional description. Unlike most of GCP, this API omits the field
+    /// entirely when it was never set rather than reporting an empty string, so
+    /// it carries no provider default.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    ///
+    /// Worth knowing: this API drops the labels of a resource on any PATCH
+    /// whose update mask does not name `labels`, even though it leaves every
+    /// other unmasked field alone. Verified live — a patch of `description`
+    /// alone cleared them. formae builds the mask from the request body, so
+    /// labels declared here are always sent and always survive; labels added
+    /// out of band are not.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: MeshResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

@@ -69,6 +69,24 @@ type ResourceConfig struct {
 	// API uses a different key (e.g. IAM serviceAccounts.list -> "accounts").
 	ListItemsKey string
 
+	// ReadTreatAsMissing, when set, is consulted on the body of a successful
+	// read: if it reports true the read answers NotFound instead of returning
+	// properties.
+	//
+	// Some GCP APIs keep serving a tombstone. Memorystore's aclPolicies.delete
+	// answers HTTP 200 and the policy then reads back for another fifteen to
+	// twenty seconds with "state": "DELETING" - measured against the live API -
+	// before the GET finally 404s. Without this hook a synchronization landing
+	// inside that window reads the tombstone as a live resource and puts a
+	// deleted policy back in inventory, where it stays until some later sync
+	// happens to fall outside the window.
+	//
+	// This is deliberately a read-side predicate rather than a delete-side
+	// wait: the delete really has been accepted, and it is the read that is
+	// lying. Leave nil for the overwhelming majority of resources, whose read
+	// 404s the moment the delete is accepted.
+	ReadTreatAsMissing func(body map[string]interface{}) bool
+
 	// CreateIDParam, when set, sends the resource id as a create-time query
 	// parameter (e.g. "repositoryId", "instanceId") instead of in the request
 	// body. The id is taken from the "name" property, which is then removed from

@@ -6,9 +6,12 @@
 
 /// GCP Cloud KMS KeyRing
 ///
-/// A logical grouping of CryptoKeys, scoped to a project + location. KeyRings
-/// are created synchronously and are permanent: the Cloud KMS API has no
-/// method to delete or update a KeyRing.
+/// A logical grouping of CryptoKeys, scoped to a project + location. Created
+/// synchronously, and deleted synchronously too - `keyRings.delete` answers with
+/// an Operation that is already finished.
+///
+/// A key ring cannot be updated: the API has no `keyRings.patch`, and the id is
+/// the only field there is, so any change replaces the ring.
 module gcp.kms.keyRing
 
 import "../gcp.pkl"
@@ -32,6 +35,7 @@ open class KeyRing extends formae.Resource {
     hidden parent = this
 
     /// Short KeyRing id (e.g. "my-keyring"). Immutable; sent as ?keyRingId=.
+    /// A deleted ring's id can be re-used.
     @gcp.FieldHint {
         createOnly = true
     }

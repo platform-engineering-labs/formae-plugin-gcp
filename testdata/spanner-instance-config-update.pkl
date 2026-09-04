@@ -1,0 +1,82 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/spanner/instanceConfig.pkl" as instanceConfig
+import "./config/vars.pkl" as v
+
+// A user-managed instance configuration is free to hold: it only names where a
+// Spanner instance's replicas MAY live. Nothing is provisioned and nothing is
+// billed until an instance is created against it, and this case deliberately
+// creates none — a Spanner instance bills per node-hour.
+//
+// The name breaks the usual `formae-test-...` shape on purpose. Spanner
+// requires a user-managed configuration's id to begin with "custom-" and
+// rejects anything else, so the sweep prefix moves one segment to the right:
+// the id is still `formae-test-<abbrev>-<runID>` behind the mandatory prefix,
+// and the sweep matches the `custom-formae-test-` form.
+//
+// `baseConfig` is written as the bare id "eur6" rather than a full path, which
+// is what exercises the plugin's expand-on-request / shorten-on-response round
+// trip. `replicas` must be eur6's own replicas (europe-west4 and europe-west3
+// read-write, europe-west6 witness) plus one or more of its optionalReplicas —
+// here a READ_ONLY replica in us-east1. Any other set is rejected.
+//
+// `spanner.instanceConfigs.create` also accepts `validateOnly = true`, which
+// checks a replica set without creating anything; the plugin does not wire it
+// up, since formae's own plan is the dry run.
+//
+// The update case: `displayName` and `labels` are the ONLY two fields
+// spanner.instanceConfigs.patch accepts, and this fixture changes both. Name,
+// baseConfig and replicas are identical to the create fixture on purpose — a
+// change to any of them is a replacement, not an update.
+forma {
+  v.stack
+  v.target
+
+  new instanceConfig.InstanceConfig {
+    label = "plugin-sdk-test-spanner-instance-config"
+    name = "custom-formae-test-sic-\(v.testRunID)"
+    displayName = "Formae conformance 2"
+    baseConfig = "eur6"
+    // The API echoes replicas back in exactly the order they were sent, so the
+    // order here is part of the expected state.
+    replicas = new Listing {
+      new instanceConfig.ReplicaInfo {
+        location = "europe-west4"
+        type = "READ_WRITE"
+        // Exactly one replica carries this, and the others OMIT it rather than
+        // writing `false` — the API only ever reports the flag where it is true.
+        defaultLeaderLocation = true
+      }
+      new instanceConfig.ReplicaInfo {
+        location = "europe-west4"
+        type = "READ_WRITE"
+      }
+      new instanceConfig.ReplicaInfo {
+        location = "europe-west3"
+        type = "READ_WRITE"
+      }
+      new instanceConfig.ReplicaInfo {
+        location = "europe-west3"
+        type = "READ_WRITE"
+      }
+      new instanceConfig.ReplicaInfo {
+        location = "europe-west6"
+        type = "WITNESS"
+      }
+      new instanceConfig.ReplicaInfo {
+        location = "us-east1"
+        type = "READ_ONLY"
+      }
+    }
+    labels = new Mapping {
+      ["environment"] = "updated"
+      ["managed-by"] = "formae"
+    }
+  }
+}

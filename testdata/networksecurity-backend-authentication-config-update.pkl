@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/backendAuthenticationConfig.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the description. The patch also rolls the server-assigned etag, which
+// is why the plugin never sends a stored one back.
+forma {
+  v.stack
+  v.target
+
+  new backendAuthenticationConfig.BackendAuthenticationConfig {
+    label = "plugin-sdk-test-ns-backend-auth-config"
+    name = "formae-test-ns-bac-\(v.testRunID)"
+    wellKnownRoots = "PUBLIC_ROOTS"
+    description = "Updated test backend authentication config description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

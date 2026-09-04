@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/bigquery/dataset.pkl"
+import "@gcp/bigquery/table_bigquery.pkl" as table
+import "@gcp/bigquery/rowAccessPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// The update half of bigquery-row-access-policy.pkl. Only filterPredicate
+// differs, and it is the type's only mutable field: name, datasetId, tableId and
+// project are all path components and all immutable, so changing any of them
+// would be a replacement rather than an update.
+//
+// The update is a PUT, not a PATCH - BigQuery offers rowAccessPolicies.update as
+// a full replacement and no partial form - and it takes no update mask. The new
+// predicate is deliberately a different shape from the first, not just a
+// different number: it adds a second clause and a string comparison, so the
+// round trip is exercised on the operators and quoting that JSON escapes.
+//
+// Prerequisites and cost are as in the create fixture: an empty dataset, a
+// zero-row table and a metadata-only policy, all free to hold.
+local ds = new dataset.Dataset {
+  label = "plugin-sdk-test-rap-dataset"
+  project = v.gcpProject
+  datasetId = "formae_test_rap_\(v.testRunID)"
+  location = v.gcpRegion
+}
+
+local tbl = new table.Table {
+  label = "plugin-sdk-test-rap-table"
+  project = v.gcpProject
+  datasetId = ds.res.datasetId
+  tableId = "formae_test_rap_tbl_\(v.testRunID)"
+  name = "Plugin SDK conformance row access policy table"
+  description = "Test table for the row access policy conformance test"
+  schema = new Listing {
+    new table.SchemaField {
+      name = "v"
+      type = "INTEGER"
+      mode = "NULLABLE"
+      description = "Numeric column the row access policy filters on"
+    }
+    new table.SchemaField {
+      name = "region"
+      type = "STRING"
+      mode = "NULLABLE"
+      description = "Region column the row access policy filters on"
+    }
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  ds
+  tbl
+
+  new rowAccessPolicy.RowAccessPolicy {
+    label = "plugin-sdk-test-bigquery-row-access-policy"
+    project = v.gcpProject
+    datasetId = ds.res.datasetId
+    tableId = tbl.res.tableId
+    name = "formae_test_rap_pol_\(v.testRunID)"
+    filterPredicate = "region = \"EU\" AND v > 100"
+  }
+}

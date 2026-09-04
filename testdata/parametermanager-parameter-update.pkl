@@ -1,0 +1,32 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/parametermanager/parameter.pkl"
+import "./config/vars.pkl" as v
+
+// Adds labels, which is the entire mutable surface of this type: name and
+// format are immutable (a PATCH naming either answers 400 IMMUTABLE_FIELD) and
+// kmsKey would need a billable KMS key version.
+//
+// This is also the case that covers the API's stale mutating responses: the
+// PATCH answers without the new labels and only the following GET has them, so
+// this would fail if the plugin trusted the patch response instead of reading
+// the resource back.
+forma {
+  v.stack
+  v.target
+
+  new parameter.Parameter {
+    label = "plugin-sdk-test-pm-parameter"
+    name = "formae-test-pm-param-\(v.testRunID)"
+    format = "JSON"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

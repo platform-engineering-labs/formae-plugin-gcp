@@ -1,0 +1,72 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security DnsThreatDetector
+///
+/// A subscription that has Cloud DNS queries checked against a threat
+/// intelligence feed, so a lookup of a known-malicious domain is flagged. The
+/// detector is the plumbing; `provider` names who holds the intelligence.
+///
+/// Global — asked for a region the API answers 400 "Malformed name", so it
+/// lives under locations/global whatever the target's region is.
+///
+/// Alone in this API, it is synchronous: create and update answer with the
+/// resource itself rather than an Operation to poll. Its PATCH response is also
+/// stale — a label added by a patch is absent from the response but present in
+/// the very next read — so the plugin reads the resource back after an update
+/// instead of trusting what the patch returned.
+module gcp.networksecurity.dnsThreatDetector
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::DnsThreatDetector"
+
+open class DnsThreatDetectorResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: DnsThreatDetectorResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class DnsThreatDetector extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-dns-threat-detector"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Who supplies the threat intelligence, e.g. "INFOBLOX". Required, and
+    /// fixed at creation: changing suppliers is a different subscription, so
+    /// the plugin drops it from update bodies rather than letting it enter the
+    /// field mask.
+    @gcp.FieldHint {
+        required = true
+        createOnly = true
+    }
+    provider: String
+
+    /// VPC networks left out of detection. Full network paths — the API takes
+    /// the path, not a short name.
+    @gcp.FieldHint
+    excludedNetworks: Listing<String|formae.Resolvable>?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: DnsThreatDetectorResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

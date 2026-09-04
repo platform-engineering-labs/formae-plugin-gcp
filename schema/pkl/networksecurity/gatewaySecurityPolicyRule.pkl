@@ -1,0 +1,108 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security GatewaySecurityPolicyRule
+///
+/// One rule of a Secure Web Proxy policy: a CEL session matcher, a priority,
+/// and a verdict — ALLOW or DENY. Rules are what make a
+/// GatewaySecurityPolicy do anything; a policy with none of them matches
+/// nothing.
+///
+/// Nested under its policy, and regional with it. The policy is a path
+/// component rather than a body field: the plugin drops it from the request and
+/// lifts it back out of the path the API reports, so the declared value and
+/// state agree.
+///
+/// Declare the policy through its resolvable. That reference is also the
+/// teardown order: a policy that still has rules refuses to delete with HTTP
+/// 400, and formae destroys the consumer of a reference before its producer.
+///
+/// Create, update and delete are long-running operations.
+module gcp.networksecurity.gatewaySecurityPolicyRule
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::GatewaySecurityPolicyRule"
+
+open class GatewaySecurityPolicyRuleResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: GatewaySecurityPolicyRuleResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+    parent = "GCP::NetworkSecurity::GatewaySecurityPolicy"
+    listParam = new Listing<formae.ListProperty> {
+        new formae.ListProperty {
+            parentProperty = "gatewaySecurityPolicy"
+            listParameter = "gatewaySecurityPolicy"
+        }
+    }.toList()
+}
+open class GatewaySecurityPolicyRule extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "allow-example"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The policy this rule belongs to. A path component rather than a body
+    /// field, so it is dropped from every request and recovered from the
+    /// returned path. Immutable: moving a rule between policies is a new rule.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    gatewaySecurityPolicy: (String|formae.Resolvable)
+
+    /// Whether the rule is evaluated at all.
+    @gcp.FieldHint
+    enabled: Boolean?
+
+    /// Lower numbers are evaluated first. The first matching rule wins.
+    @gcp.FieldHint
+    priority: Int?
+
+    /// CEL expression matched against the session's layer-3/4 attributes, e.g.
+    /// `host() == "example.com"`.
+    @gcp.FieldHint
+    sessionMatcher: String?
+
+    /// CEL expression matched against layer-7 attributes. Requires TLS
+    /// inspection for anything encrypted, and GCP reports it back as an empty
+    /// string when it was never set — the plugin strips that so an omitted
+    /// field stays omitted rather than reading as drift.
+    @gcp.FieldHint
+    applicationMatcher: String?
+
+    /// Whether the session is decrypted for inspection. Requires the policy to
+    /// carry a TLS inspection policy, which this plugin's conformance suite
+    /// does not set up (it needs a billable CA). GCP reports `false` for a rule
+    /// that never sent it.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    tlsInspectionEnabled: Boolean?
+
+    /// The verdict for a matching session: ALLOW or DENY.
+    @gcp.FieldHint
+    basicProfile: String?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    hidden res: GatewaySecurityPolicyRuleResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

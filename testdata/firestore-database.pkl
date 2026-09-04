@@ -1,0 +1,53 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/firestore/database_firestore.pkl" as database
+import "./config/vars.pkl" as v
+
+// A Firestore database with no documents in it is free to hold. Firestore
+// charges for stored bytes and for read/write/delete operations, and nothing in
+// a create body provisions capacity — the API reports this database as
+// "freeTier": true, and it would cost nothing even without that. The one paid
+// switch in the resource is point-in-time recovery, which retains prior
+// versions and is billed for them; it is declared DISABLED here rather than
+// left out, so the fixture states its own bill rather than relying on the
+// server's default staying free.
+//
+// deleteProtectionState is likewise declared rather than omitted. The server's
+// default was verified live to be DELETE_PROTECTION_DISABLED, but a database
+// created with it enabled cannot be deleted at all — the API answers "Cannot
+// delete the database because delete protection state is set to
+// DELETE_PROTECTION_ENABLED" — and every run of this case would then leak a
+// database. Saying DISABLED explicitly means the destroy does not depend on a
+// default the API is free to change.
+//
+// No prerequisites: a database hangs off the project, and its location is a
+// body field rather than a path segment. europe-central2 is a valid Firestore
+// location (verified against GET projects/{p}/locations on the Firestore
+// endpoint), so the suite's own region is usable and no other region is
+// hardcoded.
+
+forma {
+  v.stack
+  v.target
+
+  new database.Database {
+    label = "plugin-sdk-test-firestore-database"
+    name = "formae-test-fs-db-\(v.testRunID)"
+    locationId = v.gcpRegion
+    type = "FIRESTORE_NATIVE"
+    // The server picks PESSIMISTIC for a Standard-edition Native database, so
+    // this is the default said out loud — which is what makes it the field the
+    // update fixture moves.
+    concurrencyMode = "PESSIMISTIC"
+    appEngineIntegrationMode = "DISABLED"
+    pointInTimeRecoveryEnablement = "POINT_IN_TIME_RECOVERY_DISABLED"
+    deleteProtectionState = "DELETE_PROTECTION_DISABLED"
+    databaseEdition = "STANDARD"
+  }
+}

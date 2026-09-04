@@ -1,0 +1,38 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/dataform/repository_dataform.pkl" as repository
+import "@gcp/dataform/workspace.pkl"
+import "./config/vars.pkl" as v
+
+// Replace rather than update: the workspaces collection has no patch method at
+// all, so every field is create-only and any change destroys and recreates.
+// The name is changed here because it is the clearest such field - the old
+// workspace goes and a new one takes its place.
+//
+// The repository is unchanged and still referenced through its resolvable, so
+// the destroy order still holds.
+local repo = new repository.Repository {
+  label = "plugin-sdk-test-df-ws-repository"
+  name = "formae-test-df-wsr-\(v.testRunID)"
+  displayName = "Repository owning the workspace under test"
+}
+
+forma {
+  v.stack
+  v.target
+
+  repo
+
+  new workspace.Workspace {
+    label = "plugin-sdk-test-df-workspace"
+    name = "formae-test-df-ws2-\(v.testRunID)"
+    repository = repo.res.name
+    disableMoves = false
+  }
+}

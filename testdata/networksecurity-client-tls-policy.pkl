@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/clientTlsPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// A client TLS policy is the client half of a TLS connection a Google-managed
+// proxy makes for you. It is free and inert: nothing connects anywhere until a
+// backend service or a mesh route names the policy.
+//
+// No certificate provider is declared - one-way TLS, where only the upstream
+// proves who it is - so the case needs no key material and no CA pool.
+forma {
+  v.stack
+  v.target
+
+  new clientTlsPolicy.ClientTlsPolicy {
+    label = "plugin-sdk-test-ns-client-tls-policy"
+    name = "formae-test-ns-ctp-\(v.testRunID)"
+    sni = "example.com"
+    description = "Test client TLS policy for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

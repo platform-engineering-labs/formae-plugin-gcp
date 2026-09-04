@@ -1,0 +1,31 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/parametermanager/parameter.pkl"
+import "./config/vars.pkl" as v
+
+// The replace companion. Both changed fields are immutable, so this plans a
+// destroy and a create rather than an update, and the case asserts the native
+// ID changed:
+//
+//   * the id is a path component, and the API refuses a PATCH that names it;
+//   * format is refused too - PATCH ?updateMask=format answers 400
+//     IMMUTABLE_FIELD, "Request is trying to modify an immutable field format".
+//
+// The parameter carries no versions, so the destroy half has nothing nested to
+// trip over; a parameter that still has versions refuses to delete.
+forma {
+  v.stack
+  v.target
+
+  new parameter.Parameter {
+    label = "plugin-sdk-test-pm-parameter"
+    name = "formae-test-pm-param2-\(v.testRunID)"
+    format = "YAML"
+  }
+}

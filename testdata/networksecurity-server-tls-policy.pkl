@@ -1,0 +1,32 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/serverTlsPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// A server TLS policy says what a Google-managed proxy serves and what it
+// demands of clients. It is free and enforces nothing until a target proxy or a
+// mesh gateway names it.
+//
+// allowOpen is what makes the case self-contained: it declares "plaintext is
+// acceptable too", so the policy needs no certificate to point at and no
+// mutual-TLS trust config.
+forma {
+  v.stack
+  v.target
+
+  new serverTlsPolicy.ServerTlsPolicy {
+    label = "plugin-sdk-test-ns-server-tls-policy"
+    name = "formae-test-ns-stp-\(v.testRunID)"
+    allowOpen = true
+    description = "Test server TLS policy for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

@@ -1,0 +1,135 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Cloud Spanner InstanceConfig (user-managed)
+///
+/// A user-managed instance configuration names where a Spanner instance's
+/// replicas may live. It is configuration only and free to hold: nothing is
+/// provisioned and nothing is billed until an instance is created against it.
+///
+/// `replicas` must be the base configuration's own replicas plus one or more of
+/// that base configuration's `optionalReplicas` — the API rejects any other
+/// set. The conformance fixture uses base config `eur6` (Europe: Netherlands
+/// and Frankfurt) plus a READ_ONLY replica in us-east1.
+///
+/// Project-scoped, not location-scoped: the collection is
+/// `projects/{project}/instanceConfigs`, and the geography lives in `replicas`
+/// rather than in a path segment. Create and patch are long-running operations;
+/// delete answers 200 with an empty body.
+///
+/// `spanner.instanceConfigs.create` also supports `validateOnly: true`, which
+/// checks a body without creating anything — useful when working out a replica
+/// set by hand. The plugin does not wire it up: formae's own plan is the
+/// dry run.
+///
+/// Only `displayName` and `labels` are mutable. Everything else — `baseConfig`
+/// and `replicas` above all — is fixed at creation, so a change to either is
+/// correctly a replacement.
+module gcp.spanner.instanceConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Spanner::InstanceConfig"
+
+/// What a replica does in the configuration.
+///
+/// READ_WRITE replicas vote and can serve reads; exactly one of them carries
+/// `defaultLeaderLocation`. WITNESS replicas vote but hold no data. READ_ONLY
+/// replicas neither vote nor can be the leader — they only serve stale reads
+/// close to their region.
+typealias ReplicaType = "READ_WRITE"|"READ_ONLY"|"WITNESS"
+
+/// One replica placement.
+///
+/// The list is positional: the API echoes the replicas back in exactly the
+/// order they were sent, so keep a fixture's order stable or every sync reads
+/// as a change.
+@gcp.SubResourceHint
+open class ReplicaInfo extends formae.SubResource {
+    /// The region the replica lives in (e.g. "europe-west4").
+    @gcp.FieldHint
+    location: String
+
+    @gcp.FieldHint
+    type: ReplicaType
+
+    /// Marks this replica's region as the default leader region. Set it on
+    /// exactly one READ_WRITE replica and OMIT it everywhere else rather than
+    /// writing `false`: the API only ever reports the flag where it is true, so
+    /// a declared `false` would read back as absent and every sync would plan a
+    /// change. (The plugin also strips a nested `defaultLeaderLocation = false`
+    /// from a read, so the two shapes stay identical if a future API version
+    /// starts echoing the flag.)
+    @gcp.FieldHint
+    defaultLeaderLocation: Boolean?
+}
+
+open class InstanceConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: InstanceConfigResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class InstanceConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Short configuration id. Spanner requires a user-managed configuration's
+    /// id to begin with "custom-" and rejects anything else, so this is one of
+    /// the few names that cannot be a bare `formae-test-...`. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    name: String(startsWith("custom-"))
+
+    /// Human-readable name shown in the console. Required by the API. Mutable.
+    @gcp.FieldHint
+    displayName: String
+
+    /// The Google-managed configuration this one is derived from, written as
+    /// the bare id (e.g. "eur6", "nam3"). The plugin qualifies it to
+    /// `projects/{project}/instanceConfigs/{id}` on the way out and shortens it
+    /// back on the way in, so a forma carries no project id and stays portable
+    /// between targets. Immutable.
+    @gcp.FieldHint { createOnly = true }
+    baseConfig: String|formae.Resolvable
+
+    /// Where the instance's replicas live. Must be the base configuration's own
+    /// replicas plus one or more of its `optionalReplicas`; a set the base
+    /// configuration does not offer is rejected. Immutable — `replicas` is not
+    /// one of the two paths the patch field mask accepts.
+    @gcp.FieldHint { createOnly = true }
+    replicas: Listing<ReplicaInfo>
+
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Output only. "USER_MANAGED" for anything this type creates;
+    /// "GOOGLE_MANAGED" for the ~100 configurations Google ships in every
+    /// project, which discovery also reports and which can be neither created
+    /// nor deleted.
+    @gcp.FieldHint { hasProviderDefault = true }
+    configType: String?
+
+    /// Output only. Assigned by GCP and changed by every write. Never sent back
+    /// in a request — the plugin drops it — but kept in state because it is
+    /// what the API's own optimistic-concurrency check reads.
+    @gcp.FieldHint { hasProviderDefault = true }
+    etag: String?
+
+    /// Output only. "CREATING" while the create LRO runs, then "READY".
+    @gcp.FieldHint { hasProviderDefault = true }
+    state: String?
+
+    hidden res: InstanceConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

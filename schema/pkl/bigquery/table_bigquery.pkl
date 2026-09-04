@@ -175,10 +175,20 @@ open class Table extends formae.Resource {
     }
     project: String
 
+    /// Id of the owning dataset. A path component, not a body field - pass
+    /// `dataset.res.datasetId` so formae creates the dataset first.
+    ///
+    /// Typed to accept a resolvable as well as a literal: declared plain
+    /// `String` a resolvable fails evaluation outright ("Expected value of type
+    /// `String`, but got type `DatasetResolvable`"), so a table could only ever
+    /// name a dataset that some other forma had already created. Interpolating
+    /// the id into a string evaluates but creates no dependency edge, which is
+    /// worse - the table is then created before its dataset exists. The sibling
+    /// Routine already declares it this way.
     @gcp.FieldHint {
         createOnly = true
     }
-    datasetId: String
+    datasetId: (String|formae.Resolvable)
 
     @gcp.FieldHint {
         createOnly = true

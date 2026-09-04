@@ -1,0 +1,186 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Compute RolloutPlan (global)
+///
+/// A named, reusable schedule for rolling a change out in stages instead of
+/// everywhere at once. Each wave names a slice of the estate — by location, or
+/// by position in the resource hierarchy — and a validation step that has to
+/// pass before the next wave starts. Other Compute orchestration calls then
+/// name the plan rather than restating the staging.
+///
+/// The plan is pure configuration: it describes *how* a rollout would proceed
+/// and touches nothing until something runs against it, so holding one costs
+/// nothing.
+///
+/// Two API behaviours this type compensates for.
+///
+///  * `rolloutPlans` has insert, get, list and delete and **no update method at
+///    all**, so every field here is immutable and any change is a replacement.
+///    The type is registered without `OperationUpdate` rather than with a patch
+///    that would 404, and its conformance case is a `-replace` case.
+///  * The server stamps a `number` onto each wave it stores. It is output-only
+///    and sits *inside* `waves[]`, where a `hasProviderDefault` hint cannot
+///    reach it, so the plugin strips it on read — without that, every read
+///    disagrees with the declaration and plans a replacement that changes
+///    nothing.
+module gcp.compute.rolloutPlan
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Compute::RolloutPlan"
+
+/// Picks the locations a wave covers.
+@gcp.SubResourceHint
+open class RolloutPlanLocationSelector extends formae.SubResource {
+    /// **Bare** zone or region names — "europe-central2-b", "europe-central2" —
+    /// not scoped paths. A path is rejected outright: passing
+    /// "zones/europe-central2-b" answers 400 "RolloutPlan wave has a
+    /// LocationSelector with invalid location zones/europe-central2-b".
+    @gcp.FieldHint
+    includedLocations: Listing<String>?
+}
+
+/// Picks the wave's scope out of the resource hierarchy, for a plan that spans
+/// more than one project.
+@gcp.SubResourceHint
+open class RolloutPlanResourceHierarchySelector extends formae.SubResource {
+    @gcp.FieldHint
+    includedProjects: Listing<String>?
+
+    @gcp.FieldHint
+    includedFolders: Listing<String>?
+
+    @gcp.FieldHint
+    includedOrganizations: Listing<String>?
+}
+
+/// One way a wave names what it covers. A wave carries a list of these, and
+/// they are additive.
+@gcp.SubResourceHint
+open class RolloutPlanWaveSelector extends formae.SubResource {
+    @gcp.FieldHint
+    locationSelector: RolloutPlanLocationSelector?
+
+    @gcp.FieldHint
+    resourceHierarchySelector: RolloutPlanResourceHierarchySelector?
+}
+
+/// How long a time-based validation waits before declaring the wave healthy.
+@gcp.SubResourceHint
+open class RolloutPlanTimeBasedValidationMetadata extends formae.SubResource {
+    /// A duration with its unit, as the API spells them: "60s", "600s".
+    @gcp.FieldHint
+    waitDuration: String?
+}
+
+/// The gate between one wave and the next.
+@gcp.SubResourceHint
+open class RolloutPlanWaveValidation extends formae.SubResource {
+    /// Which kind of gate. "time" — a plain soak period, described by
+    /// `timeBasedValidationMetadata` — is the variant this plugin has exercised
+    /// live; the field is an open String so a newer validation kind does not
+    /// need a schema change to be usable.
+    @gcp.FieldHint
+    type: String?
+
+    @gcp.FieldHint
+    timeBasedValidationMetadata: RolloutPlanTimeBasedValidationMetadata?
+}
+
+/// How much of a wave runs at once.
+///
+/// ponytail: the API's `delays` list is not exposed. Its entry shape was never
+/// observed against the live API, and inventing field names for it would be a
+/// guess that reads like a fact. Add the sub-resource once a real delay entry
+/// has been seen.
+@gcp.SubResourceHint
+open class RolloutPlanOrchestrationOptions extends formae.SubResource {
+    /// Cap on locations progressing simultaneously within the wave.
+    @gcp.FieldHint
+    maxConcurrentLocations: Int?
+
+    /// Cap on resources progressing simultaneously within one location.
+    @gcp.FieldHint
+    maxConcurrentResourcesPerLocation: Int?
+}
+
+/// One stage of the rollout: a slice of the estate plus the gate that has to
+/// pass before the next stage begins.
+@gcp.SubResourceHint
+open class RolloutPlanWave extends formae.SubResource {
+    /// Human label for the wave, e.g. "canary" or "w1".
+    @gcp.FieldHint
+    displayName: String?
+
+    /// What this wave covers. At least one selector is needed for the wave to
+    /// mean anything.
+    @gcp.FieldHint
+    selectors: Listing<RolloutPlanWaveSelector>?
+
+    @gcp.FieldHint
+    validation: RolloutPlanWaveValidation?
+
+    @gcp.FieldHint
+    orchestrationOptions: RolloutPlanOrchestrationOptions?
+}
+
+open class RolloutPlanResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden id: RolloutPlanResolvable = (this) {
+        property = "id"
+    }
+
+    hidden selfLink: RolloutPlanResolvable = (this) {
+        property = "selfLink"
+    }
+
+    hidden name: RolloutPlanResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class RolloutPlan extends formae.Resource {
+    hidden parent = this
+
+    /// Short id, e.g. "staged-europe". Sent in the request body, like every
+    /// ordinary Compute insert.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Immutable, like everything else here: the API has no update method, so a
+    /// changed description replaces the plan.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    description: String?
+
+    /// Narrows the locations the plan is allowed to name at all, for a plan
+    /// that should never reach outside a region.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    locationScope: String?
+
+    /// The stages, in order.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    waves: Listing<RolloutPlanWave>?
+
+    hidden res: RolloutPlanResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

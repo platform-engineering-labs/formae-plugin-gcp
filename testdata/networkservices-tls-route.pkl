@@ -1,0 +1,113 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/healthCheck.pkl"
+import "@gcp/compute/backendService.pkl"
+import "@gcp/networkservices/mesh.pkl"
+import "@gcp/networkservices/tlsRoute.pkl"
+import "./config/vars.pkl" as v
+
+// A TLS route is the one route kind that cannot be declared without a
+// destination. There is no `originalDestination` passthrough here, and a rule
+// whose action names no destination is refused with "at least one destination
+// or original_destination must be set". So this case stands up the full chain:
+// a health check, a backend service that uses it, a mesh, and the route.
+//
+// All four are free to hold:
+//   - A health check is a probe definition. Nothing probes anything until a
+//     backend service with actual backends references it.
+//   - A backend service with an empty backend list provisions no capacity - it
+//     is a routing target with nothing behind it. INTERNAL_SELF_MANAGED is the
+//     scheme a service-mesh backend uses, and it allocates no load-balancer
+//     front end and no IP address.
+//   - A mesh allocates nothing until a workload joins it.
+//   - The route itself is configuration.
+//
+// Each reference is passed as a resolvable directly, which is what creates the
+// dependency edges and orders the creates: health check before backend service,
+// and mesh and backend service before the route.
+//
+// The two reference styles here are deliberately different, and both are
+// verified. `meshes` takes the mesh's short name, because the plugin expands it
+// to a full projects/…/locations/global/meshes/… path on the way out and
+// shortens it on the way back. `serviceName` takes the backend service's
+// selfLink, because this API echoes that field back byte-for-byte in whatever
+// form it was given - so the selfLink round-trips exactly and needs no
+// translation at all.
+local hc = new healthCheck.HealthCheck {
+  label = "plugin-sdk-test-ns-tlsr-health-check"
+  name = "formae-test-ns-tlsr-hc-\(v.testRunID)"
+  type = "TCP"
+  tcpHealthCheck = new healthCheck.TcpHealthCheck {
+    port = 80
+  }
+  description = "Health check for the TLS route conformance test"
+}
+
+local bes = new backendService.BackendService {
+  label = "plugin-sdk-test-ns-tlsr-backend-service"
+  name = "formae-test-ns-tlsr-bes-\(v.testRunID)"
+  loadBalancingScheme = "INTERNAL_SELF_MANAGED"
+  protocol = "TCP"
+  healthChecks = new Listing {
+    hc.res.selfLink
+  }
+  description = "Backend service for the TLS route conformance test"
+}
+
+local net = new mesh.Mesh {
+  label = "plugin-sdk-test-ns-tlsr-mesh"
+  name = "formae-test-ns-tlsr-mesh-\(v.testRunID)"
+  description = "Mesh for the TLS route conformance test"
+  labels = new Mapping {
+    ["environment"] = "test"
+  }
+}
+
+forma {
+  v.stack
+  v.target
+
+  hc
+  bes
+  net
+
+  new tlsRoute.TlsRoute {
+    label = "plugin-sdk-test-ns-tls-route"
+    name = "formae-test-ns-tlsr-\(v.testRunID)"
+    meshes = new Listing {
+      net.res.name
+    }
+    rules = new Listing {
+      new tlsRoute.TlsRouteRule {
+        matches = new Listing {
+          new tlsRoute.TlsRouteMatch {
+            sniHost = new Listing {
+              "formae-test-tlsr-\(v.testRunID).example.com"
+            }
+            alpn = new Listing {
+              "h2"
+            }
+          }
+        }
+        action = new tlsRoute.TlsRouteAction {
+          destinations = new Listing {
+            new tlsRoute.TlsRouteDestination {
+              serviceName = bes.res.selfLink
+              weight = 1
+            }
+          }
+        }
+      }
+    }
+    description = "Test TLS route for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/backendAuthenticationConfig.pkl"
+import "./config/vars.pkl" as v
+
+// What a load balancer trusts when it opens TLS to a backend. Free, and it
+// authenticates nothing until a backend service names it.
+//
+// wellKnownRoots keeps the case self-contained: trusting the public root set
+// needs no trust config and no certificate of our own.
+forma {
+  v.stack
+  v.target
+
+  new backendAuthenticationConfig.BackendAuthenticationConfig {
+    label = "plugin-sdk-test-ns-backend-auth-config"
+    name = "formae-test-ns-bac-\(v.testRunID)"
+    wellKnownRoots = "PUBLIC_ROOTS"
+    description = "Test backend authentication config for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

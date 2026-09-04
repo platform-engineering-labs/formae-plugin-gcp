@@ -1,0 +1,56 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/binaryauthorization/attestor.pkl"
+import "./config/vars.pkl" as v
+
+// An attestor is a record of public keys plus the Grafeas note the attestations
+// they sign are filed against. Free to hold: it provisions nothing, it holds
+// key material, and it admits nothing until a Binary Authorization admission
+// rule names it - which nothing here does.
+//
+// The note it points at deliberately does not exist. Binary Authorization does
+// not resolve noteReference at create time (verified live), which is what lets
+// this case run without the Container Analysis API and without a note - neither
+// of which this plugin ships. Nothing writes an attestation through it, so
+// nothing needs the note to be real.
+//
+// The public key is an EC P-256 public key generated for this fixture; the
+// private half was never committed and is not needed - an attestor only ever
+// verifies.
+forma {
+  v.stack
+  v.target
+
+  new attestor.Attestor {
+    label = "plugin-sdk-test-ba-attestor"
+    name = "formae-test-ba-att-\(v.testRunID)"
+    description = "Test attestor for plugin SDK conformance tests"
+    userOwnedGrafeasNote = new attestor.UserOwnedGrafeasNote {
+      noteReference = "projects/\(v.gcpProject)/notes/formae-test-ba-att-\(v.testRunID)"
+      publicKeys = new Listing {
+        new attestor.AttestorPublicKey {
+          // Set explicitly: left blank the API computes an
+          // "ni:///sha-256;..." id and that nested value would read as drift
+          // on every sync.
+          id = "formae-test-key-1"
+          comment = "Conformance test key"
+          pkixPublicKey = new attestor.AttestorPkixPublicKey {
+            publicKeyPem = """
+              -----BEGIN PUBLIC KEY-----
+              MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEwRG2MNw3cvlHTsxxnD1OFAszpfJh
+              jX4M+a6clRmtNY4f2NZTIYEAWqcgxkGdE1he1+x4W3o11l2XZ6GYOFUdQQ==
+              -----END PUBLIC KEY-----
+              """
+            signatureAlgorithm = "ECDSA_P256_SHA256"
+          }
+        }
+      }
+    }
+  }
+}

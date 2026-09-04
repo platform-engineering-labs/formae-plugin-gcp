@@ -1,0 +1,27 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/serverTlsPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Changes the description. allowOpen stays true: turning it off would demand a
+// certificate provider the case deliberately does not have.
+forma {
+  v.stack
+  v.target
+
+  new serverTlsPolicy.ServerTlsPolicy {
+    label = "plugin-sdk-test-ns-server-tls-policy"
+    name = "formae-test-ns-stp-\(v.testRunID)"
+    allowOpen = true
+    description = "Updated test server TLS policy description"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

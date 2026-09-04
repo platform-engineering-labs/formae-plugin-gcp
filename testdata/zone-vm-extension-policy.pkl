@@ -1,0 +1,46 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/compute/zoneVmExtensionPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// A VM extension policy is configuration and free to hold: it installs nothing
+// until a VM matches it.
+//
+// SAFETY: instanceSelectors is optional, and a policy with NONE selects every VM
+// in the zone and installs the named agent on all of them. This fixture always
+// carries a labelSelector whose label matches nothing, so the policy exists and
+// reconciles while selecting no machine. Never delete the selector to "simplify"
+// this case.
+forma {
+  v.stack
+  v.target
+
+  new zoneVmExtensionPolicy.ZoneVmExtensionPolicy {
+    label = "plugin-sdk-test-zone-vm-extension-policy"
+    name = "formae-test-zvep-\(v.testRunID)"
+    description = "Test VM extension policy for plugin SDK conformance tests"
+    priority = 1000
+    extensionPolicies {
+      ["ops-agent"] {
+        // "" is the API's spelling of "unpinned": track the current release.
+        pinnedVersion = ""
+      }
+    }
+    instanceSelectors {
+      new {
+        labelSelector {
+          // Deliberately matches no VM. See the SAFETY note above.
+          inclusionLabels {
+            ["formae-probe"] = "nothing-matches"
+          }
+        }
+      }
+    }
+  }
+}

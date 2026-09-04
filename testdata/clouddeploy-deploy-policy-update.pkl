@@ -1,0 +1,90 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/clouddeploy/deliveryPipeline.pkl" as deliveryPipeline
+import "@gcp/clouddeploy/deployPolicy.pkl" as deployPolicy
+import "./config/vars.pkl" as v
+
+// A deploy policy only forbids actions - it never performs one - so it holds
+// nothing and costs nothing. The pipeline it selects is configuration too, and
+// carries no stages here because the policy does not need one.
+//
+// The pipeline is referenced through its resolvable, which orders the creates.
+// A selector's id is the pipeline's short name, which is exactly what the
+// resolvable yields.
+//
+// Every clock component below is non-zero on purpose: these are protobuf
+// messages, so a zero is dropped on the wire - startTime sent as { hours = 0 }
+// is read back as an empty object - and 24 is how the API spells the end of a
+// day.
+local dp = new deliveryPipeline.DeliveryPipeline {
+  label = "plugin-sdk-test-cd-pol-pipeline"
+  name = "formae-test-cd-pol-dp-\(v.testRunID)"
+  description = "Pipeline the policy under test applies to"
+}
+
+forma {
+  v.stack
+  v.target
+
+  dp
+
+  new deployPolicy.DeployPolicy {
+    label = "plugin-sdk-test-clouddeploy-deploy-policy"
+    name = "formae-test-cd-pol-\(v.testRunID)"
+    description = "Updated deploy policy description"
+    selectors = new Listing {
+      new deployPolicy.DeployPolicyResourceSelector {
+        deliveryPipeline = new deployPolicy.DeliveryPipelineAttribute {
+          id = dp.res.name
+        }
+      }
+    }
+    rules = new Listing {
+      new deployPolicy.PolicyRule {
+        rolloutRestriction = new deployPolicy.RolloutRestriction {
+          id = "formae-test-no-friday-deploys"
+          actions = new Listing {
+            "ADVANCE"
+            "APPROVE"
+          }
+          invokers = new Listing {
+            "USER"
+          }
+          timeWindows = new deployPolicy.TimeWindows {
+            timeZone = "Europe/Berlin"
+            weeklyWindows = new Listing {
+              new deployPolicy.WeeklyWindow {
+                daysOfWeek = new Listing {
+                  "FRIDAY"
+                }
+                startTime = new deployPolicy.TimeOfDay {
+                  hours = 18
+                  minutes = 30
+                }
+                endTime = new deployPolicy.TimeOfDay {
+                  hours = 24
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // Suspending the policy is the other field this update exercises. Only
+    // ever set it to true: false is the protobuf default, so the API drops it
+    // from the response and a declared false would read as a missing field.
+    suspended = true
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+    annotations = new Mapping {
+      ["formae-test"] = "deploy-policy"
+    }
+  }
+}

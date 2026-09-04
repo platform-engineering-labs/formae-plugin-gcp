@@ -1,0 +1,35 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/clouddeploy/customTargetType.pkl" as customTargetType
+import "./config/vars.pkl" as v
+
+// A custom target type describes how to render and deploy to something Cloud
+// Deploy does not know about. It is pure configuration and free to hold: the
+// container image named here is pulled by a rollout, and a rollout is only
+// created by releasing to a pipeline, which this case never does.
+forma {
+  v.stack
+  v.target
+
+  new customTargetType.CustomTargetType {
+    label = "plugin-sdk-test-clouddeploy-custom-target-type"
+    name = "formae-test-cd-ctt-\(v.testRunID)"
+    description = "Updated custom target type description"
+    customActions = new customTargetType.CustomTargetSkaffoldActions {
+      renderAction = "render-formae-test"
+      deployAction = "deploy-formae-test-v2"
+    }
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+    annotations = new Mapping {
+      ["formae-test"] = "custom-target-type"
+    }
+  }
+}

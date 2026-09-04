@@ -1,0 +1,39 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/parametermanager/parameter.pkl"
+import "@gcp/parametermanager/parameterVersion.pkl"
+import "./config/vars.pkl" as v
+
+// Disables the version, which is the only mutable field this type has: the
+// payload is immutable (PATCH ?updateMask=payload answers 400 IMMUTABLE_FIELD,
+// and a PATCH carrying it with no mask at all answers 200 and silently ignores
+// it), and the id is a path component.
+//
+// A disabled version keeps its contents and stops serving them, so nothing is
+// destroyed and nothing starts billing. The parameter is unchanged, and is
+// still referenced through its resolvable so the destroy order still holds.
+local param = new parameter.Parameter {
+  label = "plugin-sdk-test-pm-pv-parameter"
+  name = "formae-test-pm-pvp-\(v.testRunID)"
+}
+
+forma {
+  v.stack
+  v.target
+
+  param
+
+  new parameterVersion.ParameterVersion {
+    label = "plugin-sdk-test-pm-parameter-version"
+    name = "formae-test-pm-pv-\(v.testRunID)"
+    parameter = param.res.name
+    data = "formae-test-parameter-payload"
+    disabled = true
+  }
+}

@@ -14,6 +14,7 @@ import (
 
 const (
 	InstanceResourceType       = "GCP::Spanner::Instance"
+	InstanceConfigResourceType = "GCP::Spanner::InstanceConfig"
 	DatabaseResourceType       = "GCP::Spanner::Database"
 	BackupScheduleResourceType = "GCP::Spanner::BackupSchedule"
 )
@@ -41,6 +42,25 @@ func init() {
 			},
 			RequestTransformer:  base.RequestTransformerFunc(instanceRequestTransformer),
 			ResponseTransformer: base.ResponseTransformerFunc(instanceResponseTransformer),
+		},
+		{
+			// A user-managed instance configuration: project-scoped like an
+			// instance, and free to hold - nothing is provisioned or billed
+			// until an instance is created against it.
+			//
+			// RequestWrapper, CreateIDParam and UpdateMaskFromBody are all
+			// deliberately unset; instanceConfigRequestTransformer explains
+			// which envelope each one would have produced and why none of them
+			// is the envelope Spanner accepts.
+			ResourceType: InstanceConfigResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:   "instanceConfigs",
+				Scope:          &base.ScopeConfig{Type: base.ScopeProjectLevel},
+				SupportsUpdate: true,
+				UpdateMethod:   base.UpdateMethodPatch,
+			},
+			RequestTransformer:  base.RequestTransformerFunc(instanceConfigRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(instanceConfigResponseTransformer),
 		},
 		{
 			// ponytail: no update. enableDropProtection is the only patchable

@@ -15,6 +15,7 @@ const (
 	InternalRangeResourceType           = "GCP::NetworkConnectivity::InternalRange"
 	PolicyBasedRouteResourceType        = "GCP::NetworkConnectivity::PolicyBasedRoute"
 	ServiceConnectionPolicyResourceType = "GCP::NetworkConnectivity::ServiceConnectionPolicy"
+	SpokeResourceType                   = "GCP::NetworkConnectivity::Spoke"
 )
 
 var networkConnectivityRegistry *base.ResourceRegistry
@@ -103,6 +104,30 @@ func init() {
 			// in update_mask" - so the immutable trio is dropped on update.
 			RequestTransformer:  base.DropFieldsOnUpdate("name", "serviceClass", "network"),
 			ResponseTransformer: base.ShortNameResponseTransformer,
+		},
+		{
+			// What actually attaches to a hub. A spoke of kind VPC_NETWORK
+			// links one VPC into the hub's mesh; the other spoke kinds link
+			// VPN tunnels, interconnect attachments or router appliances and
+			// are deliberately not exposed here, since each of them bills by
+			// the hour.
+			//
+			// Global, like the hub it joins: verified to create, read, patch
+			// and delete only under locations/global, despite the discovery
+			// document filing spokes under projects.locations.
+			ResourceType: SpokeResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType:       "spokes",
+				Scope:              &base.ScopeConfig{Type: base.ScopeGlobal},
+				CreateIDParam:      "spokeId", // id goes in ?spokeId=, not the body
+				SupportsUpdate:     true,
+				UpdateMaskFromBody: true,
+			},
+			// See spoke.go. The hub arrives from a resolvable as a short id and
+			// has to leave as a full path, and come back as a short id again;
+			// and linkedVpcNetwork reports members no forma can declare.
+			RequestTransformer:  base.RequestTransformerFunc(spokeRequestTransformer),
+			ResponseTransformer: base.ResponseTransformerFunc(spokeResponseTransformer),
 		},
 	})
 	if err != nil {

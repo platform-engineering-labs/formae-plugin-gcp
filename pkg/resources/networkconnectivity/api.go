@@ -12,8 +12,8 @@ import (
 )
 
 // defaultLocation is where a Network Connectivity resource lives when it has no
-// region of its own. Hubs, internal ranges and policy-based routes are global;
-// service connection policies are regional.
+// region of its own. Hubs, spokes, internal ranges and policy-based routes are
+// global; service connection policies are regional.
 //
 // The builders below read ctx.Location and fall back to this. That is safe
 // rather than lax: a globally-scoped resource is registered with
@@ -30,6 +30,12 @@ var globalResourceTypes = map[string]bool{
 	"hubs":              true,
 	"internalRanges":    true,
 	"policyBasedRoutes": true,
+	// The discovery document files spokes under projects.locations rather than
+	// locations.global, which reads as regional. It is not, for the kind of
+	// spoke this plugin exposes: a spoke that links a VPC network was verified
+	// to create, read, patch and delete only under locations/global. Pinning it
+	// here keeps the target's region out of the URL.
+	"spokes": true,
 }
 
 // locationOf returns the location segment for a request: "global" for the

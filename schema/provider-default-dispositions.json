@@ -170,6 +170,22 @@
       "disposition": "pending"
     },
     {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.createTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.disabled",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.id",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudbuild/buildTrigger.pkl#BuildTrigger.resourceName",
+      "disposition": "pending"
+    },
+    {
       "key": "cloudrun/job.pkl#TaskTemplate.executionEnvironment",
       "disposition": "pending"
     },
@@ -722,6 +738,14 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/regionBackendBucket.pkl#RegionBackendBucket.compressionMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/regionBackendBucket.pkl#RegionBackendBucket.enableCdn",
+      "disposition": "pending"
+    },
+    {
       "key": "compute/regionBackendService.pkl#RegionBackendService.fingerprint",
       "disposition": "pending"
     },
@@ -914,6 +938,10 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/regionTargetHttpsProxy.pkl#RegionTargetHttpsProxy.tlsEarlyData",
+      "disposition": "pending"
+    },
+    {
       "key": "compute/regionTargetTcpProxy.pkl#RegionTargetTcpProxy.proxyHeader",
       "disposition": "pending"
     },
@@ -1102,6 +1130,18 @@
       "disposition": "pending"
     },
     {
+      "key": "compute/zoneVmExtensionPolicy.pkl#ZoneVmExtensionPolicy.globalResourceLink",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/zoneVmExtensionPolicy.pkl#ZoneVmExtensionPolicy.managedByGlobal",
+      "disposition": "pending"
+    },
+    {
+      "key": "compute/zoneVmExtensionPolicy.pkl#ZoneVmExtensionPolicy.state",
+      "disposition": "pending"
+    },
+    {
       "key": "container/cluster.pkl#Cluster.createTime",
       "disposition": "pending"
     },
@@ -1123,6 +1163,10 @@
     },
     {
       "key": "container/nodepool.pkl#NodePool.status",
+      "disposition": "pending"
+    },
+    {
+      "key": "dataform/workspace.pkl#Workspace.disableMoves",
       "disposition": "pending"
     },
     {
@@ -1283,6 +1327,26 @@
     },
     {
       "key": "filestore/filestoreSnapshot.pkl#Snapshot.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.appEngineIntegrationMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.concurrencyMode",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.databaseEdition",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.deleteProtectionState",
+      "disposition": "pending"
+    },
+    {
+      "key": "firestore/database_firestore.pkl#Database.pointInTimeRecoveryEnablement",
       "disposition": "pending"
     },
     {
@@ -1454,11 +1518,39 @@
       "disposition": "pending"
     },
     {
+      "key": "networkconnectivity/spoke.pkl#Spoke.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.group",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.spokeType",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "networkconnectivity/spoke.pkl#Spoke.uniqueId",
+      "disposition": "pending"
+    },
+    {
       "key": "networksecurity/addressGroup.pkl#AddressGroup.purpose",
       "disposition": "pending"
     },
     {
       "key": "networksecurity/addressGroup.pkl#AddressGroup.selfLink",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/backendAuthenticationConfig.pkl#BackendAuthenticationConfig.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "networksecurity/gatewaySecurityPolicyRule.pkl#GatewaySecurityPolicyRule.tlsInspectionEnabled",
       "disposition": "pending"
     },
     {
@@ -1494,6 +1586,14 @@
       "disposition": "pending"
     },
     {
+      "key": "parametermanager/parameter.pkl#Parameter.format",
+      "disposition": "pending"
+    },
+    {
+      "key": "parametermanager/parameterVersion.pkl#ParameterVersion.disabled",
+      "disposition": "pending"
+    },
+    {
       "key": "pubsub/pubsubSnapshot.pkl#Snapshot.expireTime",
       "disposition": "pending"
     },
@@ -1511,6 +1611,26 @@
     },
     {
       "key": "pubsub/topicIamMember.pkl#TopicIamMember.project",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.createTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.state",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.updateTime",
+      "disposition": "pending"
+    },
+    {
+      "key": "redis/aclPolicy.pkl#AclPolicy.version",
       "disposition": "pending"
     },
     {
@@ -1559,6 +1679,18 @@
     },
     {
       "key": "spanner/database_spanner.pkl#Database.versionRetentionPeriod",
+      "disposition": "pending"
+    },
+    {
+      "key": "spanner/instanceConfig.pkl#InstanceConfig.configType",
+      "disposition": "pending"
+    },
+    {
+      "key": "spanner/instanceConfig.pkl#InstanceConfig.etag",
+      "disposition": "pending"
+    },
+    {
+      "key": "spanner/instanceConfig.pkl#InstanceConfig.state",
       "disposition": "pending"
     },
     {

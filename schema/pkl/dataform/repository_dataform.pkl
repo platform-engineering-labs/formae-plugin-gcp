@@ -1,0 +1,167 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Dataform Repository
+///
+/// The root of everything in Dataform: a container for the SQL workflow code
+/// that compiles into BigQuery jobs, plus the settings compilation inherits.
+///
+/// Free, and free without a Git remote — `gitRemoteSettings` is genuinely
+/// optional, and a repository created without one is a working, unconnected
+/// repository. That matters because a remote needs a personal access token in
+/// Secret Manager. Nothing is provisioned either way: a repository holds
+/// metadata until a compilation result or a workflow invocation runs, and
+/// neither of those is a resource this plugin creates.
+///
+/// Location-scoped, and every method is synchronous — create and patch answer
+/// with the repository itself rather than an operation to poll.
+///
+/// A repository that still has workspaces, release configs or workflow configs
+/// under it refuses to delete with HTTP 400 "has nested resources". Declare
+/// those through this repository's resolvable and formae destroys them first.
+module gcp.dataform.repository
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::Dataform::Repository"
+
+/// Compilation settings applied to workspace-scoped compilations, overriding
+/// what `dataform.json` in the repository says. Mutable as a whole.
+@gcp.SubResourceHint
+open class WorkspaceCompilationOverrides extends formae.SubResource {
+    /// The Google Cloud project code compiled in a workspace writes to.
+    @gcp.FieldHint
+    defaultDatabase: String?
+
+    /// Appended to every BigQuery dataset name a workspace compilation
+    /// produces, so two developers do not write to the same tables.
+    @gcp.FieldHint
+    schemaSuffix: String?
+
+    /// Prepended to every table name a workspace compilation produces.
+    @gcp.FieldHint
+    tablePrefix: String?
+}
+
+/// SSH credentials for a Git remote reached over ssh:// rather than https://.
+@gcp.SubResourceHint
+open class SshAuthenticationConfig extends formae.SubResource {
+    /// A public SSH host key, used to verify the remote's identity.
+    @gcp.FieldHint
+    hostPublicKey: String
+
+    /// The Secret Manager secret version holding the private key, as the full
+    /// path `projects/*/secrets/*/versions/*`.
+    @gcp.FieldHint
+    userPrivateKeySecretVersion: String
+}
+
+/// The Git remote this repository mirrors.
+///
+/// Optional in full. Leave it out and the repository is unconnected, which is
+/// the only form that needs no credential in Secret Manager.
+///
+/// Two fields the API reports here are absent from this class on purpose:
+/// `effectiveDefaultBranch` (the remote's actual default branch, echoed back as
+/// "main" for a repository that sent no `defaultBranch`) and `tokenStatus`
+/// (which the API's own discovery document says carries no token status
+/// information). Both are output-only and nested, where a `hasProviderDefault`
+/// hint cannot reach them, so the plugin strips them from every read instead.
+@gcp.SubResourceHint
+open class GitRemoteSettings extends formae.SubResource {
+    /// The remote's URL, e.g. "https://github.com/example/example.git".
+    @gcp.FieldHint
+    url: String
+
+    /// The branch to treat as default. The API uses "main" when this is unset.
+    @gcp.FieldHint
+    defaultBranch: String?
+
+    /// The Secret Manager secret version holding a personal access token, as
+    /// the full path `projects/*/secrets/*/versions/*`. Give this or
+    /// `sshAuthenticationConfig` or `gitRepositoryLink`.
+    @gcp.FieldHint
+    authenticationTokenSecretVersion: String?
+
+    /// SSH credentials, for an ssh:// remote.
+    @gcp.FieldHint
+    sshAuthenticationConfig: SshAuthenticationConfig?
+
+    /// A Developer Connect `GitRepositoryLink` to authenticate through instead
+    /// of a token, as the full path
+    /// `projects/*/locations/*/connections/*/gitRepositoryLinks/*`.
+    @gcp.FieldHint
+    gitRepositoryLink: String?
+}
+
+open class RepositoryResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: RepositoryResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class Repository extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-repo"). Immutable — it is sent as ?repositoryId= at
+    /// creation and is the path afterwards.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// A friendlier name for the console. Mutable.
+    @gcp.FieldHint
+    displayName: String?
+
+    /// The service account workflow invocations from this repository run under.
+    /// Mutable.
+    @gcp.FieldHint
+    serviceAccount: String?
+
+    /// A Cloud KMS key to encrypt this repository and everything under it with,
+    /// as the full path `projects/*/locations/*/keyRings/*/cryptoKeys/*`.
+    ///
+    /// Immutable, and immutable by field mask rather than by value: a PATCH
+    /// whose updateMask names it is refused with "immutable fields:
+    /// [kms_key_name]" even when the value has not changed. The plugin
+    /// therefore drops it from every update body.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    kmsKeyName: String?
+
+    /// The Secret Manager secret version holding a `.npmrc` to interpolate into
+    /// package installs, as the full path `projects/*/secrets/*/versions/*`.
+    /// Mutable, and not validated on write — the API accepts a path to a secret
+    /// that does not exist.
+    @gcp.FieldHint
+    npmrcEnvironmentVariablesSecretVersion: String?
+
+    /// The Git remote to mirror. Omit for an unconnected repository.
+    @gcp.FieldHint
+    gitRemoteSettings: GitRemoteSettings?
+
+    /// Compilation settings for workspace-scoped compilations. Mutable.
+    @gcp.FieldHint
+    workspaceCompilationOverrides: WorkspaceCompilationOverrides?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    hidden res: RepositoryResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

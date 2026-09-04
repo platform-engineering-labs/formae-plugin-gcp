@@ -119,6 +119,19 @@ const (
 
 	// Traffic inspection
 	PacketMirroringResourceType = "GCP::Compute::PacketMirroring"
+
+	// Regional counterpart of BackendBucket. Same resource body, one extra
+	// requirement: see regionBackendBucket.pkl.
+	RegionBackendBucketResourceType = "GCP::Compute::RegionBackendBucket"
+
+	// Staged rollout orchestration. rolloutPlans has no update method, so the
+	// type registers without OperationUpdate.
+	RolloutPlanResourceType = "GCP::Compute::RolloutPlan"
+
+	// Fleet-wide VM extension (agent) management, one zone at a time. The
+	// global sibling is deliberately not implemented - see
+	// zoneVmExtensionPolicy.pkl for why.
+	ZoneVmExtensionPolicyResourceType = "GCP::Compute::ZoneVmExtensionPolicy"
 )
 
 // computeRegistry is the unified registry for all Compute resources
@@ -843,6 +856,71 @@ func init() {
 			ResponseTransformer: nil,
 		},
 
+		// Region Backend Bucket - the same backendBuckets body under
+		// regions/{region} instead of global, for a regional LB. insert, get,
+		// list, patch and delete are all standard, so the generic engine does
+		// the work; the only difference from the global type is that
+		// loadBalancingScheme is required, which the schema enforces.
+		{
+			ResourceType: RegionBackendBucketResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "backendBuckets",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeRegional,
+				},
+				SupportsUpdate:    true,
+				UpdateMethod:      base.UpdateMethodPatch,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: nil,
+		},
+
+		// Rollout Plan - a named, staged schedule other Compute orchestration
+		// calls can name instead of restating the staging.
+		//
+		// rolloutPlans has insert, get, list and delete and NO update method, so
+		// every field is immutable and Update is left out of Operations rather
+		// than registered as a patch that would 404. A change replaces.
+		{
+			ResourceType: RolloutPlanResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "rolloutPlans",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeGlobal,
+				},
+				SupportsUpdate:    false,
+				OptimisticLocking: nil,
+			},
+			Operations: []resource.Operation{
+				resource.OperationCreate,
+				resource.OperationRead,
+				resource.OperationDelete,
+				resource.OperationList,
+				resource.OperationCheckStatus,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: RolloutPlanResponseTransformer,
+		},
+
+		// Zone VM Extension Policy - keeps named VM extensions (the Ops Agent,
+		// say) installed at a version on the VMs a selector picks out, in one
+		// zone. Ordinary insert/get/list/patch/delete.
+		{
+			ResourceType: ZoneVmExtensionPolicyResourceType,
+			ResourceConfig: base.ResourceConfig{
+				ResourceType: "vmExtensionPolicies",
+				Scope: &base.ScopeConfig{
+					Type: base.ScopeZonal,
+				},
+				SupportsUpdate:    true,
+				UpdateMethod:      base.UpdateMethodPatch,
+				OptimisticLocking: nil,
+			},
+			RequestTransformer:  nil,
+			ResponseTransformer: ZoneVmExtensionPolicyResponseTransformer,
+		},
+
 		// Region Autoscaler - scales a RegionInstanceGroupManager. Same
 		// ?autoscaler=NAME patch quirk as the zonal one, so update is off.
 		{
@@ -1187,6 +1265,12 @@ func init() {
 		},
 
 		// Region Target HTTP Proxy - Regional HTTP proxy for internal load balancers
+		//
+		// Update is off. regionTargetHttpProxies has only delete, get, insert,
+		// list and setUrlMap - no patch - so a PATCH lands on a URL the API does
+		// not serve and comes back as Google's HTML 404 page rather than an API
+		// error. Its global sibling does have patch, which is how the regional
+		// one came to claim update it never had. A change replaces.
 		{
 			ResourceType: RegionTargetHttpProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1194,7 +1278,7 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
+				SupportsUpdate:    false,
 				OptimisticLocking: nil,
 			},
 			RequestTransformer:  nil,
@@ -1202,6 +1286,15 @@ func init() {
 		},
 
 		// Region Target HTTPS Proxy - Regional HTTPS proxy for internal load balancers
+		//
+		// regionTargetHttpsProxies.patch enforces the fingerprint, unlike most
+		// Compute patches where it is advisory: a PATCH without one is refused
+		// outright with
+		//
+		//	Required field 'resource.fingerprint' not specified
+		//
+		// so optimistic locking is not an optimisation here, it is the only way
+		// an update reaches the API at all.
 		{
 			ResourceType: RegionTargetHttpsProxyResourceType,
 			ResourceConfig: base.ResourceConfig{
@@ -1209,8 +1302,12 @@ func init() {
 				Scope: &base.ScopeConfig{
 					Type: base.ScopeRegional,
 				},
-				SupportsUpdate:    true,
-				OptimisticLocking: nil,
+				SupportsUpdate: true,
+				OptimisticLocking: &base.OptimisticLockingConfig{
+					Enabled:       true,
+					FieldName:     "fingerprint",
+					LocationInURL: false,
+				},
 			},
 			RequestTransformer:  nil,
 			ResponseTransformer: base.RegionResponseTransformer,

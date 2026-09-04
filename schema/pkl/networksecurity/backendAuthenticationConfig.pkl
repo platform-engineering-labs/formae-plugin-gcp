@@ -1,0 +1,86 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Network Security BackendAuthenticationConfig
+///
+/// What a load balancer trusts when it opens a TLS connection *to* a backend:
+/// the public root set, or a named trust config, plus an optional client
+/// certificate to present. A backend service names it; on its own it
+/// authenticates nothing and costs nothing.
+///
+/// Global (it lives under locations/global). Create, update and delete are
+/// long-running operations.
+module gcp.networksecurity.backendAuthenticationConfig
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::NetworkSecurity::BackendAuthenticationConfig"
+
+open class BackendAuthenticationConfigResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: BackendAuthenticationConfigResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class BackendAuthenticationConfig extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-backend-auth-config"). Immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// Trust the public certificate roots rather than a private CA set:
+    /// PUBLIC_ROOTS, or NONE to trust only what `trustConfig` names.
+    @gcp.FieldHint
+    wellKnownRoots: String?
+
+    /// Full path of a Certificate Manager trust config holding the CAs the
+    /// backend's certificate is validated against. Give this or
+    /// `wellKnownRoots`.
+    ///
+    /// The API wants the full resource path, so name it in full rather than
+    /// through a resolvable, which would yield only the short id. This batch
+    /// does not exercise it: a trust config is a separate service's resource.
+    @gcp.FieldHint
+    trustConfig: (String|formae.Resolvable)?
+
+    /// Full path of the Certificate Manager certificate the load balancer
+    /// presents to the backend — the client half of mutual TLS. Same
+    /// full-path caveat as `trustConfig`, and likewise untested here.
+    @gcp.FieldHint
+    clientCertificate: (String|formae.Resolvable)?
+
+    /// An optional description.
+    @gcp.FieldHint
+    description: String?
+
+    /// Optional labels in key-value pair format.
+    @gcp.FieldHint
+    labels: Mapping<String, String>?
+
+    /// Server-assigned concurrency token. Unusually for this API it really is
+    /// returned, so it is declared and tolerated rather than ignored — but it
+    /// never goes back on a write: replaying a stored etag stakes a claim on a
+    /// version the server has already moved past.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
+    etag: String?
+
+    hidden res: BackendAuthenticationConfigResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

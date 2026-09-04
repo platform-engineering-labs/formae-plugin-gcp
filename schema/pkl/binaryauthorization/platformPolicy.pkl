@@ -1,0 +1,361 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+/// GCP Binary Authorization PlatformPolicy
+///
+/// A named, deletable document of image checks that a GKE cluster opts into —
+/// the check-based successor to the single project-wide
+/// `projects/{project}/policy`, which has no create and no delete and is
+/// therefore not modelled by this plugin.
+///
+/// Free and inert on its own. The checks describe what *would* be required of a
+/// container image; nothing evaluates them until a cluster is configured to use
+/// this policy by name, so creating one changes no admission decision anywhere.
+///
+/// Addressed as `projects/{project}/platforms/gke/policies/{policy}`. The
+/// platform segment is not a field: v1 exposes only `gke`, an unknown platform
+/// id is refused, and asking for another one with a `gkePolicy` body is refused
+/// as a platform mismatch. Create, update and delete are synchronous — this API
+/// has no long-running operations — and update is `replacePlatformPolicy`, a
+/// PUT that replaces the whole document.
+module gcp.binaryauthorization.platformPolicy
+
+import "../gcp.pkl"
+import "@formae/formae.pkl"
+
+const type = "GCP::BinaryAuthorization::PlatformPolicy"
+
+/// Image name patterns exempted from whatever they are attached to.
+@gcp.SubResourceHint
+open class ImageAllowlist extends formae.SubResource {
+    /// A disjunction of patterns, e.g. "gcr.io/my-project/**". A match exempts
+    /// the image.
+    @gcp.FieldHint
+    allowPattern: Listing<String>
+}
+
+/// Which Pods a check set applies to. Leave unset for the catch-all.
+@gcp.SubResourceHint
+open class CheckSetScope extends formae.SubResource {
+    /// Matches every service account in a namespace, e.g. "my-namespace".
+    @gcp.FieldHint
+    kubernetesNamespace: String?
+
+    /// Matches one service account, e.g. "my-namespace:my-service-account".
+    /// Always more specific than the namespace scope.
+    @gcp.FieldHint
+    kubernetesServiceAccount: String?
+}
+
+/// Reject an image older than this.
+@gcp.SubResourceHint
+open class ImageFreshnessCheck extends formae.SubResource {
+    /// Maximum age, in days, since the image was uploaded. Must be > 0.
+    @gcp.FieldHint
+    maxUploadAgeDays: Int
+}
+
+/// Reject an image that does not live in one of these directories.
+@gcp.SubResourceHint
+open class TrustedDirectoryCheck extends formae.SubResource {
+    /// Patterns of the form "registry/path/to/directory", e.g.
+    /// "gcr.io/my-project/**" or "*-docker.pkg.dev/my-project/my-repo". The
+    /// registry itself must be fully specified — "gcr.i*" is refused.
+    @gcp.FieldHint
+    trustedDirPatterns: Listing<String>
+}
+
+/// Reject an image whose vulnerabilities exceed a severity threshold.
+@gcp.SubResourceHint
+open class VulnerabilityCheck extends formae.SubResource {
+    /// Threshold for vulnerabilities that do have a fix available. Required:
+    /// BLOCK_ALL, MINIMAL, LOW, MEDIUM, HIGH, CRITICAL or ALLOW_ALL.
+    @gcp.FieldHint
+    maximumFixableSeverity: String
+
+    /// Threshold for vulnerabilities with no fix available. Required, same
+    /// values.
+    @gcp.FieldHint
+    maximumUnfixableSeverity: String
+
+    /// CVEs to ignore whatever the thresholds say, as Container Analysis note
+    /// ids, e.g. "CVE-2021-20305".
+    @gcp.FieldHint
+    allowedCves: Listing<String>?
+
+    /// CVEs to warn about even when the thresholds are met.
+    @gcp.FieldHint
+    blockedCves: Listing<String>?
+
+    /// Where the scan results are read from, as "projects/{project}". At most
+    /// ten. An error is reported if none of them holds a valid scan.
+    @gcp.FieldHint
+    containerAnalysisVulnerabilityProjects: Listing<String>?
+}
+
+/// Where SLSA provenance attestations are fetched from.
+@gcp.SubResourceHint
+open class AttestationSource extends formae.SubResource {
+    /// Projects storing the attestations as Container Analysis occurrences, as
+    /// "projects/{project}". At most ten.
+    @gcp.FieldHint
+    containerAnalysisAttestationProjects: Listing<String>
+}
+
+/// One SLSA verification rule. An image passes the check if any rule is
+/// satisfied.
+@gcp.SubResourceHint
+open class VerificationRule extends formae.SubResource {
+    /// The builder whose provenance this rule judges, e.g.
+    /// "GOOGLE_CLOUD_BUILD". For some builders the roots of trust are fetched
+    /// automatically and need not be stated.
+    @gcp.FieldHint
+    trustedBuilder: String
+
+    /// Trusted source repository URL patterns, without a scheme, e.g.
+    /// "github.com/my-project/*". `*` and `**` are allowed only as a trailing
+    /// wildcard after a "/".
+    @gcp.FieldHint
+    trustedSourceRepoPatterns: Listing<String>?
+
+    /// Where to fetch the builder's provenance attestations.
+    @gcp.FieldHint
+    attestationSource: AttestationSource?
+
+    /// Require the image to have been built from a top-level configuration held
+    /// in one of `trustedSourceRepoPatterns`.
+    @gcp.FieldHint
+    configBasedBuildRequired: Boolean?
+
+    /// A CEL expression stating extra constraints on the provenance payload,
+    /// for expectations the general check does not cover.
+    @gcp.FieldHint
+    customConstraints: String?
+}
+
+/// Require trusted-builder provenance (SLSA).
+@gcp.SubResourceHint
+open class SlsaCheck extends formae.SubResource {
+    /// The rules. Any one satisfied passes the check.
+    @gcp.FieldHint
+    rules: Listing<VerificationRule>
+}
+
+/// A Sigstore/Cosign public key.
+@gcp.SubResourceHint
+open class SigstorePublicKey extends formae.SubResource {
+    /// The key material, PEM-encoded.
+    @gcp.FieldHint
+    publicKeyPem: String
+}
+
+/// A set of Sigstore keys, any one of which may validate a signature.
+@gcp.SubResourceHint
+open class SigstorePublicKeySet extends formae.SubResource {
+    /// At least one key.
+    @gcp.FieldHint
+    publicKeys: Listing<SigstorePublicKey>
+}
+
+/// A Sigstore authority: a named key set a signature may be verified against.
+@gcp.SubResourceHint
+open class SigstoreAuthority extends formae.SubResource {
+    /// The keys. A signature is valid if any of them validates it.
+    @gcp.FieldHint
+    publicKeySet: SigstorePublicKeySet
+
+    /// A name for this authority. Affects evaluation messages only, never the
+    /// verdict.
+    @gcp.FieldHint
+    displayName: String?
+}
+
+/// Require a Cosign signature stored alongside the image in Artifact Registry.
+@gcp.SubResourceHint
+open class SigstoreSignatureCheck extends formae.SubResource {
+    /// The authorities. Verification by any one of them passes the check.
+    @gcp.FieldHint
+    sigstoreAuthorities: Listing<SigstoreAuthority>
+}
+
+/// A raw PKIX public key used to authenticate an attestation signature.
+///
+/// Unlike the attestor's own key wrapper, `keyId` is declarable here: this key
+/// stands alone rather than inside a wrapper with its own notion of id, and the
+/// API echoes it back exactly as sent (verified live).
+@gcp.SubResourceHint
+open class PkixPublicKey extends formae.SubResource {
+    /// The key material, PEM-encoded (RFC 7468).
+    @gcp.FieldHint
+    publicKeyPem: String
+
+    /// How signatures made with this key are verified, e.g.
+    /// "ECDSA_P256_SHA256". Must match the algorithm encoded in the PEM.
+    @gcp.FieldHint
+    signatureAlgorithm: String
+
+    /// The id signatures must carry, as an RFC 3986 URI. Left unset the API
+    /// computes one from the key's DER digest, which would read as drift, so
+    /// set it whenever the field is used at all.
+    @gcp.FieldHint
+    keyId: String?
+}
+
+/// A set of PKIX keys, any one of which authenticates an attestation.
+@gcp.SubResourceHint
+open class PkixPublicKeySet extends formae.SubResource {
+    /// At least one key.
+    @gcp.FieldHint
+    pkixPublicKeys: Listing<PkixPublicKey>
+}
+
+/// One authenticator an attestation may be verified against.
+@gcp.SubResourceHint
+open class AttestationAuthenticator extends formae.SubResource {
+    /// The keys. Any one validating the signature authenticates it.
+    @gcp.FieldHint
+    pkixPublicKeySet: PkixPublicKeySet?
+
+    /// A name for this authenticator. Affects evaluation messages only.
+    @gcp.FieldHint
+    displayName: String?
+}
+
+/// Require a signed SimpleSigning DSSE attestation for every image.
+@gcp.SubResourceHint
+open class SimpleSigningAttestationCheck extends formae.SubResource {
+    /// The authenticators, OR-ed: one verified attestation is enough. At least
+    /// one authenticator is required.
+    @gcp.FieldHint
+    attestationAuthenticators: Listing<AttestationAuthenticator>
+
+    /// Projects holding the attestations as Container Analysis occurrences, as
+    /// "projects/{project}" — a project id, never a number. At most ten.
+    @gcp.FieldHint
+    containerAnalysisAttestationProjects: Listing<String>?
+}
+
+/// One check against a Pod's images. Set exactly one check kind.
+@gcp.SubResourceHint
+open class Check extends formae.SubResource {
+    /// Reject images older than a set number of days.
+    @gcp.FieldHint
+    imageFreshnessCheck: ImageFreshnessCheck?
+
+    /// Reject images outside a set of trusted directories.
+    @gcp.FieldHint
+    trustedDirectoryCheck: TrustedDirectoryCheck?
+
+    /// Reject images whose vulnerabilities exceed a severity threshold.
+    @gcp.FieldHint
+    vulnerabilityCheck: VulnerabilityCheck?
+
+    /// Require trusted-builder provenance.
+    @gcp.FieldHint
+    slsaCheck: SlsaCheck?
+
+    /// Require a Cosign signature.
+    @gcp.FieldHint
+    sigstoreSignatureCheck: SigstoreSignatureCheck?
+
+    /// Require a SimpleSigning attestation.
+    @gcp.FieldHint
+    simpleSigningAttestationCheck: SimpleSigningAttestationCheck?
+
+    /// Deny everything the enclosing check set's scope covers and the
+    /// allowlists do not exempt. Useful as a default for unmatched scopes.
+    @gcp.FieldHint
+    alwaysDeny: Boolean?
+
+    /// Images exempted from this check alone.
+    @gcp.FieldHint
+    imageAllowlist: ImageAllowlist?
+
+    /// A name for this check. Affects evaluation messages only, never the
+    /// verdict.
+    @gcp.FieldHint
+    displayName: String?
+}
+
+/// A conjunction of checks, scoped to a namespace or service account. Every
+/// check must allow for the set to allow.
+@gcp.SubResourceHint
+open class CheckSet extends formae.SubResource {
+    /// The checks. All must pass. An empty set allows everything.
+    @gcp.FieldHint
+    checks: Listing<Check>?
+
+    /// Which Pods this set applies to. Leave unset for the catch-all — the API
+    /// enforces that the LAST set in `checkSets` has no scope, and that the
+    /// sets are listed in order of decreasing specificity. A scoped set placed
+    /// last is refused with "When CheckSets are not empty, the last CheckSet
+    /// must have empty scope".
+    @gcp.FieldHint
+    scope: CheckSetScope?
+
+    /// Images exempted from every check in this set.
+    @gcp.FieldHint
+    imageAllowlist: ImageAllowlist?
+
+    /// A name for this set. Affects evaluation messages only.
+    @gcp.FieldHint
+    displayName: String?
+}
+
+/// The GKE half of a platform policy.
+@gcp.SubResourceHint
+open class GkePolicy extends formae.SubResource {
+    /// The check sets, in order of decreasing scope specificity, the last one
+    /// unscoped. Empty means allow everything.
+    @gcp.FieldHint
+    checkSets: Listing<CheckSet>?
+
+    /// Images exempted from the whole policy: a match short-circuits every
+    /// check set.
+    @gcp.FieldHint
+    imageAllowlist: ImageAllowlist?
+}
+
+open class PlatformPolicyResolvable extends formae.Resolvable {
+    hidden type = module.type
+
+    hidden name: PlatformPolicyResolvable = (this) {
+        property = "name"
+    }
+}
+
+@gcp.ResourceHint {
+    type = module.type
+    identifier = "name"
+}
+open class PlatformPolicy extends formae.Resource {
+    hidden parent = this
+
+    /// Short id (e.g. "my-policy"). Sent as ?policyId= on create, and the last
+    /// segment of the path thereafter. The API reports `name` as output-only
+    /// and there is no rename, so this is immutable.
+    @gcp.FieldHint {
+        createOnly = true
+    }
+    name: String
+
+    /// The policy itself. Required in practice: a policy carrying neither a
+    /// `gkePolicy` nor (in a future version) a Cloud Run policy is rejected as
+    /// "policy should contain either gkePolicy or cloudRunPolicy".
+    @gcp.FieldHint
+    gkePolicy: GkePolicy
+
+    /// An optional description. Update replaces the whole document, so omitting
+    /// it clears it. Left out of a read when unset rather than reported as an
+    /// empty string, so no provider default is needed.
+    @gcp.FieldHint
+    description: String?
+
+    hidden res: PlatformPolicyResolvable = new {
+        label = parent.label
+        stack = parent.stack?.label
+    }
+}

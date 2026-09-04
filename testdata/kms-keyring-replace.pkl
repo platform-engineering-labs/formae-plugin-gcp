@@ -1,0 +1,28 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/kms/keyRing.pkl"
+import "./config/vars.pkl" as v
+
+// A key ring has exactly one declarable field - its id - and it is immutable,
+// so every change is a replace. Cloud KMS has no keyRings.patch, which is why
+// there is no -update companion.
+//
+// Free to hold, and free to leave behind for the moment the replace takes: a
+// key ring bills nothing, only the CryptoKeyVersions it does not have would.
+forma {
+  v.stack
+  v.target
+
+  new keyRing.KeyRing {
+    label = "plugin-sdk-test-kms-keyring"
+    // A key ring id is immutable, so changing it forces a replace: the new ring
+    // is created and the old one deleted.
+    name = "formae-test-keyring2-\(v.testRunID)"
+  }
+}

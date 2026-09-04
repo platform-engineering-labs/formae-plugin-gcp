@@ -1,0 +1,43 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/networksecurity/authorizationPolicy.pkl"
+import "./config/vars.pkl" as v
+
+// Who may talk to a mesh workload. Free, and enforced only by the sidecars of a
+// mesh that names the policy - there is no mesh here, so the rules match
+// nothing and no traffic is affected.
+//
+// The rule is deliberately source-only: a destination has to carry hosts, ports
+// and methods together, and none of that is needed to exercise the nested
+// classes.
+forma {
+  v.stack
+  v.target
+
+  new authorizationPolicy.AuthorizationPolicy {
+    label = "plugin-sdk-test-ns-authorization-policy"
+    name = "formae-test-ns-ap-\(v.testRunID)"
+    action = "ALLOW"
+    rules = new Listing {
+      new authorizationPolicy.Rule {
+        sources = new Listing {
+          new authorizationPolicy.Source {
+            ipBlocks = new Listing {
+              "10.0.0.0/8"
+            }
+          }
+        }
+      }
+    }
+    description = "Test authorization policy for plugin SDK conformance tests"
+    labels = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

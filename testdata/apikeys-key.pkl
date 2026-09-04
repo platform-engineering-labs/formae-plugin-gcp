@@ -1,0 +1,52 @@
+/*
+ * © 2025 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@gcp/apikeys/key.pkl"
+import "./config/vars.pkl" as v
+
+// An API key provisions nothing and costs nothing - it is a credential record.
+// It is the one fixture in this repo that creates a live bearer credential, so
+// it is deliberately created useless:
+//
+//   * apiTargets narrows it to translate.googleapis.com, an API this project
+//     does not have enabled, so the key authorizes nothing;
+//   * serverKeyRestrictions pins it to 203.0.113.4, an address in TEST-NET-3
+//     (RFC 5737, reserved for documentation), which no caller can ever have.
+//
+// The key string itself never reaches state: the provisioner drops keyString
+// from every response, and only the create call returns it at all.
+//
+// Deleting it is a soft delete - the key stops working immediately and vanishes
+// from listings, but the id stays reserved for thirty days. Names carry the
+// test run id, which the harness rotates, so a rerun never collides with the
+// tombstone of the last one.
+forma {
+  v.stack
+  v.target
+
+  new key.Key {
+    label = "plugin-sdk-test-ak-key"
+    name = "formae-test-ak-key-\(v.testRunID)"
+    displayName = "Formae conformance test key"
+    restrictions = new key.Restrictions {
+      apiTargets = new Listing {
+        new key.ApiTarget {
+          service = "translate.googleapis.com"
+        }
+      }
+      serverKeyRestrictions = new key.ServerKeyRestrictions {
+        allowedIps = new Listing {
+          "203.0.113.4"
+        }
+      }
+    }
+    annotations = new Mapping {
+      ["environment"] = "test"
+    }
+  }
+}

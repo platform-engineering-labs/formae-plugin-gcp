@@ -4,6 +4,25 @@
  * SPDX-License-Identifier: FSL-1.1-ALv2
  */
 
+/// GCP Compute RegionTargetHttpsProxy
+///
+/// The TLS front end of a regional Application Load Balancer: it terminates
+/// HTTPS and hands the request to a `RegionUrlMap`.
+///
+/// It has no conformance case, and the missing piece is the certificate. A
+/// regional proxy will not take a global one - Compute answers "must be in same
+/// scope as resource referencing it" - so it needs either a regional
+/// `SslCertificate`, which this plugin does not implement and which would in any
+/// case need a private key the repository cannot hold, or a Certificate Manager
+/// certificate in the proxy's own region. The second works: `sslCertificates`
+/// accepts
+///
+///	//certificatemanager.googleapis.com/projects/{p}/locations/{region}/certificates/{c}
+///
+/// verbatim, and a Google-managed certificate carries no key material. But
+/// `GCP::CertificateManager::Certificate` is pinned to `locations/global` (see
+/// certificateManagerLocation in pkg/resources/certificatemanager/api.go), so
+/// no shipped type can produce the regional certificate this one needs.
 module gcp.compute.regionTargetHttpsProxy
 
 import "../gcp.pkl"
@@ -54,6 +73,13 @@ open class RegionTargetHttpsProxy extends formae.Resource {
     @gcp.FieldHint
     urlMap: (String|formae.Resolvable)
 
+    /// URLs of the certificates the proxy serves. They must be in the proxy's
+    /// own region.
+    ///
+    /// Two forms are accepted: a regional `SslCertificate` self-link, and a
+    /// Certificate Manager certificate addressed as
+    /// `//certificatemanager.googleapis.com/projects/{p}/locations/{region}/certificates/{c}`,
+    /// which Compute stores and reports back unchanged - project id and all.
     @gcp.FieldHint
     sslCertificates: Listing<String|formae.Resolvable>?
 
@@ -74,7 +100,13 @@ open class RegionTargetHttpsProxy extends formae.Resource {
     }
     httpKeepAliveTimeoutSec: Int?
 
-    @gcp.FieldHint
+    /// Whether TLS 1.3 0-RTT data is accepted. The API reports "DISABLED" back
+    /// on every read whether or not it was sent, so the field carries a provider
+    /// default rather than being absent - without saying so, a proxy declared
+    /// without it drifts on the first sync.
+    @gcp.FieldHint {
+        hasProviderDefault = true
+    }
     tlsEarlyData: TlsEarlyData?
 
     /// Hash of the proxy's contents, used for optimistic locking. Set by the API.
