@@ -27,6 +27,25 @@ import "@formae/formae.pkl"
 
 const type = "GCP::NetworkConnectivity::Spoke"
 
+/// The VPC network this spoke links into the hub.
+@gcp.SubResourceHint
+open class LinkedVpcNetwork extends formae.SubResource {
+    /// The network itself. The API echoes back exactly the Compute self link
+    /// form ("https://www.googleapis.com/compute/v1/projects/{p}/global/networks/{n}"),
+    /// so pass a network's `selfLink` resolvable and the value round-trips
+    /// without any rewriting.
+    @gcp.FieldHint
+    uri: String|formae.Resolvable
+
+    /// Restrict propagation to these IP ranges instead of the whole network.
+    @gcp.FieldHint
+    includeExportRanges: Listing<String>?
+
+    /// Withhold these IP ranges from propagation.
+    @gcp.FieldHint
+    excludeExportRanges: Listing<String>?
+}
+
 open class SpokeResolvable extends formae.Resolvable {
     hidden type = module.type
 
@@ -58,48 +77,12 @@ open class Spoke extends formae.Resource {
     }
     hub: String|formae.Resolvable
 
-    /// The VPC network to link, as its Compute self link
-    /// ("https://www.googleapis.com/compute/v1/projects/{p}/global/networks/{n}").
-    /// Immutable: which network a spoke carries is fixed when it is created.
-    ///
-    /// The API nests this as `linkedVpcNetwork.uri`, and the plugin assembles
-    /// that object on the way out and unpacks it on the way in. The flat shape
-    /// is not cosmetic - it is the difference between a type that can be
-    /// updated and one that cannot.
-    ///
-    /// A conformance update applies in patch mode, so the network this points
-    /// at is not in that changeset and the reference is still unresolved when
-    /// the change is planned; it resolves only at execution time. formae then
-    /// checks whether resolving changed a createOnly field. When the reference
-    /// sat inside a sub-resource, that check compared the whole
-    /// `linkedVpcNetwork` object across the resolution, saw a createOnly field
-    /// go from unresolved to resolved, and refused every update:
-    /// "resolving references at execution time changed createOnly fields
-    /// [linkedVpcNetwork] ... a replacement was not planned". A property whose
-    /// declared type is `String|formae.Resolvable` is exempt from that check,
-    /// because the type says the value is a reference and is expected to
-    /// materialise; an object merely containing one carries no such signal.
-    /// `hub` above and `InternalRange.network` have always had this shape,
-    /// which is why neither ever hit it.
+    /// The VPC network to link. Immutable: which network a spoke carries is
+    /// fixed when it is created.
     @gcp.FieldHint {
         createOnly = true
     }
-    network: String|formae.Resolvable
-
-    /// Restrict propagation to these IP ranges instead of the whole network.
-    /// Part of the same immutable object as `network`: the API refuses a patch
-    /// whose update mask so much as names `linked_vpc_network`, even when every
-    /// value in it is unchanged.
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    includeExportRanges: Listing<String>?
-
-    /// Withhold these IP ranges from propagation. Immutable, as `network` is.
-    @gcp.FieldHint {
-        createOnly = true
-    }
-    excludeExportRanges: Listing<String>?
+    linkedVpcNetwork: LinkedVpcNetwork
 
     /// An optional description. One of only two mutable fields on a spoke.
     @gcp.FieldHint
