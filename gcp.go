@@ -83,6 +83,43 @@ func (p *Plugin) DiscoveryFilters() []model.MatchFilter {
 	// We filter these out during discovery to avoid managing resources that GKE controls.
 	return []model.MatchFilter{
 		{
+			// Anything formae created in order to run in this project or to
+			// reach it, chiefly an agent's own substrate. Discovered like any
+			// other resource, it could be imported and then reconciled away,
+			// which severs formae's own access.
+			//
+			// The marker answers one question, whether formae created the
+			// thing. It says nothing about who may delete it. The key avoids a
+			// colon so the same spelling is legal here as on AWS and Azure:
+			// GCP label keys admit only lowercase letters, digits, underscores
+			// and hyphens.
+			Conditions: []model.FilterCondition{
+				{
+					PropertyPath:  `$.labels['formae-owned']`,
+					PropertyValue: "true",
+				},
+			},
+		},
+		{
+			// Project IAM bindings carry no labels, so connect's own grants are
+			// recognised by the member string. It names both formae's shared
+			// pool and its subject namespace, and requiring the two together
+			// keeps a project that happens to reuse the pool id from matching.
+			//
+			// The condition searches the whole document rather than $.member
+			// because a filter selector does not evaluate against a scalar.
+			// Scoping this filter to the one type is what makes that safe: a
+			// ProjectIamMember's only other fields are project and role, and
+			// neither can hold a pool path.
+			ResourceTypes: []string{"GCP::IAM::ProjectIamMember"},
+			Conditions: []model.FilterCondition{
+				{
+					PropertyPath:  `$[?search(@, "workloadIdentityPools/formae-ai/subject/fai:")]`,
+					PropertyValue: "", // Any value matches (existence check)
+				},
+			},
+		},
+		{
 			ResourceTypes: GKEAutopilotResourceTypes,
 			Conditions: []model.FilterCondition{
 				{
