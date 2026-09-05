@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/bigquery v1.81.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.24.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.28-0.20260905010158-82d8d3fc6fe0
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.28-0.20260905024731-383de8b8543c
 	// The OidcAware interface this plugin implements landed after
 	// pkg/plugin/v0.4.1. Re-pin to the next official tag when one is cut, as
 	// the aws plugin does from the same commit.
