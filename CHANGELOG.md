@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
-## [Unreleased]
+## [0.1.13]
 
 ### Changed
 
@@ -27,6 +27,13 @@ formae agent.
   conformance runs.
 
 ### Added
+
+- Resources formae created in order to reach this project are no longer offered
+  for import. An agent's own substrate carries an ownership label that discovery
+  now excludes, so a reconcile can no longer take away formae's own access. The
+  project IAM bindings connect grants carry no labels, so they are recognised by
+  the member string naming both formae's shared workload identity pool and its
+  subject namespace; a binding in a similarly named pool stays visible.
 
 - `GCP::NetworkServices::Mesh`, `ServiceLbPolicy`, `EndpointPolicy`, `HttpRoute`,
   `GrpcRoute`, `TcpRoute` and `TlsRoute` — Cloud Service Mesh, and the direct
@@ -2258,8 +2265,6 @@ Together these close the managed-instance-group gap: the plugin previously had
   a masked change to it, and the field was annotated as though it were mutable.
   Inert today, because the type does not support update at all and any change
   replaces, but it stops the trap for whoever enables update.
-
-## [0.1.13]
 
 ### Fixed
 
