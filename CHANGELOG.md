@@ -28,6 +28,39 @@ formae agent.
 
 ### Added
 
+- Polymorphic `auth` on the target config, with one variant, `OidcAuth`:
+  workload identity federation for an agent that has no ambient GCP credentials
+  of its own. The agent exchanges a short-lived OIDC identity token for Google
+  credentials through the paired credential broker, against the workload
+  identity pool provider `formae connect gcp` reports - no service account key
+  and no static credential exists anywhere in the path. Omitting `auth` keeps
+  today's behaviour exactly: `GCP_CREDENTIALS_JSON`, `GCP_CREDENTIALS_FILE`, or
+  Application Default Credentials. `createOnly = false`, so a target can move
+  onto or off federation without replacing its resources.
+
+  There is no `DefaultChain` counterpart to `OidcAuth`. The AWS plugin has one
+  because its default chain carries a profile name; GCP's takes no parameters,
+  so the variant would be empty and would mean only what omitting `auth`
+  already says.
+
+  Two failures are closed rather than silent. An unrecognised `auth` type is an
+  error instead of falling through to ambient credentials, and an `OidcAuth`
+  target on an agent with no paired broker fails closed - a hosted agent must
+  never end up acting as itself instead of as the customer. The provider
+  resource name is also the token audience, so it is validated at the single
+  credential seam: a spelling that differs from the provisioned one is rejected
+  before any Google client is built, rather than minting a token that fails to
+  exchange with an error reading like an unrelated auth problem.
+
+- `GCP::SecretManager::SecretVersion` now exposes its payload by reference:
+  `version.res.secretValue`. The type extends `formae.Secret` and names `data`
+  as its value property, so a consumer binds the payload instead of restating
+  it - previously the only route was hand-wrapping the plaintext with
+  `formae.value(...).opaque`, which put the secret in the consumer's own forma.
+  The accessor lives on the version rather than on `SecretManager::Secret`,
+  which is the container and holds no payload. Nothing about the field changes:
+  `data` was already write-only and opaque at rest, and stays hashed.
+
 - Resources formae created in order to reach this project are no longer offered
   for import. An agent's own substrate carries an ownership label that discovery
   now excludes, so a reconcile can no longer take away formae's own access. The
