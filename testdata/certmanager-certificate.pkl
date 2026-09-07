@@ -20,8 +20,8 @@ import "./config/vars.pkl" as v
 // exercises - create, read, update, delete - works regardless.
 local auth = new dnsAuthorization.DnsAuthorization {
   label = "plugin-sdk-test-cert-dns-auth"
-  name = "formae-test-cert-da-\(v.testRunID)"
-  domain = "formae-test-cert-\(v.testRunID).example.com"
+  name = "formae-plugin-sdk-test-cert-da-\(v.testRunID)"
+  domain = "formae-plugin-sdk-test-cert-\(v.testRunID).example.com"
   description = "Authorization for the certificate under test"
 }
 
@@ -33,10 +33,10 @@ forma {
 
   new certificate.Certificate {
     label = "plugin-sdk-test-certmanager-certificate"
-    name = "formae-test-cert-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-cert-\(v.testRunID)"
     managedCertificate = new certificate.ManagedCertificate {
       domains = new Listing {
-        "formae-test-cert-\(v.testRunID).example.com"
+        "formae-plugin-sdk-test-cert-\(v.testRunID).example.com"
       }
       // Certificate Manager reports this back with the project number in place
       // of the project id; the plugin rewrites it so the two forms agree.

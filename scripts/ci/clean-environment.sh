@@ -1086,7 +1086,7 @@ fi
 
 # --- 4. Cloud Run services ---
 echo "Cleaning GCP Cloud Run services..."
-SERVICES=$(gcloud run services list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+SERVICES=$(gcloud run services list --filter="metadata.name~^formae-(plugin-sdk-|plugin-)?test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SERVICES" ]; then
     echo "$SERVICES" | while read -r svc region; do
         echo "  Deleting Cloud Run service: $svc (region: $region)"
@@ -1098,7 +1098,7 @@ fi
 
 # --- 4b. Cloud Run jobs ---
 echo "Cleaning GCP Cloud Run jobs..."
-JOBS=$(gcloud run jobs list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+JOBS=$(gcloud run jobs list --filter="metadata.name~^formae-(plugin-sdk-|plugin-)?test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
 if [ -n "$JOBS" ]; then
     echo "$JOBS" | while read -r job region; do
         echo "  Deleting Cloud Run job: $job (region: $region)"
@@ -1110,7 +1110,7 @@ fi
 
 # --- 4c. Cloud Run worker pools ---
 echo "Cleaning GCP Cloud Run worker pools..."
-WORKER_POOLS=$(gcloud run worker-pools list --filter="metadata.name~^formae-test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+WORKER_POOLS=$(gcloud run worker-pools list --filter="metadata.name~^formae-(plugin-sdk-|plugin-)?test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
 if [ -n "$WORKER_POOLS" ]; then
     echo "$WORKER_POOLS" | while read -r wp region; do
         echo "  Deleting Cloud Run worker pool: $wp (region: $region)"
@@ -1373,8 +1373,9 @@ fi
 # NOT the broad "^formae-" the other sweeps use, and never will be. The identity
 # CI and local runs authenticate as is called formae-tester@, which matches it -
 # broadening this filter deleted that account on the first run afterwards, and a
-# deleted service account takes every key with it. The fixture creates
-# "formae-plugin-sdk-test-sa-*", so that, and only that, is what this collects.
+# deleted service account takes every key with it. SA_SWEEP_RE collects the
+# fixture shapes and nothing broader - the accountId cap keeps that fixture on
+# "formae-test-sa-*", so do not "fix" it to the long prefix.
 #
 # KEEP_RE is applied as well, belt and braces: two locks, because the failure
 # here is not a leaked resource but the loss of the credential everything else

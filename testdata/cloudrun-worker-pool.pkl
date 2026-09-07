@@ -17,7 +17,7 @@ forma {
     label = "plugin-sdk-test-cloudrun-worker-pool"
     project = v.gcpProject
     region = v.gcpRegion
-    name = "formae-test-wp-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-wp-\(v.testRunID)"
     description = "Test Cloud Run worker pool for plugin SDK conformance tests"
     labels = new Mapping {
       ["environment"] = "test"

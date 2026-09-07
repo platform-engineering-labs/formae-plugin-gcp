@@ -19,7 +19,7 @@ import "./config/vars.pkl" as v
 // minutes, so this case needs a raised TIMEOUT.
 local dbCluster = new alloydbCluster.Cluster {
   label = "plugin-sdk-test-alloydb-instance-cluster"
-  name = "formae-test-inst-cluster-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-inst-cluster-\(v.testRunID)"
   networkConfig = new {
     network = "projects/\(v.gcpProject)/global/networks/default"
   }
@@ -34,7 +34,7 @@ forma {
 
   new alloydbInstance.Instance {
     label = "plugin-sdk-test-alloydb-instance"
-    name = "formae-test-instance-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-instance-\(v.testRunID)"
     // Resolvable -> establishes cluster-before-instance create ordering.
     cluster = dbCluster.res.name
     instanceType = "PRIMARY"

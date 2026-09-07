@@ -16,7 +16,7 @@ forma {
   new notificationChannel.NotificationChannel {
     label = "plugin-sdk-test-notification-channel"
     channelType = "email"
-    displayName = "formae-test-channel-\(v.testRunID)"
+    displayName = "formae-plugin-sdk-test-channel-\(v.testRunID)"
     description = "Test notification channel for plugin SDK conformance tests"
     enabled = true
     labels = new Mapping {

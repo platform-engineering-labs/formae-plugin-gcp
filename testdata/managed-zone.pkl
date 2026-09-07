@@ -15,8 +15,8 @@ forma {
 
   new managedZone.ManagedZone {
     label = "plugin-sdk-test-managed-zone"
-    name = "formae-test-zone-\(v.testRunID)"
-    dnsName = "formae-test-\(v.testRunID).example.com."
+    name = "formae-plugin-sdk-test-zone-\(v.testRunID)"
+    dnsName = "formae-plugin-sdk-test-\(v.testRunID).example.com."
     description = "Test managed zone for plugin SDK conformance tests"
     visibility = "public"
   }

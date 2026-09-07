@@ -15,7 +15,7 @@ forma {
 
   new group.Group {
     label = "plugin-sdk-test-monitoring-group"
-    displayName = "formae-test-group-\(v.testRunID)"
+    displayName = "formae-plugin-sdk-test-group-\(v.testRunID)"
     filter = "resource.type = \"gce_instance\""
   }
 }

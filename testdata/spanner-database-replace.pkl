@@ -12,10 +12,13 @@ import "./config/vars.pkl" as v
 
 // The replace companion of spanner-database. The instance is unchanged - it is
 // the prerequisite, not the resource under test - while the database id moves.
-// A database id is immutable and capped at 30 characters.
+// A database id is immutable.
+// A Spanner database id caps at 30 characters and "formae-plugin-sdk-test-"
+// alone is 23, so the database keeps the short "formae-test-" prefix. The
+// instance above it has no such cap and carries the long one.
 local inst = new instance.Instance {
   label = "plugin-sdk-test-spanner-db-instance"
-  name = "formae-test-spdb-inst-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-spdb-inst-\(v.testRunID)"
   config = "regional-\(v.gcpRegion)"
   displayName = "Formae db host"
   processingUnits = 100

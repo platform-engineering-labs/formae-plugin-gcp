@@ -271,7 +271,7 @@ esac
 # quota (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
 needs_prereq_cleanup() {
   case "$TEST_CASE" in
-    alloydb-*|eventarc-*|datastream-*|filestore-backup|filestore-snapshot|\
+    alloydb-*|eventarc-*|datastream-*|filestore-backup|\
     security-policy-rule|region-security-policy-rule|\
     network-firewall-policy-association|region-network-firewall-policy-association|\
     network-firewall-policy-rule|machine-image|spanner-database)

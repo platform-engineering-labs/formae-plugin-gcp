@@ -25,6 +25,8 @@ import "./config/vars.pkl" as v
 local inst = new instance.Instance {
   label = "plugin-sdk-test-cluster-instance"
   project = v.gcpProject
+  // A Bigtable instance id caps at 33 characters, so instances keep the
+  // short "formae-test-" prefix - see scripts/ci/sweep-patterns.sh.
   name = "formae-test-instance-cl-\(v.testRunID)"
   // Bigtable caps displayName at 30 characters.
   displayName = "Plugin SDK cluster instance"

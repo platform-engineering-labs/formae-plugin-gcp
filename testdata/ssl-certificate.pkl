@@ -18,11 +18,11 @@ forma {
   // create/read/delete lifecycle this test exercises).
   new sslCertificate.SslCertificate {
     label = "plugin-sdk-test-ssl-cert"
-    name = "formae-test-cert-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-cert-\(v.testRunID)"
     description = "Test managed SSL certificate for plugin SDK conformance tests"
     type = "MANAGED"
     managedDomains = new Listing {
-      "formae-\(v.testRunID).example.com"
+      "formae-plugin-sdk-test-\(v.testRunID).example.com"
     }
   }
 }

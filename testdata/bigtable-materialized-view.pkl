@@ -17,6 +17,8 @@ import "./config/vars.pkl" as v
 local inst = new instance.Instance {
   label = "plugin-sdk-test-mv-instance"
   project = v.gcpProject
+  // A Bigtable instance id caps at 33 characters, so instances keep the
+  // short "formae-test-" prefix - see scripts/ci/sweep-patterns.sh.
   name = "formae-test-instance-mv-\(v.testRunID)"
   // Bigtable caps displayName at 30 characters.
   displayName = "Plugin SDK MV instance"
@@ -33,7 +35,7 @@ local inst = new instance.Instance {
 // into a string emits its serialized form, and the API answered
 // "Table not found: <base64 of the resolvable>". The name is declared once and
 // used in both places instead.
-local tblName = "formae_test_mv_table_\(v.testRunID)"
+local tblName = "formae_plugin_sdk_test_mv_table_\(v.testRunID)"
 
 local tbl = new table.Table {
   label = "plugin-sdk-test-mv-table"
@@ -67,7 +69,7 @@ forma {
     // encoded envelope rather than resolved, because an interpolated reference
     // creates no edge and so the value is not known yet.
     instance = tbl.res.instance
-    name = "formae_test_mv_\(v.testRunID)"
+    name = "formae_plugin_sdk_test_mv_\(v.testRunID)"
     // Bigtable refuses a view whose query is a plain projection: "queries must
     // contain a GROUP BY or ORDER BY clause".
     query = "SELECT _key, COUNT(*) AS entries FROM `\(tblName)` GROUP BY _key"

@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // an empty repository stores nothing.
 local repo = new repository.Repository {
   label = "plugin-sdk-test-arr-repository"
-  name = "formae-test-arr-repo-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-arr-repo-\(v.testRunID)"
   format = "DOCKER"
   description = "Repository owning the rule under test"
 }
@@ -28,7 +28,7 @@ forma {
 
   new rule.Rule {
     label = "plugin-sdk-test-artifactregistry-rule"
-    name = "formae-test-arr-rule-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-arr-rule-\(v.testRunID)"
     // Resolvable -> the repository exists before the rule is created.
     repository = repo.res.name
     action = "ALLOW"

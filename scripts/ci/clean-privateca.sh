@@ -19,12 +19,16 @@
 # certificate authority mid-run.
 set -uo pipefail
 
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/ci/sweep-patterns.sh
+. "$here/sweep-patterns.sh"
+
 CASE="${1:-all}"
 case "$CASE" in
-    certificateauthority-certificate-authority) PREFIX_RE="formae-test-ca-" ;;
-    certificateauthority-certificate-template)  PREFIX_RE="formae-test-tmpl-" ;;
-    certificateauthority-capool)                PREFIX_RE="formae-test-pool-" ;;
-    all)                                        PREFIX_RE="formae-test-" ;;
+    certificateauthority-certificate-authority) PREFIX_RE="${FIXTURE_PREFIX_RE}ca-" ;;
+    certificateauthority-certificate-template)  PREFIX_RE="${FIXTURE_PREFIX_RE}tmpl-" ;;
+    certificateauthority-capool)                PREFIX_RE="${FIXTURE_PREFIX_RE}pool-" ;;
+    all)                                        PREFIX_RE="${FIXTURE_PREFIX_RE}" ;;
     *)
         echo "clean-privateca: nothing to do for '${CASE}'"
         exit 0

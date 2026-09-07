@@ -21,7 +21,7 @@ import "./config/vars.pkl" as v
 local inst = new instance.DatabaseInstance {
   label = "plugin-sdk-test-db-instance"
   project = v.gcpProject
-  name = "formae-test-sqldb-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-sqldb-\(v.testRunID)"
   databaseVersion = "MYSQL_8_0"
   region = v.gcpRegion
   settings = new instance.Settings {
@@ -51,7 +51,7 @@ forma {
     project = v.gcpProject
     // Resolvable -> the instance exists before the database is created in it.
     instance = inst.res.name
-    name = "formae_test_db_\(v.testRunID)"
+    name = "formae_plugin_sdk_test_db_\(v.testRunID)"
     charset = "utf8mb4"
     collation = "utf8mb4_general_ci"
   }

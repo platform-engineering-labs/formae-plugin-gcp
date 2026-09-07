@@ -15,6 +15,8 @@ import "./config/vars.pkl" as v
 local inst = new instance.Instance {
   label = "plugin-sdk-test-table-instance"
   project = v.gcpProject
+  // A Bigtable instance id caps at 33 characters, so instances keep the
+  // short "formae-test-" prefix - see scripts/ci/sweep-patterns.sh.
   name = "formae-test-instance-tbl-\(v.testRunID)"
   displayName = "Plugin SDK Test Table Instance"
   type = "DEVELOPMENT"
@@ -39,7 +41,7 @@ forma {
     // Until this field accepted a resolvable the reference could only be a bare
     // string, which gives formae no ordering edge at all.
     instance = inst.res.name
-    name = "formae-test-table-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-table-\(v.testRunID)"
     columnFamilies = new Mapping {
       ["cf1"] = new table.ColumnFamily {
         name = "cf1"

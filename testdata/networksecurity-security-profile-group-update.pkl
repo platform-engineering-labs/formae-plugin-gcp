@@ -16,7 +16,7 @@ import "./config/vars.pkl" as v
 // re-apply would plan a replacement of a group that has not changed.
 local profile = new sp.SecurityProfile {
   label = "plugin-sdk-test-ns-spg-profile"
-  name = "formae-test-ns-spg-sp-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-ns-spg-sp-\(v.testRunID)"
   type = "THREAT_PREVENTION"
   description = "Test security profile backing the profile group conformance test"
 }
@@ -29,7 +29,7 @@ forma {
 
   new spg.SecurityProfileGroup {
     label = "plugin-sdk-test-ns-security-profile-group"
-    name = "formae-test-ns-spg-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ns-spg-\(v.testRunID)"
     threatPreventionProfile = profile.res.name
     description = "Updated test security profile group description"
     labels = new Mapping {

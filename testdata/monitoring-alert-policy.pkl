@@ -15,7 +15,7 @@ forma {
 
   new alertPolicy.AlertPolicy {
     label = "plugin-sdk-test-alert-policy"
-    displayName = "formae-test-alert-\(v.testRunID)"
+    displayName = "formae-plugin-sdk-test-alert-\(v.testRunID)"
     combiner = "OR"
     conditions = new Listing {
       new alertPolicy.Condition {

@@ -16,12 +16,12 @@ import "./config/vars.pkl" as v
 // immutable, so the plan is a destroy and a create rather than an update.
 local ns = new namespace.Namespace {
   label = "plugin-sdk-test-sd-ep-namespace"
-  name = "formae-test-sd-ep-ns-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-sd-ep-ns-\(v.testRunID)"
 }
 
 local svc = new service.Service {
   label = "plugin-sdk-test-sd-ep-service"
-  name = "formae-test-sd-ep-svc-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-sd-ep-svc-\(v.testRunID)"
   namespace = ns.res.name
 }
 
@@ -34,7 +34,7 @@ forma {
 
   new endpoint.Endpoint {
     label = "plugin-sdk-test-sd-endpoint"
-    name = "formae-test-sd-ep2-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-sd-ep2-\(v.testRunID)"
     namespace = ns.res.name
     service = svc.res.name
     address = "10.20.30.40"

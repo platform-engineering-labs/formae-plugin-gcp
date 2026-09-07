@@ -16,6 +16,8 @@ forma {
   new instance.Instance {
     label = "plugin-sdk-test-bigtable-instance"
     project = v.gcpProject
+    // A Bigtable instance id caps at 33 characters, so instances keep the
+    // short "formae-test-" prefix - see scripts/ci/sweep-patterns.sh.
     name = "formae-test-instance-\(v.testRunID)"
     displayName = "Plugin SDK Test Instance"
     type = "DEVELOPMENT"

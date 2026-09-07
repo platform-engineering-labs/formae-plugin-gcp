@@ -15,7 +15,7 @@ import "./config/vars.pkl" as v
 // the plan is a destroy and a create rather than an update.
 local ns = new namespace.Namespace {
   label = "plugin-sdk-test-sd-svc-namespace"
-  name = "formae-test-sd-svc-ns-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-sd-svc-ns-\(v.testRunID)"
 }
 
 forma {
@@ -26,7 +26,7 @@ forma {
 
   new service.Service {
     label = "plugin-sdk-test-sd-service"
-    name = "formae-test-sd-svc2-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-sd-svc2-\(v.testRunID)"
     namespace = ns.res.name
     annotations = new Mapping {
       ["environment"] = "test"

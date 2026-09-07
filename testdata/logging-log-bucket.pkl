@@ -18,7 +18,7 @@ forma {
 
   new logBucket.LogBucket {
     label = "plugin-sdk-test-logging-log-bucket"
-    name = "formae-test-logbucket-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-logbucket-\(v.testRunID)"
     location = v.gcpLocation
     description = "Test log bucket for plugin SDK conformance tests"
     retentionDays = 30

@@ -18,7 +18,7 @@ forma {
 
   new namespace.Namespace {
     label = "plugin-sdk-test-sd-namespace"
-    name = "formae-test-sd-ns2-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-sd-ns2-\(v.testRunID)"
     labels = new Mapping {
       ["environment"] = "test"
       ["managed-by"] = "formae"

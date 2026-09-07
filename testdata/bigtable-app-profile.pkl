@@ -15,6 +15,8 @@ import "./config/vars.pkl" as v
 local inst = new instance.Instance {
   label = "plugin-sdk-test-btap-instance"
   project = v.gcpProject
+  // A Bigtable instance id caps at 33 characters, so instances keep the
+  // short "formae-test-" prefix - see scripts/ci/sweep-patterns.sh.
   name = "formae-test-btap-\(v.testRunID)"
   displayName = "Plugin SDK App Profile Host"
   type = "DEVELOPMENT"
@@ -36,7 +38,7 @@ forma {
   // multiClusterRoutingUseAny needs an instance with more than one cluster.
   new appProfile.AppProfile {
     label = "plugin-sdk-test-bigtable-app-profile"
-    name = "formae-test-btap-profile-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-btap-profile-\(v.testRunID)"
     instance = inst.res.name
     description = "Test app profile for plugin SDK conformance tests"
     singleClusterRouting = new appProfile.SingleClusterRouting {

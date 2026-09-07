@@ -19,11 +19,11 @@ import "./config/vars.pkl" as v
 // stream is never started, so nothing ever tries to connect.
 local source = new connectionProfile.ConnectionProfile {
   label = "plugin-sdk-test-stream-source"
-  name = "formae-test-src-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-src-\(v.testRunID)"
   displayName = "Plugin SDK Test Stream Source"
   mysqlProfile = new connectionProfile.MysqlProfile {
     hostname = "10.255.255.1"
-    username = "formae-test-anchor"
+    username = "formae-plugin-sdk-test-anchor"
     password = "not-a-real-password"
     port = 3306
   }
@@ -31,10 +31,10 @@ local source = new connectionProfile.ConnectionProfile {
 
 local destination = new connectionProfile.ConnectionProfile {
   label = "plugin-sdk-test-stream-destination"
-  name = "formae-test-dst-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-dst-\(v.testRunID)"
   displayName = "Plugin SDK Test Stream Destination"
   gcsProfile = new connectionProfile.GcsProfile {
-    bucket = "formae-test-datastream-\(v.testRunID)"
+    bucket = "formae-plugin-sdk-test-datastream-\(v.testRunID)"
     rootPath = "/"
   }
 }
@@ -48,7 +48,7 @@ forma {
 
   new stream.Stream {
     label = "plugin-sdk-test-datastream-stream"
-    name = "formae-test-stream-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-stream-\(v.testRunID)"
     displayName = "Plugin SDK Test Stream"
     // Resolvables -> both profiles exist first, and the plugin expands each
     // short name into the full path Datastream wants.

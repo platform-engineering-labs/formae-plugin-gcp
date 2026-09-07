@@ -18,14 +18,18 @@
 # a project-wide sweep here would delete another job's resources mid-run.
 set -uo pipefail
 
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/ci/sweep-patterns.sh
+. "$here/sweep-patterns.sh"
+
 CASE="${1:-all}"
 case "$CASE" in
     # Each case names its resources after itself; see the fixtures.
-    datastream-stream)             PREFIX_RE="formae-test-(src|dst|stream)-" ;;
-    datastream-private-connection) PREFIX_RE="formae-test-pc-" ;;
-    datastream-route)              PREFIX_RE="formae-test-(rt-pc|route)-" ;;
-    datastream-connection-profile) PREFIX_RE="formae-test-cp-" ;;
-    all)                           PREFIX_RE="formae-test-" ;;
+    datastream-stream)             PREFIX_RE="${FIXTURE_PREFIX_RE}(src|dst|stream)-" ;;
+    datastream-private-connection) PREFIX_RE="${FIXTURE_PREFIX_RE}pc-" ;;
+    datastream-route)              PREFIX_RE="${FIXTURE_PREFIX_RE}(rt-pc|route)-" ;;
+    datastream-connection-profile) PREFIX_RE="${FIXTURE_PREFIX_RE}cp-" ;;
+    all)                           PREFIX_RE="${FIXTURE_PREFIX_RE}" ;;
     *)
         echo "clean-datastream-case: nothing to do for '${CASE}'"
         exit 0

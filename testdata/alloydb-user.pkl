@@ -23,7 +23,7 @@ import "./config/vars.pkl" as v
 // minutes, so this case needs a raised TIMEOUT.
 local dbCluster = new alloydbCluster.Cluster {
   label = "plugin-sdk-test-alloydb-user-cluster"
-  name = "formae-test-user-cluster-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-user-cluster-\(v.testRunID)"
   networkConfig = new {
     network = "projects/\(v.gcpProject)/global/networks/default"
   }
@@ -38,7 +38,7 @@ forma {
 
   local primary = new alloydbInstance.Instance {
     label = "plugin-sdk-test-alloydb-user-instance"
-    name = "formae-test-user-instance-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-user-instance-\(v.testRunID)"
     // Resolvable -> establishes cluster-before-instance create ordering.
     cluster = dbCluster.res.name
     instanceType = "PRIMARY"
@@ -53,7 +53,7 @@ forma {
 
   new alloydbUser.User {
     label = "plugin-sdk-test-alloydb-user"
-    name = "formae-test-user-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-user-\(v.testRunID)"
     // Referenced through the instance, not the cluster: AlloyDB refuses to
     // create a user until a primary instance is serving, and the instance's
     // resolvable yields the same cluster id while ordering the user after it.

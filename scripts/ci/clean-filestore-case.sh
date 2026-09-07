@@ -13,7 +13,8 @@
 # would leak one.
 #
 # Snapshots live inside their instance and go with it; backups outlive it and
-# must be deleted on their own.
+# must be deleted on their own. (There is no filestore-snapshot fixture, so no
+# case entry for one - testdata_naming_test.go rejects an entry without one.)
 #
 # Scoped to ONE case's resources, because the matrix runs the Filestore cases in
 # parallel and this is invoked between phases while siblings are still live. A
@@ -25,13 +26,16 @@
 # in clean-environment.sh, which runs when nothing else does.
 set -uo pipefail
 
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/ci/sweep-patterns.sh
+. "$here/sweep-patterns.sh"
+
 CASE="${1:-all}"
 case "$CASE" in
     # Each case names its resources after itself; see the fixtures.
-    filestore-backup)   PREFIX="formae-test-bkp" ;;
-    filestore-snapshot) PREFIX="formae-test-snap" ;;
-    filestore-instance) PREFIX="formae-test-fs" ;;
-    all)                PREFIX="formae-test-" ;;
+    filestore-backup)   PREFIX_RE="${FIXTURE_PREFIX_RE}bkp" ;;
+    filestore-instance) PREFIX_RE="${FIXTURE_PREFIX_RE}fs" ;;
+    all)                PREFIX_RE="${FIXTURE_PREFIX_RE}" ;;
     *)
         echo "clean-filestore-case: nothing to do for '${CASE}'"
         exit 0
@@ -54,10 +58,10 @@ names_in() { # collection URL -> test-owned resource names
     curl -s -H "Authorization: Bearer ${TOKEN}" "$1" \
         | grep -o "\"name\": *\"[^\"]*\"" \
         | sed -E 's/.*"(projects\/[^"]*)".*/\1/' \
-        | grep "${PREFIX}" || true
+        | grep -E "${PREFIX_RE}" || true
 }
 
-echo "Cleaning GCP filestore resources (${CASE}, prefix ${PREFIX})..."
+echo "Cleaning GCP filestore resources (${CASE}, matching ${PREFIX_RE})..."
 
 for backup in $(names_in "${all}/backups"); do
     echo "  Deleting backup: $(basename "$backup")"

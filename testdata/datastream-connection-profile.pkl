@@ -15,13 +15,13 @@ forma {
 
   new connectionProfile.ConnectionProfile {
     label = "plugin-sdk-test-datastream-connection-profile"
-    name = "formae-test-cp-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-cp-\(v.testRunID)"
     displayName = "Plugin SDK Test Connection Profile"
     // GCS destination profile: the least-dependency profile that creates
     // without a reachable database. Requires an existing Cloud Storage bucket
     // that the Datastream service account can access.
     gcsProfile = new connectionProfile.GcsProfile {
-      bucket = "formae-test-datastream-\(v.testRunID)"
+      bucket = "formae-plugin-sdk-test-datastream-\(v.testRunID)"
       rootPath = "/"
     }
   }

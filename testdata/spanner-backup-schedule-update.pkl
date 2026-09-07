@@ -15,12 +15,14 @@ import "./config/vars.pkl" as v
 // their resolvables so formae orders the creates.
 local inst = new instance.Instance {
   label = "plugin-sdk-test-spanner-bs-instance"
-  name = "formae-test-spbs-inst-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-spbs-inst-\(v.testRunID)"
   config = "regional-\(v.gcpRegion)"
   displayName = "Formae schedule host"
   processingUnits = 100
 }
 
+// A Spanner database id caps at 30 characters, so this one keeps the short
+// "formae-test-" prefix - see scripts/ci/sweep-patterns.sh.
 local db = new database.Database {
   label = "plugin-sdk-test-spanner-bs-database"
   name = "formae-test-sp-bs-\(v.testRunID)"
@@ -36,7 +38,7 @@ forma {
 
   new backupSchedule.BackupSchedule {
     label = "plugin-sdk-test-spanner-backup-schedule"
-    name = "formae-test-spanner-bs-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-spanner-bs-\(v.testRunID)"
     instance = inst.res.name
     database = db.res.name
     retentionDuration = "172800s"

@@ -16,20 +16,24 @@
 # between phases without touching a cluster another job is still using.
 set -uo pipefail
 
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/ci/sweep-patterns.sh
+. "$here/sweep-patterns.sh"
+
 case "${1:-}" in
-    alloydb-cluster)  PREFIX="formae-test-cluster-" ;;
-    alloydb-instance) PREFIX="formae-test-inst-cluster-" ;;
-    alloydb-user)     PREFIX="formae-test-user-cluster-" ;;
-    alloydb-backup)   PREFIX="formae-test-bkp-cluster-" ;;
+    alloydb-cluster)  PREFIX_RE="${FIXTURE_PREFIX_RE}cluster-" ;;
+    alloydb-instance) PREFIX_RE="${FIXTURE_PREFIX_RE}inst-cluster-" ;;
+    alloydb-user)     PREFIX_RE="${FIXTURE_PREFIX_RE}user-cluster-" ;;
+    alloydb-backup)   PREFIX_RE="${FIXTURE_PREFIX_RE}bkp-cluster-" ;;
     *)
         echo "clean-alloydb-case: nothing to do for '${1:-}'"
         exit 0
         ;;
 esac
 
-echo "Cleaning AlloyDB clusters named ${PREFIX}* ..."
+echo "Cleaning AlloyDB clusters matching ${PREFIX_RE} ..."
 CLUSTERS=$(gcloud alloydb clusters list --region=- --format="value(name)" 2>/dev/null \
-    | grep "/clusters/${PREFIX}" || true)
+    | grep -E "/clusters/${PREFIX_RE}" || true)
 
 if [ -z "$CLUSTERS" ]; then
     echo "  none found"

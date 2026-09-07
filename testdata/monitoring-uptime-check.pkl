@@ -15,7 +15,7 @@ forma {
 
   new uptimeCheckConfig.UptimeCheckConfig {
     label = "plugin-sdk-test-uptime-check"
-    displayName = "formae-test-uptime-\(v.testRunID)"
+    displayName = "formae-plugin-sdk-test-uptime-\(v.testRunID)"
     timeout = "10s"
     period = "60s"
     monitoredResource = new uptimeCheckConfig.MonitoredResource {

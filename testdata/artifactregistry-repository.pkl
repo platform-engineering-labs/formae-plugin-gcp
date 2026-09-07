@@ -15,7 +15,7 @@ forma {
 
   new repository.Repository {
     label = "plugin-sdk-test-artifact-repository"
-    name = "formae-test-repo-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-repo-\(v.testRunID)"
     format = "DOCKER"
     description = "Test Artifact Registry repository for plugin SDK conformance tests"
   }

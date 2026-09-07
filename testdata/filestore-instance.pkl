@@ -15,7 +15,7 @@ forma {
 
   new filestoreInstance.Instance {
     label = "plugin-sdk-test-filestore-instance"
-    name = "formae-test-fs-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-fs-\(v.testRunID)"
     tier = "BASIC_HDD"
     fileShares {
       new {
