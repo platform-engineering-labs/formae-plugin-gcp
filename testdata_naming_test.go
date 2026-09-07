@@ -45,6 +45,14 @@ var shortPrefixExceptions = map[string]string{
 	"vpcaccess-connector.pkl": "formae-test-conn-",
 }
 
+// A few APIs force a leading segment of their own: Spanner rejects a
+// user-managed instance configuration id that does not begin "custom-". The
+// convention prefix then sits one segment to the right, and the sweep for that
+// collection matches the prefixed form - SIC_RE in clean-environment.sh. Only
+// these exact leaders are tolerated; any other leading text is a name no sweep
+// is anchored to see.
+var mandatoryLeaders = []string{"custom-"}
+
 // Any string literal that interpolates the test run ID names a live resource.
 var runIDLiteral = regexp.MustCompile(`"([^"\\]*)\\\(v\.testRunID\)`)
 
@@ -94,12 +102,16 @@ func TestFixtureNamesCarryTheSweepPrefix(t *testing.T) {
 			if i := strings.LastIndex(name, "."); i >= 0 {
 				name = name[i+1:]
 			}
+			for _, leader := range mandatoryLeaders {
+				name = strings.TrimPrefix(name, leader)
+			}
 			if hasAllowedPrefix(name) {
 				continue
 			}
-			t.Errorf("%s: name %q\\(v.testRunID) must start with one of %v; "+
-				"anything else is invisible to the cleanup sweeps in scripts/ci",
-				base, m[1], allowedPrefixes)
+			t.Errorf("%s: name %q\\(v.testRunID) must start with one of %v, "+
+				"optionally behind one of %v; anything else is invisible to the "+
+				"cleanup sweeps in scripts/ci",
+				base, m[1], allowedPrefixes, mandatoryLeaders)
 		}
 	}
 }
