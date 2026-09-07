@@ -17,7 +17,7 @@ require (
 	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/oauth2 v0.36.0
-	google.golang.org/api v0.293.0
+	google.golang.org/api v0.297.0
 	google.golang.org/grpc v1.83.2
 )
 
@@ -124,8 +124,8 @@ require (
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260715232425-e75dac1f907d // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260807164820-c8921c73eeea // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 	resty.dev/v3 v3.0.0-beta.6.0.20260127085140-f531c9de7027 // indirect
 )
 
