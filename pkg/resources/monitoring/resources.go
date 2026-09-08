@@ -302,4 +302,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// A freshly created metric descriptor 404s on read for a second or two, and
+	// a sync landing in that window tombstones it. Must run after RegisterAll.
+	registerMetricDescriptorReadback()
 }

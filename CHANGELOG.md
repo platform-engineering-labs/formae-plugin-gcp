@@ -813,6 +813,21 @@ formae agent.
   it left the firewall with no dependency edge to its network, so nothing
   ordered the create after it or the destroy before it.
 
+- A freshly created `GCP::Monitoring::MetricDescriptor` is confirmed readable
+  before its create reports success. `metricDescriptors.create` answers 200 with
+  the descriptor, but a GET on it 404s for a second or two afterwards - measured
+  live on 2026-09-08 against project `development-477117`: 404 at t=0s, 404 at
+  t=1s, 200 from t=2s. `MonitoringOperations` declares `Synchronous: true`, so
+  base reported the create complete straight from the create response and
+  `Status` was a no-op, meaning nothing waited. A synchronization landing inside
+  that window read "not found" and formae tombstoned a descriptor that existed.
+  That is not only a red nightly: on a live installation the same race removes a
+  managed resource from the inventory on a timing coincidence alone, and the
+  next reconcile recreates or orphans it. The create now polls its own read
+  until the descriptor appears, and gives up rather than failing a create that
+  demonstrably succeeded. A `List` fallback was measured and rejected: GET and
+  LIST become visible at the same instant, so listing offers no earlier signal.
+
 - Five resource types are discoverable, and a sixth class of silent failure is
   gone. Discovery lists with no properties at all, so a type that lives under a
   parent has no parent to name and a location-based type may have no location.
