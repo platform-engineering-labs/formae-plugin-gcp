@@ -7,12 +7,12 @@ require (
 	cloud.google.com/go/bigquery v1.82.0
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.24.0
-	github.com/platform-engineering-labs/formae/pkg/model v0.1.28-0.20260905024731-383de8b8543c
+	github.com/platform-engineering-labs/formae/pkg/model v0.1.28
 	// The OidcAware interface this plugin implements landed after
 	// pkg/plugin/v0.4.1. Re-pin to the next official tag when one is cut, as
 	// the aws plugin does from the same commit.
-	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.2-0.20260821224650-dc5149d5a102
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.6
+	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.2
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.7
 	// Provides oidcx/gcp, the token exchange. Re-pin when oox cuts a tag.
 	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.12.1
@@ -78,7 +78,7 @@ require (
 	github.com/naegelejd/go-acl v0.0.0-20260323030528-42e4d61407df // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/platform-engineering-labs/formae/pkg/api/model v0.1.1 // indirect
-	github.com/platform-engineering-labs/formae/pkg/credential v0.0.0-20260821213704-ba68bacf6dd6 // indirect
+	github.com/platform-engineering-labs/formae/pkg/credential v0.1.0 // indirect
 	github.com/platform-engineering-labs/orbital v0.1.36 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
