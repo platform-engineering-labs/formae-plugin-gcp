@@ -5,29 +5,32 @@
 package compute
 
 import (
-	"strings"
-
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 )
 
-const computeAPIPrefix = "https://www.googleapis.com/compute/v1/"
-
-// firewallResponseTransformer normalizes the Firewall API response:
-// 1. Strips the full API URL prefix from the network field
-// 2. Ensures empty ports arrays are preserved in allowed/denied rules
+// firewallResponseTransformer normalizes the Firewall API response by ensuring
+// empty ports arrays are preserved in allowed/denied rules.
+//
+// `network` is deliberately left as the provider returned it. The Compute API
+// is lenient on input and canonical on output: its discovery document lists
+// three accepted forms for Firewall.network (full URL, "projects/{p}/global/
+// networks/{n}", "global/networks/default"), but Network.selfLink is
+// "[Output Only] Server-defined URL for the resource" and a read always answers
+// with the full URL whichever form was written - GCP's own default-allow-icmp
+// reads back as a full URL (verified live 2026-09-08).
+//
+// So the full self-link is the only form that survives a round trip, which is
+// why Subnetwork, Router and Instance all keep it (PLA-265). This transformer
+// used to strip the prefix, which left a firewall declaring the documented
+// `network = net.res.selfLink` idiom diffing a short stored path against a full
+// desired URL - a spurious replace on every reconcile, since network is
+// createOnly (PLA-251).
 func firewallResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	result := make(map[string]interface{})
 
 	// Copy all fields
 	for k, v := range apiResponse {
 		result[k] = v
-	}
-
-	// Normalize network URL: strip the API prefix to get project-relative path
-	// e.g., "https://www.googleapis.com/compute/v1/projects/my-project/global/networks/my-network"
-	//    -> "projects/my-project/global/networks/my-network"
-	if network, ok := result["network"].(string); ok && network != "" {
-		result["network"] = strings.TrimPrefix(network, computeAPIPrefix)
 	}
 
 	// Normalize allowed rules: ensure empty ports arrays are preserved

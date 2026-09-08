@@ -788,6 +788,31 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- A `GCP::Compute::Firewall` that references its network by resolvable
+  self-link no longer re-applies as a spurious replace. The response
+  transformer stripped the API prefix from `network`, storing
+  `projects/{p}/global/networks/{n}` while the desired value resolved from
+  `net.res.selfLink` is the full URL the API returns. formae diffs raw strings,
+  so the two never matched, and `network` is createOnly - so every reconcile of
+  an unchanged forma planned a delete and recreate. Firewall was the last
+  holdout of a convention PLA-265 reversed for Subnetwork, Router and Instance
+  in July.
+
+  The Compute API settles which form is canonical. Its discovery document lists
+  three accepted forms for `Firewall.network` (full URL,
+  `projects/{p}/global/networks/{n}`, `global/networks/default`), but
+  `Network.selfLink` is "[Output Only] Server-defined URL for the resource" and
+  a read always answers with the full URL whichever form was written - GCP's own
+  `default-allow-icmp` reads back as a full URL. Lenient on input, canonical on
+  output, so the self-link is the only form that survives a round trip.
+
+  `testdata/firewall.pkl` and `firewall-replace.pkl` now reference the network
+  by `net.res.selfLink` instead of interpolating a literal path. The literal was
+  why no gate caught this: it is the one form the strip made match, so the case
+  passed while never exercising the idiom every other compute fixture uses - and
+  it left the firewall with no dependency edge to its network, so nothing
+  ordered the create after it or the destroy before it.
+
 - Five resource types are discoverable, and a sixth class of silent failure is
   gone. Discovery lists with no properties at all, so a type that lives under a
   parent has no parent to name and a location-based type may have no location.
