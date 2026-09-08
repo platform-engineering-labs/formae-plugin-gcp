@@ -12,20 +12,27 @@ import "./config/vars.pkl" as v
 
 local testNetworkName = "formae-test-fw-net-\(v.testRunID)"
 
+// Parent network for the firewall. Referenced via its resolvable self-link
+// rather than a literal path, for two reasons: the reference is what orders the
+// firewall after the network on create and before it on destroy (GCP refuses to
+// delete a network that still has a firewall attached), and the self-link is the
+// form the API returns on read, so an unchanged forma re-applies as a zero-op
+// (PLA-265, PLA-251).
+local net = new network.Network {
+  label = "plugin-sdk-test-network-for-firewall"
+  name = testNetworkName
+  description = "Test network for firewall conformance test"
+  autoCreateSubnetworks = false
+  routingConfig = new network.RoutingConfig {
+    routingMode = "REGIONAL"
+  }
+}
+
 forma {
   v.stack
   v.target
 
-  // Parent network for the firewall
-  new network.Network {
-    label = "plugin-sdk-test-network-for-firewall"
-    name = testNetworkName
-    description = "Test network for firewall conformance test"
-    autoCreateSubnetworks = false
-    routingConfig = new network.RoutingConfig {
-      routingMode = "REGIONAL"
-    }
-  }
+  net
 
   // Test firewall rule - allow SSH
   new firewall.Firewall {
@@ -34,7 +41,7 @@ forma {
     // an update: the old resource is destroyed and a new one takes its place.
     name = "formae-test-fw-r2-\(v.testRunID)"
     description = "Test firewall for plugin SDK conformance tests"
-    network = "projects/\(v.gcpProject)/global/networks/\(testNetworkName)"
+    network = net.res.selfLink
     direction = "INGRESS"
     priority = 1000
     sourceRanges = new Listing {
