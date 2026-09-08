@@ -68,7 +68,22 @@ var ContainerNativeID = base.NativeIDConfig{
 // Format: /projects/{project}/locations/{location}/{resourceType}/{name}
 // For nested resources: /projects/{project}/locations/{location}/clusters/{cluster}/nodePools/{nodePool}
 func containerPathBuilder(ctx base.PathContext) string {
-	parentPath := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, ctx.Location)
+	// Discovery lists with no properties, so a target that sets only region or
+	// only zone leaves Location empty here - base deliberately derives one from
+	// neither ("Container/CloudRun use location (no Region fallback)") - and the
+	// empty string used to be interpolated as "locations//clusters".
+	//
+	// GKE accepts "-" in the location position, probed live 2026-09-08:
+	// GET /projects/{p}/locations/-/clusters -> 200. Unlike Cloud Run there is
+	// nothing to fall back to: a GKE location is a zone for a zonal cluster and
+	// a region for a regional one, so the wildcard is the only value that finds
+	// both. It is substituted for lists only; a read or a mutation addressing
+	// "-" would name every cluster at once.
+	location := ctx.Location
+	if location == "" && ctx.IsList {
+		location = "-"
+	}
+	parentPath := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, location)
 
 	// Handle nested resources (e.g., nodePools under clusters)
 	// For nested resources, ParentResource contains the parent name (e.g., cluster name)

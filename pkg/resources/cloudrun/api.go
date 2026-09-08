@@ -37,22 +37,47 @@ var CloudRunNativeID = base.NativeIDConfig{
 	Parser:       parseCloudRunNativeID,
 }
 
+// listParentWildcards names the parent path a discovery list substitutes for
+// each nested collection. Cloud Run accepts "-" in the parent position, probed
+// live 2026-09-08 against project development-477117:
+//
+//	GET .../locations/europe-central2/services/-/revisions   -> 200, and it
+//	    returned a real revision under a real service, so the wildcard
+//	    enumerates rather than merely being tolerated.
+//	GET .../locations/us-central1/jobs/-/executions          -> 200
+//	GET .../locations/us-central1/jobs/-/executions/-/tasks   -> 200
+//
+// A task is two collections deep, hence the two wildcards in one string:
+// PathContext carries a single parent level, and this is the whole parent path.
+//
+// There is deliberately no entry for a top-level type. Only one wildcard is
+// allowed per path - locations/- together with services/- answers 400 "Request
+// contains an invalid argument" - and locations/- is not uniformly available
+// anyway: it answers 200 for services, 400 for jobs and 501 for workerPools.
+var listParentWildcards = map[string]string{
+	"revisions":  "services/-",
+	"executions": "jobs/-",
+	"tasks":      "jobs/-/executions/-",
+}
+
 // cloudRunPathBuilder builds Cloud Run API paths with location-based scoping
 // Cloud Run v2 API format: /projects/{project}/locations/{location}/{resourceType}[/{name}]
 // Nested resources: /projects/{project}/locations/{location}/{parentType}/{parentName}/{resourceType}[/{name}]
 // Special case for Create: adds query parameter ?serviceId={name} or ?jobId={name}
-// Location must be explicitly provided in target config (no wildcards or defaults).
 func cloudRunPathBuilder(ctx base.PathContext) string {
-	// Use location (Cloud Run v2 uses locations, not zones/regions)
-	// Location must be explicitly set in target config
-	location := ctx.Location
-
-	// Build base path
-	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, location)
+	path := fmt.Sprintf("/projects/%s/locations/%s", ctx.Project, cloudRunLocation(ctx))
 
 	// For nested resources, include parent path segments
 	if ctx.ParentType != "" && ctx.ParentResource != "" {
 		path += fmt.Sprintf("/%s/%s", ctx.ParentType, ctx.ParentResource)
+	} else if ctx.IsList {
+		// Discovery lists with no properties at all, so a nested type has no
+		// parent to name and the branch above cannot fire. Without the
+		// wildcard the path drops the parent collection entirely and asks for
+		// e.g. /locations/{l}/revisions, which does not exist.
+		if wildcard, ok := listParentWildcards[ctx.ResourceType]; ok {
+			path += "/" + wildcard
+		}
 	}
 
 	path += "/" + ctx.ResourceType
@@ -63,6 +88,24 @@ func cloudRunPathBuilder(ctx base.PathContext) string {
 	}
 
 	return path
+}
+
+// cloudRunLocation resolves the location segment, falling back to the target's
+// region.
+//
+// Cloud Run v2 has no zones and no second concept for a region to name: a
+// location *is* a region. base deliberately does not derive one from the other
+// ("Container/CloudRun use location (no Region fallback)" in
+// base_resource_helpers.go), so a target that sets region and leaves location
+// unset - the shape /formae:connect writes - interpolated the empty string and
+// asked for "locations//services", which the API answers 400 on every
+// discovery cycle. Resolving it here rather than in base keeps GKE out of it,
+// where a location may legitimately be a zone.
+func cloudRunLocation(ctx base.PathContext) string {
+	if ctx.Location != "" {
+		return ctx.Location
+	}
+	return ctx.Region
 }
 
 // extractCloudRunOperationID extracts operation name from Cloud Run API response
@@ -102,12 +145,11 @@ func extractCloudRunNativeID(response map[string]interface{}, ctx base.PathConte
 		}
 		// If it's an operation response and we have context, construct the path
 		if ctx.ResourceName != "" {
-			location := ctx.Location
-			if location == "" {
-				location = "us-central1"
-			}
+			// A hardcoded default here writes a native ID naming a region the
+			// resource is not in, and unlike a bad list path it fails silently:
+			// no 404, just a wrong stored id.
 			return fmt.Sprintf("projects/%s/locations/%s/%s/%s",
-				ctx.Project, location, ctx.ResourceType, ctx.ResourceName)
+				ctx.Project, cloudRunLocation(ctx), ctx.ResourceType, ctx.ResourceName)
 		}
 	}
 
