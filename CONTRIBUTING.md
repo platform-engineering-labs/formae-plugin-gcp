@@ -99,7 +99,7 @@ namespace prefix.
 
 Two workflows run conformance against real GCP, and both authenticate through
 Workload Identity Federation (see
-[docs/gcp-github-actions-setup.md](docs/gcp-github-actions-setup.md) and the
+[docs/gcp-workload-identity-federation-github-actions.md](docs/gcp-workload-identity-federation-github-actions.md) and the
 secrets below):
 
 - **`ci.yml`** resolves its conformance scope from the event:
@@ -162,6 +162,7 @@ secrets below):
 | `GCP_PROJECT_NUMBER` | GCP project number |
 | `GCP_REGION` | GCP region |
 | `GCP_ZONE` | GCP zone |
+| `GCP_LOCATION` | Location for APIs that use `location` rather than `region`/`zone` |
 
 For detailed WIF setup instructions, see
 [docs/gcp-workload-identity-federation-github-actions.md](docs/gcp-workload-identity-federation-github-actions.md).
