@@ -16,6 +16,11 @@ var EssentialContactsAPI = base.APIConfig{
 	BaseURL:     "https://essentialcontacts.googleapis.com/v1",
 	APIVersion:  "v1",
 	PathBuilder: essentialContactsPathBuilder,
+	// contacts.list takes pageSize/pageToken. Leaving Pagination nil falls back
+	// to the compute-family "maxResults", which this API does not merely ignore
+	// - it refuses the whole request with 400 "Unknown name \"maxResults\":
+	// Cannot bind query parameter", so the type was undiscoverable.
+	Pagination: &base.PaginationConfig{PageSizeParam: "pageSize", PageTokenParam: "pageToken"},
 }
 
 // EssentialContactsOperations - Essential Contacts operations are synchronous:

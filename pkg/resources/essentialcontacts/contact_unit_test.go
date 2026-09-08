@@ -86,3 +86,14 @@ func TestContactRegistered(t *testing.T) {
 		t.Errorf("%s should not be registered for Update", ContactResourceType)
 	}
 }
+
+func TestPaginationParams(t *testing.T) {
+	// Essential Contacts v1 rejects the compute-family "maxResults" outright
+	// (400, "Cannot bind query parameter"), so the default must not apply here.
+	if got := EssentialContactsAPI.GetPageSizeParam(); got != "pageSize" {
+		t.Errorf("page size param = %q, want pageSize", got)
+	}
+	if got := EssentialContactsAPI.GetPageTokenParam(); got != "pageToken" {
+		t.Errorf("page token param = %q, want pageToken", got)
+	}
+}
