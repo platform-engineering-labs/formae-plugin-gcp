@@ -101,4 +101,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	// GKE has no wildcard in the cluster position, so a node pool can only be
+	// discovered by walking the clusters. Must run after RegisterAll above.
+	registerNodePoolWalkingList()
 }

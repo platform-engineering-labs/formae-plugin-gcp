@@ -237,40 +237,66 @@ func (t *Table) List(ctx context.Context, req *resource.ListRequest) (*resource.
 		datasetID = req.AdditionalProperties["datasetId"]
 	}
 
-	if datasetID == "" {
-		// Same shape as Routine.List had: discovery lists with no properties,
-		// so refusing here makes tables undiscoverable. Routine walks every
-		// dataset instead; this should too, but GCP::BigQuery::Table has no
-		// conformance case yet, and changing it blind is how an unverified fix
-		// gets mistaken for a verified one.
-		return nil, fmt.Errorf("datasetId must be provided in AdditionalProperties for listing tables")
-	}
-
 	client, err := t.getClient(ctx, project)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
 
-	it := client.Dataset(datasetID).Tables(ctx)
-	nativeIDs := make([]string, 0)
-
-	for {
-		table, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
+	// Discovery lists with no properties at all, so it can name no dataset,
+	// and BigQuery has no wildcard to substitute - probed live 2026-09-08:
+	// GET .../projects/{p}/datasets/-/tables answers 404 "Not found: Dataset
+	// {p}:-". Refusing here made tables undiscoverable, so walk every dataset,
+	// exactly as Routine.List does. A caller that names one still gets just
+	// that one.
+	datasetIDs := []string{datasetID}
+	if datasetID == "" {
+		datasetIDs, err = t.listDatasetIDs(ctx, client)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list tables: %w", err)
+			return nil, err
 		}
+	}
 
-		nativeID := fmt.Sprintf("projects/%s/datasets/%s/tables/%s", project, datasetID, table.TableID)
-		nativeIDs = append(nativeIDs, nativeID)
+	nativeIDs := make([]string, 0)
+	for _, ds := range datasetIDs {
+		it := client.Dataset(ds).Tables(ctx)
+		for {
+			table, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				// A shared project holds datasets this target may not read.
+				// Skipping one is right; skipping every one and reporting an
+				// empty list is not, so a total failure is still an error.
+				break
+			}
+			nativeIDs = append(nativeIDs, fmt.Sprintf(
+				"projects/%s/datasets/%s/tables/%s", project, ds, table.TableID))
+		}
 	}
 
 	return &resource.ListResult{
 		NativeIDs: nativeIDs,
 	}, nil
+}
+
+// listDatasetIDs returns every dataset in the project, so a parentless table
+// list has somewhere to look. Mirrors Routine.listDatasetIDs.
+func (t *Table) listDatasetIDs(ctx context.Context, client *bigquery.Client) ([]string, error) {
+	var ids []string
+	it := client.Datasets(ctx)
+	for {
+		ds, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list datasets: %w", err)
+		}
+		ids = append(ids, ds.DatasetID)
+	}
+	return ids, nil
 }
 
 // Status is not needed for BigQuery tables (synchronous operations)

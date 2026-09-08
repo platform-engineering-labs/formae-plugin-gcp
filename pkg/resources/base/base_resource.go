@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
@@ -398,9 +399,22 @@ func (b *BaseResource) List(
 			// Zonal resources use both region and zone
 			// Keep both as-is
 		case ScopeLocationBased:
-			// Location-based resources (Container/GKE, CloudRun) require explicit location
-			// If location is not provided, return empty result instead of making API call
-			if pathCtx.Location == "" {
+			// A location-based API used to give up here the moment Location was
+			// empty, returning an empty result with no error and no request.
+			// That is the worst available answer: a target that sets only
+			// region - the shape /formae:connect writes - reported "no
+			// resources exist" for every Cloud Run service and GKE cluster in
+			// the project, silently, with nothing in the log to notice. It also
+			// meant a path builder that *can* handle the case never got asked.
+			//
+			// So ask it, exactly as the parent block below already defers to
+			// it: a package whose API can list without an explicit location -
+			// because a region is its location (Cloud Run), or because it has a
+			// "-" wildcard (GKE) - builds a complete URL and the request goes
+			// out. One that cannot leaves an empty path segment, and that
+			// request really is doomed, so it is still skipped rather than
+			// 404ing on every cycle.
+			if pathCtx.Location == "" && listPathIsDoomed(b.APIConfig, pathCtx) {
 				return &resource.ListResult{
 					NativeIDs:     []string{},
 					NextPageToken: nil,
@@ -678,4 +692,18 @@ func StatusWithRead(
 		}
 	}
 	return result, nil
+}
+
+// listPathIsDoomed reports whether the API config would build a list path with
+// an empty segment, which no Google API answers usefully. It is the test for
+// "this request cannot succeed" that replaced assuming an absent location
+// always means that.
+func listPathIsDoomed(apiConfig APIConfig, pathCtx PathContext) bool {
+	if apiConfig.PathBuilder == nil {
+		return true
+	}
+	// Only the path is examined; the base URL's own "//" after the scheme is
+	// none of our business.
+	path := apiConfig.PathBuilder(pathCtx)
+	return path == "" || strings.Contains(path, "//") || strings.HasSuffix(path, "/")
 }

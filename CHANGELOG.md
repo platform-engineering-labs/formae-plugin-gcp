@@ -788,6 +788,50 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- Five resource types are discoverable, and a sixth class of silent failure is
+  gone. Discovery lists with no properties at all, so a type that lives under a
+  parent has no parent to name and a location-based type may have no location.
+  Each API's own answer was probed live (project `development-477117`,
+  2026-09-08) rather than assumed:
+
+  - `GCP::CloudRun::Revision`, `::Execution` and `::Task` now substitute the
+    API's wildcard parent on a list - `services/-`, `jobs/-` and
+    `jobs/-/executions/-`. All three answer 200, and `services/-/revisions`
+    returned a real revision under a real service, so the wildcard enumerates
+    rather than merely being tolerated. Only one wildcard is allowed per path
+    (`locations/-` together with `services/-` answers 400), so the location
+    stays concrete.
+  - `GCP::Container::NodePool` walks its clusters instead, because GKE has no
+    wildcard there: `clusters/-/nodePools` answers 404 and
+    `locations/-/clusters/-/nodePools` answers 400. Clusters are enumerated
+    with `locations/-`, which finds zonal and regional clusters alike.
+  - `GCP::BigQuery::Table` walks every dataset, exactly as `::Routine` already
+    did. `datasets/-/tables` answers 404 `Not found: Dataset {p}:-`, so there
+    was no wildcard to use.
+  - Cloud Run paths fall back to the target's region when no location is set.
+    Cloud Run v2 has no zones and its locations *are* regions, so a target that
+    sets only region - the shape `/formae:connect` writes - was interpolating
+    an empty segment and asking for `locations//services`.
+  - GKE lists substitute `locations/-` for an absent location, since a GKE
+    location may be a zone or a region and only the wildcard covers both.
+
+- A `ScopeLocationBased` list no longer reports "no resources exist" when the
+  target sets no location. `base` returned an empty `ListResult` with no error
+  and no request the moment `Location` was empty, so on a region-only target
+  every Cloud Run service, job and worker pool and every GKE cluster in the
+  project was silently invisible - no 404, nothing in the log to notice, and
+  the path builder never got asked whether it could handle the case. It is now
+  asked, mirroring how the parent-resource block beneath it already defers to
+  it: a builder that produces a complete URL gets its request sent, and one
+  that would leave an empty path segment is still skipped rather than 404ing
+  every cycle. Verified live - `GCP::CloudRun::Service` on a region-only target
+  went from 0 results to 3.
+
+- `extractCloudRunNativeID` no longer substitutes a hardcoded `us-central1`
+  when the location is empty, which wrote a native ID naming a region the
+  resource is not in. Unlike a bad list path this failed silently: no 404, just
+  a wrong stored id.
+
 - `GCP::EssentialContacts::Contact` is discoverable. Its `APIConfig` declared no
   `Pagination`, which falls back to the compute-family `maxResults`, and the
   Essential Contacts API does not ignore that parameter - it refuses the whole
