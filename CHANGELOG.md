@@ -788,6 +788,16 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- `GCP::EssentialContacts::Contact` is discoverable. Its `APIConfig` declared no
+  `Pagination`, which falls back to the compute-family `maxResults`, and the
+  Essential Contacts API does not ignore that parameter - it refuses the whole
+  request with 400 `Unknown name "maxResults": Cannot bind query parameter`. So
+  every discovery cycle failed to list the type while create, read and delete
+  all worked. It now sends `pageSize`/`pageToken`, which is what the API
+  defines. Every other `base.APIConfig` in the plugin was checked: compute,
+  storage, dns and sql are the only others that omit `Pagination`, and all four
+  genuinely use `maxResults`.
+
 - `GCP::SQL::Database` is discoverable. A database only exists underneath an
   instance and Cloud SQL cannot be asked across instances -
   `/projects/{p}/databases` answers 404 and `/projects/{p}/instances/-/databases`
