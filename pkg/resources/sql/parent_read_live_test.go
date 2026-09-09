@@ -52,6 +52,10 @@ func TestNestedSQLReadParentSafety(t *testing.T) {
 			if parentErr == nil {
 				t.Fatal("negative-control parent unexpectedly exists")
 			}
+			var parentGoogleErr *googleapi.Error
+			if !errors.As(parentErr, &parentGoogleErr) {
+				t.Fatalf("parent lookup did not reach the provider: %v", parentErr)
+			}
 			parentCode := transport.ToResourceErrorCode(transport.WrapError(parentErr, "parent read").Code)
 			if parentCode != scenario.parentCode {
 				t.Fatalf("negative-control parent lookup: error=%v code=%s, want %s", parentErr, parentCode, scenario.parentCode)
