@@ -176,7 +176,7 @@ func (b *BaseResource) Read(
 	if err != nil {
 		// An API that reports a gone resource as something other than a 404;
 		// see ResourceConfig.ReadErrorTreatAsMissing.
-		if f := b.ResourceConfig.ReadErrorTreatAsMissing; f != nil && f(err) {
+		if f := b.ResourceConfig.ReadErrorTreatAsMissing; f != nil && f(ctx, client, pathCtx, err) {
 			return &resource.ReadResult{
 				ErrorCode: resource.OperationErrorCodeNotFound,
 			}, nil

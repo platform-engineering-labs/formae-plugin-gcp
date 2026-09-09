@@ -5,6 +5,7 @@
 package sql
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 )
 
@@ -85,39 +87,45 @@ func isRetryableSQLError(err error) bool {
 		strings.Contains(msg, "another operation was already in progress")
 }
 
-// parentInstanceGone reports whether an error says the instance a nested
-// resource hangs off no longer exists.
-//
-// Cloud SQL does not 404 for a collection under a missing instance, it 403s.
-// Probed live against project development-477117 on 2026-09-08, with a caller
-// holding cloudsql.instances.get and cloudsql.databases.list at project level:
-//
-//	GET instances/gone              -> 404 instanceDoesNotExist
-//	GET instances/gone/databases/x  -> 403 notAuthorized
-//	GET instances/gone/users        -> 403 notAuthorized
-//	GET instances/gone/sslCerts     -> 403 notAuthorized
-//	GET instances/gone/backupRuns   -> 403 notAuthorized
-//
-// 403 classifies as AccessDenied, which is terminal, so before this a database
-// orphaned by an out-of-band instance delete failed its read on every sync and
-// failed the whole sync command with it - 542 such failures in 24 hours on one
-// production installation, and the command had no way to ever succeed again.
-//
-// The reason is checked, not just the status: a 403 that is a real permission
-// problem carries "forbidden" and must stay terminal, because answering
-// NotFound would have core reconcile away a resource that merely could not be
-// read. Only the nested collections carry this hook; instances.get 404s
-// honestly and needs none.
-func parentInstanceGone(err error) bool {
-	if err == nil {
+// sqlReadErrorTreatAsMissing confirms whether an ambiguous child read error
+// comes from a missing parent. Reuse the child read's authenticated client.
+func sqlReadErrorTreatAsMissing(ctx context.Context, client *transport.Client, pathCtx base.PathContext, err error) bool {
+	if pathCtx.Project == "" || pathCtx.ParentType != "instances" || pathCtx.ParentResource == "" {
 		return false
 	}
+	return parentInstanceGone(err, func() error {
+		url := fmt.Sprintf("%s/projects/%s/instances/%s", SQLAPI.BaseURL, pathCtx.Project, pathCtx.ParentResource)
+		_, parentErr := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
+		return parentErr
+	})
+}
+
+// parentInstanceGone requires an explicit instanceDoesNotExist response from
+// the parent lookup. A child 403 notAuthorized is ambiguous: it can mask a
+// missing parent, but it must never be sufficient to discard managed state.
+// If the parent exists, is inaccessible, or cannot be checked, keep the child
+// error. The callback isolates the additional provider request for unit tests.
+func parentInstanceGone(err error, readParent func() error) bool {
 	var gerr *googleapi.Error
-	if !errors.As(err, &gerr) || gerr.Code != 403 {
+	if !errors.As(err, &gerr) || gerr.Code != 403 || readParent == nil {
 		return false
 	}
+	candidate := false
 	for _, item := range gerr.Errors {
 		if item.Reason == "notAuthorized" {
+			candidate = true
+			break
+		}
+	}
+	if !candidate {
+		return false
+	}
+	var parentErr *googleapi.Error
+	if !errors.As(readParent(), &parentErr) || parentErr.Code != 404 {
+		return false
+	}
+	for _, item := range parentErr.Errors {
+		if item.Reason == "instanceDoesNotExist" {
 			return true
 		}
 	}

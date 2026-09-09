@@ -12,9 +12,16 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
+func TestUnverifiedAuthorizationFailureDoesNotProveParentMissing(t *testing.T) {
+	err := &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "notAuthorized"}}}
+	if parentInstanceGone(err, nil) {
+		t.Fatal("an unverified authorization failure must not remove a child from managed state")
+	}
+}
+
 // Cloud SQL answers a nested collection under a deleted instance with 403
 // notAuthorized rather than 404, so a database whose instance is gone must be
-// recognised from the error alone. Established live against project
+// recognised only after an instance lookup confirms it is missing. Established live against project
 // development-477117 on 2026-09-08:
 //
 //	GET instances/gone              -> 404 instanceDoesNotExist
@@ -58,7 +65,9 @@ func TestParentInstanceGone(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := parentInstanceGone(tc.err); got != tc.want {
+			if got := parentInstanceGone(tc.err, func() error {
+				return &googleapi.Error{Code: 404, Errors: []googleapi.ErrorItem{{Reason: "instanceDoesNotExist"}}}
+			}); got != tc.want {
 				t.Errorf("parentInstanceGone() = %v, want %v", got, tc.want)
 			}
 		})
@@ -88,5 +97,40 @@ func TestNestedSQLTypesTreatMissingParentAsGone(t *testing.T) {
 	if def.ResourceConfig.ReadErrorTreatAsMissing != nil {
 		t.Error("DatabaseInstance: 403 on an instance is a genuine authorization " +
 			"failure - instances.get 404s when the instance is gone")
+	}
+}
+
+// A 403 for a child is not enough: changing the parent verification to accept
+// denied, existing, or unverified parents must fail these cases.
+func TestParentInstanceGoneRequiresConfirmedParentAbsence(t *testing.T) {
+	childErr := &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "notAuthorized"}}}
+	missing := &googleapi.Error{Code: 404, Errors: []googleapi.ErrorItem{{Reason: "instanceDoesNotExist"}}}
+	for _, tc := range []struct {
+		name      string
+		parentErr error
+		want      bool
+	}{
+		{"missing", missing, true},
+		{"wrapped missing", fmt.Errorf("lookup: %w", missing), true},
+		{"existing", nil, false},
+		{"permission denied", &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "notAuthorized"}}}, false},
+		{"unexplained 404", &googleapi.Error{Code: 404}, false},
+		{"wrong 404 reason", &googleapi.Error{Code: 404, Errors: []googleapi.ErrorItem{{Reason: "notFound"}}}, false},
+		{"wrong status", &googleapi.Error{Code: 500, Errors: []googleapi.ErrorItem{{Reason: "instanceDoesNotExist"}}}, false},
+		{"network failure", errors.New("connection failed"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := parentInstanceGone(childErr, func() error { return tc.parentErr }); got != tc.want {
+				t.Errorf("parentInstanceGone = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestUnrelatedChildErrorsDoNotReadParent(t *testing.T) {
+	for _, childErr := range []error{nil, errors.New("network failure"), &googleapi.Error{Code: 404}, &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "forbidden"}}}} {
+		if parentInstanceGone(childErr, func() error { t.Fatal("unexpected parent read"); return nil }) {
+			t.Error("unrelated error classified as missing")
+		}
 	}
 }

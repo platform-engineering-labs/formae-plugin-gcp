@@ -31,9 +31,10 @@ on:
 
 # Share the serialization group with ci.yml and nightly.yml so runs never race
 # for the same GCP test project. A debug invocation queues behind an in-flight
-# CI or nightly run.
+# CI or nightly run. The read-only SQL probe has no cloud writes or cleanup,
+# so it can run independently of that shared-project lifecycle lock.
 concurrency:
-  group: gcp-conformance-tests
+  group: ${{ inputs.test_cases == 'sql-read-parent-safety' && format('gcp-sql-read-probe-{0}', github.run_id) || 'gcp-conformance-tests' }}
   cancel-in-progress: false
 
 jobs:
@@ -57,7 +58,7 @@ jobs:
 
   pre-cleanup:
     needs: [parse-input]
-    if: inputs.pre_cleanup
+    if: inputs.pre_cleanup && inputs.test_cases != 'sql-read-parent-safety'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -201,7 +202,7 @@ jobs:
 
   post-cleanup:
     needs: [conformance-tests]
-    if: always() && needs.conformance-tests.result != 'skipped'
+    if: always() && needs.conformance-tests.result != 'skipped' && inputs.test_cases != 'sql-read-parent-safety'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
