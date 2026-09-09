@@ -86,8 +86,15 @@ func TestNestedSQLReadParentSafety(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if result.ErrorCode != scenario.want {
-						t.Errorf("Read returned %s, want %s: an unverified parent must not erase managed child state", result.ErrorCode, scenario.want)
+					want := scenario.want
+					// BackupRun masks even an invalid project as notAuthorized,
+					// unlike the other three child APIs. Preserve that child error;
+					// do not replace it with the parent's InvalidRequest or NotFound.
+					if scenario.name == "invalid project" && child.resourceType == BackupRunResourceType {
+						want = resource.OperationErrorCodeAccessDenied
+					}
+					if result.ErrorCode != want {
+						t.Errorf("Read returned %s, want %s: an unverified parent must not erase managed child state", result.ErrorCode, want)
 					}
 				})
 			}
