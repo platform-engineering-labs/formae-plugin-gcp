@@ -788,6 +788,25 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- A Cloud SQL database, user, SSL certificate or backup run whose instance was
+  deleted out of band no longer fails every synchronization. Cloud SQL answers
+  child reads with `403 notAuthorized` when the instance is gone. The plugin
+  now checks the parent using the same credentials and reports `NotFound` only
+  when that lookup returns `404 instanceDoesNotExist`. An existing or
+  inaccessible parent, an unrelated 404, or a failed lookup preserves the
+  original child error, so an authorization failure cannot by itself remove
+  managed resources from inventory.
+
+- `GCP::NetworkSecurity::UrlList` and `GCP::NetworkSecurity::GatewaySecurityPolicy`
+  are discoverable. Both are regional, and discovery lists with no properties at
+  all, so both arrived with an empty location and fell back to `global` - which
+  the package already documented as a 400 for exactly these two collections.
+  Every discovery cycle logged `Malformed name` for both. They now list across
+  regions with the `-` wildcard, verified live along with
+  `locations/-/gatewaySecurityPolicies/-/rules`, which answers 200: unlike Cloud
+  Run, this API takes two wildcards in one path, so nested rules are enumerated
+  without naming a region either.
+
 - A `GCP::Compute::Firewall` that references its network by resolvable
   self-link no longer re-applies as a spurious replace. The response
   transformer stripped the API prefix from `network`, storing

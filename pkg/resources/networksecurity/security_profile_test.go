@@ -175,7 +175,9 @@ func TestLocationOf(t *testing.T) {
 		{"securityProfiles", "europe-central2", "global"},
 		{"securityProfileGroups", "europe-central2", "global"},
 		{"urlLists", "europe-central2", "europe-central2"},
-		{"urlLists", "", "global"},
+		// No location is discovery. "global" 400s on a regional collection;
+		// see locationOf and TestLocationOfRegionalCollectionWithoutLocation.
+		{"urlLists", "", "-"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.resourceType+"/"+tt.location, func(t *testing.T) {

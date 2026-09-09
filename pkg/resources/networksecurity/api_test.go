@@ -203,3 +203,69 @@ func TestExtractOperationNameIgnoresAResourceResponse(t *testing.T) {
 		t.Error("the sync config needs a non-nil OperationIDExtractor or the registry replaces it wholesale")
 	}
 }
+
+// Discovery lists with no properties at all, so a regional collection arrives
+// with an empty location. Falling back to "global" - which the comment above
+// globalResourceTypes already records as a 400 for these two - made
+// UrlList and GatewaySecurityPolicy fail on every discovery cycle in
+// production. The wildcard is the only segment that lists across regions;
+// probed live against project development-477117 on 2026-09-09:
+//
+//	locations/global/urlLists                   -> 400 Malformed name
+//	locations/-/urlLists                        -> 200
+//	locations/global/gatewaySecurityPolicies    -> 400 Malformed name
+//	locations/-/gatewaySecurityPolicies         -> 200
+//	locations/-/gatewaySecurityPolicies/-/rules -> 200 (two wildcards are fine)
+func TestLocationOfRegionalCollectionWithoutLocation(t *testing.T) {
+	tests := []struct {
+		resourceType string
+		want         string
+	}{
+		{"urlLists", "-"},
+		{"gatewaySecurityPolicies", "-"},
+		{"rules", "-"},
+		// A global collection ignores the missing location as it ignores a
+		// present one.
+		{"clientTlsPolicies", "global"},
+		{"addressGroups", "global"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.resourceType, func(t *testing.T) {
+			got := locationOf(base.PathContext{ResourceType: tt.resourceType})
+			if got != tt.want {
+				t.Errorf("locationOf(%s, no location) = %q, want %q", tt.resourceType, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPathBuilderListsRegionalCollectionAcrossRegions(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  base.PathContext
+		want string
+	}{
+		{
+			name: "url lists with no location",
+			ctx:  base.PathContext{Project: "p", ResourceType: "urlLists"},
+			want: "/projects/p/locations/-/urlLists",
+		},
+		{
+			name: "gateway security policies with no location",
+			ctx:  base.PathContext{Project: "p", ResourceType: "gatewaySecurityPolicies"},
+			want: "/projects/p/locations/-/gatewaySecurityPolicies",
+		},
+		{
+			name: "rules with neither location nor parent",
+			ctx:  base.PathContext{Project: "p", ResourceType: "rules"},
+			want: "/projects/p/locations/-/gatewaySecurityPolicies/-/rules",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := networkSecurityPathBuilder(tt.ctx); got != tt.want {
+				t.Errorf("networkSecurityPathBuilder() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

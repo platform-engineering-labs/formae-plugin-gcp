@@ -4,6 +4,12 @@
 
 package base
 
+import (
+	"context"
+
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+)
+
 // UpdateMethod specifies the HTTP method to use for update operations
 type UpdateMethod string
 
@@ -86,6 +92,28 @@ type ResourceConfig struct {
 	// lying. Leave nil for the overwhelming majority of resources, whose read
 	// 404s the moment the delete is accepted.
 	ReadTreatAsMissing func(body map[string]interface{}) bool
+
+	// ReadErrorTreatAsMissing, when set, is consulted on the error of a failed
+	// read: if it reports true the read answers NotFound instead of the error's
+	// own code.
+	//
+	// The companion to ReadTreatAsMissing, for an API that reports a gone
+	// resource with something other than 404. Cloud SQL is the case that forced
+	// it: every collection nested under an instance - databases, users,
+	// sslCerts, backupRuns - answers 403 notAuthorized once the instance is
+	// deleted, while the instance itself answers a plain 404. 403 maps to
+	// AccessDenied, which is terminal, so a single database left behind by an
+	// out-of-band instance delete failed its read on every synchronization and
+	// took the whole sync command down with it, forever.
+	//
+	// The hook receives the existing authenticated client and parsed path so it
+	// can verify parent absence before classifying an ambiguous error.
+	// Keep the predicate narrow. It converts a hard error into "the resource is
+	// gone", and core reconciles on that, so a predicate that also matches a
+	// genuine permission failure deletes state that is merely unreadable. Leave
+	// nil unless the API is known to lie, and say in the comment what was
+	// observed.
+	ReadErrorTreatAsMissing func(ctx context.Context, client *transport.Client, pathCtx PathContext, err error) bool
 
 	// CreateIDParam, when set, sends the resource id as a create-time query
 	// parameter (e.g. "repositoryId", "instanceId") instead of in the request

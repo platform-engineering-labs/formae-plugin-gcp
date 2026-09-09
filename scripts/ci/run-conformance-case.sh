@@ -83,6 +83,12 @@ case "${FORMAE_TEST_CALLER_EMAIL:-}" in
 esac
 echo "Conformance caller identity: source=${caller_email_source}, ${caller_email_shape}"
 
+# Read-only provider regression: no fixture or resource creation is needed.
+# Use the debug-conformance workflow's normal credentials and serialization.
+if [ "$TEST_CASE" = "sql-read-parent-safety" ]; then
+  exec go test -tags integration ./pkg/resources/sql -run '^TestNestedSQLReadParentSafety$' -count=1 -v -timeout=5m
+fi
+
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
 # "no available packages for: formae" when the package channel is unreachable,

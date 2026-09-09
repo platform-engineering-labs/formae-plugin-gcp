@@ -63,7 +63,17 @@ var parentCollectionOf = map[string]string{
 }
 
 // locationOf returns the location segment for a request: "global" for the
-// collections above, and the target's region for the rest.
+// collections above, the target's region for the rest, and the wildcard for a
+// regional collection that arrives without one.
+//
+// That last case is discovery, which lists with no properties at all. Falling
+// back to "global" there asked a regional collection for a location it does not
+// have, and the 400 recorded above then repeated on every discovery cycle -
+// UrlList and GatewaySecurityPolicy failed that way in production for as long
+// as they have been registered. Probed live against project development-477117
+// on 2026-09-09: locations/-/urlLists, locations/-/gatewaySecurityPolicies and
+// locations/-/gatewaySecurityPolicies/-/rules all answer 200, so a second
+// wildcard in the path is fine here, unlike Cloud Run.
 func locationOf(ctx base.PathContext) string {
 	if globalResourceTypes[ctx.ResourceType] {
 		return defaultLocation
@@ -71,7 +81,7 @@ func locationOf(ctx base.PathContext) string {
 	if ctx.Location != "" {
 		return ctx.Location
 	}
-	return defaultLocation
+	return "-"
 }
 
 // NetworkSecurityAPI - Network Security API v1. create/update/delete are

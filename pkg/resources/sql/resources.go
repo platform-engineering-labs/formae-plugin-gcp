@@ -80,6 +80,8 @@ func init() {
 			ResourceType: DatabaseResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "databases",
+				// Verify the parent before treating an ambiguous child 403 as missing.
+				ReadErrorTreatAsMissing: sqlReadErrorTreatAsMissing,
 				// A database is nested under its instance:
 				// /projects/{p}/instances/{instance}/databases/{name}
 				ParentResource: &base.ParentResourceConfig{
@@ -103,6 +105,8 @@ func init() {
 			ResourceType: UserResourceType,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "users",
+				// Verify the parent before treating an ambiguous child 403 as missing.
+				ReadErrorTreatAsMissing: sqlReadErrorTreatAsMissing,
 				ParentResource: &base.ParentResourceConfig{
 					ParentType:     "instances",
 					PropertyName:   "instance",
@@ -126,6 +130,8 @@ func init() {
 			OperationConfig: SQLSslCertOperations,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "sslCerts",
+				// Verify the parent before treating an ambiguous child 403 as missing.
+				ReadErrorTreatAsMissing: sqlReadErrorTreatAsMissing,
 				ParentResource: &base.ParentResourceConfig{
 					ParentType:     "instances",
 					PropertyName:   "instance",
@@ -154,6 +160,8 @@ func init() {
 			OperationConfig: SQLBackupRunOperations,
 			ResourceConfig: base.ResourceConfig{
 				ResourceType: "backupRuns",
+				// Verify the parent before treating an ambiguous child 403 as missing.
+				ReadErrorTreatAsMissing: sqlReadErrorTreatAsMissing,
 				ParentResource: &base.ParentResourceConfig{
 					ParentType:     "instances",
 					PropertyName:   "instance",

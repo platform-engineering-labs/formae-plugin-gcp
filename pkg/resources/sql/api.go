@@ -5,10 +5,15 @@
 package sql
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"google.golang.org/api/googleapi"
+
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
 )
 
@@ -80,6 +85,51 @@ func isRetryableSQLError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "is being accessed by other users") ||
 		strings.Contains(msg, "another operation was already in progress")
+}
+
+// sqlReadErrorTreatAsMissing confirms whether an ambiguous child read error
+// comes from a missing parent. Reuse the child read's authenticated client.
+func sqlReadErrorTreatAsMissing(ctx context.Context, client *transport.Client, pathCtx base.PathContext, err error) bool {
+	if pathCtx.Project == "" || pathCtx.ParentType != "instances" || pathCtx.ParentResource == "" {
+		return false
+	}
+	return parentInstanceGone(err, func() error {
+		url := fmt.Sprintf("%s/projects/%s/instances/%s", SQLAPI.BaseURL, pathCtx.Project, pathCtx.ParentResource)
+		_, parentErr := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
+		return parentErr
+	})
+}
+
+// parentInstanceGone requires an explicit instanceDoesNotExist response from
+// the parent lookup. A child 403 notAuthorized is ambiguous: it can mask a
+// missing parent, but it must never be sufficient to discard managed state.
+// If the parent exists, is inaccessible, or cannot be checked, keep the child
+// error. The callback isolates the additional provider request for unit tests.
+func parentInstanceGone(err error, readParent func() error) bool {
+	var gerr *googleapi.Error
+	if !errors.As(err, &gerr) || gerr.Code != 403 || readParent == nil {
+		return false
+	}
+	candidate := false
+	for _, item := range gerr.Errors {
+		if item.Reason == "notAuthorized" {
+			candidate = true
+			break
+		}
+	}
+	if !candidate {
+		return false
+	}
+	var parentErr *googleapi.Error
+	if !errors.As(readParent(), &parentErr) || parentErr.Code != 404 {
+		return false
+	}
+	for _, item := range parentErr.Errors {
+		if item.Reason == "instanceDoesNotExist" {
+			return true
+		}
+	}
+	return false
 }
 
 // SQLNativeID defines native ID format for SQL resources
