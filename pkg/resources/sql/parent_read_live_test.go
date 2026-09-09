@@ -24,8 +24,8 @@ import (
 
 // TestNestedSQLReadParentSafety checks the provider's actual ambiguous 403
 // responses. It makes GET requests only. A random nonexistent project is an
-// authorization-negative control: its parent lookup must not establish absence
-// of an instance within an accessible project.
+// invalid-project control, which must retain the provider error rather than
+// pretending the requested child was confirmed missing.
 func TestNestedSQLReadParentSafety(t *testing.T) {
 	project := os.Getenv("GCP_PROJECT_ID")
 	if project == "" {
@@ -44,7 +44,7 @@ func TestNestedSQLReadParentSafety(t *testing.T) {
 		parentCode, want resource.OperationErrorCode
 	}{
 		{"missing instance", project, resource.OperationErrorCodeNotFound, resource.OperationErrorCodeNotFound},
-		{"inaccessible project", "formae-denied-" + uuid.NewString()[:8], resource.OperationErrorCodeAccessDenied, resource.OperationErrorCodeAccessDenied},
+		{"invalid project", "formae-invalid-" + uuid.NewString()[:8], resource.OperationErrorCodeInvalidRequest, resource.OperationErrorCodeInvalidRequest},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			parent := fmt.Sprintf("projects/%s/instances/%s", scenario.project, instance)
@@ -87,7 +87,7 @@ func TestNestedSQLReadParentSafety(t *testing.T) {
 						t.Fatal(err)
 					}
 					if result.ErrorCode != scenario.want {
-						t.Errorf("Read returned %s, want %s: a denied parent must not erase managed child state", result.ErrorCode, scenario.want)
+						t.Errorf("Read returned %s, want %s: an unverified parent must not erase managed child state", result.ErrorCode, scenario.want)
 					}
 				})
 			}

@@ -789,21 +789,13 @@ formae agent.
 ### Fixed
 
 - A Cloud SQL database, user, SSL certificate or backup run whose instance was
-  deleted out of band no longer fails every synchronization forever. Cloud SQL
-  does not 404 for a collection under a missing instance, it answers 403
-  `notAuthorized` - verified live, with a caller holding the matching project
-  IAM permissions, for all four nested collections, while `instances.get`
-  itself 404s honestly. 403 classifies as AccessDenied, which is terminal, so
-  one orphaned database failed its read on every sync cycle and took the whole
-  sync command down with it: 542 such failures in 24 hours on one production
-  installation, with no state the command could ever reach that would let it
-  succeed. The four nested types now read that specific answer as "the resource
-  is gone", so formae retires them from inventory the way a 404 always did. The
-  reason string is matched, not just the status, because a 403 that is a real
-  permission failure must stay terminal - answering NotFound there would
-  reconcile away state that is merely unreadable. Carried by a new
-  `ResourceConfig.ReadErrorTreatAsMissing` hook, the error-side companion to
-  `ReadTreatAsMissing`.
+  deleted out of band no longer fails every synchronization. Cloud SQL answers
+  child reads with `403 notAuthorized` when the instance is gone. The plugin
+  now checks the parent using the same credentials and reports `NotFound` only
+  when that lookup returns `404 instanceDoesNotExist`. An existing or
+  inaccessible parent, an unrelated 404, or a failed lookup preserves the
+  original child error, so an authorization failure cannot by itself remove
+  managed resources from inventory.
 
 - `GCP::NetworkSecurity::UrlList` and `GCP::NetworkSecurity::GatewaySecurityPolicy`
   are discoverable. Both are regional, and discovery lists with no properties at

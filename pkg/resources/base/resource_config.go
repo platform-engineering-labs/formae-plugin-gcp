@@ -4,6 +4,12 @@
 
 package base
 
+import (
+	"context"
+
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+)
+
 // UpdateMethod specifies the HTTP method to use for update operations
 type UpdateMethod string
 
@@ -100,12 +106,14 @@ type ResourceConfig struct {
 	// out-of-band instance delete failed its read on every synchronization and
 	// took the whole sync command down with it, forever.
 	//
+	// The hook receives the existing authenticated client and parsed path so it
+	// can verify parent absence before classifying an ambiguous error.
 	// Keep the predicate narrow. It converts a hard error into "the resource is
 	// gone", and core reconciles on that, so a predicate that also matches a
 	// genuine permission failure deletes state that is merely unreadable. Leave
 	// nil unless the API is known to lie, and say in the comment what was
 	// observed.
-	ReadErrorTreatAsMissing func(err error) bool
+	ReadErrorTreatAsMissing func(ctx context.Context, client *transport.Client, pathCtx PathContext, err error) bool
 
 	// CreateIDParam, when set, sends the resource id as a create-time query
 	// parameter (e.g. "repositoryId", "instanceId") instead of in the request
