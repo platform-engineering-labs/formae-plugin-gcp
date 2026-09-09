@@ -5,8 +5,11 @@
 package sql
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+
+	"google.golang.org/api/googleapi"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/utils"
@@ -80,6 +83,45 @@ func isRetryableSQLError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "is being accessed by other users") ||
 		strings.Contains(msg, "another operation was already in progress")
+}
+
+// parentInstanceGone reports whether an error says the instance a nested
+// resource hangs off no longer exists.
+//
+// Cloud SQL does not 404 for a collection under a missing instance, it 403s.
+// Probed live against project development-477117 on 2026-09-08, with a caller
+// holding cloudsql.instances.get and cloudsql.databases.list at project level:
+//
+//	GET instances/gone              -> 404 instanceDoesNotExist
+//	GET instances/gone/databases/x  -> 403 notAuthorized
+//	GET instances/gone/users        -> 403 notAuthorized
+//	GET instances/gone/sslCerts     -> 403 notAuthorized
+//	GET instances/gone/backupRuns   -> 403 notAuthorized
+//
+// 403 classifies as AccessDenied, which is terminal, so before this a database
+// orphaned by an out-of-band instance delete failed its read on every sync and
+// failed the whole sync command with it - 542 such failures in 24 hours on one
+// production installation, and the command had no way to ever succeed again.
+//
+// The reason is checked, not just the status: a 403 that is a real permission
+// problem carries "forbidden" and must stay terminal, because answering
+// NotFound would have core reconcile away a resource that merely could not be
+// read. Only the nested collections carry this hook; instances.get 404s
+// honestly and needs none.
+func parentInstanceGone(err error) bool {
+	if err == nil {
+		return false
+	}
+	var gerr *googleapi.Error
+	if !errors.As(err, &gerr) || gerr.Code != 403 {
+		return false
+	}
+	for _, item := range gerr.Errors {
+		if item.Reason == "notAuthorized" {
+			return true
+		}
+	}
+	return false
 }
 
 // SQLNativeID defines native ID format for SQL resources

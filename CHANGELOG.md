@@ -788,6 +788,33 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- A Cloud SQL database, user, SSL certificate or backup run whose instance was
+  deleted out of band no longer fails every synchronization forever. Cloud SQL
+  does not 404 for a collection under a missing instance, it answers 403
+  `notAuthorized` - verified live, with a caller holding the matching project
+  IAM permissions, for all four nested collections, while `instances.get`
+  itself 404s honestly. 403 classifies as AccessDenied, which is terminal, so
+  one orphaned database failed its read on every sync cycle and took the whole
+  sync command down with it: 542 such failures in 24 hours on one production
+  installation, with no state the command could ever reach that would let it
+  succeed. The four nested types now read that specific answer as "the resource
+  is gone", so formae retires them from inventory the way a 404 always did. The
+  reason string is matched, not just the status, because a 403 that is a real
+  permission failure must stay terminal - answering NotFound there would
+  reconcile away state that is merely unreadable. Carried by a new
+  `ResourceConfig.ReadErrorTreatAsMissing` hook, the error-side companion to
+  `ReadTreatAsMissing`.
+
+- `GCP::NetworkSecurity::UrlList` and `GCP::NetworkSecurity::GatewaySecurityPolicy`
+  are discoverable. Both are regional, and discovery lists with no properties at
+  all, so both arrived with an empty location and fell back to `global` - which
+  the package already documented as a 400 for exactly these two collections.
+  Every discovery cycle logged `Malformed name` for both. They now list across
+  regions with the `-` wildcard, verified live along with
+  `locations/-/gatewaySecurityPolicies/-/rules`, which answers 200: unlike Cloud
+  Run, this API takes two wildcards in one path, so nested rules are enumerated
+  without naming a region either.
+
 - A `GCP::Compute::Firewall` that references its network by resolvable
   self-link no longer re-applies as a spurious replace. The response
   transformer stripped the API prefix from `network`, storing

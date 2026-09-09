@@ -174,6 +174,13 @@ func (b *BaseResource) Read(
 		URL:    url,
 	})
 	if err != nil {
+		// An API that reports a gone resource as something other than a 404;
+		// see ResourceConfig.ReadErrorTreatAsMissing.
+		if f := b.ResourceConfig.ReadErrorTreatAsMissing; f != nil && f(err) {
+			return &resource.ReadResult{
+				ErrorCode: resource.OperationErrorCodeNotFound,
+			}, nil
+		}
 		wrappedErr := transport.WrapError(err, "failed to read resource")
 		return &resource.ReadResult{
 			ErrorCode: transport.ToResourceErrorCode(wrappedErr.Code),
