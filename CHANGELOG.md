@@ -788,6 +788,27 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- A resource type whose GCP API has never been enabled in the target project
+  now lists as empty instead of failing. GCP answers a call to a disabled
+  service with 403 PERMISSION_DENIED, indistinguishable from a real
+  authorization failure by status alone; the machine-readable answer is
+  `SERVICE_DISABLED` in the error's `details`, with `errors` empty (verified
+  live against `gkehub.googleapis.com` in project development-477117, where the
+  parsed `googleapi.Error` carries three details and no error items). Discovery
+  runs every cycle against every registered type and no project is expected to
+  have all of them enabled, so this was two permanent ERROR lines per cycle in
+  one production installation - `GKEHub::Membership` and `GKEHub::Feature` -
+  for a condition no code change can fix. A project that has not enabled an API
+  holds no resources of its types, which is what an empty list says.
+
+  The guard sits at the plugin's single `List` entrypoint rather than in
+  `base.List`: about twenty resource packages implement `List` themselves, most
+  walking a parent collection through their own transport calls, and the
+  disabled-API answer can surface from any of those requests. It applies to
+  `List` only. On a `Read` the same 403 means a resource formae already tracks
+  has become unreadable, which is a real failure - answering "not found" there
+  would have core reconcile it away.
+
 - A Cloud SQL database, user, SSL certificate or backup run whose instance was
   deleted out of band no longer fails every synchronization. Cloud SQL answers
   child reads with `403 notAuthorized` when the instance is gone. The plugin

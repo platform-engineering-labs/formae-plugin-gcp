@@ -16,6 +16,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/gcp"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 )
 
 // Plugin implements the Formae ResourcePlugin interface for GCP.
@@ -265,7 +266,7 @@ func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (r
 func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	if registry.HasProvisioner(request.ResourceType, resource.OperationList) {
 		provisioner := registry.Get(request.ResourceType, resource.OperationList, p.targetConfig(request.TargetConfig))
-		return provisioner.List(ctx, request)
+		return emptyIfServiceDisabled(provisioner.List(ctx, request))
 	}
 
 	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
@@ -273,5 +274,32 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 		return nil, err
 	}
 
-	return client.ListResources(ctx, request)
+	return emptyIfServiceDisabled(client.ListResources(ctx, request))
+}
+
+// emptyIfServiceDisabled turns "this project has never enabled the API" into an
+// empty list, and leaves every other outcome alone.
+//
+// A project that has not turned an API on holds no resources of its types, so
+// an empty list is the true answer; an error is not. The distinction matters
+// because discovery runs every cycle against every registered type, and a
+// project is never expected to have all ~250 of them enabled. Reported as
+// errors these are unfixable by any code change and drown the signal: two of
+// them per cycle - GKEHub::Membership and GKEHub::Feature - were a standing
+// entry in one production installation's ERROR logs and in its alerting.
+//
+// The guard sits here, at the plugin's single List entrypoint, rather than in
+// base.List. Roughly twenty resource packages implement List themselves, most
+// of them walking a parent collection through their own transport calls, and
+// the disabled-API answer can surface from any of those requests. One seam
+// covers all of them.
+//
+// It applies to List only, and deliberately. On a Read the same 403 means a
+// resource formae already tracks has become unreadable, which is a real
+// failure; answering "not found" there would have core reconcile it away.
+func emptyIfServiceDisabled(result *resource.ListResult, err error) (*resource.ListResult, error) {
+	if err != nil && transport.IsServiceDisabled(err) {
+		return &resource.ListResult{NativeIDs: []string{}}, nil
+	}
+	return result, err
 }
