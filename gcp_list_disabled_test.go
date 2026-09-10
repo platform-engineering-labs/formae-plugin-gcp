@@ -28,7 +28,7 @@ func disabledAPIError() error {
 // ERROR lines per discovery cycle into a production installation's logs and
 // alerted on them, for a condition no code change can fix.
 func TestListAnswersEmptyWhenTheAPIIsDisabled(t *testing.T) {
-	result, err := emptyIfServiceDisabled(nil, disabledAPIError())
+	result, err := emptyIfUnlistable(nil, disabledAPIError())
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
@@ -47,16 +47,32 @@ func TestListAnswersEmptyWhenTheAPIIsDisabled(t *testing.T) {
 // silent "no resources exist" and formae reconciles live infrastructure away.
 func TestListPassesEverythingElseThrough(t *testing.T) {
 	otherErr := errors.New("failed to list resources: googleapi: Error 403: forbidden")
-	if _, err := emptyIfServiceDisabled(nil, otherErr); !errors.Is(err, otherErr) {
+	if _, err := emptyIfUnlistable(nil, otherErr); !errors.Is(err, otherErr) {
 		t.Errorf("err = %v, want the original error", err)
 	}
 
 	ok := &resource.ListResult{NativeIDs: []string{"projects/p/things/a"}}
-	got, err := emptyIfServiceDisabled(ok, nil)
+	got, err := emptyIfUnlistable(ok, nil)
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
 	if got != ok {
 		t.Errorf("result = %v, want the original result", got)
+	}
+}
+
+// The other answer that means "you will never enumerate this", for the same
+// reason: nothing about the caller can change, so an error repeats forever.
+func TestListAnswersEmptyWhenTheAPIWantsAnEndUser(t *testing.T) {
+	err := fmt.Errorf("failed to list resources: %w", &googleapi.Error{
+		Code:    403,
+		Message: "Authentication error. Invalid end user or user type not supported.",
+	})
+	result, gotErr := emptyIfUnlistable(nil, err)
+	if gotErr != nil {
+		t.Fatalf("err = %v, want nil", gotErr)
+	}
+	if result == nil || len(result.NativeIDs) != 0 {
+		t.Errorf("result = %v, want an empty ListResult", result)
 	}
 }

@@ -788,6 +788,34 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- A resource type whose API only serves humans and service accounts now lists
+  as empty instead of failing, for the same reason a disabled API does: the
+  error can only repeat. A hosted installation's agent authenticates through
+  workload identity federation, so Google sees a federated principal - the
+  roles are bound straight to `principal://...workloadIdentityPools/.../subject/...`
+  with no service account impersonated - and an API restricted to identities
+  that can own the thing being listed refuses it outright.
+
+  No IAM grant fixes this, which is the part worth knowing. Cloud Logging's
+  `SavedQuery` is the type it was found on: listing private saved queries needs
+  `logging.queries.list`, and that permission is in no published role - not
+  `logging.viewer`, not `logging.admin`, not `editor`, not `owner` (13,702
+  permissions, checked). A private saved query belongs to a person, so there is
+  nothing to grant. The same URL answers 200 for a service account, which
+  simply owns none.
+
+  Matched on Google's message rather than a structured reason, deliberately and
+  with a note in the code: the agent's error formatting drops
+  `googleapi.Error.Details` before logging, so production cannot say whether
+  this answer carries a machine-readable reason, and reproducing it needs a
+  federated credential. The status is checked alongside the sentence, and the
+  package already takes this trade in `isRetryableSQLError`.
+
+  A caller that merely lacks a role is untouched - a plain 403 still fails
+  loudly, verified against live traffic where `Container::Cluster`, `IAM::Role`
+  and `OrgPolicy::Policy` kept erroring through this guard on a credential
+  missing their permissions.
+
 - A resource type whose GCP API has never been enabled in the target project
   now lists as empty instead of failing. GCP answers a call to a disabled
   service with 403 PERMISSION_DENIED, indistinguishable from a real

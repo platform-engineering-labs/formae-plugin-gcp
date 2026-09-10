@@ -266,7 +266,7 @@ func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (r
 func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	if registry.HasProvisioner(request.ResourceType, resource.OperationList) {
 		provisioner := registry.Get(request.ResourceType, resource.OperationList, p.targetConfig(request.TargetConfig))
-		return emptyIfServiceDisabled(provisioner.List(ctx, request))
+		return emptyIfUnlistable(provisioner.List(ctx, request))
 	}
 
 	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
@@ -274,11 +274,11 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 		return nil, err
 	}
 
-	return emptyIfServiceDisabled(client.ListResources(ctx, request))
+	return emptyIfUnlistable(client.ListResources(ctx, request))
 }
 
-// emptyIfServiceDisabled turns "this project has never enabled the API" into an
-// empty list, and leaves every other outcome alone.
+// emptyIfUnlistable turns the two answers that mean "you will never enumerate
+// this" into an empty list, and leaves every other outcome alone.
 //
 // A project that has not turned an API on holds no resources of its types, so
 // an empty list is the true answer; an error is not. The distinction matters
@@ -294,11 +294,27 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 // the disabled-API answer can surface from any of those requests. One seam
 // covers all of them.
 //
-// It applies to List only, and deliberately. On a Read the same 403 means a
-// resource formae already tracks has become unreadable, which is a real
-// failure; answering "not found" there would have core reconcile it away.
-func emptyIfServiceDisabled(result *resource.ListResult, err error) (*resource.ListResult, error) {
-	if err != nil && transport.IsServiceDisabled(err) {
+// The second answer is the caller being the wrong kind of identity rather than
+// the API being off. A hosted installation's agent authenticates through
+// workload identity federation, so Google sees a federated principal, and an
+// API restricted to humans and service accounts refuses it outright. No IAM
+// grant changes that - see transport.IsEndUserOnly for why the permission
+// involved is in no role, owner included - so, exactly as with a disabled API,
+// the error can only repeat on every cycle. Cloud Logging's
+// GCP::Logging::SavedQuery is the type it was found on, erroring every
+// discovery pass on a production installation.
+//
+// Both are List-only, and deliberately. On a Read either 403 means a resource
+// formae already tracks has become unreadable, which is a real failure;
+// answering "not found" there would have core reconcile it away.
+//
+// Neither hides a permission problem. A caller that merely lacks a role gets a
+// plain 403 both predicates reject, and it still fails loudly - verified
+// against live traffic, where Container::Cluster, IAM::Role and
+// OrgPolicy::Policy kept erroring through this guard on a credential missing
+// their permissions.
+func emptyIfUnlistable(result *resource.ListResult, err error) (*resource.ListResult, error) {
+	if err != nil && (transport.IsServiceDisabled(err) || transport.IsEndUserOnly(err)) {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
 	return result, err
