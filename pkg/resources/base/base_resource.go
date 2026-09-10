@@ -181,6 +181,9 @@ func (b *BaseResource) Read(
 				ErrorCode: resource.OperationErrorCodeNotFound,
 			}, nil
 		}
+		// The result carries a code and no message, and core's terminal-failure
+		// record carries neither URL nor status; see logUnauthorizedRead.
+		logUnauthorizedRead(ctx, url, err)
 		wrappedErr := transport.WrapError(err, "failed to read resource")
 		return &resource.ReadResult{
 			ErrorCode: transport.ToResourceErrorCode(wrappedErr.Code),

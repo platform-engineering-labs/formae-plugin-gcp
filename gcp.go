@@ -16,6 +16,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/gcp"
 	_ "github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 )
 
 // Plugin implements the Formae ResourcePlugin interface for GCP.
@@ -265,7 +266,8 @@ func (p *Plugin) Status(ctx context.Context, request *resource.StatusRequest) (r
 func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*resource.ListResult, error) {
 	if registry.HasProvisioner(request.ResourceType, resource.OperationList) {
 		provisioner := registry.Get(request.ResourceType, resource.OperationList, p.targetConfig(request.TargetConfig))
-		return provisioner.List(ctx, request)
+		result, err := provisioner.List(ctx, request)
+		return emptyIfUnlistable(ctx, request.ResourceType, result, err)
 	}
 
 	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
@@ -273,5 +275,62 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 		return nil, err
 	}
 
-	return client.ListResources(ctx, request)
+	result, err := client.ListResources(ctx, request)
+	return emptyIfUnlistable(ctx, request.ResourceType, result, err)
+}
+
+// emptyIfUnlistable turns a List that could not look into an empty list, says
+// so in the plugin's log, and leaves every other outcome alone.
+//
+// Two answers qualify, and neither can be acted on by the caller that got it:
+//
+//   - The API is not enabled in this project. Discovery lists every registered
+//     type every cycle and no project enables all ~250 of them, so this is an
+//     ordinary state rather than a fault. Info.
+//   - We are not authorized. A missing role, or - on a hosted installation
+//     authenticating through workload identity federation - an API that only
+//     serves identities able to own what is being listed, and refuses a
+//     federated principal outright with "Invalid end user or user type not
+//     supported". Warn: unlike a disabled API this is usually a gap worth
+//     closing, and the log is what makes an empty result honest.
+//
+// Reported as errors instead, both fail the whole synchronization command on
+// every cycle, forever, for a condition no code change fixes - two of them,
+// GKEHub::Membership and GKEHub::Feature, were a standing entry in one
+// production installation's ERROR logs and in its alerting.
+//
+// The log line is the whole reason this is safe. An empty list without one is
+// indistinguishable from "no resources exist", which is how a permission gap
+// turns into formae quietly believing infrastructure is gone. Every fallback
+// here names the resource type and the API's own words, at a level below the
+// one that pages anybody.
+//
+// It applies to List only, and deliberately. On a Read the same answer means a
+// resource formae already tracks has become unreadable, which is a real
+// failure; reporting "nothing here" would have core reconcile it away. Read
+// logs instead - see BaseResource.Read.
+func emptyIfUnlistable(
+	ctx context.Context,
+	resourceType string,
+	result *resource.ListResult,
+	err error,
+) (*resource.ListResult, error) {
+	if err == nil {
+		return result, nil
+	}
+
+	log := plugin.LoggerFromContext(ctx)
+	empty := &resource.ListResult{NativeIDs: []string{}}
+
+	switch {
+	case transport.IsServiceDisabled(err):
+		log.Info("cannot list resources: the API is not enabled in this project",
+			"resourceType", resourceType, "error", err.Error())
+		return empty, nil
+	case transport.ClassifyError(err) == transport.ErrorCodeUnauthorized:
+		log.Warn("cannot list resources: not authorized, reporting none found",
+			"resourceType", resourceType, "error", err.Error())
+		return empty, nil
+	}
+	return result, err
 }

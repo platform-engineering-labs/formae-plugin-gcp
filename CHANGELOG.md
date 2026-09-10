@@ -788,6 +788,52 @@ formae agent.
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
 
+- A `List` that could not look now answers with an empty list and says so in
+  the plugin's log, instead of failing the whole synchronization command on
+  every cycle. Two answers qualify, and no caller can act on either:
+
+  **The API is not enabled in this project.** GCP answers a disabled service
+  with 403 PERMISSION_DENIED, indistinguishable from a real authorization
+  failure by status alone; the machine-readable marker is `SERVICE_DISABLED` in
+  the error's `details`, with `errors` empty (verified live against
+  `gkehub.googleapis.com`, where the parsed error carries three details and no
+  error items). Discovery lists every registered type every cycle and no
+  project enables all ~250 of them, so this is an ordinary state: logged at
+  `Info`, naming the type and the API's own words.
+
+  **We are not authorized.** A missing role, or - on a hosted installation
+  authenticating through workload identity federation - an API that only serves
+  identities able to own what is being listed and refuses a federated principal
+  with "Invalid end user or user type not supported". No IAM grant fixes that
+  second one: Cloud Logging's `SavedQuery` needs `logging.queries.list`, which
+  is in no published role, `owner` included (13,702 permissions, checked).
+  Logged at `Warn`, because unlike a disabled API this is usually a gap worth
+  closing.
+
+  The log line is what makes this safe. An empty list without one is
+  indistinguishable from "no resources exist", which is how a permission gap
+  becomes formae quietly believing infrastructure is gone.
+
+  Both are `List`-only, deliberately. On a `Read` the same answer means a
+  resource formae already tracks has become unreadable, which is a real
+  failure - reporting "nothing here" would have core reconcile it away.
+
+  The guard sits at the plugin's single `List` entrypoint rather than in
+  `base.List`: about twenty resource packages implement `List` themselves, most
+  walking a parent collection through their own transport calls, and either
+  answer can surface from any of those requests.
+
+- A `Read` refused on authorization now logs what the API said. The read result
+  carries an error code and never a message, and core's own record of a
+  terminal failure is `counting terminal failure type=... operation=read` with
+  no URL, no status and no text at any level - so a refused read was the one
+  failure nothing in the system could explain. Sixteen Cloud SQL databases
+  failed this way on a production installation for over a day, 542 times in 24
+  hours, and identifying the cause needed the call reproduced by hand against
+  live GCP. Logged at `Warn` and restricted to 401 and 403: core still reports
+  and counts the failure, and a second `Error` voice on every read is what
+  buried the signal to begin with.
+
 - A Cloud SQL database, user, SSL certificate or backup run whose instance was
   deleted out of band no longer fails every synchronization. Cloud SQL answers
   child reads with `403 notAuthorized` when the instance is gone. The plugin
