@@ -8,6 +8,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.14]
+
+### Fixed
+
+- A `List` that could not look now answers with an empty list and says so in
+  the plugin's log, instead of failing the whole synchronization command on
+  every cycle. Two answers qualify, and no caller can act on either:
+
+  **The API is not enabled in this project.** GCP answers a disabled service
+  with 403 PERMISSION_DENIED, indistinguishable from a real authorization
+  failure by status alone; the machine-readable marker is `SERVICE_DISABLED` in
+  the error's `details`, with `errors` empty (verified live against
+  `gkehub.googleapis.com`, where the parsed error carries three details and no
+  error items). Discovery lists every registered type every cycle and no
+  project enables all ~250 of them, so this is an ordinary state: logged at
+  `Info`, naming the type and the API's own words.
+
+  **We are not authorized.** A missing role, or - on a hosted installation
+  authenticating through workload identity federation - an API that only serves
+  identities able to own what is being listed and refuses a federated principal
+  with "Invalid end user or user type not supported". No IAM grant fixes that
+  second one: Cloud Logging's `SavedQuery` needs `logging.queries.list`, which
+  is in no published role, `owner` included (13,702 permissions, checked).
+  Logged at `Warn`, because unlike a disabled API this is usually a gap worth
+  closing.
+
+  The log line is what makes this safe. An empty list without one is
+  indistinguishable from "no resources exist", which is how a permission gap
+  becomes formae quietly believing infrastructure is gone.
+
+  Both are `List`-only, deliberately. On a `Read` the same answer means a
+  resource formae already tracks has become unreadable, which is a real
+  failure - reporting "nothing here" would have core reconcile it away.
+
+  The guard sits at the plugin's single `List` entrypoint rather than in
+  `base.List`: about twenty resource packages implement `List` themselves, most
+  walking a parent collection through their own transport calls, and either
+  answer can surface from any of those requests.
+
+- A `Read` refused on authorization now logs what the API said. The read result
+  carries an error code and never a message, and core's own record of a
+  terminal failure is `counting terminal failure type=... operation=read` with
+  no URL, no status and no text at any level - so a refused read was the one
+  failure nothing in the system could explain. Sixteen Cloud SQL databases
+  failed this way on a production installation for over a day, 542 times in 24
+  hours, and identifying the cause needed the call reproduced by hand against
+  live GCP. Logged at `Warn` and restricted to 401 and 403: core still reports
+  and counts the failure, and a second `Error` voice on every read is what
+  buried the signal to begin with.
+
+- A Cloud SQL database, user, SSL certificate or backup run whose instance was
+  deleted out of band no longer fails every synchronization. Cloud SQL answers
+  child reads with `403 notAuthorized` when the instance is gone. The plugin
+  now checks the parent using the same credentials and reports `NotFound` only
+  when that lookup returns `404 instanceDoesNotExist`. An existing or
+  inaccessible parent, an unrelated 404, or a failed lookup preserves the
+  original child error, so an authorization failure cannot by itself remove
+  managed resources from inventory.
+
+- `GCP::NetworkSecurity::UrlList` and `GCP::NetworkSecurity::GatewaySecurityPolicy`
+  are discoverable. Both are regional, and discovery lists with no properties at
+  all, so both arrived with an empty location and fell back to `global` - which
+  the package already documented as a 400 for exactly these two collections.
+  Every discovery cycle logged `Malformed name` for both. They now list across
+  regions with the `-` wildcard, verified live along with
+  `locations/-/gatewaySecurityPolicies/-/rules`, which answers 200: unlike Cloud
+  Run, this API takes two wildcards in one path, so nested rules are enumerated
+  without naming a region either.
+
+- A `GCP::Compute::Firewall` that references its network by resolvable
+  self-link no longer re-applies as a spurious replace. The response
+  transformer stripped the API prefix from `network`, storing
+  `projects/{p}/global/networks/{n}` while the desired value resolved from
+  `net.res.selfLink` is the full URL the API returns. formae diffs raw strings,
+  so the two never matched, and `network` is createOnly - so every reconcile of
+  an unchanged forma planned a delete and recreate. Firewall was the last
+  holdout of a convention PLA-265 reversed for Subnetwork, Router and Instance
+  in July.
+
+  The Compute API settles which form is canonical. Its discovery document lists
+  three accepted forms for `Firewall.network` (full URL,
+  `projects/{p}/global/networks/{n}`, `global/networks/default`), but
+  `Network.selfLink` is "[Output Only] Server-defined URL for the resource" and
+  a read always answers with the full URL whichever form was written - GCP's own
+  `default-allow-icmp` reads back as a full URL. Lenient on input, canonical on
+  output, so the self-link is the only form that survives a round trip.
+
+  `testdata/firewall.pkl` and `firewall-replace.pkl` now reference the network
+  by `net.res.selfLink` instead of interpolating a literal path. The literal was
+  why no gate caught this: it is the one form the strip made match, so the case
+  passed while never exercising the idiom every other compute fixture uses - and
+  it left the firewall with no dependency edge to its network, so nothing
+  ordered the create after it or the destroy before it.
+
+- A freshly created `GCP::Monitoring::MetricDescriptor` is confirmed readable
+  before its create reports success. `metricDescriptors.create` answers 200 with
+  the descriptor, but a GET on it 404s for a second or two afterwards - measured
+  live on 2026-09-08 against project `development-477117`: 404 at t=0s, 404 at
+  t=1s, 200 from t=2s. `MonitoringOperations` declares `Synchronous: true`, so
+  base reported the create complete straight from the create response and
+  `Status` was a no-op, meaning nothing waited. A synchronization landing inside
+  that window read "not found" and formae tombstoned a descriptor that existed.
+  That is not only a red nightly: on a live installation the same race removes a
+  managed resource from the inventory on a timing coincidence alone, and the
+  next reconcile recreates or orphans it. The create now polls its own read
+  until the descriptor appears, and gives up rather than failing a create that
+  demonstrably succeeded. A `List` fallback was measured and rejected: GET and
+  LIST become visible at the same instant, so listing offers no earlier signal.
+
+- Five resource types are discoverable, and a sixth class of silent failure is
+  gone. Discovery lists with no properties at all, so a type that lives under a
+  parent has no parent to name and a location-based type may have no location.
+  Each API's own answer was probed live (project `development-477117`,
+  2026-09-08) rather than assumed:
+
+  - `GCP::CloudRun::Revision`, `::Execution` and `::Task` now substitute the
+    API's wildcard parent on a list - `services/-`, `jobs/-` and
+    `jobs/-/executions/-`. All three answer 200, and `services/-/revisions`
+    returned a real revision under a real service, so the wildcard enumerates
+    rather than merely being tolerated. Only one wildcard is allowed per path
+    (`locations/-` together with `services/-` answers 400), so the location
+    stays concrete.
+  - `GCP::Container::NodePool` walks its clusters instead, because GKE has no
+    wildcard there: `clusters/-/nodePools` answers 404 and
+    `locations/-/clusters/-/nodePools` answers 400. Clusters are enumerated
+    with `locations/-`, which finds zonal and regional clusters alike.
+  - `GCP::BigQuery::Table` walks every dataset, exactly as `::Routine` already
+    did. `datasets/-/tables` answers 404 `Not found: Dataset {p}:-`, so there
+    was no wildcard to use.
+  - Cloud Run paths fall back to the target's region when no location is set.
+    Cloud Run v2 has no zones and its locations *are* regions, so a target that
+    sets only region - the shape `/formae:connect` writes - was interpolating
+    an empty segment and asking for `locations//services`.
+  - GKE lists substitute `locations/-` for an absent location, since a GKE
+    location may be a zone or a region and only the wildcard covers both.
+
+- A `ScopeLocationBased` list no longer reports "no resources exist" when the
+  target sets no location. `base` returned an empty `ListResult` with no error
+  and no request the moment `Location` was empty, so on a region-only target
+  every Cloud Run service, job and worker pool and every GKE cluster in the
+  project was silently invisible - no 404, nothing in the log to notice, and
+  the path builder never got asked whether it could handle the case. It is now
+  asked, mirroring how the parent-resource block beneath it already defers to
+  it: a builder that produces a complete URL gets its request sent, and one
+  that would leave an empty path segment is still skipped rather than 404ing
+  every cycle. Verified live - `GCP::CloudRun::Service` on a region-only target
+  went from 0 results to 3.
+
+- `extractCloudRunNativeID` no longer substitutes a hardcoded `us-central1`
+  when the location is empty, which wrote a native ID naming a region the
+  resource is not in. Unlike a bad list path this failed silently: no 404, just
+  a wrong stored id.
+
+- `GCP::EssentialContacts::Contact` is discoverable. Its `APIConfig` declared no
+  `Pagination`, which falls back to the compute-family `maxResults`, and the
+  Essential Contacts API does not ignore that parameter - it refuses the whole
+  request with 400 `Unknown name "maxResults": Cannot bind query parameter`. So
+  every discovery cycle failed to list the type while create, read and delete
+  all worked. It now sends `pageSize`/`pageToken`, which is what the API
+  defines. Every other `base.APIConfig` in the plugin was checked: compute,
+  storage, dns and sql are the only others that omit `Pagination`, and all four
+  genuinely use `maxResults`.
+
 ## [0.1.13]
 
 ### Changed
@@ -787,165 +950,6 @@ formae agent.
   fields fail as stale. All current annotations start as `pending`;
   classifications land per field as the provider-default audit reaches them.
 ### Fixed
-
-- A `List` that could not look now answers with an empty list and says so in
-  the plugin's log, instead of failing the whole synchronization command on
-  every cycle. Two answers qualify, and no caller can act on either:
-
-  **The API is not enabled in this project.** GCP answers a disabled service
-  with 403 PERMISSION_DENIED, indistinguishable from a real authorization
-  failure by status alone; the machine-readable marker is `SERVICE_DISABLED` in
-  the error's `details`, with `errors` empty (verified live against
-  `gkehub.googleapis.com`, where the parsed error carries three details and no
-  error items). Discovery lists every registered type every cycle and no
-  project enables all ~250 of them, so this is an ordinary state: logged at
-  `Info`, naming the type and the API's own words.
-
-  **We are not authorized.** A missing role, or - on a hosted installation
-  authenticating through workload identity federation - an API that only serves
-  identities able to own what is being listed and refuses a federated principal
-  with "Invalid end user or user type not supported". No IAM grant fixes that
-  second one: Cloud Logging's `SavedQuery` needs `logging.queries.list`, which
-  is in no published role, `owner` included (13,702 permissions, checked).
-  Logged at `Warn`, because unlike a disabled API this is usually a gap worth
-  closing.
-
-  The log line is what makes this safe. An empty list without one is
-  indistinguishable from "no resources exist", which is how a permission gap
-  becomes formae quietly believing infrastructure is gone.
-
-  Both are `List`-only, deliberately. On a `Read` the same answer means a
-  resource formae already tracks has become unreadable, which is a real
-  failure - reporting "nothing here" would have core reconcile it away.
-
-  The guard sits at the plugin's single `List` entrypoint rather than in
-  `base.List`: about twenty resource packages implement `List` themselves, most
-  walking a parent collection through their own transport calls, and either
-  answer can surface from any of those requests.
-
-- A `Read` refused on authorization now logs what the API said. The read result
-  carries an error code and never a message, and core's own record of a
-  terminal failure is `counting terminal failure type=... operation=read` with
-  no URL, no status and no text at any level - so a refused read was the one
-  failure nothing in the system could explain. Sixteen Cloud SQL databases
-  failed this way on a production installation for over a day, 542 times in 24
-  hours, and identifying the cause needed the call reproduced by hand against
-  live GCP. Logged at `Warn` and restricted to 401 and 403: core still reports
-  and counts the failure, and a second `Error` voice on every read is what
-  buried the signal to begin with.
-
-- A Cloud SQL database, user, SSL certificate or backup run whose instance was
-  deleted out of band no longer fails every synchronization. Cloud SQL answers
-  child reads with `403 notAuthorized` when the instance is gone. The plugin
-  now checks the parent using the same credentials and reports `NotFound` only
-  when that lookup returns `404 instanceDoesNotExist`. An existing or
-  inaccessible parent, an unrelated 404, or a failed lookup preserves the
-  original child error, so an authorization failure cannot by itself remove
-  managed resources from inventory.
-
-- `GCP::NetworkSecurity::UrlList` and `GCP::NetworkSecurity::GatewaySecurityPolicy`
-  are discoverable. Both are regional, and discovery lists with no properties at
-  all, so both arrived with an empty location and fell back to `global` - which
-  the package already documented as a 400 for exactly these two collections.
-  Every discovery cycle logged `Malformed name` for both. They now list across
-  regions with the `-` wildcard, verified live along with
-  `locations/-/gatewaySecurityPolicies/-/rules`, which answers 200: unlike Cloud
-  Run, this API takes two wildcards in one path, so nested rules are enumerated
-  without naming a region either.
-
-- A `GCP::Compute::Firewall` that references its network by resolvable
-  self-link no longer re-applies as a spurious replace. The response
-  transformer stripped the API prefix from `network`, storing
-  `projects/{p}/global/networks/{n}` while the desired value resolved from
-  `net.res.selfLink` is the full URL the API returns. formae diffs raw strings,
-  so the two never matched, and `network` is createOnly - so every reconcile of
-  an unchanged forma planned a delete and recreate. Firewall was the last
-  holdout of a convention PLA-265 reversed for Subnetwork, Router and Instance
-  in July.
-
-  The Compute API settles which form is canonical. Its discovery document lists
-  three accepted forms for `Firewall.network` (full URL,
-  `projects/{p}/global/networks/{n}`, `global/networks/default`), but
-  `Network.selfLink` is "[Output Only] Server-defined URL for the resource" and
-  a read always answers with the full URL whichever form was written - GCP's own
-  `default-allow-icmp` reads back as a full URL. Lenient on input, canonical on
-  output, so the self-link is the only form that survives a round trip.
-
-  `testdata/firewall.pkl` and `firewall-replace.pkl` now reference the network
-  by `net.res.selfLink` instead of interpolating a literal path. The literal was
-  why no gate caught this: it is the one form the strip made match, so the case
-  passed while never exercising the idiom every other compute fixture uses - and
-  it left the firewall with no dependency edge to its network, so nothing
-  ordered the create after it or the destroy before it.
-
-- A freshly created `GCP::Monitoring::MetricDescriptor` is confirmed readable
-  before its create reports success. `metricDescriptors.create` answers 200 with
-  the descriptor, but a GET on it 404s for a second or two afterwards - measured
-  live on 2026-09-08 against project `development-477117`: 404 at t=0s, 404 at
-  t=1s, 200 from t=2s. `MonitoringOperations` declares `Synchronous: true`, so
-  base reported the create complete straight from the create response and
-  `Status` was a no-op, meaning nothing waited. A synchronization landing inside
-  that window read "not found" and formae tombstoned a descriptor that existed.
-  That is not only a red nightly: on a live installation the same race removes a
-  managed resource from the inventory on a timing coincidence alone, and the
-  next reconcile recreates or orphans it. The create now polls its own read
-  until the descriptor appears, and gives up rather than failing a create that
-  demonstrably succeeded. A `List` fallback was measured and rejected: GET and
-  LIST become visible at the same instant, so listing offers no earlier signal.
-
-- Five resource types are discoverable, and a sixth class of silent failure is
-  gone. Discovery lists with no properties at all, so a type that lives under a
-  parent has no parent to name and a location-based type may have no location.
-  Each API's own answer was probed live (project `development-477117`,
-  2026-09-08) rather than assumed:
-
-  - `GCP::CloudRun::Revision`, `::Execution` and `::Task` now substitute the
-    API's wildcard parent on a list - `services/-`, `jobs/-` and
-    `jobs/-/executions/-`. All three answer 200, and `services/-/revisions`
-    returned a real revision under a real service, so the wildcard enumerates
-    rather than merely being tolerated. Only one wildcard is allowed per path
-    (`locations/-` together with `services/-` answers 400), so the location
-    stays concrete.
-  - `GCP::Container::NodePool` walks its clusters instead, because GKE has no
-    wildcard there: `clusters/-/nodePools` answers 404 and
-    `locations/-/clusters/-/nodePools` answers 400. Clusters are enumerated
-    with `locations/-`, which finds zonal and regional clusters alike.
-  - `GCP::BigQuery::Table` walks every dataset, exactly as `::Routine` already
-    did. `datasets/-/tables` answers 404 `Not found: Dataset {p}:-`, so there
-    was no wildcard to use.
-  - Cloud Run paths fall back to the target's region when no location is set.
-    Cloud Run v2 has no zones and its locations *are* regions, so a target that
-    sets only region - the shape `/formae:connect` writes - was interpolating
-    an empty segment and asking for `locations//services`.
-  - GKE lists substitute `locations/-` for an absent location, since a GKE
-    location may be a zone or a region and only the wildcard covers both.
-
-- A `ScopeLocationBased` list no longer reports "no resources exist" when the
-  target sets no location. `base` returned an empty `ListResult` with no error
-  and no request the moment `Location` was empty, so on a region-only target
-  every Cloud Run service, job and worker pool and every GKE cluster in the
-  project was silently invisible - no 404, nothing in the log to notice, and
-  the path builder never got asked whether it could handle the case. It is now
-  asked, mirroring how the parent-resource block beneath it already defers to
-  it: a builder that produces a complete URL gets its request sent, and one
-  that would leave an empty path segment is still skipped rather than 404ing
-  every cycle. Verified live - `GCP::CloudRun::Service` on a region-only target
-  went from 0 results to 3.
-
-- `extractCloudRunNativeID` no longer substitutes a hardcoded `us-central1`
-  when the location is empty, which wrote a native ID naming a region the
-  resource is not in. Unlike a bad list path this failed silently: no 404, just
-  a wrong stored id.
-
-- `GCP::EssentialContacts::Contact` is discoverable. Its `APIConfig` declared no
-  `Pagination`, which falls back to the compute-family `maxResults`, and the
-  Essential Contacts API does not ignore that parameter - it refuses the whole
-  request with 400 `Unknown name "maxResults": Cannot bind query parameter`. So
-  every discovery cycle failed to list the type while create, read and delete
-  all worked. It now sends `pageSize`/`pageToken`, which is what the API
-  defines. Every other `base.APIConfig` in the plugin was checked: compute,
-  storage, dns and sql are the only others that omit `Pagination`, and all four
-  genuinely use `maxResults`.
 
 - `GCP::SQL::Database` is discoverable. A database only exists underneath an
   instance and Cloud SQL cannot be asked across instances -
