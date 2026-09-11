@@ -71,7 +71,7 @@ func (p *instanceWalkingListProvisioner) List(
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: instancesURL})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list bigtable instances")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}

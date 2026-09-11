@@ -330,7 +330,7 @@ func (p *GlobalNetworkEndpointProvisioner) List(
 	if groups == nil {
 		discovered, gErr := p.listGroups(ctx, project)
 		if gErr != nil {
-			return nil, fmt.Errorf("%s", gErr.Message)
+			return nil, gErr
 		}
 		groups = discovered
 	}

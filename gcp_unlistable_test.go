@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"google.golang.org/api/googleapi"
@@ -82,8 +83,8 @@ func TestListLogsInfoAndEmptiesWhenTheAPIIsNotEnabled(t *testing.T) {
 // the empty result means "could not look" rather than "nothing is there".
 func TestListLogsWarnAndEmptiesWhenNotAuthorized(t *testing.T) {
 	cases := map[string]error{
-		"a plain permission denial":  deniedErr(`Required "container.clusters.list" permission(s) for "projects/p".`),
-		"an end-user-only API":       deniedErr("Authentication error. Invalid end user or user type not supported."),
+		"a plain permission denial": deniedErr(`Required "container.clusters.list" permission(s) for "projects/p".`),
+		"an end-user-only API":      deniedErr("Authentication error. Invalid end user or user type not supported."),
 		"Cloud SQL's notAuthorized": deniedErr("The client is not authorized to make this request."),
 	}
 	for name, listErr := range cases {
@@ -126,5 +127,24 @@ func TestListPassesOtherOutcomesThrough(t *testing.T) {
 	}
 	if len(lines) != 0 {
 		t.Errorf("logged %v on success, want nothing", lines)
+	}
+}
+
+// A walked list wraps the parent collection's failure in a transport error
+// before handing it up. The wrapper must keep the API's answer reachable, or
+// every instance-, router- and zone-scoped type fails discovery in a project
+// whose API is simply not enabled.
+func TestWalkedListsDisabledAPIReadsAsEmptyThroughTheTransportWrapper(t *testing.T) {
+	var lines []string
+	wrapped := transport.WrapError(disabledErr(), "failed to list SQL instances")
+	got, err := emptyIfUnlistable(ctxWithLog(&lines), "GCP::SQL::Database", nil, wrapped)
+	if err != nil {
+		t.Fatalf("expected the disabled API to read as an empty list, got %v", err)
+	}
+	if got == nil || len(got.NativeIDs) != 0 {
+		t.Fatalf("expected an empty list, got %+v", got)
+	}
+	if len(lines) != 1 || !strings.HasPrefix(lines[0], "INFO") || !strings.Contains(lines[0], "failed to list SQL instances") {
+		t.Fatalf("expected one Info line carrying the walker's context, got %q", lines)
 	}
 }

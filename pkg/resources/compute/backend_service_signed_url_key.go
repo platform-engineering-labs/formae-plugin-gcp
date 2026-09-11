@@ -277,7 +277,7 @@ func (p *SignedUrlKeyProvisioner) List(
 			})
 			if rErr != nil {
 				wrapped := transport.WrapError(rErr, "failed to read backend service")
-				return nil, fmt.Errorf("%s", wrapped.Message)
+				return nil, wrapped
 			}
 			nativeIDs := []string{}
 			for _, name := range signedUrlKeyNames(resp.Body) {
@@ -293,7 +293,7 @@ func (p *SignedUrlKeyProvisioner) List(
 	})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to list backend services")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}

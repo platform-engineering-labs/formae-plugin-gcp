@@ -6,7 +6,6 @@ package compute
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 )
@@ -24,7 +23,7 @@ func listComputeCollectionNames(
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list "+what)
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 	items, _ := resp.Body["items"].([]interface{})
 	names := make([]string, 0, len(items))

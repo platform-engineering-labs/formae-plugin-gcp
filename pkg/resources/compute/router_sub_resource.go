@@ -407,7 +407,7 @@ func (p *RouterSubResourceProvisioner) List(
 		if rErr != nil {
 			if router != "" {
 				wrapped := transport.WrapError(rErr, "failed to list "+p.kind.label+"s")
-				return nil, fmt.Errorf("%s", wrapped.Message)
+				return nil, wrapped
 			}
 			// One unreadable router must not hide the rest.
 			continue

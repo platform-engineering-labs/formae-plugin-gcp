@@ -327,7 +327,7 @@ func (p *DiskResourcePolicyAttachmentProvisioner) List(
 	})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to list disks")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	// Keys are "zones/{zone}" or "regions/{region}". Each kind reports only its
