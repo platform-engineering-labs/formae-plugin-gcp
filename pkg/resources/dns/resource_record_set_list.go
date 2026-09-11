@@ -70,7 +70,7 @@ func (p *resourceRecordSetListProvisioner) List(
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: zonesURL})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list DNS managed zones")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}

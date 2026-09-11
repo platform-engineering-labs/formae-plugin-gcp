@@ -364,7 +364,7 @@ func (p *FirewallPolicyAssociationProvisioner) List(
 		if rErr != nil {
 			if policy != "" {
 				wrapped := transport.WrapError(rErr, "failed to list firewall policy associations")
-				return nil, fmt.Errorf("%s", wrapped.Message)
+				return nil, wrapped
 			}
 			// One unreadable policy must not hide the rest.
 			continue

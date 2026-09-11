@@ -71,7 +71,7 @@ func (p *responsePolicyRuleListProvisioner) List(
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: policiesURL})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list DNS response policies")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}

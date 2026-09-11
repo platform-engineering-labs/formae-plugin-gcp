@@ -79,7 +79,7 @@ func (p *rowAccessPolicyListProvisioner) List(
 		"datasets", "datasetReference", "datasetId")
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list bigquery datasets")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := make([]string, 0)

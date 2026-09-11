@@ -286,7 +286,7 @@ func (p *NetworkPeeringProvisioner) List(
 	})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list networks")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	items, _ := resp.Body["items"].([]interface{})

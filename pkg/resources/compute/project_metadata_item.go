@@ -329,7 +329,7 @@ func (p *ProjectMetadataItemProvisioner) List(
 	}
 	items, _, rErr := p.readMetadata(ctx, project)
 	if rErr != nil {
-		return nil, fmt.Errorf("%s", rErr.Message)
+		return nil, rErr
 	}
 	nativeIDs := make([]string, 0, len(items))
 	for _, raw := range items {

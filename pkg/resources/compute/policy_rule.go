@@ -474,7 +474,7 @@ func (p *PolicyRuleProvisioner) rulesOfPolicy(
 	})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list "+p.kind.label+"s")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	rules, _ := resp.Body["rules"].([]interface{})

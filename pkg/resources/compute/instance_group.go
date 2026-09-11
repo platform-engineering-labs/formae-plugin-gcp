@@ -287,7 +287,7 @@ func (p *InstanceGroupProvisioner) issueVerb(
 	})
 	if err != nil {
 		wrapped := transport.WrapError(err, "instance group verb failed")
-		return "", fmt.Errorf("%s", wrapped.Message)
+		return "", wrapped
 	}
 	opID := p.OperationConfig.OperationIDExtractor(resp.Body)
 	return p.OperationConfig.OperationURLBuilder(pathCtx, opID), nil
@@ -316,7 +316,7 @@ func (p *InstanceGroupProvisioner) listMembers(ctx context.Context, client *tran
 			if transport.ToResourceErrorCode(wrapped.Code) == resource.OperationErrorCodeNotFound {
 				break
 			}
-			return nil, fmt.Errorf("%s", wrapped.Message)
+			return nil, wrapped
 		}
 		all = append(all, rawPageMembers(resp.Body)...)
 		pageToken = utils.GetString(resp.Body, "nextPageToken")

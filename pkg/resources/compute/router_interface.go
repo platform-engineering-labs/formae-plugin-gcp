@@ -379,7 +379,7 @@ func (p *RouterInterfaceProvisioner) List(
 		current, gone, fErr := p.fetchRouter(ctx, project, region, name)
 		if fErr != nil {
 			if router != "" {
-				return nil, fmt.Errorf("%s", fErr.Message)
+				return nil, fErr
 			}
 			// One unreadable router must not hide the rest.
 			continue

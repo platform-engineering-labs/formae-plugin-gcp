@@ -86,7 +86,7 @@ func (p *parentWalkListProvisioner) List(
 			if listErr != nil {
 				if level == 0 {
 					wrapped := transport.WrapError(listErr, "failed to list spanner instances")
-					return nil, fmt.Errorf("%s", wrapped.Message)
+					return nil, wrapped
 				}
 				// One unreadable parent must not hide the rest.
 				continue

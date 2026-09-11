@@ -73,7 +73,7 @@ func (p *logViewListProvisioner) List(
 	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: bucketsURL})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to list logging buckets")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}

@@ -75,7 +75,7 @@ func (p *bucketWalkingListProvisioner) List(
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: bucketsURL})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list storage buckets")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}

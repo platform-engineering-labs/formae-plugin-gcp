@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [Unreleased]
+
+### Fixed
+
+- A List that walks a parent collection first - databases under Cloud SQL
+  instances, NATs and interfaces under routers, record sets under managed
+  zones, and the other instance-, cluster- and zone-scoped types - now answers
+  a disabled API or an unauthorized principal the way a direct List does: an
+  empty list and a log line, instead of an error that fails discovery every
+  cycle. The walkers rendered the parent's failure to a string on the way out,
+  which hid the API's `SERVICE_DISABLED` marker and status from the
+  classifier; they return the wrapped error now, so the answer stays
+  reachable. A brand-new project with nothing enabled logged 29 such errors
+  per discovery cycle. A test names any site that flattens a transport error
+  again.
+
 ## [0.1.14]
 
 ### Fixed

@@ -70,7 +70,7 @@ func (p *userListProvisioner) List(
 	resp, rErr := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: base})
 	if rErr != nil {
 		wrapped := transport.WrapError(rErr, "failed to list alloydb clusters")
-		return nil, fmt.Errorf("%s", wrapped.Message)
+		return nil, wrapped
 	}
 
 	nativeIDs := []string{}
