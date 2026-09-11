@@ -46,7 +46,7 @@ local octet = (hexVal.getOrNull(v.testRunID.substring(0, 1)) ?? 0) * 16
 
 local connection = new privateConnection.PrivateConnection {
   label = "plugin-sdk-test-route-connection"
-  name = "formae-test-rt-pc-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-rt-pc-\(v.testRunID)"
   displayName = "Plugin SDK Test Route Connection"
   vpcPeeringConfig = new privateConnection.VpcPeeringConfig {
     vpc = "projects/\(v.gcpProject)/global/networks/default"
@@ -62,7 +62,7 @@ forma {
 
   new route.Route {
     label = "plugin-sdk-test-datastream-route"
-    name = "formae-test-route-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-route-\(v.testRunID)"
     // Resolvable -> the private connection exists before the route is created.
     privateConnection = connection.res.name
     displayName = "Plugin SDK Test Route"

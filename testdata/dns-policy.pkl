@@ -18,7 +18,7 @@ forma {
 
   new dnsPolicy.Policy {
     label = "plugin-sdk-test-dns-policy"
-    name = "formae-test-dns-policy-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-dns-policy-\(v.testRunID)"
     description = "Test DNS policy for plugin SDK conformance tests"
     enableInboundForwarding = false
     enableLogging = false

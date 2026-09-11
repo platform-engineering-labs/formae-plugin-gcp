@@ -15,7 +15,7 @@ forma {
 
   new logMetric.LogMetric {
     label = "plugin-sdk-test-log-metric"
-    name = "formae_test_metric_\(v.testRunID)"
+    name = "formae_plugin_sdk_test_metric_\(v.testRunID)"
     filter = "resource.type=\"gce_instance\""
     description = "Test log-based metric for plugin SDK conformance tests"
   }

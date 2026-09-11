@@ -18,7 +18,7 @@ forma {
 
   new sp.SecurityProfile {
     label = "plugin-sdk-test-ns-security-profile"
-    name = "formae-test-ns-sp-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ns-sp-\(v.testRunID)"
     type = "THREAT_PREVENTION"
     threatPreventionProfile = new sp.ThreatPreventionProfile {
       severityOverrides = new Listing {

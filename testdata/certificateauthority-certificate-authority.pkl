@@ -19,7 +19,7 @@ import "./config/vars.pkl" as v
 // after the run.
 local pool = new caPool.CaPool {
   label = "plugin-sdk-test-ca-pool"
-  name = "formae-test-ca-pool-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-ca-pool-\(v.testRunID)"
   tier = "DEVOPS"
 }
 
@@ -31,7 +31,7 @@ forma {
 
   new ca.CertificateAuthority {
     label = "plugin-sdk-test-certificate-authority"
-    name = "formae-test-ca-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ca-\(v.testRunID)"
     location = v.gcpLocation
     // Resolvable -> the pool exists before the CA is created.
     caPool = pool.res.name
@@ -43,7 +43,7 @@ forma {
     config = new ca.CertificateConfig {
       subjectConfig = new ca.SubjectConfig {
         subject = new ca.Subject {
-          commonName = "formae-test-root"
+          commonName = "formae-plugin-sdk-test-root"
           organization = "formae plugin sdk test"
         }
       }

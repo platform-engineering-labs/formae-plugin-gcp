@@ -11,11 +11,13 @@ import "@gcp/spanner/database_spanner.pkl" as database
 import "./config/vars.pkl" as v
 
 // The instance the database lives on. Referenced through its resolvable so
-// formae creates and settles the instance first. A Spanner database id is
-// capped at 30 characters, hence the shorter prefix here.
+// formae creates and settles the instance first.
+// A Spanner database id caps at 30 characters and "formae-plugin-sdk-test-"
+// alone is 23, so the database keeps the short "formae-test-" prefix. The
+// instance above it has no such cap and carries the long one.
 local inst = new instance.Instance {
   label = "plugin-sdk-test-spanner-db-instance"
-  name = "formae-test-spdb-inst-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-spdb-inst-\(v.testRunID)"
   config = "regional-\(v.gcpRegion)"
   displayName = "Formae db host"
   processingUnits = 100

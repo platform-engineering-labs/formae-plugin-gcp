@@ -15,6 +15,10 @@ forma {
 
   new connector.Connector {
     label = "plugin-sdk-test-vpcaccess-connector"
+    // Serverless VPC Access caps connector names hard: the docs say "less than 21
+    // characters long, and hyphens (-) count as two characters". The 25-character
+    // name here predates that reading and is known to work, so the effective
+    // limit is somewhere above 25 - but nowhere near the 36 the long prefix needs.
     name = "formae-test-conn-\(v.testRunID)"
     network = "default"
     ipCidrRange = "10.8.0.0/28"

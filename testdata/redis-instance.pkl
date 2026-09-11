@@ -15,7 +15,7 @@ forma {
 
   new redisInstance.Instance {
     label = "plugin-sdk-test-redis-instance"
-    name = "formae-test-redis-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-redis-\(v.testRunID)"
     tier = "BASIC"
     memorySizeGb = 1
   }

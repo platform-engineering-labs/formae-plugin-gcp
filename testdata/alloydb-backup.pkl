@@ -22,7 +22,7 @@ import "./config/vars.pkl" as v
 // minutes, so this case needs a raised TIMEOUT.
 local dbCluster = new alloydbCluster.Cluster {
   label = "plugin-sdk-test-alloydb-backup-cluster"
-  name = "formae-test-bkp-cluster-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-bkp-cluster-\(v.testRunID)"
   networkConfig = new {
     network = "projects/\(v.gcpProject)/global/networks/default"
   }
@@ -37,7 +37,7 @@ forma {
 
   local primary = new alloydbInstance.Instance {
     label = "plugin-sdk-test-alloydb-backup-instance"
-    name = "formae-test-bkp-instance-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-bkp-instance-\(v.testRunID)"
     // Resolvable -> establishes cluster-before-instance create ordering.
     cluster = dbCluster.res.name
     instanceType = "PRIMARY"
@@ -52,7 +52,7 @@ forma {
 
   new alloydbBackup.Backup {
     label = "plugin-sdk-test-alloydb-backup"
-    name = "formae-test-backup-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-backup-\(v.testRunID)"
     // Referenced through the instance: a backup needs a serving primary, and
     // this yields the cluster id while ordering the backup after the instance.
     cluster = primary.res.cluster

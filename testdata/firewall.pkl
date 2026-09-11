@@ -10,7 +10,7 @@ import "@gcp/compute/network.pkl"
 import "@gcp/compute/firewall.pkl"
 import "./config/vars.pkl" as v
 
-local testNetworkName = "formae-test-fw-net-\(v.testRunID)"
+local testNetworkName = "formae-plugin-sdk-test-fw-net-\(v.testRunID)"
 
 // Parent network for the firewall. Referenced via its resolvable self-link
 // rather than a literal path, for two reasons: the reference is what orders the
@@ -37,7 +37,7 @@ forma {
   // Test firewall rule - allow SSH
   new firewall.Firewall {
     label = "plugin-sdk-test-firewall"
-    name = "formae-test-fw-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-fw-\(v.testRunID)"
     description = "Test firewall for plugin SDK conformance tests"
     network = net.res.selfLink
     direction = "INGRESS"

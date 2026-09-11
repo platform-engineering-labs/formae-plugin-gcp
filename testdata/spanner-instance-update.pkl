@@ -19,7 +19,7 @@ forma {
 
   new instance.Instance {
     label = "plugin-sdk-test-spanner-instance"
-    name = "formae-test-spanner-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-spanner-\(v.testRunID)"
     config = "regional-\(v.gcpRegion)"
     displayName = "Formae conformance 2"
     processingUnits = 100

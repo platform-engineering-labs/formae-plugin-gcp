@@ -20,7 +20,7 @@ import "./config/vars.pkl" as v
 // discovery looks for it, and the instance pins its zone itself.
 local sourceFs = new filestoreInstance.Instance {
   label = "plugin-sdk-test-backup-instance"
-  name = "formae-test-bkp-fs-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-bkp-fs-\(v.testRunID)"
   location = v.gcpZone
   tier = "BASIC_HDD"
   fileShares {
@@ -47,7 +47,7 @@ forma {
 
   new backup.Backup {
     label = "plugin-sdk-test-filestore-backup"
-    name = "formae-test-bkp-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-bkp-\(v.testRunID)"
     location = v.gcpRegion
     // Resolvable -> the instance exists before the backup is taken, and the
     // plugin expands the bare name into the full path. Interpolating the path

@@ -16,7 +16,7 @@ forma {
 
   new urlList.UrlList {
     label = "plugin-sdk-test-ns-url-list"
-    name = "formae-test-ns-ul-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ns-ul-\(v.testRunID)"
     values = new Listing {
       "example.com"
       "updated.example.net"

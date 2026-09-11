@@ -21,7 +21,7 @@ import "./config/vars.pkl" as v
 // until a firewall endpoint is attached. This fixture attaches none.
 local profile = new sp.SecurityProfile {
   label = "plugin-sdk-test-ns-spg-profile"
-  name = "formae-test-ns-spg-sp-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-ns-spg-sp-\(v.testRunID)"
   type = "THREAT_PREVENTION"
   description = "Test security profile backing the profile group conformance test"
 }
@@ -34,7 +34,7 @@ forma {
 
   new spg.SecurityProfileGroup {
     label = "plugin-sdk-test-ns-security-profile-group"
-    name = "formae-test-ns-spg-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ns-spg-\(v.testRunID)"
     // The API wants a full resource path here; the resolvable yields the short
     // name and the plugin expands it on the way out and shortens it on the way
     // back, so the declared value and the stored state agree.

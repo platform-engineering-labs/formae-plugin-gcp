@@ -21,7 +21,7 @@ forma {
 
   new addressGroup.AddressGroup {
     label = "plugin-sdk-test-ns-address-group"
-    name = "formae-test-ns-ag-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ns-ag-\(v.testRunID)"
     type = "IPV4"
     capacity = 100
     items = new Listing {

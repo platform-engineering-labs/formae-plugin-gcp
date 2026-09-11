@@ -18,7 +18,7 @@ forma {
 
   new responsePolicy.ResponsePolicy {
     label = "plugin-sdk-test-dns-response-policy"
-    name = "formae-test-dns-rp2-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-dns-rp2-\(v.testRunID)"
     description = "Test response policy for plugin SDK conformance tests"
   }
 }

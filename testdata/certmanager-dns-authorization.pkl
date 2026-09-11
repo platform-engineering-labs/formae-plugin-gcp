@@ -18,8 +18,8 @@ forma {
 
   new dnsAuthorization.DnsAuthorization {
     label = "plugin-sdk-test-certmanager-dns-auth"
-    name = "formae-test-dnsauth-\(v.testRunID)"
-    domain = "formae-\(v.testRunID).example.com"
+    name = "formae-plugin-sdk-test-dnsauth-\(v.testRunID)"
+    domain = "formae-plugin-sdk-test-\(v.testRunID).example.com"
     description = "Test DNS authorization for plugin SDK conformance tests"
   }
 }

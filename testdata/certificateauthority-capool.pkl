@@ -15,7 +15,7 @@ forma {
 
   new caPool.CaPool {
     label = "plugin-sdk-test-capool"
-    name = "formae-test-pool-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-pool-\(v.testRunID)"
     tier = "ENTERPRISE"
   }
 }

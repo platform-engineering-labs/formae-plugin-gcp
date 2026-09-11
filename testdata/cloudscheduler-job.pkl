@@ -15,7 +15,7 @@ forma {
 
   new schedulerJob.Job {
     label = "plugin-sdk-test-scheduler-job"
-    name = "formae-test-job-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-job-\(v.testRunID)"
     schedule = "0 2 * * *"
     timeZone = "Etc/UTC"
     description = "Test Cloud Scheduler job for plugin SDK conformance tests"

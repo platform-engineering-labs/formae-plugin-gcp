@@ -15,7 +15,7 @@ forma {
 
   new queue.Queue {
     label = "plugin-sdk-test-tasks-queue"
-    name = "formae-test-queue-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-queue-\(v.testRunID)"
     rateLimits = new queue.RateLimits {
       maxDispatchesPerSecond = 10.0
       maxConcurrentDispatches = 5

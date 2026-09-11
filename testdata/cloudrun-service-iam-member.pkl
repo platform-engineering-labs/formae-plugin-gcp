@@ -18,7 +18,7 @@ forma {
     label = "plugin-sdk-test-iam-svc"
     project = v.gcpProject
     region = v.gcpRegion
-    name = "formae-test-iamsvc-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-iamsvc-\(v.testRunID)"
     ingress = "INGRESS_TRAFFIC_ALL"
     template = new service.RevisionTemplate {
       containers = new Listing {

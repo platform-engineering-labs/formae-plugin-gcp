@@ -17,7 +17,7 @@ forma {
     label = "plugin-sdk-test-cloudrun-job"
     project = v.gcpProject
     region = v.gcpRegion
-    name = "formae-test-job-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-job-\(v.testRunID)"
     labels = new Mapping {
       ["environment"] = "test"
       ["managed-by"] = "formae"

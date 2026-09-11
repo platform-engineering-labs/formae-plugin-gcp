@@ -15,7 +15,7 @@ forma {
 
   new alloydbCluster.Cluster {
     label = "plugin-sdk-test-alloydb-cluster"
-    name = "formae-test-cluster-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-cluster-\(v.testRunID)"
     networkConfig = new {
       network = "projects/development-477117/global/networks/default"
     }

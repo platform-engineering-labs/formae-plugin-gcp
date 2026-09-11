@@ -17,7 +17,7 @@ forma {
 
   new certificateTemplate.CertificateTemplate {
     label = "plugin-sdk-test-certificate-template"
-    name = "formae-test-tmpl-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-tmpl-\(v.testRunID)"
     location = v.gcpLocation
     description = "Created by the formae GCP plugin conformance suite."
     maximumLifetime = "86400s"

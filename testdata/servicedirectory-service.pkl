@@ -14,7 +14,7 @@ import "./config/vars.pkl" as v
 // so formae creates it first. Both are free.
 local ns = new namespace.Namespace {
   label = "plugin-sdk-test-sd-svc-namespace"
-  name = "formae-test-sd-svc-ns-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-sd-svc-ns-\(v.testRunID)"
 }
 
 forma {
@@ -25,7 +25,7 @@ forma {
 
   new service.Service {
     label = "plugin-sdk-test-sd-service"
-    name = "formae-test-sd-svc-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-sd-svc-\(v.testRunID)"
     namespace = ns.res.name
     annotations = new Mapping {
       ["environment"] = "test"

@@ -16,24 +16,28 @@
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/ci/sweep-patterns.sh
+. "$here/sweep-patterns.sh"
 
 case "${1:-}" in
     alloydb-*)  exec "$here/clean-alloydb-case.sh"  "$1" ;;
     eventarc-*) exec "$here/clean-eventarc-case.sh" "$1" ;;
     datastream-*) exec "$here/clean-datastream-case.sh" "$1" ;;
     filestore-*)  exec "$here/clean-filestore-case.sh" "$1" ;;
-    # These prefixes must match what the fixture actually names. They were
-    # written against the old "formae-plugin-sdk-test-" convention and never
-    # updated when the fixtures were renamed, so every one of them swept nothing
-    # while reporting success - which is how network-firewall-policy-association
-    # met its own leftover policy in the 2026-09-03 nightly.
-    security-policy-rule)        PREFIX="formae-test-spr-"  KIND=armor ;;
-    region-security-policy-rule) PREFIX="formae-test-rspr-" KIND=armor ;;
-    network-firewall-policy-association)        PREFIX="formae-test-nfpa-pol-"  KIND=firewall ;;
-    region-network-firewall-policy-association) PREFIX="formae-test-rnfpa-pol-" KIND=firewall ;;
-    network-firewall-policy-rule)               PREFIX="formae-test-nfpr-pol-"  KIND=firewall ;;
-    machine-image)                              PREFIX="formae-test-mi-"        KIND=vmchain ;;
-    spanner-database)                           PREFIX="formae-test-spdb-inst-" KIND=spanner ;;
+    # Only the case-specific segment is written here; the prefix comes from
+    # FIXTURE_PREFIX_RE so all three allowed shapes are swept at once. These used
+    # to carry a hard-coded prefix, and when the fixtures were renamed every one
+    # of them swept nothing while reporting success - which is how
+    # network-firewall-policy-association met its own leftover policy in the
+    # 2026-09-03 nightly. testdata_naming_test.go now pins each segment below to
+    # the fixture it names.
+    security-policy-rule)        PREFIX_RE="${FIXTURE_PREFIX_RE}spr-"  KIND=armor ;;
+    region-security-policy-rule) PREFIX_RE="${FIXTURE_PREFIX_RE}rspr-" KIND=armor ;;
+    network-firewall-policy-association)        PREFIX_RE="${FIXTURE_PREFIX_RE}nfpa-pol-"  KIND=firewall ;;
+    region-network-firewall-policy-association) PREFIX_RE="${FIXTURE_PREFIX_RE}rnfpa-pol-" KIND=firewall ;;
+    network-firewall-policy-rule)               PREFIX_RE="${FIXTURE_PREFIX_RE}nfpr-pol-"  KIND=firewall ;;
+    machine-image)                              PREFIX_RE="${FIXTURE_PREFIX_RE}mi-"        KIND=vmchain ;;
+    spanner-database)                           PREFIX_RE="${FIXTURE_PREFIX_RE}spdb-inst-" KIND=spanner ;;
     *)
         KIND=network
         ;;
@@ -65,7 +69,7 @@ if [ "${KIND:-}" = "network" ]; then
     # the bare "formae-test-" the network case yields sailed past it and the
     # sweep would have taken every test network in the project, including the
     # ones sibling jobs were using.
-    if printf '%s' "$NET_PREFIX" | grep -qE '^formae[-_](test|probe|plugin)[-_]$'; then
+    if printf '%s' "$NET_PREFIX" | grep -qE "^(${FIXTURE_PREFIX_RE}|${FIXTURE_PREFIX_RE_SNAKE}|formae[-_](test|probe|plugin)[-_])$"; then
         echo "clean-case-prereqs: '${1}' owns no distinct network prefix, skipping"
         exit 0
     fi
@@ -105,10 +109,10 @@ fi
 # the end-of-run sweep, a failed run holds a chargeable instance for the rest of
 # the matrix; three of them survived a single afternoon of local runs.
 if [ "${KIND:-}" = "spanner" ]; then
-    echo "Cleaning Spanner instances named ${PREFIX}* ..."
+    echo "Cleaning Spanner instances matching ${PREFIX_RE} ..."
     # Deleting an instance takes its databases with it.
     gcloud spanner instances list --format="value(name)" 2>/dev/null \
-        | grep "^${PREFIX}" | while read -r inst; do
+        | grep -E "^${PREFIX_RE}" | while read -r inst; do
             echo "  instance $inst"
             gcloud spanner instances delete "$inst" --quiet 2>&1 | tail -1 || true
         done
@@ -120,26 +124,26 @@ fi
 # discovery phase then tries to build them again under the same names:
 # "The resource 'projects/.../disks/...-mi-disk-...' already exists".
 if [ "${KIND:-}" = "vmchain" ]; then
-    echo "Cleaning the VM chain named ${PREFIX}* ..."
+    echo "Cleaning the VM chain matching ${PREFIX_RE} ..."
     # Dependency order: an attached disk cannot be deleted while its instance
     # exists, and a network cannot go before its subnets.
     gcloud compute instances list --format="value(name,zone.basename())" 2>/dev/null \
-        | grep "^${PREFIX}" | while read -r n z; do
+        | grep -E "^${PREFIX_RE}" | while read -r n z; do
         echo "  Deleting instance $n ($z)"
         gcloud compute instances delete "$n" --zone="$z" --quiet 2>&1 | tail -1 || true
     done
     gcloud compute disks list --format="value(name,zone.basename())" 2>/dev/null \
-        | grep "^${PREFIX}" | while read -r n z; do
+        | grep -E "^${PREFIX_RE}" | while read -r n z; do
         echo "  Deleting disk $n ($z)"
         gcloud compute disks delete "$n" --zone="$z" --quiet 2>&1 | tail -1 || true
     done
     gcloud compute networks subnets list --format="value(name,region.basename())" 2>/dev/null \
-        | grep "^${PREFIX}" | while read -r n r; do
+        | grep -E "^${PREFIX_RE}" | while read -r n r; do
         echo "  Deleting subnet $n ($r)"
         gcloud compute networks subnets delete "$n" --region="$r" --quiet 2>&1 | tail -1 || true
     done
     gcloud compute networks list --format="value(name)" 2>/dev/null \
-        | grep "^${PREFIX}" | while read -r n; do
+        | grep -E "^${PREFIX_RE}" | while read -r n; do
         echo "  Deleting network $n"
         gcloud compute networks delete "$n" --quiet 2>&1 | tail -1 || true
     done
@@ -154,9 +158,9 @@ else
     COLLECTION="network-firewall-policies"
 fi
 
-echo "Cleaning ${COLLECTION} named ${PREFIX}* ..."
+echo "Cleaning ${COLLECTION} matching ${PREFIX_RE} ..."
 POLICIES=$(gcloud compute "$COLLECTION" list --format="value(name,region.basename())" 2>/dev/null \
-    | grep "^${PREFIX}" || true)
+    | grep -E "^${PREFIX_RE}" || true)
 
 if [ -z "$POLICIES" ]; then
     echo "  none found"

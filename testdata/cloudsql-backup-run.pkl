@@ -16,7 +16,7 @@ import "./config/vars.pkl" as v
 local inst = new database.DatabaseInstance {
   label = "plugin-sdk-test-backuprun-instance"
   project = v.gcpProject
-  name = "formae-test-backuprun-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-backuprun-\(v.testRunID)"
   databaseVersion = "MYSQL_8_0"
   region = v.gcpRegion
   settings = new database.Settings {

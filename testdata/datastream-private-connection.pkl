@@ -22,7 +22,7 @@ forma {
 
   new privateConnection.PrivateConnection {
     label = "plugin-sdk-test-datastream-private-connection"
-    name = "formae-test-pc-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-pc-\(v.testRunID)"
     displayName = "Plugin SDK Test Private Connection"
     vpcPeeringConfig = new privateConnection.VpcPeeringConfig {
       vpc = "projects/\(v.gcpProject)/global/networks/default"

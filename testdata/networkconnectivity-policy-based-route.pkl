@@ -18,7 +18,7 @@ import "./config/vars.pkl" as v
 // standing up a load balancer and its backends for a route that is never used.
 local net = new network.Network {
   label = "plugin-sdk-test-nc-pbr-network"
-  name = "formae-test-nc-pbr-net-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-nc-pbr-net-\(v.testRunID)"
   description = "Test network for the policy-based route conformance test"
   autoCreateSubnetworks = false
 }
@@ -31,7 +31,7 @@ forma {
 
   new policyBasedRoute.PolicyBasedRoute {
     label = "plugin-sdk-test-nc-policy-based-route"
-    name = "formae-test-nc-pbr-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-nc-pbr-\(v.testRunID)"
     network = net.res.selfLink
     priority = 1000
     filter = new policyBasedRoute.Filter {

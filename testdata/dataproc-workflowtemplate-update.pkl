@@ -18,10 +18,10 @@ forma {
 
   new workflowTemplate.WorkflowTemplate {
     label = "plugin-sdk-test-dataproc-workflow-template"
-    id = "formae-test-wt-\(v.testRunID)"
+    id = "formae-plugin-sdk-test-wt-\(v.testRunID)"
     placement = new workflowTemplate.WorkflowPlacement {
       managedCluster = new workflowTemplate.ManagedCluster {
-        clusterName = "formae-test-wt-cluster"
+        clusterName = "formae-plugin-sdk-test-wt-cluster"
         config = new workflowTemplate.WorkflowClusterConfig {
           masterConfig = new workflowTemplate.InstanceGroupConfig {
             numInstances = 1

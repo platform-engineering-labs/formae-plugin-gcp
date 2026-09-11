@@ -25,7 +25,7 @@ forma {
 
   new trustConfig.TrustConfig {
     label = "plugin-sdk-test-certmanager-trust-config"
-    name = "formae-test-trustcfg-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-trustcfg-\(v.testRunID)"
     description = "Updated trust config description"
     trustStores = new Listing {
       new trustConfig.TrustStore {

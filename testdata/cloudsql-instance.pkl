@@ -16,7 +16,7 @@ forma {
   new database.DatabaseInstance {
     label = "plugin-sdk-test-cloudsql-instance"
     project = v.gcpProject
-    name = "formae-test-sql-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-sql-\(v.testRunID)"
     databaseVersion = "MYSQL_8_0"
     region = v.gcpRegion
     settings = new database.Settings {

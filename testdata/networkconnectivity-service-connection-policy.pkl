@@ -19,14 +19,14 @@ import "./config/vars.pkl" as v
 // endpoints, not an endpoint.
 local net = new network.Network {
   label = "plugin-sdk-test-nc-scp-network"
-  name = "formae-test-nc-scp-net-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-nc-scp-net-\(v.testRunID)"
   description = "Test network for the service connection policy conformance test"
   autoCreateSubnetworks = false
 }
 
 local subnet = new subnetwork.Subnetwork {
   label = "plugin-sdk-test-nc-scp-subnet"
-  name = "formae-test-nc-scp-sub-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-nc-scp-sub-\(v.testRunID)"
   description = "Test subnetwork for the service connection policy conformance test"
   network = net.res.selfLink
   ipCidrRange = "10.95.0.0/24"
@@ -42,7 +42,7 @@ forma {
 
   new scp.ServiceConnectionPolicy {
     label = "plugin-sdk-test-nc-service-connection-policy"
-    name = "formae-test-nc-scp-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-nc-scp-\(v.testRunID)"
     network = net.res.selfLink
     // The value is defined by the producing service, not by this API.
     serviceClass = "gcp-memorystore-redis"

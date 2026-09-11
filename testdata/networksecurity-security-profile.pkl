@@ -23,7 +23,7 @@ forma {
 
   new sp.SecurityProfile {
     label = "plugin-sdk-test-ns-security-profile"
-    name = "formae-test-ns-sp-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-ns-sp-\(v.testRunID)"
     // Immutable, and it decides which settings block applies.
     type = "THREAT_PREVENTION"
     threatPreventionProfile = new sp.ThreatPreventionProfile {

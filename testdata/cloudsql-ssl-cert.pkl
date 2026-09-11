@@ -16,7 +16,7 @@ import "./config/vars.pkl" as v
 local inst = new database.DatabaseInstance {
   label = "plugin-sdk-test-sslcert-instance"
   project = v.gcpProject
-  name = "formae-test-sslcert-\(v.testRunID)"
+  name = "formae-plugin-sdk-test-sslcert-\(v.testRunID)"
   databaseVersion = "MYSQL_8_0"
   region = v.gcpRegion
   settings = new database.Settings {
@@ -46,7 +46,7 @@ forma {
   // once, which the plugin drops rather than persisting.
   new sqlSslCert.SslCert {
     label = "plugin-sdk-test-sslcert"
-    commonName = "formae-test-client"
+    commonName = "formae-plugin-sdk-test-client"
     instance = inst.res.name
   }
 }

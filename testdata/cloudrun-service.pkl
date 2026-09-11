@@ -17,7 +17,7 @@ forma {
     label = "plugin-sdk-test-cloudrun-service"
     project = v.gcpProject
     region = v.gcpRegion
-    name = "formae-test-svc-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-svc-\(v.testRunID)"
     description = "Test Cloud Run service for plugin SDK conformance tests"
     labels = new Mapping {
       ["environment"] = "test"

@@ -17,7 +17,7 @@ forma {
 
   new certificateMap.CertificateMap {
     label = "plugin-sdk-test-certmanager-map"
-    name = "formae-test-certmap-\(v.testRunID)"
+    name = "formae-plugin-sdk-test-certmap-\(v.testRunID)"
     description = "Updated certificate map description"
     labels = new Mapping {
       ["environment"] = "updated"
