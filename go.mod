@@ -16,7 +16,7 @@ require (
 	// Provides oidcx/gcp, the token exchange. Re-pin when oox cuts a tag.
 	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.297.0
 	google.golang.org/grpc v1.83.2
 )
