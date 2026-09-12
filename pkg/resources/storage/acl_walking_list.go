@@ -48,10 +48,11 @@ func (a *aclProvisioner) List(
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
 	}
 
-	buckets, err := a.listBuckets(ctx, client, cfg.Project)
+	items, err := a.listBucketItems(ctx, client, cfg.Project)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
+	buckets := bucketsWithLegacyACLs(items)
 
 	collection := a.ResourceConfig.ResourceType
 	nativeIDs := make([]string, 0, len(buckets))
@@ -84,10 +85,32 @@ func (a *aclProvisioner) List(
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
 }
 
+// listBuckets names every bucket in the project; the notification walker
+// wants all of them, since a notification config lives on any bucket.
 func (a *aclProvisioner) listBuckets(
 	ctx context.Context, client *transport.Client, project string,
 ) ([]string, error) {
-	var out []string
+	items, err := a.listBucketItems(ctx, client, project)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(items))
+	for _, raw := range items {
+		if item, ok := raw.(map[string]interface{}); ok {
+			if name, ok := item["name"].(string); ok && name != "" {
+				out = append(out, name)
+			}
+		}
+	}
+	return out, nil
+}
+
+// listBucketItems returns the project's buckets as the API describes them,
+// across every page.
+func (a *aclProvisioner) listBucketItems(
+	ctx context.Context, client *transport.Client, project string,
+) ([]interface{}, error) {
+	var out []interface{}
 	url := fmt.Sprintf("%s/b?project=%s", a.APIConfig.BaseURL, project)
 	next := url
 	for next != "" {
@@ -96,15 +119,7 @@ func (a *aclProvisioner) listBuckets(
 			return nil, err
 		}
 		items, _ := response.Body["items"].([]interface{})
-		for _, raw := range items {
-			item, ok := raw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if name, ok := item["name"].(string); ok && name != "" {
-				out = append(out, name)
-			}
-		}
+		out = append(out, items...)
 		token, _ := response.Body["nextPageToken"].(string)
 		if token == "" {
 			break
@@ -114,6 +129,46 @@ func (a *aclProvisioner) listBuckets(
 		}
 	}
 	return out, nil
+}
+
+// bucketsWithLegacyACLs names the buckets on which an ACL can exist at all.
+//
+// A bucket with uniform bucket-level access has no legacy ACLs by definition,
+// and Cloud Storage answers its ACL collections with 400 rather than an empty
+// list. Asking is a wasted request that reads as a failure, and a project
+// where every bucket is uniform, which is the default for a new bucket, would
+// trip the walk's every-bucket-failed guard on every discovery cycle. The
+// bucket listing already carries the setting, under its current name and the
+// one it had before the rename, so those buckets are left out here.
+func bucketsWithLegacyACLs(items []interface{}) []string {
+	out := make([]string, 0, len(items))
+	for _, raw := range items {
+		item, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, ok := item["name"].(string)
+		if !ok || name == "" {
+			continue
+		}
+		if uniformBucketLevelAccess(item) {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+func uniformBucketLevelAccess(bucket map[string]interface{}) bool {
+	iam, _ := bucket["iamConfiguration"].(map[string]interface{})
+	for _, key := range []string{"uniformBucketLevelAccess", "bucketPolicyOnly"} {
+		if setting, ok := iam[key].(map[string]interface{}); ok {
+			if enabled, ok := setting["enabled"].(bool); ok && enabled {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // listEntities returns the entity of every ACL entry on one bucket. The entity

@@ -24,6 +24,14 @@ formae agent.
   per discovery cycle. A test names any site that flattens a transport error
   again, whether through `fmt.Errorf` or `errors.New`; the router NAT walker
   used the latter and was caught by the second pass.
+- `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
+  discovery no longer fails in a project whose buckets all have uniform
+  bucket-level access, which is the default for a new bucket. Such a bucket
+  has no legacy ACLs and Cloud Storage answers its ACL collections with 400,
+  so the walk asked, failed on every bucket, and reported the failure every
+  cycle. The bucket listing already says which buckets are uniform, so those
+  are left out before any ACL is asked for; buckets that still carry legacy
+  ACLs are walked as before.
 
 ## [0.1.14]
 
