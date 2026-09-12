@@ -7,7 +7,6 @@ package compute
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -149,7 +148,7 @@ func (p *RouterNatProvisioner) fetchRouter(
 		if transport.ToResourceErrorCode(wrapped.Code) == resource.OperationErrorCodeNotFound {
 			return nil, nil
 		}
-		return nil, errors.New(wrapped.Message)
+		return nil, wrapped
 	}
 	return resp.Body, nil
 }
@@ -435,7 +434,7 @@ func (p *RouterNatProvisioner) List(
 	resp, err := client.SendRequest(ctx, transport.RequestOptions{Method: "GET", URL: url})
 	if err != nil {
 		wrapped := transport.WrapError(err, "failed to list routers")
-		return nil, errors.New(wrapped.Message)
+		return nil, wrapped
 	}
 
 	items, _ := resp.Body["items"].([]interface{})

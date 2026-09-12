@@ -24,7 +24,7 @@ import (
 //
 // transport.WrapError keeps the underlying error reachable through Unwrap, so
 // returning it is enough. This test names every site that flattens one instead.
-var flattenedTransportError = regexp.MustCompile(`fmt\.Errorf\("%s", \w+\.Message\)`)
+var flattenedTransportError = regexp.MustCompile(`(fmt\.Errorf\("%s", |errors\.New\()\w+\.Message\)`)
 
 func TestWalkedListsKeepTheAPIErrorReachable(t *testing.T) {
 	var offenders []string
