@@ -12,6 +12,7 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
+	"github.com/platform-engineering-labs/formae/pkg/plugin"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
 
@@ -30,14 +31,6 @@ func (a *aclProvisioner) List(
 	ctx context.Context,
 	request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	// A caller that names its bucket wants only that one; the base path builder
-	// already handles it.
-	if request.AdditionalProperties != nil {
-		if parent := request.AdditionalProperties["bucket"]; parent != "" {
-			return a.BaseResource.List(ctx, request)
-		}
-	}
-
 	cfg := config.FromTargetConfig(request.TargetConfig, a.Config.Deps())
 	if cfg.Project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
@@ -46,6 +39,25 @@ func (a *aclProvisioner) List(
 	client, err := transport.NewClient(ctx, a.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transport client: %w", err)
+	}
+
+	// A caller that names its bucket wants only that one, and discovery does:
+	// it walks the buckets it found and asks for each one's ACLs. A uniform
+	// bucket answers that with 400, so its setting is read first and the ACL
+	// collection is only asked for on a bucket that can hold one.
+	if request.AdditionalProperties != nil {
+		if bucket := request.AdditionalProperties["bucket"]; bucket != "" {
+			uniform, err := a.bucketIsUniform(ctx, client, bucket)
+			if err != nil {
+				return nil, err
+			}
+			if uniform {
+				plugin.LoggerFromContext(ctx).Info("bucket has uniform bucket-level access, no legacy ACLs to list",
+					"resourceType", a.ResourceConfig.ResourceType, "bucket", bucket)
+				return &resource.ListResult{NativeIDs: []string{}}, nil
+			}
+			return a.BaseResource.List(ctx, request)
+		}
 	}
 
 	items, err := a.listBucketItems(ctx, client, cfg.Project)
@@ -83,6 +95,21 @@ func (a *aclProvisioner) List(
 			collection, failed, lastErr)
 	}
 	return &resource.ListResult{NativeIDs: nativeIDs}, nil
+}
+
+// bucketIsUniform reads one bucket's IAM configuration and reports whether
+// uniform bucket-level access is on.
+func (a *aclProvisioner) bucketIsUniform(
+	ctx context.Context, client *transport.Client, bucket string,
+) (bool, error) {
+	response, err := client.SendRequest(ctx, transport.RequestOptions{
+		Method: "GET",
+		URL:    fmt.Sprintf("%s/b/%s?fields=iamConfiguration", a.APIConfig.BaseURL, bucket),
+	})
+	if err != nil {
+		return false, transport.WrapError(err, "failed to read bucket "+bucket)
+	}
+	return uniformBucketLevelAccess(response.Body), nil
 }
 
 // listBuckets names every bucket in the project; the notification walker

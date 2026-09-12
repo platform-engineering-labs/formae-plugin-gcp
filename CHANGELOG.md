@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [Unreleased]
+
+### Fixed
+
+- `GCP::Storage::BucketAccessControl` and `GCP::Storage::DefaultObjectAccessControl`
+  no longer fail discovery on a bucket with uniform bucket-level access when
+  the bucket is named. Discovery walks the buckets it found and asks for each
+  one's ACLs, and 0.1.15 only taught the project-wide walk to leave uniform
+  buckets out; the per-bucket path still asked and got the 400. The bucket's
+  IAM configuration is read first now, and a uniform bucket answers with an
+  empty list and an Info line.
+
 ## [0.1.15]
 
 ### Fixed
