@@ -22,7 +22,8 @@ formae agent.
   classifier; they return the wrapped error now, so the answer stays
   reachable. A brand-new project with nothing enabled logged 29 such errors
   per discovery cycle. A test names any site that flattens a transport error
-  again.
+  again, whether through `fmt.Errorf` or `errors.New`; the router NAT walker
+  used the latter and was caught by the second pass.
 
 ## [0.1.14]
 
