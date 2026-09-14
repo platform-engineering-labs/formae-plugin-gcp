@@ -57,7 +57,7 @@ func deniedErr(msg string) error {
 // registered types - so it is Info, and it says why nothing was listed.
 func TestListLogsInfoAndEmptiesWhenTheAPIIsNotEnabled(t *testing.T) {
 	var lines []string
-	got, err := emptyIfUnlistable(ctxWithLog(&lines), "GCP::GKEHub::Membership", nil, disabledErr())
+	got, err := emptyIfUnlistable(ctxWithLog(&lines), &resource.ListRequest{ResourceType: "GCP::GKEHub::Membership"}, nil, disabledErr())
 
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
@@ -90,7 +90,7 @@ func TestListLogsWarnAndEmptiesWhenNotAuthorized(t *testing.T) {
 	for name, listErr := range cases {
 		t.Run(name, func(t *testing.T) {
 			var lines []string
-			got, err := emptyIfUnlistable(ctxWithLog(&lines), "GCP::Container::Cluster", nil, listErr)
+			got, err := emptyIfUnlistable(ctxWithLog(&lines), &resource.ListRequest{ResourceType: "GCP::Container::Cluster"}, nil, listErr)
 
 			if err != nil {
 				t.Fatalf("err = %v, want nil", err)
@@ -113,7 +113,7 @@ func TestListLogsWarnAndEmptiesWhenNotAuthorized(t *testing.T) {
 func TestListPassesOtherOutcomesThrough(t *testing.T) {
 	var lines []string
 	boom := errors.New("failed to list resources: googleapi: Error 500: backend error")
-	if _, err := emptyIfUnlistable(ctxWithLog(&lines), "GCP::Compute::Network", nil, boom); !errors.Is(err, boom) {
+	if _, err := emptyIfUnlistable(ctxWithLog(&lines), &resource.ListRequest{ResourceType: "GCP::Compute::Network"}, nil, boom); !errors.Is(err, boom) {
 		t.Errorf("err = %v, want the original error", err)
 	}
 	if len(lines) != 0 {
@@ -121,7 +121,7 @@ func TestListPassesOtherOutcomesThrough(t *testing.T) {
 	}
 
 	ok := &resource.ListResult{NativeIDs: []string{"projects/p/networks/n"}}
-	got, err := emptyIfUnlistable(ctxWithLog(&lines), "GCP::Compute::Network", ok, nil)
+	got, err := emptyIfUnlistable(ctxWithLog(&lines), &resource.ListRequest{ResourceType: "GCP::Compute::Network"}, ok, nil)
 	if err != nil || got != ok {
 		t.Errorf("success was altered: result=%v err=%v", got, err)
 	}
@@ -137,7 +137,7 @@ func TestListPassesOtherOutcomesThrough(t *testing.T) {
 func TestWalkedListsDisabledAPIReadsAsEmptyThroughTheTransportWrapper(t *testing.T) {
 	var lines []string
 	wrapped := transport.WrapError(disabledErr(), "failed to list SQL instances")
-	got, err := emptyIfUnlistable(ctxWithLog(&lines), "GCP::SQL::Database", nil, wrapped)
+	got, err := emptyIfUnlistable(ctxWithLog(&lines), &resource.ListRequest{ResourceType: "GCP::SQL::Database"}, nil, wrapped)
 	if err != nil {
 		t.Fatalf("expected the disabled API to read as an empty list, got %v", err)
 	}
@@ -146,5 +146,42 @@ func TestWalkedListsDisabledAPIReadsAsEmptyThroughTheTransportWrapper(t *testing
 	}
 	if len(lines) != 1 || !strings.HasPrefix(lines[0], "INFO") || !strings.Contains(lines[0], "failed to list SQL instances") {
 		t.Fatalf("expected one Info line carrying the walker's context, got %q", lines)
+	}
+}
+
+func notFoundErr(msg string) error {
+	return fmt.Errorf("failed to list resources: %w", &googleapi.Error{Code: 404, Message: msg})
+}
+
+// A parented list whose parent has been deleted since discovery snapshotted it
+// answers 404 for the parent. Nothing exists to list; reported as an error it
+// failed the whole discovery command on every cycle.
+func TestListEmptiesWhenTheParentIsGone(t *testing.T) {
+	var lines []string
+	req := &resource.ListRequest{
+		ResourceType:         "GCP::Bigtable::Table",
+		AdditionalProperties: map[string]string{"instance": "formae-test-instance-tbl-1a2b"},
+	}
+	got, err := emptyIfUnlistable(ctxWithLog(&lines), req,
+		nil, notFoundErr("Instance projects/p/instances/formae-test-instance-tbl-1a2b not found."))
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if got == nil || len(got.NativeIDs) != 0 {
+		t.Fatalf("result = %+v, want an empty list", got)
+	}
+	if len(lines) != 1 || !strings.HasPrefix(lines[0], "INFO ") {
+		t.Fatalf("logged %v, want one INFO line", lines)
+	}
+}
+
+// An unparented 404 means the URL itself is wrong. That is a defect, and it
+// still has to surface.
+func TestListKeepsNotFoundErrorWhenThereIsNoParent(t *testing.T) {
+	var lines []string
+	req := &resource.ListRequest{ResourceType: "GCP::Storage::Bucket"}
+	_, err := emptyIfUnlistable(ctxWithLog(&lines), req, nil, notFoundErr("not found"))
+	if err == nil {
+		t.Fatal("err = nil, want the 404 to survive")
 	}
 }

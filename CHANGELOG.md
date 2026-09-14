@@ -29,6 +29,16 @@ formae agent.
   discovery had no cluster to list node pools under. Both spellings are
   accepted now, for cluster and node pool paths alike.
 
+- A parented List whose parent has been deleted reports no resources instead of
+  failing the discovery command. Discovery lists children against a parent it
+  read earlier in the same cycle, and the parent can be gone by the time the
+  request goes out: a swept Bigtable instance answers `Instance ... not found`,
+  a removed bucket answers `The specified bucket does not exist`. Both are 404s
+  about the parent, not about the children, and reported as errors they failed
+  the whole cycle for as long as the stale parent sat in the store. Only a list
+  that names a parent is treated this way - a 404 on an unparented collection
+  means the URL is wrong, and that still surfaces.
+
 ## [0.1.16]
 
 ### Fixed
