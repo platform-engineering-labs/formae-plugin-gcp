@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/auth v0.23.2
 	cloud.google.com/go/bigquery v1.82.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.24.0
+	github.com/googleapis/gax-go/v2 v2.24.1
 	github.com/platform-engineering-labs/formae/pkg/model v0.1.28
 	// The OidcAware interface this plugin implements landed after
 	// pkg/plugin/v0.4.1. Re-pin to the next official tag when one is cut, as
