@@ -48,7 +48,9 @@ open class WorkspaceResolvable extends formae.Resolvable {
     parent = "GCP::Dataform::Repository"
     listParam = new Listing<formae.ListProperty> {
         new formae.ListProperty {
-            parentProperty = "repository"
+            // parentProperty is read off the PARENT, whose identifier is "name";
+            // the child's own "repository" field is not on it.
+            parentProperty = "name"
             listParameter = "repository"
         }
     }.toList()

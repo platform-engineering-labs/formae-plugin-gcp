@@ -44,7 +44,9 @@ open class ParameterVersionResolvable extends formae.Resolvable {
     parent = "GCP::ParameterManager::Parameter"
     listParam = new Listing<formae.ListProperty> {
         new formae.ListProperty {
-            parentProperty = "parameter"
+            // parentProperty is read off the PARENT, whose identifier is "name";
+            // the child's own "parameter" field is not on it.
+            parentProperty = "name"
             listParameter = "parameter"
         }
     }.toList()
