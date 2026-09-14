@@ -80,3 +80,25 @@ func TestNodePoolKeepsGenericLifecycle(t *testing.T) {
 		}
 	}
 }
+
+// A zonal cluster reports its path with "zones", not "locations". Rejecting it
+// left clusterName unset, and discovery then never listed that cluster's node
+// pools - the shape seen in production as "Missing parent property
+// property=clusterName parent_id=projects/p/zones/europe-west4-a/clusters/c".
+func TestParseClusterPathAcceptsZonalPaths(t *testing.T) {
+	for _, id := range []string{
+		"projects/development-477117/zones/europe-west4-a/clusters/connect-matrix",
+		"projects/development-477117/locations/europe-west4/clusters/connect-matrix",
+	} {
+		project, location, name, err := ParseClusterPath(id)
+		if err != nil {
+			t.Fatalf("ParseClusterPath(%q) = %v", id, err)
+		}
+		if project != "development-477117" || name != "connect-matrix" || location == "" {
+			t.Fatalf("ParseClusterPath(%q) = %q/%q/%q", id, project, location, name)
+		}
+	}
+	if _, _, _, err := ParseClusterPath("projects/p/regions/r/clusters/c"); err == nil {
+		t.Fatal("ParseClusterPath accepted a path that is not a GKE cluster")
+	}
+}

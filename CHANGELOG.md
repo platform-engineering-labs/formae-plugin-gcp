@@ -20,6 +20,15 @@ formae agent.
   reason to carry. Each parent's identifier is `name` and each already shortens
   it, so that is what the list parameter is taken from now.
 
+- A zonal GKE cluster's node pools are discoverable again.
+  `GCP::Container::NodePool` finds its cluster through the `clusterName` the
+  cluster's response transformer lifts out of the reported path, and that
+  parse demanded a `locations` segment. A zonal cluster reports `zones`
+  instead - the v1 API answers both and keeps the older spelling for anything
+  not regional - so the parse failed, `clusterName` was never set, and
+  discovery had no cluster to list node pools under. Both spellings are
+  accepted now, for cluster and node pool paths alike.
+
 ## [0.1.16]
 
 ### Fixed
