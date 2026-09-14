@@ -38,6 +38,11 @@ case "${1:-}" in
     network-firewall-policy-rule)               PREFIX_RE="${FIXTURE_PREFIX_RE}nfpr-pol-"  KIND=firewall ;;
     machine-image)                              PREFIX_RE="${FIXTURE_PREFIX_RE}mi-"        KIND=vmchain ;;
     spanner-database)                           PREFIX_RE="${FIXTURE_PREFIX_RE}spdb-inst-" KIND=spanner ;;
+    bigtable-table)              PREFIX_RE="${FIXTURE_PREFIX_RE}instance-tbl-" KIND=bigtable ;;
+    bigtable-backup)             PREFIX_RE="${FIXTURE_PREFIX_RE}instance-bk-"  KIND=bigtable ;;
+    bigtable-materialized-view)  PREFIX_RE="${FIXTURE_PREFIX_RE}instance-mv-"  KIND=bigtable ;;
+    bigtable-cluster)            PREFIX_RE="${FIXTURE_PREFIX_RE}instance-cl-"  KIND=bigtable ;;
+    bigtable-app-profile)        PREFIX_RE="${FIXTURE_PREFIX_RE}btap-"         KIND=bigtable ;;
     *)
         KIND=network
         ;;
@@ -100,6 +105,29 @@ if [ "${KIND:-}" = "network" ]; then
     gcloud compute networks list --format="value(name)" 2>/dev/null         | grep "^${NET_PREFIX}" | while read -r n; do
             echo "  network $n"
             gcloud compute networks delete "$n" --quiet 2>&1 | tail -1 || true
+        done
+    exit 0
+fi
+
+# A Bigtable instance bills per node per hour from the moment it exists, and
+# four cases build one as a prerequisite rather than as the resource under test,
+# so Destroy leaves every one of them running until the end-of-run sweep. That
+# is the largest line on this project's bill: thirteen days of the
+# cluster/node_count metric show 1118 node-hours over 345 instances, of which
+# the five prefixes below account for 1067 - not because there are many, but
+# because each lives an average of 3.2 hours for a case that runs in minutes.
+# Eighteen lived past twelve hours, four past thirty.
+#
+# bigtable-instance is deliberately absent: there the instance is the resource
+# under test and Destroy removes it. Its name cannot be caught by the segments
+# below either, since none of tbl/bk/mv/cl is a hex string.
+if [ "${KIND:-}" = "bigtable" ]; then
+    echo "Cleaning Bigtable instances matching ${PREFIX_RE} ..."
+    # Deleting an instance takes its clusters, tables, backups and views with it.
+    gcloud bigtable instances list --format="value(name)" 2>/dev/null \
+        | grep -E "^${PREFIX_RE}" | while read -r inst; do
+            echo "  instance $inst"
+            gcloud bigtable instances delete "$inst" --quiet 2>&1 | tail -1 || true
         done
     exit 0
 fi
