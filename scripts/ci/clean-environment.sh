@@ -515,24 +515,30 @@ fi
 # deleted while it holds configs, so the hierarchy is torn down from the bottom.
 # Every delete is a long-running operation; --async would leave the next delete
 # racing the previous one, so these wait.
+# Not scoped to GCP_REGION/GCP_LOCATION: API Gateway serves eleven regions and
+# the target's europe-central2 is not one of them, so the fixture pins
+# europe-west1 and a per-region loop over the target never saw the gateway it
+# left behind - the list call answered "Location europe-central2 is not found or
+# access is unauthorized" into /dev/null. A bare list covers every location.
 echo "Cleaning GCP API Gateway gateways..."
-for agw_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
-    [ -z "$agw_loc" ] && continue
-    AGW_GW=$(gcloud api-gateway gateways list --location="$agw_loc" \
-        --filter="name~formae-|name~formae-test" --format="value(name)" 2>/dev/null || true)
-    if [ -n "$AGW_GW" ]; then
-        echo "$AGW_GW" | while read -r gw; do
-            echo "  Deleting API Gateway gateway: $gw (location: $agw_loc)"
-            gcloud api-gateway gateways delete "$gw" --location="$agw_loc" --quiet 2>/dev/null || true
-        done
-    else
-        echo "  No API Gateway gateways found in $agw_loc"
-    fi
-done
+# name.segment(5) is the gateway id and segment(3) its location: this
+# collection reports the full projects/*/locations/*/gateways/* path, and
+# "value(name)" abbreviates it to the id alone, which loses the location the
+# delete needs.
+AGW_GW=$(gcloud api-gateway gateways list --format="value(name.segment(5),name.segment(3))" 2>/dev/null \
+    | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$AGW_GW" ]; then
+    echo "$AGW_GW" | while read -r gw gw_loc; do
+        echo "  Deleting API Gateway gateway: $gw (location: ${gw_loc:-unknown})"
+        gcloud api-gateway gateways delete "$gw" --location="$gw_loc" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No API Gateway gateways found"
+fi
 
 echo "Cleaning GCP API Gateway apis and their configs..."
-AGW_APIS=$(gcloud api-gateway apis list --filter="name~formae-|name~formae-test" \
-    --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+AGW_APIS=$(gcloud api-gateway apis list --format="value(name.segment(5))" 2>/dev/null \
+    | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$AGW_APIS" ]; then
     echo "$AGW_APIS" | while read -r agw_api; do
         AGW_CFGS=$(gcloud api-gateway api-configs list --api="$agw_api" --format="value(name)" 2>/dev/null || true)
@@ -556,8 +562,8 @@ fi
 echo "Cleaning GCP Memcache instances..."
 for mc_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
     [ -z "$mc_loc" ] && continue
-    MEMCACHE=$(gcloud memcache instances list --region="$mc_loc" \
-        --filter="name~formae-|name~formae-test" --format="value(name)" 2>/dev/null || true)
+    MEMCACHE=$(gcloud memcache instances list --region="$mc_loc" --format="value(name)" 2>/dev/null \
+        | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
     if [ -n "$MEMCACHE" ]; then
         echo "$MEMCACHE" | while read -r inst; do
             echo "  Deleting Memcache instance: $inst (region: $mc_loc)"
@@ -574,8 +580,8 @@ done
 # leaked instance is a standing cost rather than a tidiness problem. Deleting an
 # instance takes its databases with it.
 echo "Cleaning GCP Spanner instances..."
-SPANNER=$(gcloud spanner instances list --filter="name~formae-|name~formae-test" \
-    --format="value(name)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+SPANNER=$(gcloud spanner instances list --format="value(name)" 2>/dev/null \
+    | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SPANNER" ]; then
     echo "$SPANNER" | while read -r inst; do
         echo "  Deleting Spanner instance: $inst"
@@ -592,8 +598,11 @@ fi
 echo "Cleaning GCP Service Directory namespaces..."
 for sd_loc in "${GCP_REGION:-}" "${GCP_LOCATION:-}"; do
     [ -z "$sd_loc" ] && continue
+    # name.basename(): this collection reports the full
+    # projects/*/locations/*/namespaces/* path, which no anchored prefix matches.
     SD_NS=$(gcloud service-directory namespaces list --location="$sd_loc" \
-        --filter="name~formae-|name~formae-test" --format="value(name)" 2>/dev/null || true)
+        --format="value(name.basename())" 2>/dev/null \
+        | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
     if [ -n "$SD_NS" ]; then
         echo "$SD_NS" | while read -r ns; do
             echo "  Deleting Service Directory namespace: $ns (location: $sd_loc)"
@@ -1086,7 +1095,11 @@ fi
 
 # --- 4. Cloud Run services ---
 echo "Cleaning GCP Cloud Run services..."
-SERVICES=$(gcloud run services list --filter="metadata.name~^formae-(plugin-sdk-|plugin-)?test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+# gcloud's --filter "~" does not honour regex alternation: the
+# "^formae-(plugin-sdk-|plugin-)?test" form matched none of the eleven
+# formae-plugin-sdk-test-iamsvc-* services standing in the project. Listed
+# unfiltered and matched against SWEEP_RE like every other sweep here.
+SERVICES=$(gcloud run services list --format="value(metadata.name,region)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$SERVICES" ]; then
     echo "$SERVICES" | while read -r svc region; do
         echo "  Deleting Cloud Run service: $svc (region: $region)"
@@ -1098,7 +1111,7 @@ fi
 
 # --- 4b. Cloud Run jobs ---
 echo "Cleaning GCP Cloud Run jobs..."
-JOBS=$(gcloud run jobs list --filter="metadata.name~^formae-(plugin-sdk-|plugin-)?test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+JOBS=$(gcloud run jobs list --format="value(metadata.name,region)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$JOBS" ]; then
     echo "$JOBS" | while read -r job region; do
         echo "  Deleting Cloud Run job: $job (region: $region)"
@@ -1110,7 +1123,7 @@ fi
 
 # --- 4c. Cloud Run worker pools ---
 echo "Cleaning GCP Cloud Run worker pools..."
-WORKER_POOLS=$(gcloud run worker-pools list --filter="metadata.name~^formae-(plugin-sdk-|plugin-)?test" --format="value(metadata.name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
+WORKER_POOLS=$(gcloud run worker-pools list --format="value(metadata.name,region)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
 if [ -n "$WORKER_POOLS" ]; then
     echo "$WORKER_POOLS" | while read -r wp region; do
         echo "  Deleting Cloud Run worker pool: $wp (region: $region)"
