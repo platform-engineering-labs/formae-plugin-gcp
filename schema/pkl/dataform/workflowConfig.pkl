@@ -86,6 +86,18 @@ open class InvocationConfig extends formae.SubResource {
     @gcp.FieldHint
     fullyRefreshIncrementalTablesEnabled: Boolean?
 
+    /// Which actions the scheduled invocations run: "DEFAULT",
+    /// "ALL_EXCEPT_UNIT_TESTS" or "UNIT_TESTS_ONLY".
+    ///
+    /// Unlike `queryPriority`, the API does not answer with a placeholder when
+    /// a create leaves this out - it answers "DEFAULT", a real value. Verified
+    /// live: a create sending an invocationConfig with only a serviceAccount
+    /// and a queryPriority reads back carrying executionMode "DEFAULT". So this
+    /// cannot be dropped on read the way the priority placeholder is; it has to
+    /// be declared, and a forma that omits it will see "DEFAULT" in state.
+    @gcp.FieldHint
+    executionMode: String?
+
     /// BigQuery query priority: "INTERACTIVE" or "BATCH".
     ///
     /// The API reports "QUERY_PRIORITY_UNSPECIFIED" for an invocation config
