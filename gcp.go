@@ -267,7 +267,7 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 	if registry.HasProvisioner(request.ResourceType, resource.OperationList) {
 		provisioner := registry.Get(request.ResourceType, resource.OperationList, p.targetConfig(request.TargetConfig))
 		result, err := provisioner.List(ctx, request)
-		return emptyIfUnlistable(ctx, request.ResourceType, result, err)
+		return emptyIfUnlistable(ctx, request, result, err)
 	}
 
 	client, err := gcp.NewClient(ctx, p.targetConfig(request.TargetConfig))
@@ -276,7 +276,7 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 	}
 
 	result, err := client.ListResources(ctx, request)
-	return emptyIfUnlistable(ctx, request.ResourceType, result, err)
+	return emptyIfUnlistable(ctx, request, result, err)
 }
 
 // emptyIfUnlistable turns a List that could not look into an empty list, says
@@ -311,7 +311,7 @@ func (p *Plugin) List(ctx context.Context, request *resource.ListRequest) (*reso
 // logs instead - see BaseResource.Read.
 func emptyIfUnlistable(
 	ctx context.Context,
-	resourceType string,
+	request *resource.ListRequest,
 	result *resource.ListResult,
 	err error,
 ) (*resource.ListResult, error) {
@@ -319,10 +319,25 @@ func emptyIfUnlistable(
 		return result, nil
 	}
 
+	resourceType := request.ResourceType
 	log := plugin.LoggerFromContext(ctx)
 	empty := &resource.ListResult{NativeIDs: []string{}}
 
 	switch {
+	case len(request.AdditionalProperties) > 0 && transport.ClassifyError(err) == transport.ErrorCodeResourceNotFound:
+		// A parented list names its parent in the URL, and discovery reads that
+		// parent from a snapshot taken earlier in the cycle. Between the two the
+		// parent can be gone - a sweep deletes a Bigtable instance, a bucket is
+		// removed - and the collection under it then answers 404 for the parent,
+		// not for the children. Nothing exists to list, which is the honest
+		// answer; reported as an error it fails the whole discovery command on
+		// every cycle for as long as the stale parent is in the store.
+		//
+		// Only parented lists qualify. A 404 on an unparented collection means
+		// the URL itself is wrong, and that is a defect worth surfacing.
+		log.Info("cannot list resources: the parent is gone, reporting none found",
+			"resourceType", resourceType, "error", err.Error())
+		return empty, nil
 	case transport.IsServiceDisabled(err):
 		log.Info("cannot list resources: the API is not enabled in this project",
 			"resourceType", resourceType, "error", err.Error())

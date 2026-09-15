@@ -33,7 +33,9 @@ open class CertificateMapEntryResolvable extends formae.Resolvable {
     parent = "GCP::CertificateManager::CertificateMap"
     listParam = new Listing<formae.ListProperty> {
         new formae.ListProperty {
-            parentProperty = "certificateMap"
+            // parentProperty is read off the PARENT, whose identifier is "name";
+            // the child's own "certificateMap" field is not on it.
+            parentProperty = "name"
             listParameter = "certificateMap"
         }
     }.toList()

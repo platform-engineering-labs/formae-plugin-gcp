@@ -42,7 +42,9 @@ open class GatewaySecurityPolicyRuleResolvable extends formae.Resolvable {
     parent = "GCP::NetworkSecurity::GatewaySecurityPolicy"
     listParam = new Listing<formae.ListProperty> {
         new formae.ListProperty {
-            parentProperty = "gatewaySecurityPolicy"
+            // parentProperty is read off the PARENT, whose identifier is "name";
+            // the child's own "gatewaySecurityPolicy" field is not on it.
+            parentProperty = "name"
             listParameter = "gatewaySecurityPolicy"
         }
     }.toList()

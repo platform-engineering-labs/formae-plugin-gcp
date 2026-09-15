@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [Unreleased]
+
+### Fixed
+
+- Nested types no longer report `Missing parent property` on every discovery
+  cycle. `parentProperty` is read off the *parent* resource, but
+  `CertificateMapEntry`, `GatewaySecurityPolicyRule`, `ParameterVersion`,
+  `Automation` and the three Dataform children named their own field - the one
+  their response transformer synthesises on the child, which the parent has no
+  reason to carry. Each parent's identifier is `name` and each already shortens
+  it, so that is what the list parameter is taken from now.
+
+- A zonal GKE cluster's node pools are discoverable again.
+  `GCP::Container::NodePool` finds its cluster through the `clusterName` the
+  cluster's response transformer lifts out of the reported path, and that
+  parse demanded a `locations` segment. A zonal cluster reports `zones`
+  instead - the v1 API answers both and keeps the older spelling for anything
+  not regional - so the parse failed, `clusterName` was never set, and
+  discovery had no cluster to list node pools under. Both spellings are
+  accepted now, for cluster and node pool paths alike.
+
+- A parented List whose parent has been deleted reports no resources instead of
+  failing the discovery command. Discovery lists children against a parent it
+  read earlier in the same cycle, and the parent can be gone by the time the
+  request goes out: a swept Bigtable instance answers `Instance ... not found`,
+  a removed bucket answers `The specified bucket does not exist`. Both are 404s
+  about the parent, not about the children, and reported as errors they failed
+  the whole cycle for as long as the stale parent sat in the store. Only a list
+  that names a parent is treated this way - a 404 on an unparented collection
+  means the URL is wrong, and that still surfaces.
+
 ## [0.1.16]
 
 ### Fixed

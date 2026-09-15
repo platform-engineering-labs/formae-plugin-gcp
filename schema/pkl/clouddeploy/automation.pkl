@@ -126,7 +126,9 @@ open class AutomationResolvable extends formae.Resolvable {
     parent = "GCP::CloudDeploy::DeliveryPipeline"
     listParam = new Listing<formae.ListProperty> {
         new formae.ListProperty {
-            parentProperty = "deliveryPipeline"
+            // parentProperty is read off the PARENT, whose identifier is "name";
+            // the child's own "deliveryPipeline" field is not on it.
+            parentProperty = "name"
             listParameter = "deliveryPipeline"
         }
     }.toList()

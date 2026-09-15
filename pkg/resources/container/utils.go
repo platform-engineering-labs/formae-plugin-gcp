@@ -38,11 +38,22 @@ func BuildNodePoolPath(project, location, clusterName, nodePoolName string) stri
 		project, location, clusterName, nodePoolName)
 }
 
+// isLocationSegment reports whether a path segment introduces a GKE location.
+//
+// A zonal cluster reports its selfLink and operation targets with "zones"
+// rather than "locations" - the v1 API answers both, and keeps the older
+// spelling for anything that is not regional. Rejecting it left every zonal
+// cluster unparsed, which cost the synthesised clusterName that discovery
+// reads to find the cluster's node pools: they were simply never listed.
+func isLocationSegment(segment string) bool {
+	return segment == "locations" || segment == "zones"
+}
+
 // ParseClusterPath parses a cluster native ID into its components
 // Input: projects/{project}/locations/{location}/clusters/{cluster}
 func ParseClusterPath(nativeID string) (project, location, clusterName string, err error) {
 	parts := strings.Split(nativeID, "/")
-	if len(parts) != 6 || parts[0] != "projects" || parts[2] != "locations" || parts[4] != "clusters" {
+	if len(parts) != 6 || parts[0] != "projects" || !isLocationSegment(parts[2]) || parts[4] != "clusters" {
 		return "", "", "", fmt.Errorf("invalid cluster path format: %s (expected: projects/{project}/locations/{location}/clusters/{cluster})", nativeID)
 	}
 
@@ -64,7 +75,7 @@ func ParseOperationPath(operationID string) (project, location, operationName st
 // Input: projects/{project}/locations/{location}/clusters/{cluster}/nodePools/{nodePool}
 func ParseNodePoolPath(nativeID string) (project, location, clusterName, nodePoolName string, err error) {
 	parts := strings.Split(nativeID, "/")
-	if len(parts) != 8 || parts[0] != "projects" || parts[2] != "locations" || parts[4] != "clusters" || parts[6] != "nodePools" {
+	if len(parts) != 8 || parts[0] != "projects" || !isLocationSegment(parts[2]) || parts[4] != "clusters" || parts[6] != "nodePools" {
 		return "", "", "", "", fmt.Errorf("invalid node pool path format: %s (expected: projects/{project}/locations/{location}/clusters/{cluster}/nodePools/{nodePool})", nativeID)
 	}
 
