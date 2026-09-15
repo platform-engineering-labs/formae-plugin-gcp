@@ -58,7 +58,9 @@ jobs:
         run: make test-unit
 
       - name: Self-check CI scripts
-        run: ./scripts/ci/conformance-scope_test.sh
+        run: |
+          ./scripts/ci/conformance-scope_test.sh
+          ./scripts/ci/clean-case-prereqs_bigtable_test.sh
 
   lint:
     runs-on: ubuntu-latest

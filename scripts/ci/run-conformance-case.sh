@@ -275,12 +275,17 @@ esac
 # prerequisite survives and the discovery phase then either collides with it by
 # name (Cloud Armor policies: "The resource ... already exists") or runs out of
 # quota (5 AlloyDB clusters per region, 1 Eventarc message bus per region).
+# The Bigtable cases are listed for a third reason: their prerequisite instance
+# bills per node per hour, so holding it until the matrix ends is what makes
+# Bigtable the largest line on this project's bill.
 needs_prereq_cleanup() {
   case "$TEST_CASE" in
     alloydb-*|eventarc-*|datastream-*|filestore-backup|\
     security-policy-rule|region-security-policy-rule|\
     network-firewall-policy-association|region-network-firewall-policy-association|\
-    network-firewall-policy-rule|machine-image|spanner-database)
+    network-firewall-policy-rule|machine-image|spanner-database|\
+    bigtable-table|bigtable-backup|bigtable-materialized-view|\
+    bigtable-cluster|bigtable-app-profile)
       return 0 ;;
   esac
   # A case that builds a network needs the same treatment for a different
