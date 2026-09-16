@@ -190,7 +190,19 @@ jobs:
             echo "Using formae_version input: ${VERSION}"
           fi
           echo "Building formae with VERSION=${VERSION}"
-          make build VERSION="${VERSION}"
+          # The build downloads pkl reader binaries from GitHub releases. Every
+          # job in this matrix does it at the same moment, and GitHub answers a
+          # share of them with a connection reset, which fails the whole job
+          # before a single test runs. Retry rather than lose the job.
+          for attempt in 1 2 3; do
+            make build VERSION="${VERSION}" && break
+            if [ "$attempt" = 3 ]; then
+              echo "make build failed after 3 attempts"
+              exit 1
+            fi
+            echo "make build failed (attempt ${attempt}); retrying in $((attempt * 15))s"
+            sleep $((attempt * 15))
+          done
           echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
 
       - name: Track formae clone
