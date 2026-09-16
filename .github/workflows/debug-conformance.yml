@@ -150,7 +150,18 @@ jobs:
           LATEST_TAG=$(git tag -l "[0-9]*" --sort=-version:refname | head -1)
           VERSION=$(echo "$LATEST_TAG" | cut -d'-' -f1)
           echo "Building formae ${BRANCH} ($(git rev-parse --short HEAD)) with VERSION=${VERSION}"
-          make build VERSION="${VERSION}"
+          # The build downloads pkl reader binaries from GitHub releases, which
+          # intermittently answer with a connection reset. Retry rather than
+          # lose the job before a single test runs.
+          for attempt in 1 2 3; do
+            make build VERSION="${VERSION}" && break
+            if [ "$attempt" = 3 ]; then
+              echo "make build failed after 3 attempts"
+              exit 1
+            fi
+            echo "make build failed (attempt ${attempt}); retrying in $((attempt * 15))s"
+            sleep $((attempt * 15))
+          done
           echo "FORMAE_BINARY=/tmp/formae/formae" >> $GITHUB_ENV
 
       - name: Inject formae replace directives
