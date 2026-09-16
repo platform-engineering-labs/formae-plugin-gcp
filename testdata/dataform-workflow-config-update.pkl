@@ -52,6 +52,10 @@ forma {
       includedTags = new Listing { "nightly" }
       transitiveDependenciesIncluded = true
       queryPriority = "BATCH"
+      // Same as the create fixture: the API answers "DEFAULT" whether or not
+      // the body sends it, so the update forma has to name it too or the
+      // property arrives unexpected after the update.
+      executionMode = "DEFAULT"
     }
   }
 }
