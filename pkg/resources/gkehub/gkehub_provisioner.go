@@ -52,7 +52,12 @@ func (p *GKEHubProvisioner) Create(
 		ResourceName: resourceName,
 	}
 
-	if pathCtx.Location == "" {
+	// Fleet Features live at the global parent. Normalize the PathContext, not
+	// only the URL, because the same context synthesizes the native ID when the
+	// create operation response carries only an operation name.
+	if p.resourceTypeAPI == "features" {
+		pathCtx.Location = "global"
+	} else if pathCtx.Location == "" {
 		pathCtx.Location = "global"
 	}
 

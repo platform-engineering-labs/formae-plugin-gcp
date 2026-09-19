@@ -7,6 +7,12 @@
 package container
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
@@ -14,6 +20,129 @@ import (
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/registry"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 )
+
+func TestNamedNodePoolListUsesParentLocationInsteadOfTargetWildcard(t *testing.T) {
+	for _, location := range []string{"europe-west1", "europe-west1-b"} {
+		t.Run(location, func(t *testing.T) {
+			var requestedPath string
+			server := containerAuthenticatedServer(t, func(w http.ResponseWriter, r *http.Request) {
+				requestedPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"nodePools":[{"name":"pool-1"}]}`))
+			})
+
+			provisioner := registry.Get(NodePoolResourceType, resource.OperationList, &config.Config{}).(*nodePoolListProvisioner)
+			provisioner.APIConfig.BaseURL = server.URL + "/v1"
+			target, _ := json.Marshal(config.Config{Project: "project-1", Location: "-"})
+			result, err := provisioner.List(context.Background(), &resource.ListRequest{
+				ResourceType: NodePoolResourceType,
+				TargetConfig: target,
+				AdditionalProperties: map[string]string{
+					"cluster":  "cluster-1",
+					"location": location,
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantPath := "/v1/projects/project-1/locations/" + location + "/clusters/cluster-1/nodePools"
+			if requestedPath != wantPath {
+				t.Fatalf("NodePool.List requested %q, want %q", requestedPath, wantPath)
+			}
+			wantID := "projects/project-1/locations/" + location + "/clusters/cluster-1/nodePools/pool-1"
+			if len(result.NativeIDs) != 1 || result.NativeIDs[0] != wantID {
+				t.Fatalf("NodePool.List native IDs = %v, want [%s]", result.NativeIDs, wantID)
+			}
+		})
+	}
+}
+
+func TestNamedNodePoolListRejectsWildcardWithoutConcreteParentLocation(t *testing.T) {
+	requests := 0
+	server := containerAuthenticatedServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		http.Error(w, "request must not be sent", http.StatusBadRequest)
+	})
+	provisioner := registry.Get(NodePoolResourceType, resource.OperationList, &config.Config{}).(*nodePoolListProvisioner)
+	provisioner.APIConfig.BaseURL = server.URL + "/v1"
+	target, _ := json.Marshal(config.Config{Project: "project-1", Location: "-"})
+
+	_, err := provisioner.List(context.Background(), &resource.ListRequest{
+		ResourceType:         NodePoolResourceType,
+		TargetConfig:         target,
+		AdditionalProperties: map[string]string{"cluster": "cluster-1"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "concrete location") {
+		t.Fatalf("NodePool.List error = %v, want missing concrete location", err)
+	}
+	if requests != 0 {
+		t.Fatalf("NodePool.List sent %d API requests", requests)
+	}
+}
+
+func TestNamedNodePoolListFallsBackToConcreteTargetLocation(t *testing.T) {
+	var requestedPath string
+	server := containerAuthenticatedServer(t, func(w http.ResponseWriter, r *http.Request) {
+		requestedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"nodePools":[]}`))
+	})
+	provisioner := registry.Get(NodePoolResourceType, resource.OperationList, &config.Config{}).(*nodePoolListProvisioner)
+	provisioner.APIConfig.BaseURL = server.URL + "/v1"
+	target, _ := json.Marshal(config.Config{Project: "project-1", Location: "europe-west1-b"})
+
+	_, err := provisioner.List(context.Background(), &resource.ListRequest{
+		ResourceType:         NodePoolResourceType,
+		TargetConfig:         target,
+		AdditionalProperties: map[string]string{"cluster": "cluster-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "/v1/projects/project-1/locations/europe-west1-b/clusters/cluster-1/nodePools"
+	if requestedPath != want {
+		t.Fatalf("NodePool.List requested %q, want %q", requestedPath, want)
+	}
+}
+
+func TestNamedNodePoolListPropagatesProviderError(t *testing.T) {
+	server := containerAuthenticatedServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":{"code":500,"message":"provider failed"}}`, http.StatusInternalServerError)
+	})
+	provisioner := registry.Get(NodePoolResourceType, resource.OperationList, &config.Config{}).(*nodePoolListProvisioner)
+	provisioner.APIConfig.BaseURL = server.URL + "/v1"
+	target, _ := json.Marshal(config.Config{Project: "project-1", Location: "-"})
+
+	_, err := provisioner.List(context.Background(), &resource.ListRequest{
+		ResourceType:         NodePoolResourceType,
+		TargetConfig:         target,
+		AdditionalProperties: map[string]string{"cluster": "cluster-1", "location": "europe-west1-b"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "provider failed") {
+		t.Fatalf("NodePool.List error = %v, want provider failure", err)
+	}
+}
+
+func containerAuthenticatedServer(t *testing.T, api http.HandlerFunc) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/subject" {
+			_, _ = w.Write([]byte("test-subject-token"))
+			return
+		}
+		if r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"test-token","token_type":"Bearer","expires_in":3600}`))
+			return
+		}
+		api(w, r)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("GCP_CREDENTIALS_JSON", fmt.Sprintf(
+		`{"type":"external_account","audience":"//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test/providers/test","subject_token_type":"urn:ietf:params:oauth:token-type:jwt","token_url":%q,"credential_source":{"url":%q,"format":{"type":"text"}}}`,
+		server.URL+"/token", server.URL+"/subject"))
+	return server
+}
 
 // GKE accepts "-" in the location position, probed live 2026-09-08 against
 // project development-477117: GET /projects/{p}/locations/-/clusters -> 200.
