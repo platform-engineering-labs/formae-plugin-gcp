@@ -34,7 +34,7 @@ on:
 # CI or nightly run. The read-only SQL probe has no cloud writes or cleanup,
 # so it can run independently of that shared-project lifecycle lock.
 concurrency:
-  group: ${{ inputs.test_cases == 'sql-read-parent-safety' && format('gcp-sql-read-probe-{0}', github.run_id) || 'gcp-conformance-tests' }}
+  group: ${{ (inputs.test_cases == 'sql-read-parent-safety' || inputs.test_cases == 'gcp-discovery-paths') && format('gcp-read-only-probe-{0}', github.run_id) || 'gcp-conformance-tests' }}
   cancel-in-progress: false
 
 jobs:
@@ -58,7 +58,7 @@ jobs:
 
   pre-cleanup:
     needs: [parse-input]
-    if: inputs.pre_cleanup && inputs.test_cases != 'sql-read-parent-safety'
+    if: inputs.pre_cleanup && inputs.test_cases != 'sql-read-parent-safety' && inputs.test_cases != 'gcp-discovery-paths'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -213,7 +213,7 @@ jobs:
 
   post-cleanup:
     needs: [conformance-tests]
-    if: always() && needs.conformance-tests.result != 'skipped' && inputs.test_cases != 'sql-read-parent-safety'
+    if: always() && needs.conformance-tests.result != 'skipped' && inputs.test_cases != 'sql-read-parent-safety' && inputs.test_cases != 'gcp-discovery-paths'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

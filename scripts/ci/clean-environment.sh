@@ -704,6 +704,20 @@ else
     echo "  No networks to check for peerings"
 fi
 
+# --- 1i. GKE clusters (hold subnet and network references). Deleting a
+#         cluster also deletes its node pools, so one sweep covers the complete
+#         gke-nodepool fixture. ---
+echo "Cleaning GKE clusters..."
+GKE_CLUSTERS=$(gcloud container clusters list --format="value(name,location)" 2>/dev/null | grep -E "$SWEEP_RE" | grep -Ev "$KEEP_RE" || true)
+if [ -n "$GKE_CLUSTERS" ]; then
+    echo "$GKE_CLUSTERS" | while read -r cluster location; do
+        echo "  Deleting GKE cluster: $cluster (location: $location)"
+        gcloud container clusters delete "$cluster" --location="$location" --quiet 2>/dev/null || true
+    done
+else
+    echo "  No GKE clusters found"
+fi
+
 # --- 2. Subnetworks (must delete before networks) ---
 echo "Cleaning GCP subnetworks..."
 SUBNETWORKS=$(gcloud compute networks subnets list --filter="name~^formae-" --format="value(name,region)" 2>/dev/null | grep -Ev "$KEEP_RE" || true)
