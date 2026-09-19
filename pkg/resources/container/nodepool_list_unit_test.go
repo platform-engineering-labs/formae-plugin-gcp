@@ -58,25 +58,29 @@ func TestNamedNodePoolListUsesParentLocationInsteadOfTargetWildcard(t *testing.T
 }
 
 func TestNamedNodePoolListRejectsWildcardWithoutConcreteParentLocation(t *testing.T) {
-	requests := 0
-	server := containerAuthenticatedServer(t, func(w http.ResponseWriter, _ *http.Request) {
-		requests++
-		http.Error(w, "request must not be sent", http.StatusBadRequest)
-	})
-	provisioner := registry.Get(NodePoolResourceType, resource.OperationList, &config.Config{}).(*nodePoolListProvisioner)
-	provisioner.APIConfig.BaseURL = server.URL + "/v1"
-	target, _ := json.Marshal(config.Config{Project: "project-1", Location: "-"})
+	for _, targetLocation := range []string{"-", ""} {
+		t.Run(fmt.Sprintf("target location %q", targetLocation), func(t *testing.T) {
+			requests := 0
+			server := containerAuthenticatedServer(t, func(w http.ResponseWriter, _ *http.Request) {
+				requests++
+				http.Error(w, "request must not be sent", http.StatusBadRequest)
+			})
+			provisioner := registry.Get(NodePoolResourceType, resource.OperationList, &config.Config{}).(*nodePoolListProvisioner)
+			provisioner.APIConfig.BaseURL = server.URL + "/v1"
+			target, _ := json.Marshal(config.Config{Project: "project-1", Location: targetLocation})
 
-	_, err := provisioner.List(context.Background(), &resource.ListRequest{
-		ResourceType:         NodePoolResourceType,
-		TargetConfig:         target,
-		AdditionalProperties: map[string]string{"cluster": "cluster-1"},
-	})
-	if err == nil || !strings.Contains(err.Error(), "concrete location") {
-		t.Fatalf("NodePool.List error = %v, want missing concrete location", err)
-	}
-	if requests != 0 {
-		t.Fatalf("NodePool.List sent %d API requests", requests)
+			_, err := provisioner.List(context.Background(), &resource.ListRequest{
+				ResourceType:         NodePoolResourceType,
+				TargetConfig:         target,
+				AdditionalProperties: map[string]string{"cluster": "cluster-1"},
+			})
+			if err == nil || !strings.Contains(err.Error(), "concrete location") {
+				t.Fatalf("NodePool.List error = %v, want missing concrete location", err)
+			}
+			if requests != 0 {
+				t.Fatalf("NodePool.List sent %d API requests", requests)
+			}
+		})
 	}
 }
 

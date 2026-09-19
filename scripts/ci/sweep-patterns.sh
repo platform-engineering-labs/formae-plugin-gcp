@@ -31,6 +31,7 @@
 #                                            spanner-backup-schedule{,-update}.pkl
 #   Bigtable instance id            cap 33   bigtable-*.pkl
 #   VPC Access connector name       cap <21  vpcaccess-connector.pkl
+#   GKE cluster/node pool name      cap 40    gke-nodepool.pkl
 #
 # The first three are hard arithmetic: 23 + 8 = 31 exceeds 30, and Bigtable's 33
 # would fit only by dropping the per-case abbrev, which is what tells you which

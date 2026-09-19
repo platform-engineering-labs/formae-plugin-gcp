@@ -89,6 +89,13 @@ if [ "$TEST_CASE" = "sql-read-parent-safety" ]; then
   exec go test -tags integration ./pkg/resources/sql -run '^TestNestedSQLReadParentSafety$' -count=1 -v -timeout=5m
 fi
 
+# Read-only provider integration regression for discovery path selection. This
+# is deliberately not called CRUD conformance: it creates no fixtures and
+# compares the real provisioners with direct GCP list responses.
+if [ "$TEST_CASE" = "gcp-discovery-paths" ]; then
+  exec go test -tags integration . -run '^TestGCPDiscoveryProviderPaths$' -count=1 -v -timeout=10m
+fi
+
 # The harness acquires the formae binary and starts an agent before it runs
 # anything. Both steps reach the network and both have failed on their own -
 # "no available packages for: formae" when the package channel is unreachable,
@@ -127,6 +134,13 @@ run_make() {
 # the SDK reads.
 TIMEOUT_ARG=""
 case "$TEST_CASE" in
+  gke-nodepool)
+    # A standard GKE cluster and two one-node pools are provisioned for this
+    # lifecycle. Cluster creation/deletion routinely takes several minutes,
+    # and discovery must sweep the full plugin before asserting the child.
+    TIMEOUT_ARG="TIMEOUT=30"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
+    ;;
   cloudsql-*|sql-database)
     # Cloud SQL provisions an instance per create (5-15 min each). The CRUD
     # lifecycle creates two (initial + OOB-delete re-apply) and discovery
@@ -280,7 +294,7 @@ esac
 # Bigtable the largest line on this project's bill.
 needs_prereq_cleanup() {
   case "$TEST_CASE" in
-    alloydb-*|eventarc-*|datastream-*|filestore-backup|\
+    alloydb-*|eventarc-*|datastream-*|filestore-backup|gke-nodepool|\
     security-policy-rule|region-security-policy-rule|\
     network-firewall-policy-association|region-network-firewall-policy-association|\
     network-firewall-policy-rule|machine-image|spanner-database|\
