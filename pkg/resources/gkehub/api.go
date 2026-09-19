@@ -41,7 +41,11 @@ var GKEHubNativeID = base.NativeIDConfig{
 // Format: /projects/{project}/locations/{location}/memberships[/{name}]
 func gkehubPathBuilder(ctx base.PathContext) string {
 	location := ctx.Location
-	if location == "" {
+	// Fleet Feature discovery is global. A target location is an addressing
+	// default for location-based resources in general, but it is never a valid
+	// Feature list parent. Restrict this override to List: Read/Delete parse an
+	// explicit native ID and must preserve the location encoded in that ID.
+	if (ctx.ResourceType == "features" && ctx.IsList) || location == "" {
 		location = "global"
 	}
 
