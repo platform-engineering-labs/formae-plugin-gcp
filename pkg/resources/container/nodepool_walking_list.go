@@ -42,15 +42,34 @@ func (n *nodePoolListProvisioner) List(
 	ctx context.Context,
 	request *resource.ListRequest,
 ) (*resource.ListResult, error) {
-	// A caller that names its cluster wants only that one; the generic path
-	// builder already handles it.
+	cfg := config.PathFromTargetConfig(request.TargetConfig)
+
+	// Discovery normally supplies both list parameters from the parent cluster.
+	// Use that concrete location rather than the target's aggregate "-", which
+	// is valid for clusters.list but invalid beneath a named cluster.
 	if request.AdditionalProperties != nil {
 		if parent := request.AdditionalProperties["cluster"]; parent != "" {
-			return n.BaseResource.List(ctx, request)
+			location := request.AdditionalProperties["location"]
+			if location == "" && cfg.Location != "-" {
+				location = cfg.Location
+			}
+			if location == "" || location == "-" {
+				return nil, fmt.Errorf("cannot list node pools for cluster %q without a concrete location", parent)
+			}
+
+			client, err := transport.NewClient(ctx, n.Config)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create transport client: %w", err)
+			}
+			clusterPath := fmt.Sprintf("projects/%s/locations/%s/clusters/%s", cfg.Project, location, parent)
+			nativeIDs, err := n.listNodePools(ctx, client, clusterPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list node pools for cluster %q: %w", parent, err)
+			}
+			return &resource.ListResult{NativeIDs: nativeIDs}, nil
 		}
 	}
 
-	cfg := config.PathFromTargetConfig(request.TargetConfig)
 	if cfg.Project == "" {
 		return &resource.ListResult{NativeIDs: []string{}}, nil
 	}
