@@ -28,9 +28,8 @@ import (
 
 const readinessFixtureNativeID = "projects/test-project/metricDescriptors/custom.googleapis.com/formae/test"
 
-// A successful POST is acceptance, not readiness. Cancel any synchronous
-// readback after its first missing response so this regression exercises the
-// old false-success path without sleeping through its twenty-second budget.
+// A successful POST is acceptance, not readiness; Create must return pending
+// and leave readability checks to Status.
 func TestMetricDescriptorCreateRemainsPendingUntilReadable(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
