@@ -8,7 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
-## [Unreleased]
+## [0.1.18]
+
+Requires formae >= 0.89.0.
+
+### Fixed
+
+- GKE node pools are discovered under their parent cluster's actual regional
+  or zonal location, including when the target uses the aggregate `-`
+  location.
+- GKE Hub memberships and fleet features now appear in discovery results.
+  Fleet feature discovery always queries the global collection, regardless of
+  the target's default region, and newly created features retain a global
+  resource identity.
+
+## [0.1.17]
 
 ### Fixed
 
