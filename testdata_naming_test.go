@@ -43,6 +43,8 @@ var shortPrefixExceptions = map[string]string{
 	"bigtable-app-profile-update.pkl": "formae-test-btap-",
 	// VPC Access connector names cap below 21-25 - far under the long prefix.
 	"vpcaccess-connector.pkl": "formae-test-conn-",
+	// GKE cluster and node pool names use a conservative 40-character cap.
+	"gke-nodepool.pkl": "formae-test-gke-",
 }
 
 // A few APIs force a leading segment of their own: Spanner rejects a

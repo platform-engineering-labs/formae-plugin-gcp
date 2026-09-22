@@ -61,6 +61,7 @@ jobs:
         run: |
           ./scripts/ci/conformance-scope_test.sh
           ./scripts/ci/clean-case-prereqs_bigtable_test.sh
+          ./scripts/ci/clean-case-prereqs_gke_test.sh
           ./scripts/ci/sweep-filters_test.sh
 
   lint:

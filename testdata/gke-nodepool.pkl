@@ -1,0 +1,93 @@
+/*
+ * © 2026 Platform Engineering Labs Inc.
+ *
+ * SPDX-License-Identifier: FSL-1.1-ALv2
+ */
+
+amends "@formae/forma.pkl"
+
+import "@formae/formae.pkl"
+import "@gcp/gcp.pkl"
+import "@gcp/compute/network.pkl"
+import "@gcp/compute/subnetwork.pkl"
+import "@gcp/container/cluster.pkl"
+import "@gcp/container/nodepool.pkl"
+import "./config/vars.pkl" as v
+
+local net = new network.Network {
+  label = "plugin-sdk-test-gke-network"
+  name = "formae-plugin-sdk-test-gke-net-\(v.testRunID)"
+  autoCreateSubnetworks = false
+}
+local subnet = new subnetwork.Subnetwork {
+  label = "plugin-sdk-test-gke-subnetwork"
+  name = "formae-plugin-sdk-test-gke-subnet-\(v.testRunID)"
+  network = net.res.selfLink
+  region = v.gcpRegion
+  ipCidrRange = "10.70.0.0/24"
+  secondaryIpRanges = new Listing {
+    new subnetwork.SecondaryIpRange {
+      rangeName = "pods"
+      ipCidrRange = "10.71.0.0/16"
+    }
+    new subnetwork.SecondaryIpRange {
+      rangeName = "services"
+      ipCidrRange = "10.72.0.0/20"
+    }
+  }
+}
+local gkeCluster = new cluster.Cluster {
+  label = "plugin-sdk-test-gke-cluster"
+  // GKE cluster names are capped at 40 characters, so use the supported short
+  // fixture prefix while retaining the case name and unique run ID.
+  name = "formae-test-gke-\(v.testRunID)"
+  description = "Parent cluster for node pool conformance"
+  location = v.gcpZone
+  network = net.res.name
+  subnetwork = subnet.res.name
+  initialNodeCount = 1
+  nodeConfig = new cluster.NodeConfig {
+    machineType = "e2-small"
+    diskSizeGb = 30
+    diskType = "pd-standard"
+  }
+  ipAllocationPolicy = new cluster.IPAllocationPolicy {
+    useIpAliases = true
+    clusterSecondaryRangeName = "pods"
+    servicesSecondaryRangeName = "services"
+  }
+}
+local wildcardTarget = new formae.Target {
+  label = "gcp-target"
+  config = new gcp.Config {
+    project = v.gcpProject
+    region = v.gcpRegion
+    zone = v.gcpZone
+    // Reproduces aggregate discovery: the child List must use its parent
+    // cluster's concrete location instead of this target wildcard.
+    location = "-"
+  }
+}
+
+forma {
+  v.stack
+  wildcardTarget
+  net
+  subnet
+  gkeCluster
+
+  new nodepool.NodePool {
+    label = "plugin-sdk-test-gke-nodepool"
+    // Node pool names use the same conservative 40-character ceiling as the
+    // parent cluster in this fixture.
+    name = "formae-test-gkp-\(v.testRunID)"
+    cluster = gkeCluster.res.name
+    location = v.gcpZone
+    initialNodeCount = 1
+    config = new nodepool.NodeConfig {
+      machineType = "e2-small"
+      diskSizeGb = 30
+      diskType = "pd-balanced"
+    }
+  }
+}

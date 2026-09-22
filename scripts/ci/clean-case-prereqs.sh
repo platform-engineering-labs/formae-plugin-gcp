@@ -38,6 +38,7 @@ case "${1:-}" in
     network-firewall-policy-rule)               PREFIX_RE="${FIXTURE_PREFIX_RE}nfpr-pol-"  KIND=firewall ;;
     machine-image)                              PREFIX_RE="${FIXTURE_PREFIX_RE}mi-"        KIND=vmchain ;;
     spanner-database)                           PREFIX_RE="${FIXTURE_PREFIX_RE}spdb-inst-" KIND=spanner ;;
+    gke-nodepool)                              PREFIX_RE="${FIXTURE_PREFIX_RE}gke-"       KIND=gke ;;
     bigtable-table)              PREFIX_RE="${FIXTURE_PREFIX_RE}instance-tbl-" KIND=bigtable ;;
     bigtable-backup)             PREFIX_RE="${FIXTURE_PREFIX_RE}instance-bk-"  KIND=bigtable ;;
     bigtable-materialized-view)  PREFIX_RE="${FIXTURE_PREFIX_RE}instance-mv-"  KIND=bigtable ;;
@@ -47,6 +48,28 @@ case "${1:-}" in
         KIND=network
         ;;
 esac
+
+if [ "${KIND:-}" = "gke" ]; then
+    echo "Cleaning GKE prerequisites matching ${PREFIX_RE} ..."
+    # Cluster deletion is synchronous and removes its node pools. It must
+    # finish before the cluster's subnet and network can be deleted.
+    gcloud container clusters list --format="value(name,location)" 2>/dev/null \
+        | grep -E "^${PREFIX_RE}" | while read -r cluster location; do
+            echo "  cluster $cluster ($location)"
+            gcloud container clusters delete "$cluster" --location="$location" --quiet 2>&1 | tail -1 || true
+        done
+    gcloud compute networks subnets list --format="value(name,region.basename())" 2>/dev/null \
+        | grep -E "^${PREFIX_RE}" | while read -r subnet region; do
+            echo "  subnet $subnet ($region)"
+            gcloud compute networks subnets delete "$subnet" --region="$region" --quiet 2>&1 | tail -1 || true
+        done
+    gcloud compute networks list --format="value(name)" 2>/dev/null \
+        | grep -E "^${PREFIX_RE}" | while read -r network; do
+            echo "  network $network"
+            gcloud compute networks delete "$network" --quiet 2>&1 | tail -1 || true
+        done
+    exit 0
+fi
 
 # A case that builds a network leaves it behind: Destroy removes only the
 # resource under test. 30 fixtures build one against a project cap of 30, so a
