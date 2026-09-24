@@ -14,6 +14,14 @@ Requires formae >= 0.89.0.
 
 ### Fixed
 
+- Plugin communication preserves early replies and resumes sending after
+  connection recovery. Linking an operator to its requester and cleaning up
+  a terminated operator release the shared tracking lock before waiting for
+  remote replies.
+- Metric descriptor creation now reports pending until the descriptor is
+  readable through Cloud Monitoring, avoiding a sync race that could treat an
+  accepted descriptor as absent. Readiness checks are bounded and retain their
+  deadline across plugin restarts.
 - GKE node pools are discovered under their parent cluster's actual regional
   or zonal location, including when the target uses the aggregate `-`
   location.
