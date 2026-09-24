@@ -12,7 +12,7 @@ require (
 	// pkg/plugin/v0.4.1. Re-pin to the next official tag when one is cut, as
 	// the aws plugin does from the same commit.
 	github.com/platform-engineering-labs/formae/pkg/plugin v0.4.2
-	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.7
+	github.com/platform-engineering-labs/formae/pkg/plugin-conformance-tests v0.2.8
 	// Provides oidcx/gcp, the token exchange. Re-pin when oox cuts a tag.
 	github.com/platform-engineering-labs/oox v0.1.1-0.20260825170105-3bd97cb18d15
 	github.com/stretchr/testify v1.12.1
