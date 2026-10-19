@@ -8,6 +8,9 @@ on:
   # not even the build. The scope is resolved from the diff either way, so a
   # stacked pull request tests exactly the fixtures it touches. The push filter
   # stays: only main runs the full matrix.
+    paths-ignore:
+      - '**/*.md'
+  
   pull_request:
   workflow_dispatch:
 
