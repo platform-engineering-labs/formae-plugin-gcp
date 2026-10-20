@@ -1,7 +1,7 @@
 # GCP plugin for formae
 
 [![CI](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/ci.yml)
-[![Monthly](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/monthly.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/monthly.yml)
+[![Weekly](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/weekly.yml/badge.svg?branch=main)](https://github.com/platform-engineering-labs/formae-plugin-gcp/actions/workflows/weekly.yml)
 
 Google Cloud Platform resource plugin for
 [formae](https://github.com/platform-engineering-labs/formae). Manage GCP
