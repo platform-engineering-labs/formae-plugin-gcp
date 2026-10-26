@@ -261,7 +261,7 @@ local forwardingRule = new globalForwardingRule.GlobalForwardingRule {
 
     // Protocol and port configuration
     IPProtocol = "TCP"
-    portRange = "80"  // Use "443" for HTTPS
+    portRange = "80-80"  // Use "443-443" for HTTPS
 
     // Target the HTTP proxy
     targetProxy = httpProxy.res.selfLink
