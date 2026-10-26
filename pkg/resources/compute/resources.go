@@ -6,6 +6,7 @@ package compute
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/config"
 	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/resources/base"
@@ -166,6 +167,21 @@ func wrapInstanceBodyBuilder(props map[string]interface{}, ctx base.TransformCon
 
 func wrapInstanceResponseTransformer(apiResponse map[string]interface{}, ctx base.TransformContext) map[string]interface{} {
 	return instanceResponseTransformer(apiResponse, ctx)
+}
+
+// globalForwardingRuleResponseTransformer normalizes the portRange field.
+// GCP API returns "80-80" for a single port, but users declare "80" in their Pkl.
+// This transformer normalizes "80-80" -> "80" so formae diff matches user intent.
+func globalForwardingRuleResponseTransformer(apiResponse map[string]interface{}, _ base.TransformContext) map[string]interface{} {
+	if portRange, ok := apiResponse["portRange"].(string); ok {
+		if strings.Contains(portRange, "-") {
+			parts := strings.Split(portRange, "-")
+			if len(parts) == 2 && parts[0] == parts[1] {
+				apiResponse["portRange"] = parts[0]
+			}
+		}
+	}
+	return apiResponse
 }
 
 func init() {
@@ -1206,7 +1222,7 @@ func init() {
 				},
 			},
 			RequestTransformer:  nil,
-			ResponseTransformer: nil,
+			ResponseTransformer: base.ResponseTransformerFunc(globalForwardingRuleResponseTransformer),
 		},
 
 		// ==================== Load Balancer - Regional Resources ====================
