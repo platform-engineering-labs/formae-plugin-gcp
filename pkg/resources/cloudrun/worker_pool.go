@@ -42,6 +42,15 @@ func workerPoolBodyBuilder(props map[string]interface{}) (map[string]interface{}
 		if maxInstanceCount := utils.GetInt32(scaling, "maxInstanceCount"); maxInstanceCount > 0 {
 			scalingMap["maxInstanceCount"] = maxInstanceCount
 		}
+		if manualInstanceCount := utils.GetInt32(scaling, "manualInstanceCount"); manualInstanceCount > 0 {
+			scalingMap["manualInstanceCount"] = manualInstanceCount
+		}
+		if scalingMode := utils.GetString(scaling, "scalingMode"); scalingMode != "" {
+			scalingMap["scalingMode"] = scalingMode
+		}
+		if cpuScaling := utils.GetObject(scaling, "cpuScaling"); cpuScaling != nil {
+			scalingMap["cpuScaling"] = cpuScaling
+		}
 		if len(scalingMap) > 0 {
 			body["scaling"] = scalingMap
 		}
