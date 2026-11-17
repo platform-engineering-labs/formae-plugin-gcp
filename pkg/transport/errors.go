@@ -57,6 +57,11 @@ const (
 	// ErrorCodeNotStabilized indicates resource is not yet ready
 	ErrorCodeNotStabilized ErrorCode = "NOT_STABILIZED"
 
+	// ErrorCodePermissionPropagating indicates Service Usage refused the quota
+	// project because a recent grant has not propagated yet (HTTP 403
+	// USER_PROJECT_DENIED); see IsUserProjectDenied
+	ErrorCodePermissionPropagating ErrorCode = "PERMISSION_PROPAGATING"
+
 	// ErrorCodeUnknown indicates an unclassified error
 	ErrorCodeUnknown ErrorCode = "UNKNOWN"
 )
@@ -85,7 +90,8 @@ func (e *Error) IsRetryable() bool {
 	case ErrorCodeThrottling,
 		ErrorCodeInternalError,
 		ErrorCodeNotStabilized,
-		ErrorCodeConcurrencyConflict:
+		ErrorCodeConcurrencyConflict,
+		ErrorCodePermissionPropagating:
 		return true
 	default:
 		return false
@@ -130,6 +136,9 @@ func ClassifyError(err error) ErrorCode {
 			// Check for specific 400 error types
 			return classifyBadRequestError(gerr)
 		case 401, 403:
+			if IsUserProjectDenied(gerr) {
+				return ErrorCodePermissionPropagating
+			}
 			return ErrorCodeUnauthorized
 		case 404:
 			return ErrorCodeResourceNotFound

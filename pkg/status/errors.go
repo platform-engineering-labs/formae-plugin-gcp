@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/googleapis/gax-go/v2/apierror"
+	"github.com/platform-engineering-labs/formae-plugin-gcp/pkg/transport"
 	"github.com/platform-engineering-labs/formae/pkg/plugin/resource"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/grpc/codes"
@@ -18,6 +19,12 @@ import (
 func MapGCPError(err error) resource.OperationErrorCode {
 	if err == nil {
 		return resource.OperationErrorCodeNotSet
+	}
+
+	// A quota-project refusal while a grant propagates is a 403 that clears on
+	// its own; see transport.IsUserProjectDenied for why it maps to Throttling.
+	if isUserProjectDenied(err) {
+		return resource.OperationErrorCodeThrottling
 	}
 
 	// Check if it's wrapped in an APIError (newer GCP SDK)
@@ -43,6 +50,17 @@ func MapGCPError(err error) resource.OperationErrorCode {
 
 	// Default to unforeseen error
 	return resource.OperationErrorCodeUnforeseenError
+}
+
+// isUserProjectDenied covers both client generations: the REST envelope
+// (googleapi.Error) and the gax APIError, whose Reason carries the ErrorInfo
+// reason for gRPC and REST alike.
+func isUserProjectDenied(err error) bool {
+	if transport.IsUserProjectDenied(err) {
+		return true
+	}
+	var apiErr *apierror.APIError
+	return errors.As(err, &apiErr) && apiErr.Reason() == "USER_PROJECT_DENIED"
 }
 
 func mapGoogleAPIError(err *googleapi.Error) resource.OperationErrorCode {
