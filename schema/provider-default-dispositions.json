@@ -198,11 +198,23 @@
       "disposition": "pending"
     },
     {
+      "key": "cloudrun/worker_pool.pkl#CpuScaling.cpuUtilization",
+      "disposition": "pending"
+    },
+    {
       "key": "cloudrun/worker_pool.pkl#WorkerPool.scaling",
       "disposition": "pending"
     },
     {
+      "key": "cloudrun/worker_pool.pkl#WorkerPoolScaling.cpuScaling",
+      "disposition": "pending"
+    },
+    {
       "key": "cloudrun/worker_pool.pkl#WorkerPoolScaling.manualInstanceCount",
+      "disposition": "pending"
+    },
+    {
+      "key": "cloudrun/worker_pool.pkl#WorkerPoolScaling.scalingMode",
       "disposition": "pending"
     },
     {
