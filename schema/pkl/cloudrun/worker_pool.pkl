@@ -72,6 +72,22 @@ open class WorkerPoolScaling extends formae.SubResource {
 
   @gcp.FieldHint { hasProviderDefault = true }
   manualInstanceCount: Int?
+
+  /// AUTOMATIC (scale between min and max) or MANUAL (run manualInstanceCount).
+  /// GCP fills this in when unset.
+  @gcp.FieldHint { hasProviderDefault = true }
+  scalingMode: String?
+
+  @gcp.FieldHint { hasProviderDefault = true }
+  cpuScaling: CpuScaling?
+}
+
+/// CPU-based scaling for worker pools
+@gcp.SubResourceHint
+open class CpuScaling extends formae.SubResource {
+  /// Utilization threshold before scaling begins: 0.1 to 0.9, or 0.0 to disable.
+  @gcp.FieldHint { hasProviderDefault = true }
+  cpuUtilization: Float?
 }
 
 @gcp.SubResourceHint
