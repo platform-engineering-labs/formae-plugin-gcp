@@ -24,6 +24,7 @@ forma {
       ["managed-by"] = "formae"
     }
     scaling = new worker_pool.WorkerPoolScaling {
+      scalingMode = "AUTOMATIC"
       minInstanceCount = 1
       maxInstanceCount = 3
     }
