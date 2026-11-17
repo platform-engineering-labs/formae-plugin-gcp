@@ -35,6 +35,12 @@ func ToResourceErrorCode(code ErrorCode) resource.OperationErrorCode {
 		return resource.OperationErrorCodeUnforeseenError
 	case ErrorCodeNotStabilized:
 		return resource.OperationErrorCodeNotStabilized
+	case ErrorCodePermissionPropagating:
+		// Throttling rather than NotStabilized: formae backs off exponentially
+		// only on Throttling, which at the default retry config spans about four
+		// minutes - the "few minutes" Service Usage propagation can take. The
+		// flat retry delay of the other recoverable codes gives up after ~90s.
+		return resource.OperationErrorCodeThrottling
 	case ErrorCodeUnknown:
 		return resource.OperationErrorCodeUnforeseenError
 	default:
