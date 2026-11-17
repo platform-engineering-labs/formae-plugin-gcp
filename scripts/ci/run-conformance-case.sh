@@ -201,6 +201,13 @@ case "$TEST_CASE" in
     TIMEOUT_ARG="TIMEOUT=30"
     export FORMAE_TEST_DISCOVERY_TIMEOUT=30 FORMAE_TEST_OOB_TIMEOUT=30 FORMAE_TEST_OOB_DELETE_TIMEOUT=20
     ;;
+  vpcaccess-connector)
+    # A Serverless VPC Access connector runs managed VMs, and deleting one tears
+    # them down: the delete alone took ~3m57s in a green run, 79% of the 5m
+    # default, and a CI run timed out on Destroy with nothing wrong at the API.
+    TIMEOUT_ARG="TIMEOUT=15"
+    export FORMAE_TEST_DISCOVERY_TIMEOUT=15 FORMAE_TEST_OOB_TIMEOUT=15 FORMAE_TEST_OOB_DELETE_TIMEOUT=15
+    ;;
   eventarc-pipeline|eventarc-message-bus|eventarc-enrollment|eventarc-google-api-source)
     # An Eventarc message bus takes ~5-6 min to create and the pipeline case
     # builds one first, so a single apply runs past the 5m default (6m20s
