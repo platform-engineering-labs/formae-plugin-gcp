@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install with `sudo formae plugin install gcp` on the host that runs the
 formae agent.
 
+## [0.1.20]
+
+### Fixed
+
+- A request refused with `USER_PROJECT_DENIED` is retried instead of failing.
+  The plugin bills requests to the target project, so Google first checks that
+  the caller may use it, and that check lags a fresh IAM grant by up to a few
+  minutes. A principal granted access just before formae acts on it - as
+  `formae connect gcp` does - was refused with a 403 and the operation failed
+  outright. That refusal is now reported as throttling, which formae retries
+  with exponential backoff for about four minutes. Every other 403 is still
+  terminal, and the refusal is no longer mistaken for an empty or missing
+  resource by List and Read.
+
+- `GCP::CloudRun::WorkerPool` declares `scaling.scalingMode`. Cloud Run now
+  returns the scaling mode on every read, and the schema had no field for it,
+  so the read carried a property formae could not match against the forma.
+  `scalingMode` and `cpuScaling` are declared now, both filled in
+  by GCP when unset, and they are sent on create along with
+  `manualInstanceCount`, which was declared before but never sent - a pool
+  asking for manual scaling was created with automatic scaling.
+
+### Changed
+
+- Updated the Google Cloud client libraries: `google.golang.org/api` 0.299.0,
+  `google.golang.org/grpc` 1.85.0, `cloud.google.com/go/auth` 0.23.3 and
+  `cloud.google.com/go/bigquery` 1.84.0.
+
+## [0.1.19]
+
+No changes to the plugin itself.
+
+### Changed
+
+- The README covers installing the plugin, restarting the agent and setting up
+  a new or existing project, and points to the formae plugin for AI
+  assistants.
+
 ## [0.1.18]
 
 Requires formae >= 0.89.0.
