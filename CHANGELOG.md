@@ -38,7 +38,7 @@ formae agent.
 
 ## [0.1.19]
 
-No changes to the plugin itself.
+No changes to the actual plugin.
 
 ### Changed
 
